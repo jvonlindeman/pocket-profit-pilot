@@ -62,6 +62,15 @@ const Settings = () => {
                   <li>Usa ese nuevo refresh token en la configuración a continuación</li>
                 </ol>
               </div>
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
+                <p className="font-medium text-blue-800">Notas importantes para cuentas de USA:</p>
+                <ul className="list-disc ml-5 space-y-1 mt-2 text-blue-800">
+                  <li>La URL de autenticación debe ser <code className="bg-gray-700 text-white px-1 py-0.5 rounded">https://accounts.zoho.com</code> (sin region)</li>
+                  <li>La URL de API debe ser <code className="bg-gray-700 text-white px-1 py-0.5 rounded">https://books.zohoapis.com</code></li>
+                  <li>Asegúrate de utilizar el Organization ID correcto de tu cuenta de Zoho Books US</li>
+                  <li>Esta aplicación está configurada para trabajar con cuentas de Zoho Books US</li>
+                </ul>
+              </div>
               <p className="mt-2">Después de actualizar la configuración, vuelve al Dashboard para probar nuevamente.</p>
             </AlertDescription>
           </Alert>

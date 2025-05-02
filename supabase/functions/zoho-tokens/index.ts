@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -19,22 +18,8 @@ interface RefreshTokenRequest {
 
 // Helper function to determine the Zoho API region from token or explicit setting
 function getZohoRegion(token: string): string {
-  // Force "com" as default for US accounts
-  let region = "com";
-  
-  // Only use token-based detection as a fallback in case we need to support other regions later
-  if (token.includes(".eu.")) {
-    region = "eu";
-  } else if (token.includes(".in.")) {
-    region = "in";
-  } else if (token.includes(".au.")) {
-    region = "au";
-  } else if (token.includes(".cn.")) {
-    region = "cn";
-  }
-  
-  console.log(`Using Zoho region: ${region} (for domain zoho.${region})`);
-  return region;
+  // Always use "com" for US accounts
+  return "com";
 }
 
 serve(async (req: Request) => {
@@ -71,8 +56,8 @@ serve(async (req: Request) => {
     if (integration.access_token && tokenExpiry > now) {
       console.log("Access token is still valid, returning it");
       
-      // Determine region (US accounts use "com")
-      const region = getZohoRegion(integration.refresh_token);
+      // Always use "com" for US accounts
+      const region = "com";
       
       return new Response(
         JSON.stringify({ 
@@ -110,11 +95,11 @@ serve(async (req: Request) => {
       );
     }
 
-    // Determine region (US accounts use "com")
-    const region = getZohoRegion(refreshToken);
+    // Always use "com" for US accounts
+    const region = "com";
     
-    // Always use accounts.zoho.{region} for authentication
-    const zohoTokenUrl = `https://accounts.zoho.${region}/oauth/v2/token`;
+    // Always use accounts.zoho.com for authentication (US accounts)
+    const zohoTokenUrl = `https://accounts.zoho.com/oauth/v2/token`;
     
     console.log(`Using Zoho OAuth endpoint: ${zohoTokenUrl}`);
 

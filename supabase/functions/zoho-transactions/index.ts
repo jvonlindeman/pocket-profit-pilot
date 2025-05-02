@@ -53,7 +53,9 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 2)
         await new Promise(resolve => setTimeout(resolve, 300 * Math.pow(3, attempt - 1)));
       }
       
+      console.log(`Fetching URL: ${url} (attempt ${attempt})`);
       const response = await fetch(url, options);
+      console.log(`Response status: ${response.status}`);
       return response;
     } catch (err) {
       console.error(`Attempt ${attempt} failed:`, err);
@@ -178,11 +180,12 @@ serve(async (req: Request) => {
     const formattedStartDate = new Date(startDate).toISOString().split('T')[0];
     const formattedEndDate = new Date(endDate).toISOString().split('T')[0];
     
-    // Use the correct Zoho API domain with region
-    const region = tokenData.region || "com";
+    // US accounts always use zohoapis.com domain
+    const apiDomain = "zohoapis.com";
     
-    // First, let's do a simple API call to verify connectivity
-    const testApiUrl = `https://books.zohoapis.${region}/api/v3/organizations/${tokenData.organization_id}`;
+    // First, do a test API call to check authentication and connection
+    // Use a simple organizations endpoint which is more reliable
+    const testApiUrl = `https://books.${apiDomain}/api/v3/organizations/${tokenData.organization_id}`;
     
     console.log("Testing Zoho Books API connectivity:", testApiUrl);
     
@@ -202,9 +205,20 @@ serve(async (req: Request) => {
         const testErrorText = await testResponse.text();
         console.error("Failed connection test to Zoho Books API:", testErrorText);
         
+        let errorMessage = "Failed to connect to Zoho Books API";
+        
+        // Better error handling for specific issues
+        if (testErrorText.includes("invalid_token")) {
+          errorMessage = "Invalid access token. Please regenerate your refresh token.";
+        } else if (testErrorText.includes("expired")) {
+          errorMessage = "Access token has expired. Please try again.";
+        } else if (testErrorText.includes("invalid_organization")) {
+          errorMessage = "Invalid Organization ID. Please check your Zoho Books settings.";
+        }
+        
         return new Response(
           JSON.stringify({ 
-            error: "Failed to connect to Zoho Books API", 
+            error: errorMessage, 
             details: testErrorText,
             url: testApiUrl
           }),
@@ -212,7 +226,11 @@ serve(async (req: Request) => {
         );
       }
       
-      console.log("API connection test successful");
+      // Try to parse the response to ensure it's valid JSON
+      const testData = await testResponse.json();
+      console.log("Test API connection successful. Organization data:", JSON.stringify(testData).substring(0, 200) + "...");
+      
+      // If we get here, the organization call worked, which confirms our auth is good
     } catch (testError) {
       console.error("Error testing API connection:", testError);
       return new Response(
@@ -226,7 +244,7 @@ serve(async (req: Request) => {
     }
     
     // Now proceed with the transactions API call
-    const zohoApiUrl = `https://books.zohoapis.${region}/api/v3/banktransactions?organization_id=${tokenData.organization_id}&from_date=${formattedStartDate}&to_date=${formattedEndDate}`;
+    const zohoApiUrl = `https://books.${apiDomain}/api/v3/banktransactions?organization_id=${tokenData.organization_id}&from_date=${formattedStartDate}&to_date=${formattedEndDate}`;
     
     console.log("Calling Zoho Books API:", zohoApiUrl);
     
