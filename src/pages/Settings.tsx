@@ -2,7 +2,7 @@
 import React from 'react';
 import ZohoConfig from '@/components/ZohoConfig';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Info, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Info, AlertTriangle, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -47,12 +47,22 @@ const Settings = () => {
             <AlertDescription className="space-y-2">
               <p>Si estás experimentando el error <strong>"Failed to fetch Zoho transactions"</strong>, verifica:</p>
               <ul className="list-disc pl-5 space-y-1">
-                <li>Que el Refresh Token tenga el scope <code>ZohoBooks.fullaccess.all</code></li>
+                <li>Que el Refresh Token tenga el scope <code className="bg-gray-700 text-white px-1 py-0.5 rounded">ZohoBooks.fullaccess.all</code></li>
                 <li>Que hayas ingresado el Client Secret correctamente</li>
-                <li>Que el Organization ID sea válido</li>
-                <li>Que tu cuenta de Zoho Books esté activa</li>
+                <li>Que el Organization ID sea válido - encuéntralo en Zoho Books bajo Settings → Organizations</li>
+                <li>Que tu cuenta de Zoho Books esté activa y sea de Estados Unidos (región US)</li>
               </ul>
-              <p>Después de actualizar la configuración, vuelve al Dashboard para probar nuevamente.</p>
+              <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
+                <p className="font-medium text-amber-800">Pasos para generar un nuevo Refresh Token:</p>
+                <ol className="list-decimal ml-5 space-y-1 mt-2 text-amber-800">
+                  <li>Visita <a href="https://api-console.zoho.com/" target="_blank" rel="noopener noreferrer" className="text-amber-800 font-medium underline">Zoho API Console <ExternalLink className="h-3 w-3 inline" /></a></li>
+                  <li>Crea una aplicación "Self Client"</li>
+                  <li>Agrega el scope: <code className="bg-gray-700 text-white px-1 py-0.5 rounded">ZohoBooks.fullaccess.all</code></li>
+                  <li>Genera un refresh token con ese scope</li>
+                  <li>Usa ese nuevo refresh token en la configuración a continuación</li>
+                </ol>
+              </div>
+              <p className="mt-2">Después de actualizar la configuración, vuelve al Dashboard para probar nuevamente.</p>
             </AlertDescription>
           </Alert>
 

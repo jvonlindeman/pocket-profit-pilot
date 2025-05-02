@@ -17,21 +17,23 @@ interface RefreshTokenRequest {
   refreshToken?: string;
 }
 
-// Helper function to determine the Zoho API region from token
+// Helper function to determine the Zoho API region from token or explicit setting
 function getZohoRegion(token: string): string {
-  // Default region
+  // Force "com" as default for US accounts
   let region = "com";
   
-  // Try to detect region from token if possible
+  // Only use token-based detection as a fallback in case we need to support other regions later
   if (token.includes(".eu.")) {
     region = "eu";
   } else if (token.includes(".in.")) {
     region = "in";
   } else if (token.includes(".au.")) {
     region = "au";
+  } else if (token.includes(".cn.")) {
+    region = "cn";
   }
   
-  console.log(`Detected Zoho region: ${region}`);
+  console.log(`Using Zoho region: ${region} (for domain zoho.${region})`);
   return region;
 }
 
@@ -69,7 +71,7 @@ serve(async (req: Request) => {
     if (integration.access_token && tokenExpiry > now) {
       console.log("Access token is still valid, returning it");
       
-      // Detect region from refresh token
+      // Determine region (US accounts use "com")
       const region = getZohoRegion(integration.refresh_token);
       
       return new Response(
@@ -108,8 +110,10 @@ serve(async (req: Request) => {
       );
     }
 
-    // Detect region from refresh token
+    // Determine region (US accounts use "com")
     const region = getZohoRegion(refreshToken);
+    
+    // Always use accounts.zoho.{region} for authentication
     const zohoTokenUrl = `https://accounts.zoho.${region}/oauth/v2/token`;
     
     console.log(`Using Zoho OAuth endpoint: ${zohoTokenUrl}`);
@@ -142,7 +146,12 @@ serve(async (req: Request) => {
       console.error("Zoho token refresh failed:", responseText);
       
       return new Response(
-        JSON.stringify({ error: "Failed to refresh Zoho token", details: responseText }),
+        JSON.stringify({ 
+          error: "Failed to refresh Zoho token", 
+          details: responseText,
+          status: response.status,
+          url: zohoTokenUrl 
+        }),
         { 
           status: response.status, 
           headers: { ...corsHeaders, "Content-Type": "application/json" } 

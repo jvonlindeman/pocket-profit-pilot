@@ -180,7 +180,52 @@ serve(async (req: Request) => {
     
     // Use the correct Zoho API domain with region
     const region = tokenData.region || "com";
-    // Modified: Use the correct zohoapis domain format instead of just books.zoho.com
+    
+    // First, let's do a simple API call to verify connectivity
+    const testApiUrl = `https://books.zohoapis.${region}/api/v3/organizations/${tokenData.organization_id}`;
+    
+    console.log("Testing Zoho Books API connectivity:", testApiUrl);
+    
+    // Test API access first
+    try {
+      const testResponse = await fetchWithRetry(testApiUrl, {
+        method: "GET",
+        headers: {
+          "Authorization": `Zoho-oauthtoken ${tokenData.access_token}`,
+          "Content-Type": "application/json"
+        }
+      });
+      
+      console.log(`Test API response status: ${testResponse.status}`);
+      
+      if (!testResponse.ok) {
+        const testErrorText = await testResponse.text();
+        console.error("Failed connection test to Zoho Books API:", testErrorText);
+        
+        return new Response(
+          JSON.stringify({ 
+            error: "Failed to connect to Zoho Books API", 
+            details: testErrorText,
+            url: testApiUrl
+          }),
+          { status: testResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      console.log("API connection test successful");
+    } catch (testError) {
+      console.error("Error testing API connection:", testError);
+      return new Response(
+        JSON.stringify({ 
+          error: "Error connecting to Zoho Books API", 
+          details: testError.message,
+          url: testApiUrl
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    // Now proceed with the transactions API call
     const zohoApiUrl = `https://books.zohoapis.${region}/api/v3/banktransactions?organization_id=${tokenData.organization_id}&from_date=${formattedStartDate}&to_date=${formattedEndDate}`;
     
     console.log("Calling Zoho Books API:", zohoApiUrl);
@@ -208,12 +253,22 @@ serve(async (req: Request) => {
       // Better error handling for common Zoho API errors
       let errorMessage = "Failed to fetch Zoho transactions";
       
-      if (responseText.includes("domain")) {
-        errorMessage = "Incorrect Zoho API domain. Please verify your region configuration.";
+      if (responseText.includes("invalid_token")) {
+        errorMessage = "Invalid token. Please check credentials and scope.";
+      } else if (responseText.includes("expired")) { 
+        errorMessage = "Token expired. Try refreshing your configuration.";
+      } else if (responseText.includes("invalid_organization")) {
+        errorMessage = "Invalid Organization ID. Verify the ID in your configuration.";
+      } else if (responseText.includes("domain")) {
+        errorMessage = "Incorrect Zoho API domain. Verify your region configuration.";
       }
       
       return new Response(
-        JSON.stringify({ error: errorMessage, details: responseText }),
+        JSON.stringify({ 
+          error: errorMessage, 
+          details: responseText,
+          url: zohoApiUrl
+        }),
         { status: zohoResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

@@ -24,6 +24,10 @@ const handleApiError = (error: any, message: string) => {
       // Check for common errors
       if (error.details.includes('domain')) {
         errorMessage = 'El API de Zoho requiere la región correcta. Por favor, verifique su configuración.';
+      } else if (error.details.includes('invalid_organization')) {
+        errorMessage = 'El Organization ID es inválido. Verifíquelo en su cuenta de Zoho Books.';
+      } else if (error.details.includes('invalid_token')) {
+        errorMessage = 'El token de acceso es inválido o ha expirado. Por favor, regenere su Refresh Token con el scope ZohoBooks.fullaccess.all.';
       } else if (error.details.includes('<!DOCTYPE html>')) {
         errorMessage = 'El API de Zoho ha devuelto una página HTML en lugar de JSON. Verifique las credenciales, los permisos y la configuración de región.';
       } else if (error?.message) {
@@ -33,7 +37,7 @@ const handleApiError = (error: any, message: string) => {
   }
   
   toast({
-    title: 'Error',
+    title: 'Error de Zoho Books',
     description: errorMessage,
     variant: 'destructive'
   });
@@ -104,6 +108,12 @@ const ZohoService = {
       console.warn('Falling back to mock data due to exception');
       return ZohoService.getMockTransactions(startDate, endDate);
     }
+  },
+  
+  // Force refresh transactions and bypass cache
+  forceRefresh: async (startDate: Date, endDate: Date): Promise<Transaction[]> => {
+    console.log("ZohoService: Force refreshing transactions from", startDate, "to", endDate);
+    return ZohoService.getTransactions(startDate, endDate, true);
   },
   
   // Mock data for fallback when API fails or for development
