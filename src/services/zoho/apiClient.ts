@@ -74,18 +74,33 @@ export const fetchTransactionsFromWebhook = async (
 
 // Helper function to process and normalize transaction data
 const processTransactionData = (data: any[]): Transaction[] => {
-  // Process the data to ensure valid date formats
-  return Array.isArray(data) ? data.map((item: any) => {
-    // Ensure the item has all required fields
-    if (!item.id) item.id = `zoho-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    if (!item.date) item.date = new Date().toISOString().split('T')[0];
-    else item.date = ensureValidDateFormat(item.date);
-    if (!item.type) item.type = 'income'; // Default type
-    if (!item.category) item.category = 'Uncategorized';
-    if (!item.description && item.customer_name) item.description = `Transacción de ${item.customer_name}`;
-    if (!item.description) item.description = 'Sin descripción';
-    if (!item.source) item.source = 'Zoho';
+  if (!Array.isArray(data)) {
+    console.error("Expected array from webhook, received:", typeof data);
+    return [];
+  }
+  
+  return data.map((item: any) => {
+    // Determine if this is an income or expense transaction
+    // If vendor_name is present, it's an expense; if customer_name is present, it's income
+    const transactionType = item.vendor_name ? 'expense' : 'income';
     
-    return item as Transaction;
-  }) : [];
+    // Set appropriate description based on transaction type
+    let description = 'Sin descripción';
+    if (transactionType === 'income' && item.customer_name) {
+      description = `Ingreso de ${item.customer_name}`;
+    } else if (transactionType === 'expense' && item.vendor_name) {
+      description = `Pago a ${item.vendor_name}`;
+    }
+    
+    // Ensure the item has all required fields
+    return {
+      id: item.id || `zoho-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      date: item.date ? ensureValidDateFormat(item.date) : new Date().toISOString().split('T')[0],
+      amount: Math.abs(Number(item.amount) || 0),  // Ensure amount is positive
+      description: item.description || description,
+      category: item.category || (transactionType === 'expense' ? 'Gastos generales' : 'Ingresos'),
+      source: 'Zoho',
+      type: transactionType
+    } as Transaction;
+  });
 };
