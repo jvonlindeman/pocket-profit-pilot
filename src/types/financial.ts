@@ -3,6 +3,8 @@ export interface Transaction {
   id: string;
   date: string;
   amount: number;
+  original_amount?: number;
+  currency?: string;
   description: string;
   category: string;
   source: 'Zoho' | 'Stripe';

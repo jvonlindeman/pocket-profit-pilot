@@ -28,11 +28,11 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenseData }) => {
     percentage: item.percentage.toFixed(1) + '%'
   }));
 
-  // Formateo de moneda
+  // Formateo de moneda (ahora en USD)
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-ES', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'EUR'
+      currency: 'USD'
     }).format(value);
   };
 
@@ -53,7 +53,7 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenseData }) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Distribución de Gastos</CardTitle>
+        <CardTitle>Distribución de Gastos (USD)</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="w-full h-[250px]">

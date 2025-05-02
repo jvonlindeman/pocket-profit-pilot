@@ -42,12 +42,23 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions }) => {
     return new Intl.DateTimeFormat('es-ES').format(date);
   };
 
-  // Formato de moneda
+  // Formato de moneda (ahora mostramos en USD por defecto)
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-ES', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'EUR'
+      currency: 'USD'
     }).format(amount);
+  };
+
+  // Función para mostrar el monto original si está disponible
+  const formatOriginalAmount = (tx: Transaction) => {
+    if (tx.original_amount && tx.currency && tx.original_amount !== tx.amount) {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: tx.currency
+      }).format(tx.original_amount);
+    }
+    return null;
   };
 
   return (
@@ -56,7 +67,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions }) => {
         <div className="flex items-center justify-between">
           <div>
             <CardTitle>Transacciones</CardTitle>
-            <CardDescription>Lista detallada de ingresos y gastos</CardDescription>
+            <CardDescription>Lista detallada de ingresos y gastos (USD)</CardDescription>
           </div>
           <Select value={filter} onValueChange={(value: any) => setFilter(value)}>
             <SelectTrigger className="w-[180px]">
@@ -78,7 +89,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions }) => {
               <TableHead>Descripción</TableHead>
               <TableHead>Categoría</TableHead>
               <TableHead>Fuente</TableHead>
-              <TableHead className="text-right">Importe</TableHead>
+              <TableHead className="text-right">Importe (USD)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -97,6 +108,11 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions }) => {
                   <TableCell>{transaction.source}</TableCell>
                   <TableCell className={`text-right font-medium ${transaction.type === 'income' ? 'income-text' : 'expense-text'}`}>
                     {transaction.type === 'income' ? '+' : '-'} {formatCurrency(transaction.amount)}
+                    {formatOriginalAmount(transaction) && (
+                      <div className="text-xs text-gray-500">
+                        Orig: {formatOriginalAmount(transaction)}
+                      </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))

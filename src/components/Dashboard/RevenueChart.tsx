@@ -19,9 +19,9 @@ const RevenueChart: React.FC<RevenueChartProps> = ({ incomeData, expenseData }) 
   }));
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('es-ES', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'EUR',
+      currency: 'USD',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     }).format(value);
@@ -30,7 +30,7 @@ const RevenueChart: React.FC<RevenueChartProps> = ({ incomeData, expenseData }) 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Evolución de Ingresos y Gastos</CardTitle>
+        <CardTitle>Evolución de Ingresos y Gastos (USD)</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         <div className="w-full h-[350px]">

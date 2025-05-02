@@ -1,11 +1,17 @@
 
-project_id = "rstexocnpvtxfhqbnetn"
-
-[functions.zoho-tokens]
+# rstexocnpvtxfhqbnetn
+[[functions]]
+name = "zoho-config"
 verify_jwt = false
 
-[functions.zoho-transactions]
+[[functions]]
+name = "zoho-tokens"
 verify_jwt = false
 
-[functions.zoho-config]
+[[functions]]
+name = "zoho-transactions"
+verify_jwt = false
+
+[[functions]]
+name = "exchange-rates"
 verify_jwt = false

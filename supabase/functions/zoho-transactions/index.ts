@@ -19,17 +19,59 @@ interface TransactionRequest {
   forceRefresh?: boolean;
 }
 
+// Get the latest exchange rates
+async function getExchangeRates(): Promise<Record<string, number>> {
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/exchange-rates`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${supabaseServiceRoleKey}`,
+      }
+    });
+    
+    if (!response.ok) {
+      console.error("Failed to fetch exchange rates:", await response.text());
+      return { EUR: 1.08, MXN: 0.05 }; // Fallback rates if API fails
+    }
+    
+    const data = await response.json();
+    return data.rates;
+  } catch (err) {
+    console.error("Error getting exchange rates:", err);
+    return { EUR: 1.08, MXN: 0.05 }; // Fallback rates if API fails
+  }
+}
+
+// Convert amount to USD based on currency
+function convertToUSD(amount: number, currency: string, rates: Record<string, number>): number {
+  if (currency === "USD") return amount;
+  
+  // If we don't have a rate for this currency, use EUR as default
+  const rate = rates[currency] || rates["EUR"];
+  if (!rate) return amount; // If no rate available, return original
+  
+  // Since our rates are USD-based (1 USD = X currency), we divide by the rate
+  return amount / rate;
+}
+
 // Format transaction data from Zoho to match our database schema
-function formatTransaction(transaction: any, source = 'Zoho') {
+function formatTransaction(transaction: any, exchangeRates: Record<string, number>, source = 'Zoho') {
   // Determine if it's income or expense based on transaction type
   const isIncome = transaction.transaction_type === 'customer_payment' || 
                   transaction.transaction_type === 'sales_invoice' ||
                   transaction.transaction_type === 'credit_note';
   
+  // Get the amount and handle currency
+  const originalAmount = Math.abs(parseFloat(transaction.amount || transaction.total || '0'));
+  const currency = transaction.currency_code || "EUR"; // Default to EUR if not provided
+  const amountInUSD = convertToUSD(originalAmount, currency, exchangeRates);
+  
   return {
     external_id: transaction.transaction_id,
     date: transaction.date,
-    amount: Math.abs(parseFloat(transaction.amount || transaction.total || '0')),
+    amount: amountInUSD,
+    original_amount: originalAmount,
+    currency: currency,
     description: transaction.reference_number || transaction.transaction_number || 'Zoho Transaction',
     category: transaction.account_name || transaction.transaction_type || 'Uncategorized',
     type: isIncome ? 'income' : 'expense',
@@ -80,6 +122,9 @@ serve(async (req: Request) => {
     
     // No cached data or force refresh, fetch new data from Zoho
     console.log("Fetching fresh data from Zoho API");
+    
+    // Get exchange rates first
+    const exchangeRates = await getExchangeRates();
     
     // Get Zoho access token
     const tokenResponse = await fetch(`${supabaseUrl}/functions/v1/zoho-tokens`, {
@@ -142,7 +187,7 @@ serve(async (req: Request) => {
     }
     
     // Format the transactions and prepare for caching
-    const transactions = zohoData.banktransactions.map((tx: any) => formatTransaction(tx));
+    const transactions = zohoData.banktransactions.map((tx: any) => formatTransaction(tx, exchangeRates));
     
     // Delete existing cached transactions for this date range and source
     const { error: deleteError } = await supabase

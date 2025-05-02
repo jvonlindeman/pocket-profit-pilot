@@ -10,15 +10,15 @@ interface FinanceSummaryProps {
 
 const FinanceSummary: React.FC<FinanceSummaryProps> = ({ summary }) => {
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-ES', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'EUR',
+      currency: 'USD',
       minimumFractionDigits: 2
     }).format(amount);
   };
 
   const formatPercentage = (percentage: number) => {
-    return new Intl.NumberFormat('es-ES', {
+    return new Intl.NumberFormat('en-US', {
       style: 'percent',
       minimumFractionDigits: 1,
       maximumFractionDigits: 1
@@ -31,7 +31,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({ summary }) => {
       <Card className="finance-card">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Ingresos Totales</h3>
+            <h3 className="text-sm font-medium text-gray-500">Ingresos Totales (USD)</h3>
             <div className="p-2 bg-green-50 rounded-full">
               <ArrowUpIcon className="h-4 w-4 text-finance-income" />
             </div>
@@ -46,7 +46,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({ summary }) => {
       <Card className="finance-card">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Gastos Totales</h3>
+            <h3 className="text-sm font-medium text-gray-500">Gastos Totales (USD)</h3>
             <div className="p-2 bg-red-50 rounded-full">
               <ArrowDownIcon className="h-4 w-4 text-finance-expense" />
             </div>
@@ -61,7 +61,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({ summary }) => {
       <Card className="finance-card">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Beneficio Neto</h3>
+            <h3 className="text-sm font-medium text-gray-500">Beneficio Neto (USD)</h3>
             <div className="p-2 bg-blue-50 rounded-full">
               <TrendingUpIcon className="h-4 w-4 text-finance-profit" />
             </div>
