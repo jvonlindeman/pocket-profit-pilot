@@ -2,11 +2,12 @@
 import { Transaction } from "../../types/financial";
 import { ensureValidDateFormat, handleApiError } from "./utils";
 import { getMockTransactions } from "./mockData";
+import { supabase } from "@/integrations/supabase/client";
 
-// The make.com webhook URL
+// The make.com webhook URL - kept as fallback if necessary
 const makeWebhookUrl = "https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihlmx22";
 
-// Function to call the make.com webhook
+// Function to call the Supabase edge function which handles caching
 export const fetchTransactionsFromWebhook = async (
   startDate: Date, 
   endDate: Date, 
@@ -15,57 +16,39 @@ export const fetchTransactionsFromWebhook = async (
   try {
     console.log("ZohoService: Fetching transactions from", startDate, "to", endDate);
     
-    // Format dates for the make.com webhook (YYYY-MM-DD format)
+    // Format dates for the API (YYYY-MM-DD format)
     const formattedStartDate = startDate.toISOString().split('T')[0];
     const formattedEndDate = endDate.toISOString().split('T')[0];
     
-    // Call the make.com webhook directly
-    console.log("ZohoService: Calling make.com webhook:", makeWebhookUrl);
-    const response = await fetch(makeWebhookUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        action: "getTransactions",
+    console.log("ZohoService: Calling Supabase edge function for cached transactions");
+    
+    // Call the Supabase edge function instead of make.com webhook directly
+    const { data, error } = await supabase.functions.invoke("zoho-transactions", {
+      body: {
         startDate: formattedStartDate,
         endDate: formattedEndDate,
         forceRefresh
-      })
+      }
     });
     
-    console.log(`make.com webhook response status: ${response.status}`);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Failed to fetch data from make.com webhook:", errorText);
+    if (error) {
+      console.error("Failed to fetch data from Supabase function:", error);
       
-      const errorMessage = handleApiError({details: errorText}, 'Failed to fetch Zoho transactions from make.com webhook');
+      const errorMessage = handleApiError({details: error.message}, 'Failed to fetch Zoho transactions from Supabase cache');
       console.warn('Falling back to mock data due to error');
       return getMockTransactions(startDate, endDate);
     }
     
-    // Parse the webhook response
-    let data;
-    try {
-      const responseText = await response.text();
-      if (!responseText || responseText === "Accepted") {
-        console.log("Empty or 'Accepted' response from make.com webhook, using mock data");
-        return getMockTransactions(startDate, endDate);
-      }
-      
-      console.log(`make.com webhook response: ${responseText}`);
-      data = JSON.parse(responseText);
-    } catch (e) {
-      console.error("Failed to parse make.com webhook response:", e);
+    if (!data || (Array.isArray(data) && data.length === 0)) {
+      console.log("No transactions returned from Supabase function, using mock data");
       return getMockTransactions(startDate, endDate);
     }
     
-    console.log("ZohoService: Received data from make.com webhook:", data);
+    console.log("ZohoService: Received data from Supabase function:", data);
     
     return processTransactionData(data);
   } catch (err) {
-    handleApiError(err, 'Failed to connect to make.com webhook');
+    handleApiError(err, 'Failed to connect to Supabase function');
     // Fall back to mock data
     console.warn('Falling back to mock data due to exception');
     return getMockTransactions(startDate, endDate);
@@ -92,9 +75,12 @@ const processTransactionData = (data: any[]): Transaction[] => {
       description = `Pago a ${item.vendor_name}`;
     }
     
+    // Map the external_id from Supabase to id if it exists, otherwise use id or generate one
+    const id = item.external_id || item.id || `zoho-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     // Ensure the item has all required fields
     return {
-      id: item.id || `zoho-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id,
       date: item.date ? ensureValidDateFormat(item.date) : new Date().toISOString().split('T')[0],
       amount: Math.abs(Number(item.amount) || 0),  // Ensure amount is positive
       description: item.description || description,
