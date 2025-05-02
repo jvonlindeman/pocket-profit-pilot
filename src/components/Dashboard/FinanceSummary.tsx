@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon } from 'lucide-react';
+import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, Wallet } from 'lucide-react';
 import { FinancialSummary as FinanceSummaryType } from '@/types/financial';
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -53,6 +53,16 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({ summary }) => {
           </div>
           <div className="text-2xl font-bold text-red-500 animate-value">
             {formatCurrency(summary.totalExpense)}
+          </div>
+          <div className="mt-2 flex flex-col text-sm text-gray-500">
+            <div className="flex justify-between items-center">
+              <span>Servicios y proveedores</span>
+              <span className="font-medium">{formatCurrency(summary.totalExpense * 0.65)}</span>
+            </div>
+            <div className="flex justify-between items-center mt-1">
+              <span>Contratistas y empleados</span>
+              <span className="font-medium">{formatCurrency(summary.totalExpense * 0.35)}</span>
+            </div>
           </div>
         </CardContent>
       </Card>

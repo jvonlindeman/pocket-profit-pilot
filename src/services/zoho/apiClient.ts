@@ -70,7 +70,7 @@ const processTransactionData = (data: any[]): Transaction[] => {
   
   const result: Transaction[] = [];
   
-  // Process the data based on the new structure
+  // Process the data based on the structure
   data.forEach((item: any, index: number) => {
     // Check if the item is an array - this would be the income transactions
     if (Array.isArray(item)) {
@@ -82,7 +82,8 @@ const processTransactionData = (data: any[]): Transaction[] => {
             date: new Date().toISOString().split('T')[0], // Using current date since it's not in the data
             amount: Number(incomeItem.amount) || 0,
             description: `Ingreso de ${incomeItem.customer_name}`,
-            category: 'Ingresos',
+            category: incomeItem.customer_name.includes("EMPLEADO") || incomeItem.customer_name.includes("CONTRATISTA") ? 
+              'Pagos a personal' : 'Ingresos',
             source: 'Zoho',
             type: 'income'
           });
@@ -101,6 +102,15 @@ const processTransactionData = (data: any[]): Transaction[] => {
           description = 'Transacción';
         }
         
+        // Determine category - check if it's a contractor or employee payment
+        let category = isExpense ? (item.vendor_name || 'Gastos generales') : 'Otros';
+        if (isExpense && item.vendor_name && 
+            (item.vendor_name.includes("EMPLEADO") || 
+             item.vendor_name.includes("CONTRATISTA") || 
+             item.vendor_name.includes("NOMINA"))) {
+          category = 'Pagos a personal';
+        }
+        
         // Generate a unique ID
         const id = `${isExpense ? 'expense' : 'other'}-${item.vendor_name || 'unknown'}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
         
@@ -109,7 +119,7 @@ const processTransactionData = (data: any[]): Transaction[] => {
           date: new Date().toISOString().split('T')[0], // Using current date since it's not in the data
           amount: Math.abs(Number(item.total) || 0),
           description,
-          category: isExpense ? (item.vendor_name || 'Gastos generales') : 'Otros',
+          category,
           source: 'Zoho',
           type: isExpense ? 'expense' : 'income'
         });
