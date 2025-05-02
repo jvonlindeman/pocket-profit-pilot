@@ -17,7 +17,10 @@ const ZohoService = {
   // Get configuration status
   getStatus: async (): Promise<ZohoServiceStatus> => {
     try {
-      const { data, error } = await supabase.functions.invoke('zoho-config');
+      console.log("ZohoService: Getting configuration status");
+      const { data, error } = await supabase.functions.invoke('zoho-config', {
+        method: 'GET'
+      });
       
       if (error) {
         console.error('Error getting Zoho configuration status:', error);
@@ -48,7 +51,9 @@ const ZohoService = {
       }
       
       // Call our edge function to get transactions
+      console.log("ZohoService: Calling zoho-transactions edge function");
       const { data, error } = await supabase.functions.invoke('zoho-transactions', {
+        method: 'POST',
         body: {
           startDate: startDate.toISOString(),
           endDate: endDate.toISOString(),
@@ -60,10 +65,11 @@ const ZohoService = {
         console.error('Error fetching Zoho transactions:', error);
         toast({
           title: 'Error',
-          description: 'Failed to fetch Zoho transactions',
+          description: 'Failed to fetch Zoho transactions: ' + error.message,
           variant: 'destructive'
         });
         // Fall back to mock data
+        console.warn('Falling back to mock data due to error');
         return ZohoService.getMockTransactions(startDate, endDate);
       }
       
@@ -77,6 +83,7 @@ const ZohoService = {
         variant: 'destructive'
       });
       // Fall back to mock data
+      console.warn('Falling back to mock data due to exception');
       return ZohoService.getMockTransactions(startDate, endDate);
     }
   },

@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -17,6 +18,8 @@ interface RefreshTokenRequest {
 }
 
 serve(async (req: Request) => {
+  console.log(`zoho-tokens function called with method: ${req.method}`);
+  
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -24,6 +27,7 @@ serve(async (req: Request) => {
 
   try {
     // Get the current integration record
+    console.log("Fetching Zoho integration record");
     const { data: integration, error: fetchError } = await supabase
       .from("zoho_integration")
       .select("*")
@@ -45,6 +49,7 @@ serve(async (req: Request) => {
     
     // If token is valid and not expired, return it
     if (integration.access_token && tokenExpiry > now) {
+      console.log("Access token is still valid, returning it");
       return new Response(
         JSON.stringify({ 
           access_token: integration.access_token,
@@ -66,6 +71,11 @@ serve(async (req: Request) => {
     const clientSecret = integration.client_secret;
     
     if (!refreshToken || !clientId || !clientSecret) {
+      console.error("Missing Zoho credentials:", {
+        hasRefreshToken: !!refreshToken,
+        hasClientId: !!clientId,
+        hasClientSecret: !!clientSecret,
+      });
       return new Response(
         JSON.stringify({ error: "Missing Zoho credentials" }),
         { 
@@ -82,6 +92,7 @@ serve(async (req: Request) => {
       grant_type: "refresh_token"
     });
 
+    console.log("Calling Zoho OAuth API to refresh token");
     const response = await fetch(
       "https://accounts.zoho.com/oauth/v2/token",
       {
@@ -113,6 +124,7 @@ serve(async (req: Request) => {
     const expiryDate = new Date(now.getTime() + expiresIn * 1000);
     
     // Update the database with the new token
+    console.log("Updating database with new access token");
     const { error: updateError } = await supabase
       .from("zoho_integration")
       .update({
@@ -133,6 +145,7 @@ serve(async (req: Request) => {
       );
     }
     
+    console.log("Token refreshed successfully");
     return new Response(
       JSON.stringify({ 
         access_token: tokenData.access_token,

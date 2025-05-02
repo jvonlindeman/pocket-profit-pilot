@@ -30,7 +30,7 @@ function formatTransaction(transaction: any, source = 'Zoho') {
   const amount = Math.abs(parseFloat(transaction.amount || transaction.total || '0'));
   
   return {
-    external_id: transaction.transaction_id,
+    external_id: transaction.transaction_id || `zoho-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
     date: transaction.date,
     amount: amount,
     description: transaction.reference_number || transaction.transaction_number || 'Zoho Transaction',
@@ -41,6 +41,8 @@ function formatTransaction(transaction: any, source = 'Zoho') {
 }
 
 serve(async (req: Request) => {
+  console.log(`zoho-transactions function called with method: ${req.method}`);
+  
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -48,9 +50,32 @@ serve(async (req: Request) => {
   
   try {
     // Get the request body
-    const { startDate, endDate, forceRefresh = false }: TransactionRequest = await req.json();
+    let requestBody: TransactionRequest;
+    
+    try {
+      const text = await req.text();
+      if (!text) {
+        console.error("Empty request body");
+        return new Response(
+          JSON.stringify({ error: "Empty request body" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      requestBody = JSON.parse(text);
+      console.log("Request body parsed:", requestBody);
+    } catch (parseError) {
+      console.error("Error parsing request body:", parseError);
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON in request body" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    const { startDate, endDate, forceRefresh = false } = requestBody;
     
     if (!startDate || !endDate) {
+      console.error("Missing start or end date");
       return new Response(
         JSON.stringify({ error: "Start date and end date are required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -59,6 +84,7 @@ serve(async (req: Request) => {
     
     // Check if we have cached data for this date range and don't need to refresh
     if (!forceRefresh) {
+      console.log("Checking for cached transactions");
       const { data: cachedTransactions, error: cacheError } = await supabase
         .from("cached_transactions")
         .select("*")
@@ -72,7 +98,7 @@ serve(async (req: Request) => {
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
         
         if (latestSync > oneHourAgo) {
-          console.log("Returning cached Zoho transactions");
+          console.log("Returning cached Zoho transactions:", cachedTransactions.length);
           return new Response(
             JSON.stringify(cachedTransactions),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -85,6 +111,7 @@ serve(async (req: Request) => {
     console.log("Fetching fresh data from Zoho API");
     
     // Get Zoho access token
+    console.log("Calling zoho-tokens function");
     const tokenResponse = await fetch(`${supabaseUrl}/functions/v1/zoho-tokens`, {
       method: "GET",
       headers: {
@@ -96,16 +123,17 @@ serve(async (req: Request) => {
       const errorText = await tokenResponse.text();
       console.error("Failed to get Zoho token:", errorText);
       return new Response(
-        JSON.stringify({ error: "Failed to authenticate with Zoho" }),
+        JSON.stringify({ error: "Failed to authenticate with Zoho", details: errorText }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     
-    const { access_token, organization_id } = await tokenResponse.json();
+    const tokenData = await tokenResponse.json();
     
-    if (!access_token || !organization_id) {
+    if (!tokenData.access_token || !tokenData.organization_id) {
+      console.error("Invalid token data:", tokenData);
       return new Response(
-        JSON.stringify({ error: "Invalid Zoho credentials" }),
+        JSON.stringify({ error: "Invalid Zoho credentials", details: "Missing access token or organization ID" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -115,21 +143,29 @@ serve(async (req: Request) => {
     const formattedEndDate = new Date(endDate).toISOString().split('T')[0];
     
     // Fetch transactions from Zoho
-    const zohoApiUrl = `https://books.zoho.com/api/v3/banktransactions?organization_id=${organization_id}&from_date=${formattedStartDate}&to_date=${formattedEndDate}`;
+    const zohoApiUrl = `https://books.zoho.com/api/v3/banktransactions?organization_id=${tokenData.organization_id}&from_date=${formattedStartDate}&to_date=${formattedEndDate}`;
     
+    console.log("Calling Zoho Books API:", zohoApiUrl);
     const zohoResponse = await fetch(zohoApiUrl, {
       method: "GET",
       headers: {
-        "Authorization": `Zoho-oauthtoken ${access_token}`,
+        "Authorization": `Zoho-oauthtoken ${tokenData.access_token}`,
         "Content-Type": "application/json"
       }
     });
     
     if (!zohoResponse.ok) {
-      const errorText = await zohoResponse.text();
-      console.error("Failed to fetch Zoho transactions:", errorText);
+      let errorDetails = "";
+      try {
+        const errorText = await zohoResponse.text();
+        errorDetails = errorText;
+        console.error("Failed to fetch Zoho transactions:", errorText);
+      } catch (parseError) {
+        console.error("Failed to parse Zoho error response");
+      }
+      
       return new Response(
-        JSON.stringify({ error: "Failed to fetch Zoho transactions", details: errorText }),
+        JSON.stringify({ error: "Failed to fetch Zoho transactions", details: errorDetails }),
         { status: zohoResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -137,9 +173,9 @@ serve(async (req: Request) => {
     const zohoData = await zohoResponse.json();
     
     if (!zohoData.banktransactions) {
-      console.log("No transactions found in Zoho response");
+      console.log("No transactions found in Zoho response:", zohoData);
       return new Response(
-        JSON.stringify({ error: "Invalid Zoho response format or no transactions found" }),
+        JSON.stringify({ error: "Invalid Zoho response format or no transactions found", details: zohoData }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -148,6 +184,7 @@ serve(async (req: Request) => {
     const transactions = zohoData.banktransactions.map((tx: any) => formatTransaction(tx));
     
     // Delete existing cached transactions for this date range and source
+    console.log("Deleting existing cached transactions");
     const { error: deleteError } = await supabase
       .from("cached_transactions")
       .delete()
@@ -161,6 +198,7 @@ serve(async (req: Request) => {
     
     // Insert new transactions into cache
     if (transactions.length > 0) {
+      console.log("Caching new transactions:", transactions.length);
       const { error: insertError } = await supabase
         .from("cached_transactions")
         .insert(transactions);
@@ -174,6 +212,7 @@ serve(async (req: Request) => {
       }
     }
     
+    console.log("Successfully fetched and cached transactions:", transactions.length);
     return new Response(
       JSON.stringify(transactions),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
