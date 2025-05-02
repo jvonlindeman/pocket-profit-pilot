@@ -12,6 +12,29 @@ export interface ZohoServiceStatus {
 // Helper function to get the current year
 const getCurrentYear = () => new Date().getFullYear();
 
+// Helper function to ensure valid date format
+const ensureValidDateFormat = (dateStr: string) => {
+  try {
+    // Check if the date string is already in YYYY-MM-DD format
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return dateStr;
+    }
+    
+    // Try to parse the date and format it as YYYY-MM-DD
+    const date = new Date(dateStr);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0];
+    }
+    
+    // If we can't parse it, use the current date
+    console.warn(`Invalid date format detected: ${dateStr}, using current date instead`);
+    return new Date().toISOString().split('T')[0];
+  } catch (error) {
+    console.error(`Error processing date: ${dateStr}`, error);
+    return new Date().toISOString().split('T')[0];
+  }
+};
+
 // Helper function to handle API errors and provide better user feedback
 const handleApiError = (error: any, message: string) => {
   console.error(`ZohoService error: ${message}`, error);
@@ -101,7 +124,23 @@ const ZohoService = {
       }
       
       console.log("ZohoService: Received data from make.com webhook:", data);
-      return data as Transaction[];
+      
+      // Process the data to ensure valid date formats
+      const processedData = Array.isArray(data) ? data.map((item: any) => {
+        // Ensure the item has all required fields
+        if (!item.id) item.id = `zoho-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        if (!item.date) item.date = new Date().toISOString().split('T')[0];
+        else item.date = ensureValidDateFormat(item.date);
+        if (!item.type) item.type = 'income'; // Default type
+        if (!item.category) item.category = 'Uncategorized';
+        if (!item.description && item.customer_name) item.description = `Transacción de ${item.customer_name}`;
+        if (!item.description) item.description = 'Sin descripción';
+        if (!item.source) item.source = 'Zoho';
+        
+        return item as Transaction;
+      }) : [];
+      
+      return processedData;
     } catch (err) {
       handleApiError(err, 'Failed to connect to make.com webhook');
       // Fall back to mock data

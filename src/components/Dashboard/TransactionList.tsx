@@ -38,8 +38,20 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions }) => {
 
   // Formato de fecha
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('es-ES').format(date);
+    try {
+      const date = new Date(dateString);
+      
+      // Check if the date is valid
+      if (isNaN(date.getTime())) {
+        console.error(`Invalid date string: ${dateString}`);
+        return 'Invalid date';
+      }
+      
+      return new Intl.DateTimeFormat('es-ES').format(date);
+    } catch (error) {
+      console.error(`Error formatting date: ${dateString}`, error);
+      return 'Invalid date';
+    }
   };
 
   // Formato de moneda (ahora mostramos en USD por defecto)
