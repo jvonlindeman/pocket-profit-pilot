@@ -2,7 +2,7 @@
 import React from 'react';
 import ZohoConfig from '@/components/ZohoConfig';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Info, AlertTriangle, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Info, AlertTriangle, ExternalLink, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -40,6 +40,14 @@ const Settings = () => {
               El Refresh Token ya ha sido pre-llenado con el valor más reciente.
             </AlertDescription>
           </Alert>
+          
+          <Alert variant="success" className="bg-green-50 text-green-800 border-green-200">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <AlertTitle>Actualización de API</AlertTitle>
+            <AlertDescription>
+              La integración ha sido actualizada para usar correctamente la API de Zoho Books para cuentas de Estados Unidos.
+            </AlertDescription>
+          </Alert>
 
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
@@ -66,7 +74,7 @@ const Settings = () => {
                 <p className="font-medium text-blue-800">Notas importantes para cuentas de USA:</p>
                 <ul className="list-disc ml-5 space-y-1 mt-2 text-blue-800">
                   <li>La URL de autenticación debe ser <code className="bg-gray-700 text-white px-1 py-0.5 rounded">https://accounts.zoho.com</code> (sin region)</li>
-                  <li>La URL de API debe ser <code className="bg-gray-700 text-white px-1 py-0.5 rounded">https://books.zohoapis.com</code></li>
+                  <li>La URL de API debe ser <code className="bg-gray-700 text-white px-1 py-0.5 rounded">https://www.zohoapis.com/books/v3</code></li>
                   <li>Asegúrate de utilizar el Organization ID correcto de tu cuenta de Zoho Books US</li>
                   <li>Esta aplicación está configurada para trabajar con cuentas de Zoho Books US</li>
                 </ul>

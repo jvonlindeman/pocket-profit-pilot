@@ -180,12 +180,12 @@ serve(async (req: Request) => {
     const formattedStartDate = new Date(startDate).toISOString().split('T')[0];
     const formattedEndDate = new Date(endDate).toISOString().split('T')[0];
     
-    // US accounts always use zohoapis.com domain
-    const apiDomain = "zohoapis.com";
+    // FIXED: Use the correct API URL format for US accounts
+    // For US accounts: https://www.zohoapis.com/books/v3/
     
     // First, do a test API call to check authentication and connection
     // Use a simple organizations endpoint which is more reliable
-    const testApiUrl = `https://books.${apiDomain}/api/v3/organizations/${tokenData.organization_id}`;
+    const testApiUrl = `https://www.zohoapis.com/books/v3/organizations/${tokenData.organization_id}`;
     
     console.log("Testing Zoho Books API connectivity:", testApiUrl);
     
@@ -243,8 +243,8 @@ serve(async (req: Request) => {
       );
     }
     
-    // Now proceed with the transactions API call
-    const zohoApiUrl = `https://books.${apiDomain}/api/v3/banktransactions?organization_id=${tokenData.organization_id}&from_date=${formattedStartDate}&to_date=${formattedEndDate}`;
+    // Now proceed with the transactions API call - FIXED URL for US accounts
+    const zohoApiUrl = `https://www.zohoapis.com/books/v3/banktransactions?organization_id=${tokenData.organization_id}&from_date=${formattedStartDate}&to_date=${formattedEndDate}`;
     
     console.log("Calling Zoho Books API:", zohoApiUrl);
     
