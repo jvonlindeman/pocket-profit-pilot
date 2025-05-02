@@ -68,31 +68,55 @@ const processTransactionData = (data: any[]): Transaction[] => {
     return [];
   }
   
-  return data.map((item: any) => {
-    // Determine if this is an income or expense transaction
-    // If vendor_name is present, it's an expense; if customer_name is present, it's income
-    const transactionType = item.vendor_name ? 'expense' : 'income';
-    
-    // Set appropriate description based on transaction type
-    let description = 'Sin descripción';
-    if (transactionType === 'income' && item.customer_name) {
-      description = `Ingreso de ${item.customer_name}`;
-    } else if (transactionType === 'expense' && item.vendor_name) {
-      description = `Pago a ${item.vendor_name}`;
+  const result: Transaction[] = [];
+  
+  // Process the data based on the new structure
+  data.forEach((item: any, index: number) => {
+    // Check if the item is an array - this would be the income transactions
+    if (Array.isArray(item)) {
+      // This is the income transactions array
+      item.forEach((incomeItem: any) => {
+        if (incomeItem && incomeItem.amount && incomeItem.customer_name) {
+          result.push({
+            id: `income-${incomeItem.customer_name.replace(/\s/g, '-')}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            date: new Date().toISOString().split('T')[0], // Using current date since it's not in the data
+            amount: Number(incomeItem.amount) || 0,
+            description: `Ingreso de ${incomeItem.customer_name}`,
+            category: 'Ingresos',
+            source: 'Zoho',
+            type: 'income'
+          });
+        }
+      });
+    } else if (item && typeof item === 'object') {
+      // This is likely an expense item (with vendor_name)
+      if (item.total !== null && item.total !== undefined) {
+        const isExpense = item.vendor_name !== undefined;
+        
+        // Generate a description based on transaction type
+        let description = 'Sin descripción';
+        if (isExpense && item.vendor_name) {
+          description = `Pago a ${item.vendor_name}`;
+        } else {
+          description = 'Transacción';
+        }
+        
+        // Generate a unique ID
+        const id = `${isExpense ? 'expense' : 'other'}-${item.vendor_name || 'unknown'}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+        
+        result.push({
+          id,
+          date: new Date().toISOString().split('T')[0], // Using current date since it's not in the data
+          amount: Math.abs(Number(item.total) || 0),
+          description,
+          category: isExpense ? (item.vendor_name || 'Gastos generales') : 'Otros',
+          source: 'Zoho',
+          type: isExpense ? 'expense' : 'income'
+        });
+      }
     }
-    
-    // Map the external_id from Supabase to id if it exists, otherwise use id or generate one
-    const id = item.external_id || item.id || `zoho-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    // Ensure the item has all required fields
-    return {
-      id,
-      date: item.date ? ensureValidDateFormat(item.date) : new Date().toISOString().split('T')[0],
-      amount: Math.abs(Number(item.amount) || 0),  // Ensure amount is positive
-      description: item.description || description,
-      category: item.category || (transactionType === 'expense' ? 'Gastos generales' : 'Ingresos'),
-      source: 'Zoho',
-      type: transactionType
-    } as Transaction;
   });
+  
+  // Sort by date (newer first)
+  return result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 };
