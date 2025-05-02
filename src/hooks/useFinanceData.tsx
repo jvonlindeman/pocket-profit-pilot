@@ -203,35 +203,23 @@ export const useFinanceData = (initialDateRange?: DateRange) => {
     return { income, expense };
   }, [transactions, dateRange]);
 
-  // Datos mensuales (usaremos los datos actuales para el último mes)
+  // Datos mensuales usando las transacciones actuales en lugar de datos dummy
   const monthlyData = useMemo(() => {
-    const currentMonth = new Date().getMonth();
-    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const labels = ['Actual'];
     
-    // Crear un array de los últimos 5 meses
-    const lastMonthsLabels = [];
-    for (let i = 4; i >= 0; i--) {
-      const monthIndex = (currentMonth - i + 12) % 12; // Ensure it's always positive
-      lastMonthsLabels.push(months[monthIndex]);
-    }
-    
-    // Valores de ejemplo para los meses anteriores
-    const incomeValues = [12500, 15000, 13200, 16700, financialSummary.totalIncome];
-    const expenseValues = [8200, 9500, 7800, 10200, financialSummary.totalExpense];
-    const profitValues = incomeValues.map((inc, idx) => inc - expenseValues[idx]);
-    
+    // Solo usamos datos reales del período actual, sin datos dummy de meses anteriores
     return {
       income: {
-        labels: lastMonthsLabels,
-        values: incomeValues
+        labels,
+        values: [financialSummary.totalIncome]
       },
       expense: {
-        labels: lastMonthsLabels,
-        values: expenseValues
+        labels,
+        values: [financialSummary.totalExpense]
       },
       profit: {
-        labels: lastMonthsLabels,
-        values: profitValues
+        labels,
+        values: [financialSummary.profit]
       }
     };
   }, [financialSummary]);
