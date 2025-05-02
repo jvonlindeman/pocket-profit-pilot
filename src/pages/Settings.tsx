@@ -1,6 +1,7 @@
 
 import React from 'react';
 import ZohoConfig from '@/components/ZohoConfig';
+import ZohoDebug from '@/components/ZohoDebug';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Info, AlertTriangle, ExternalLink, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -88,6 +89,11 @@ const Settings = () => {
           <section>
             <h2 className="text-lg font-medium text-gray-900 mb-4">Zoho Books (via make.com)</h2>
             <ZohoConfig />
+          </section>
+          
+          <section>
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Herramientas de Debug</h2>
+            <ZohoDebug />
           </section>
         </div>
       </main>

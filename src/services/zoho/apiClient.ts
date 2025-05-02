@@ -11,8 +11,9 @@ const makeWebhookUrl = "https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihlmx
 export const fetchTransactionsFromWebhook = async (
   startDate: Date, 
   endDate: Date, 
-  forceRefresh = false
-): Promise<Transaction[]> => {
+  forceRefresh = false,
+  returnRawResponse = false
+): Promise<Transaction[] | any> => {
   try {
     console.log("ZohoService: Fetching transactions from", startDate, "to", endDate);
     
@@ -36,22 +37,27 @@ export const fetchTransactionsFromWebhook = async (
       
       const errorMessage = handleApiError({details: error.message}, 'Failed to fetch Zoho transactions from Supabase cache');
       console.warn('Falling back to mock data due to error');
-      return getMockTransactions(startDate, endDate);
+      return returnRawResponse ? { error: error.message } : getMockTransactions(startDate, endDate);
     }
     
     if (!data || (Array.isArray(data) && data.length === 0)) {
       console.log("No transactions returned from Supabase function, using mock data");
-      return getMockTransactions(startDate, endDate);
+      return returnRawResponse ? { message: "No data returned", data: null } : getMockTransactions(startDate, endDate);
     }
     
     console.log("ZohoService: Received data from Supabase function:", data);
+    
+    // Return raw response for debugging if requested
+    if (returnRawResponse) {
+      return data;
+    }
     
     return processTransactionData(data);
   } catch (err) {
     handleApiError(err, 'Failed to connect to Supabase function');
     // Fall back to mock data
     console.warn('Falling back to mock data due to exception');
-    return getMockTransactions(startDate, endDate);
+    return returnRawResponse ? { error: err instanceof Error ? err.message : 'Unknown error' } : getMockTransactions(startDate, endDate);
   }
 };
 

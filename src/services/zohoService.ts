@@ -16,6 +16,12 @@ const ZohoService = {
     return fetchTransactionsFromWebhook(startDate, endDate, true);
   },
   
+  // Get raw webhook response data for debugging
+  getRawResponse: async (startDate: Date, endDate: Date): Promise<any> => {
+    console.log("ZohoService: Getting raw response data for debugging");
+    return fetchTransactionsFromWebhook(startDate, endDate, true, true);
+  },
+  
   // Mock data for fallback when API fails or for development
   getMockTransactions
 };
