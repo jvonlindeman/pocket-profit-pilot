@@ -31,7 +31,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({ summary }) => {
       <Card className="finance-card">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Ingresos Totales (USD)</h3>
+            <h3 className="text-sm font-medium text-gray-500">Ingresos Totales</h3>
             <div className="p-2 bg-green-50 rounded-full">
               <ArrowUpIcon className="h-4 w-4 text-green-500" />
             </div>
@@ -46,7 +46,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({ summary }) => {
       <Card className="finance-card">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Gastos Totales (USD)</h3>
+            <h3 className="text-sm font-medium text-gray-500">Gastos Totales</h3>
             <div className="p-2 bg-red-50 rounded-full">
               <ArrowDownIcon className="h-4 w-4 text-red-500" />
             </div>
@@ -61,7 +61,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({ summary }) => {
       <Card className="finance-card">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Beneficio Neto (USD)</h3>
+            <h3 className="text-sm font-medium text-gray-500">Beneficio Neto</h3>
             <div className="p-2 bg-blue-50 rounded-full">
               <TrendingUpIcon className="h-4 w-4 text-blue-500" />
             </div>

@@ -11,7 +11,3 @@ verify_jwt = false
 [[functions]]
 name = "zoho-transactions"
 verify_jwt = false
-
-[[functions]]
-name = "exchange-rates"
-verify_jwt = false

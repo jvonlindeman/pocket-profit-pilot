@@ -50,24 +50,13 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions }) => {
     }).format(amount);
   };
 
-  // Función para mostrar el monto original si está disponible
-  const formatOriginalAmount = (tx: Transaction) => {
-    if (tx.original_amount && tx.currency && tx.original_amount !== tx.amount) {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: tx.currency
-      }).format(tx.original_amount);
-    }
-    return null;
-  };
-
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
             <CardTitle>Transacciones</CardTitle>
-            <CardDescription>Lista detallada de ingresos y gastos (USD)</CardDescription>
+            <CardDescription>Lista detallada de ingresos y gastos en USD</CardDescription>
           </div>
           <Select value={filter} onValueChange={(value: any) => setFilter(value)}>
             <SelectTrigger className="w-[180px]">
@@ -108,11 +97,6 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions }) => {
                   <TableCell>{transaction.source}</TableCell>
                   <TableCell className={`text-right font-medium ${transaction.type === 'income' ? 'income-text' : 'expense-text'}`}>
                     {transaction.type === 'income' ? '+' : '-'} {formatCurrency(transaction.amount)}
-                    {formatOriginalAmount(transaction) && (
-                      <div className="text-xs text-gray-500">
-                        Orig: {formatOriginalAmount(transaction)}
-                      </div>
-                    )}
                   </TableCell>
                 </TableRow>
               ))
