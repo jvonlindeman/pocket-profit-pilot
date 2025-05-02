@@ -3,11 +3,8 @@ import { Transaction } from "../types/financial";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
-// Interface for ZohoService configuration status
-export interface ZohoServiceStatus {
-  isConfigured: boolean;
-  lastUpdated?: string;
-}
+// The make.com webhook URL
+const makeWebhookUrl = "https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihlmx22";
 
 // Helper function to get the current year
 const getCurrentYear = () => new Date().getFullYear();
@@ -46,13 +43,13 @@ const handleApiError = (error: any, message: string) => {
     if (typeof error.details === 'string') {
       // Check for common errors
       if (error.details.includes('domain')) {
-        errorMessage = 'Error al comunicarse con make.com. Por favor, verifique su configuración.';
+        errorMessage = 'Error al comunicarse con make.com. Por favor, intente de nuevo más tarde.';
       } else if (error.details.includes('invalid_organization')) {
-        errorMessage = 'El Organization ID es inválido. Verifíquelo en su cuenta de Zoho Books.';
+        errorMessage = 'Error de configuración. Por favor, contacte al administrador.';
       } else if (error.details.includes('invalid_token')) {
-        errorMessage = 'El token de acceso es inválido o ha expirado. Por favor, regenere su Refresh Token con el scope ZohoBooks.fullaccess.all.';
+        errorMessage = 'Error de autenticación con Zoho Books. Por favor, contacte al administrador.';
       } else if (error.details.includes('<!DOCTYPE html>')) {
-        errorMessage = 'El webhook ha devuelto una página HTML en lugar de JSON. Verifique la configuración de make.com.';
+        errorMessage = 'Error de comunicación con make.com. Por favor, intente de nuevo más tarde.';
       } else if (error?.message) {
         errorMessage = `${message}: ${error.message}`;
       }
@@ -70,56 +67,54 @@ const handleApiError = (error: any, message: string) => {
 
 // Implementation that connects to Zoho Books API via make.com webhook
 const ZohoService = {
-  // Get configuration status
-  getStatus: async (): Promise<ZohoServiceStatus> => {
-    try {
-      console.log("ZohoService: Getting configuration status");
-      const { data, error } = await supabase.functions.invoke('zoho-config', {
-        method: 'GET'
-      });
-      
-      if (error) {
-        console.error('Error getting Zoho configuration status:', error);
-        return { isConfigured: false };
-      }
-      
-      return {
-        isConfigured: data.configured,
-        lastUpdated: data.config?.updatedAt
-      };
-    } catch (err) {
-      console.error('Error in getStatus:', err);
-      return { isConfigured: false };
-    }
-  },
-
   // Get transactions within a date range
   getTransactions: async (startDate: Date, endDate: Date, forceRefresh = false): Promise<Transaction[]> => {
     try {
       console.log("ZohoService: Fetching transactions from", startDate, "to", endDate);
       
-      // Check if Zoho is configured
-      const status = await ZohoService.getStatus();
+      // Format dates for the make.com webhook (YYYY-MM-DD format)
+      const formattedStartDate = startDate.toISOString().split('T')[0];
+      const formattedEndDate = endDate.toISOString().split('T')[0];
       
-      if (!status.isConfigured) {
-        console.warn('Zoho Books is not configured. Using mock data.');
+      // Call the make.com webhook directly
+      console.log("ZohoService: Calling make.com webhook:", makeWebhookUrl);
+      const response = await fetch(makeWebhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "getTransactions",
+          startDate: formattedStartDate,
+          endDate: formattedEndDate,
+          forceRefresh
+        })
+      });
+      
+      console.log(`make.com webhook response status: ${response.status}`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Failed to fetch data from make.com webhook:", errorText);
+        
+        const errorMessage = handleApiError({details: errorText}, 'Failed to fetch Zoho transactions from make.com webhook');
+        console.warn('Falling back to mock data due to error');
         return ZohoService.getMockTransactions(startDate, endDate);
       }
       
-      // Call our edge function to get transactions via make.com webhook
-      console.log("ZohoService: Calling zoho-transactions edge function");
-      const { data, error } = await supabase.functions.invoke('zoho-transactions', {
-        method: 'POST',
-        body: {
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
-          forceRefresh
+      // Parse the webhook response
+      let data;
+      try {
+        const responseText = await response.text();
+        if (!responseText || responseText === "Accepted") {
+          console.log("Empty or 'Accepted' response from make.com webhook, using mock data");
+          return ZohoService.getMockTransactions(startDate, endDate);
         }
-      });
-      
-      if (error) {
-        const errorMessage = handleApiError(error, 'Failed to fetch Zoho transactions from make.com webhook');
-        console.warn('Falling back to mock data due to error');
+        
+        console.log(`make.com webhook response: ${responseText}`);
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error("Failed to parse make.com webhook response:", e);
         return ZohoService.getMockTransactions(startDate, endDate);
       }
       
