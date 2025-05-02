@@ -58,7 +58,7 @@ serve(async (req: Request) => {
     } catch (err) {
       console.error("Error in zoho-config GET:", err);
       return new Response(
-        JSON.stringify({ error: "Internal server error" }),
+        JSON.stringify({ error: "Internal server error", details: err.message }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -131,36 +131,70 @@ serve(async (req: Request) => {
       const expiresIn = tokenData.expires_in || 3600;
       const expiryDate = new Date(now.getTime() + expiresIn * 1000);
 
-      // Save configuration to database
-      const { data, error } = await supabase
-        .from("zoho_integration")
-        .insert({
-          client_id: clientId,
-          client_secret: clientSecret,
-          refresh_token: refreshToken,
-          organization_id: organizationId,
-          access_token: tokenData.access_token,
-          token_expires_at: expiryDate.toISOString()
-        })
-        .select();
+      try {
+        // First try to update existing config if it exists
+        const { data: existingConfig } = await supabase
+          .from("zoho_integration")
+          .select("id")
+          .limit(1);
 
-      if (error) {
-        console.error("Error saving Zoho config:", error);
+        let result;
+        if (existingConfig && existingConfig.length > 0) {
+          // Update existing configuration
+          result = await supabase
+            .from("zoho_integration")
+            .update({
+              client_id: clientId,
+              client_secret: clientSecret,
+              refresh_token: refreshToken,
+              organization_id: organizationId,
+              access_token: tokenData.access_token,
+              token_expires_at: expiryDate.toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq("id", existingConfig[0].id)
+            .select();
+        } else {
+          // Insert new configuration
+          result = await supabase
+            .from("zoho_integration")
+            .insert({
+              client_id: clientId,
+              client_secret: clientSecret,
+              refresh_token: refreshToken,
+              organization_id: organizationId,
+              access_token: tokenData.access_token,
+              token_expires_at: expiryDate.toISOString()
+            })
+            .select();
+        }
+
+        const { data, error } = result;
+
+        if (error) {
+          console.error("Error saving Zoho config:", error);
+          return new Response(
+            JSON.stringify({ error: "Failed to save configuration", details: error.message }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
         return new Response(
-          JSON.stringify({ error: "Failed to save configuration" }),
+          JSON.stringify({ 
+            success: true, 
+            message: "Zoho configuration saved successfully",
+            id: data[0].id
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } catch (dbError: any) {
+        console.error("Database error:", dbError);
+        return new Response(
+          JSON.stringify({ error: "Database error", details: dbError.message }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: "Zoho configuration saved successfully",
-          id: data[0].id
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error in zoho-config POST:", err);
       return new Response(
         JSON.stringify({ error: "Internal server error", details: err.message }),

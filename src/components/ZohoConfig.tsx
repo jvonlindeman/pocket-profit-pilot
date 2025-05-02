@@ -49,6 +49,7 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
         
         if (error) {
           console.error('Error fetching Zoho config:', error);
+          setError('Failed to fetch existing Zoho configuration');
           toast({
             title: 'Error',
             description: 'Failed to fetch existing Zoho configuration',
@@ -65,6 +66,7 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
         }
       } catch (err) {
         console.error('Error in fetchConfig:', err);
+        setError('Failed to connect to Zoho configuration service');
       } finally {
         setLoading(false);
       }
@@ -121,6 +123,9 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
       if (onConfigSaved) {
         onConfigSaved();
       }
+
+      // Reload the config to get the latest values
+      window.location.reload();
     } catch (err: any) {
       console.error('Error in handleSubmit:', err);
       setError(err.message || 'An unexpected error occurred');
@@ -133,6 +138,21 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
       setLoading(false);
     }
   };
+
+  const handleRetry = () => {
+    window.location.reload();
+  };
+
+  if (loading && !error) {
+    return (
+      <Card className="w-full max-w-2xl mx-auto">
+        <CardContent className="flex flex-col items-center justify-center py-10">
+          <Loader2 className="w-10 h-10 animate-spin text-primary mb-4" />
+          <p>Loading configuration...</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
@@ -149,7 +169,18 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
           <CardContent>
             <Alert variant="destructive" className="mb-4">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription className="flex flex-col gap-2">
+                <span>{error}</span>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleRetry}
+                  className="self-start mt-2"
+                >
+                  Retry Connection
+                </Button>
+              </AlertDescription>
             </Alert>
           </CardContent>
         )}
