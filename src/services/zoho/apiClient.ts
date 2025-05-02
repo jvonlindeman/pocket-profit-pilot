@@ -90,38 +90,54 @@ const processTransactionData = (data: any[]): Transaction[] => {
         }
       });
     } else if (item && typeof item === 'object') {
-      // This is likely an expense item (with vendor_name)
-      if (item.total !== null && item.total !== undefined) {
-        const isExpense = item.vendor_name !== undefined;
-        
+      // This could be either an expense (with vendor_name) or a bill
+      const isExpense = item.vendor_name !== undefined;
+      const isBill = item.bill_number !== undefined;
+      
+      // Amount field can be in different locations based on the item type
+      let amount = 0;
+      if (isExpense && item.total !== null && item.total !== undefined) {
+        amount = Math.abs(Number(item.total) || 0);
+      } else if (isBill && item.balance !== null && item.balance !== undefined) {
+        amount = Math.abs(Number(item.balance) || 0);
+      } else if (item.total !== null && item.total !== undefined) {
+        amount = Math.abs(Number(item.total) || 0);
+      }
+      
+      // Only add the item if it has an amount
+      if (amount > 0) {
         // Generate a description based on transaction type
         let description = 'Sin descripción';
+        let category = 'Gastos generales';
+        
         if (isExpense && item.vendor_name) {
           description = `Pago a ${item.vendor_name}`;
+          category = item.vendor_name || 'Gastos generales';
+          if (item.vendor_name.includes("EMPLEADO") || 
+              item.vendor_name.includes("CONTRATISTA") || 
+              item.vendor_name.includes("NOMINA")) {
+            category = 'Pagos a personal';
+          }
+        } else if (isBill && item.vendor_name) {
+          description = `Factura #${item.bill_number} de ${item.vendor_name}`;
+          category = 'Facturas de proveedores';
         } else {
           description = 'Transacción';
         }
         
-        // Determine category - check if it's a contractor or employee payment
-        let category = isExpense ? (item.vendor_name || 'Gastos generales') : 'Otros';
-        if (isExpense && item.vendor_name && 
-            (item.vendor_name.includes("EMPLEADO") || 
-             item.vendor_name.includes("CONTRATISTA") || 
-             item.vendor_name.includes("NOMINA"))) {
-          category = 'Pagos a personal';
-        }
-        
-        // Generate a unique ID
-        const id = `${isExpense ? 'expense' : 'other'}-${item.vendor_name || 'unknown'}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+        // Generate a unique ID based on type
+        const id = `${isExpense ? 'expense' : (isBill ? 'bill' : 'other')}-${
+          item.vendor_name || item.bill_number || 'unknown'
+        }-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
         
         result.push({
           id,
-          date: new Date().toISOString().split('T')[0], // Using current date since it's not in the data
-          amount: Math.abs(Number(item.total) || 0),
+          date: new Date().toISOString().split('T')[0],
+          amount,
           description,
           category,
           source: 'Zoho',
-          type: isExpense ? 'expense' : 'income'
+          type: 'expense' // All vendor payments and bills are expenses
         });
       }
     }
