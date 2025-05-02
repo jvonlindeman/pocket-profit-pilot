@@ -14,6 +14,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useSearchParams } from 'react-router-dom';
 
 interface ZohoConfigProps {
   onConfigSaved?: () => void;
@@ -34,6 +35,7 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
   const [configured, setConfigured] = useState(false);
   const [existingConfig, setExistingConfig] = useState<ZohoConfigData | null>(null);
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
 
   // Fetch current configuration
   useEffect(() => {
@@ -63,7 +65,17 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
     };
     
     fetchConfig();
-  }, [toast]);
+    
+    // Check if refresh token is provided in URL
+    const tokenFromUrl = searchParams.get('refreshToken');
+    if (tokenFromUrl) {
+      setRefreshToken(tokenFromUrl);
+      toast({
+        title: 'Refresh Token Received',
+        description: 'Refresh token has been pre-filled from OAuth flow'
+      });
+    }
+  }, [toast, searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,6 +169,9 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
               required={!configured}
               placeholder={configured ? "••••••••" : ""}
             />
+            <p className="text-xs text-muted-foreground mt-1">
+              You've already provided a refresh token: {refreshToken.substring(0, 10)}...
+            </p>
           </div>
           
           <div className="space-y-2">

@@ -2,8 +2,9 @@
 import React from 'react';
 import ZohoConfig from '@/components/ZohoConfig';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Info } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const Settings = () => {
   return (
@@ -30,7 +31,16 @@ const Settings = () => {
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-10">
+        <div className="space-y-6">
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertTitle>Zoho Books Integration</AlertTitle>
+            <AlertDescription>
+              You've provided a refresh token via direct input. To complete the setup, fill in your Client ID, 
+              Client Secret, and Organization ID below.
+            </AlertDescription>
+          </Alert>
+
           <section>
             <h2 className="text-lg font-medium text-gray-900 mb-4">Zoho Books</h2>
             <ZohoConfig />
