@@ -1,6 +1,6 @@
 
-import React, { useMemo } from 'react';
-import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, Wallet } from 'lucide-react';
+import React from 'react';
+import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon } from 'lucide-react';
 import { FinancialSummary as FinanceSummaryType } from '@/types/financial';
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -25,28 +25,6 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({ summary, expenseCategor
       maximumFractionDigits: 1
     }).format(percentage / 100);
   };
-
-  // Calculate expenses by category
-  const expenseBreakdown = useMemo(() => {
-    // Default case when no categories are provided
-    if (!expenseCategories || expenseCategories.length === 0) {
-      return [];
-    }
-
-    // Group similar categories
-    const serviceProviders = expenseCategories
-      .filter(cat => cat.category !== 'Pagos a personal')
-      .reduce((sum, cat) => sum + cat.amount, 0);
-      
-    const contractors = expenseCategories
-      .filter(cat => cat.category === 'Pagos a personal')
-      .reduce((sum, cat) => sum + cat.amount, 0);
-
-    return [
-      { name: 'Servicios y proveedores', amount: serviceProviders },
-      { name: 'Contratistas y empleados', amount: contractors }
-    ];
-  }, [expenseCategories]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">
@@ -77,16 +55,6 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({ summary, expenseCategor
           <div className="text-2xl font-bold text-red-500 animate-value">
             {formatCurrency(summary.totalExpense)}
           </div>
-          {expenseBreakdown.length > 0 && (
-            <div className="mt-2 flex flex-col text-sm text-gray-500">
-              {expenseBreakdown.map((item, index) => (
-                <div key={index} className="flex justify-between items-center mt-1">
-                  <span>{item.name}</span>
-                  <span className="font-medium">{formatCurrency(item.amount)}</span>
-                </div>
-              ))}
-            </div>
-          )}
         </CardContent>
       </Card>
 
