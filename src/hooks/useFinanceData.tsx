@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import ZohoService from '../services/zohoService';
 import StripeService from '../services/stripeService';
 import { Transaction, FinancialData, FinancialSummary, CategorySummary, DateRange, ChartData } from '../types/financial';
+import { useToast } from '@/hooks/use-toast';
 
 // Define el formato de fecha para gráficos
 const formatDateForChart = (date: Date): string => {
@@ -27,38 +28,51 @@ export const useFinanceData = (initialDateRange?: DateRange) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   // Función para actualizar el rango de fechas
   const updateDateRange = (newRange: DateRange) => {
     setDateRange(newRange);
   };
+  
+  // Función para forzar la actualización de datos
+  const refreshData = (forceRefresh = false) => {
+    fetchData(dateRange.startDate, dateRange.endDate, forceRefresh);
+  };
+
+  // Función para obtener los datos
+  const fetchData = async (startDate: Date, endDate: Date, forceRefresh = false) => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Obtenemos datos de ambas fuentes
+      const zohoTransactions = await ZohoService.getTransactions(startDate, endDate, forceRefresh);
+      const stripeTransactions = await StripeService.getTransactions(startDate, endDate);
+      
+      // Combinamos los resultados
+      const allTransactions = [...zohoTransactions, ...stripeTransactions];
+      
+      // Ordenamos por fecha
+      allTransactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      
+      setTransactions(allTransactions);
+    } catch (err: any) {
+      console.error('Error fetching financial data:', err);
+      setError(err.message || 'Error al cargar datos financieros. Por favor, intente nuevamente.');
+      
+      toast({
+        title: 'Error',
+        description: 'No se pudieron cargar los datos financieros',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Efecto para cargar datos cuando cambia el rango de fechas
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        // Obtenemos datos de ambas fuentes
-        const zohoTransactions = await ZohoService.getTransactions(dateRange.startDate, dateRange.endDate);
-        const stripeTransactions = await StripeService.getTransactions(dateRange.startDate, dateRange.endDate);
-        
-        // Combinamos los resultados
-        const allTransactions = [...zohoTransactions, ...stripeTransactions];
-        
-        // Ordenamos por fecha
-        allTransactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        
-        setTransactions(allTransactions);
-      } catch (err) {
-        console.error('Error fetching financial data:', err);
-        setError('Error al cargar datos financieros. Por favor, intente nuevamente.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+    fetchData(dateRange.startDate, dateRange.endDate);
   }, [dateRange]);
 
   // Calculamos el resumen financiero basado en las transacciones
@@ -205,7 +219,8 @@ export const useFinanceData = (initialDateRange?: DateRange) => {
     financialData,
     loading,
     error,
-    getCurrentMonthRange
+    getCurrentMonthRange,
+    refreshData
   };
 };
 

@@ -1,1 +1,11 @@
+
 project_id = "rstexocnpvtxfhqbnetn"
+
+[functions.zoho-tokens]
+verify_jwt = false
+
+[functions.zoho-transactions]
+verify_jwt = false
+
+[functions.zoho-config]
+verify_jwt = false

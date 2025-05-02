@@ -1,93 +1,158 @@
 
-// Este es un mock del servicio de Zoho Books
-// En una implementación real, se conectaría con la API de Zoho Books
-
 import { Transaction } from "../types/financial";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
-// Mock data for Zoho Books
-const zohoMockData: Transaction[] = [
-  {
-    id: "zoho-1",
-    date: "2023-05-01",
-    amount: 2500,
-    description: "Cliente ABC - Servicio de marketing",
-    category: "Ingresos por servicio",
-    source: "Zoho",
-    type: "income"
-  },
-  {
-    id: "zoho-2",
-    date: "2023-05-05",
-    amount: 1200,
-    description: "Cliente XYZ - Consultoría",
-    category: "Ingresos por consultoría",
-    source: "Zoho",
-    type: "income"
-  },
-  {
-    id: "zoho-3",
-    date: "2023-05-07",
-    amount: 350,
-    description: "Suscripción Adobe",
-    category: "software",
-    source: "Zoho",
-    type: "expense"
-  },
-  {
-    id: "zoho-4",
-    date: "2023-05-10",
-    amount: 780,
-    description: "Pago a diseñador freelance",
-    category: "personal",
-    source: "Zoho",
-    type: "expense"
-  },
-  {
-    id: "zoho-5",
-    date: "2023-05-15",
-    amount: 1500,
-    description: "Cliente DEF - Servicio mensual",
-    category: "Ingresos recurrentes",
-    source: "Zoho",
-    type: "income"
-  },
-  {
-    id: "zoho-6",
-    date: "2023-05-18",
-    amount: 250,
-    description: "Suscripción herramientas de análisis",
-    category: "tools",
-    source: "Zoho",
-    type: "expense"
-  },
-  {
-    id: "zoho-7",
-    date: "2023-05-20",
-    amount: 2000,
-    description: "Pago de salarios",
-    category: "personal",
-    source: "Zoho",
-    type: "expense"
-  }
-];
+// Interface for ZohoService configuration status
+export interface ZohoServiceStatus {
+  isConfigured: boolean;
+  lastUpdated?: string;
+}
 
-export const ZohoService = {
+// Real implementation that connects to Zoho Books API
+const ZohoService = {
+  // Get configuration status
+  getStatus: async (): Promise<ZohoServiceStatus> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('zoho-config');
+      
+      if (error) {
+        console.error('Error getting Zoho configuration status:', error);
+        return { isConfigured: false };
+      }
+      
+      return {
+        isConfigured: data.configured,
+        lastUpdated: data.config?.updatedAt
+      };
+    } catch (err) {
+      console.error('Error in getStatus:', err);
+      return { isConfigured: false };
+    }
+  },
+
   // Get transactions within a date range
-  getTransactions: async (startDate: Date, endDate: Date): Promise<Transaction[]> => {
-    // En una implementación real, aquí se haría una llamada a la API de Zoho Books
+  getTransactions: async (startDate: Date, endDate: Date, forceRefresh = false): Promise<Transaction[]> => {
+    try {
+      // Check if Zoho is configured
+      const status = await ZohoService.getStatus();
+      
+      if (!status.isConfigured) {
+        console.warn('Zoho Books is not configured. Using mock data.');
+        return ZohoService.getMockTransactions(startDate, endDate);
+      }
+      
+      // Call our edge function to get transactions
+      const { data, error } = await supabase.functions.invoke('zoho-transactions', {
+        body: {
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          forceRefresh
+        }
+      });
+      
+      if (error) {
+        console.error('Error fetching Zoho transactions:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch Zoho transactions',
+          variant: 'destructive'
+        });
+        // Fall back to mock data
+        return ZohoService.getMockTransactions(startDate, endDate);
+      }
+      
+      return data as Transaction[];
+    } catch (err) {
+      console.error('Error in getTransactions:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to connect to Zoho Books API',
+        variant: 'destructive'
+      });
+      // Fall back to mock data
+      return ZohoService.getMockTransactions(startDate, endDate);
+    }
+  },
+  
+  // Mock data for fallback when API fails or for development
+  getMockTransactions: async (startDate: Date, endDate: Date): Promise<Transaction[]> => {
+    // Original mock data
+    const zohoMockData: Transaction[] = [
+      {
+        id: "zoho-1",
+        date: "2023-05-01",
+        amount: 2500,
+        description: "Cliente ABC - Servicio de marketing",
+        category: "Ingresos por servicio",
+        source: "Zoho",
+        type: "income"
+      },
+      {
+        id: "zoho-2",
+        date: "2023-05-05",
+        amount: 1200,
+        description: "Cliente XYZ - Consultoría",
+        category: "Ingresos por consultoría",
+        source: "Zoho",
+        type: "income"
+      },
+      {
+        id: "zoho-3",
+        date: "2023-05-07",
+        amount: 350,
+        description: "Suscripción Adobe",
+        category: "software",
+        source: "Zoho",
+        type: "expense"
+      },
+      {
+        id: "zoho-4",
+        date: "2023-05-10",
+        amount: 780,
+        description: "Pago a diseñador freelance",
+        category: "personal",
+        source: "Zoho",
+        type: "expense"
+      },
+      {
+        id: "zoho-5",
+        date: "2023-05-15",
+        amount: 1500,
+        description: "Cliente DEF - Servicio mensual",
+        category: "Ingresos recurrentes",
+        source: "Zoho",
+        type: "income"
+      },
+      {
+        id: "zoho-6",
+        date: "2023-05-18",
+        amount: 250,
+        description: "Suscripción herramientas de análisis",
+        category: "tools",
+        source: "Zoho",
+        type: "expense"
+      },
+      {
+        id: "zoho-7",
+        date: "2023-05-20",
+        amount: 2000,
+        description: "Pago de salarios",
+        category: "personal",
+        source: "Zoho",
+        type: "expense"
+      }
+    ];
     
-    // Simulamos un delay para imitar una llamada a API
+    // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 800));
 
-    // Filtramos las transacciones por fecha
+    // Filter the transactions by date
     return zohoMockData.filter(tx => {
       const txDate = new Date(tx.date);
       return txDate >= startDate && txDate <= endDate;
     });
-  },
-
-  // En una implementación real, aquí se añadirían más métodos para interactuar con Zoho Books
-  // como obtener facturas, contactos, etc.
+  }
 };
 
 export default ZohoService;

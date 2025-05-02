@@ -1,0 +1,191 @@
+
+import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+
+interface ZohoConfigProps {
+  onConfigSaved?: () => void;
+}
+
+interface ZohoConfigData {
+  clientId: string;
+  organizationId: string;
+  updatedAt: string;
+}
+
+const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
+  const [clientId, setClientId] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
+  const [refreshToken, setRefreshToken] = useState('');
+  const [organizationId, setOrganizationId] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [configured, setConfigured] = useState(false);
+  const [existingConfig, setExistingConfig] = useState<ZohoConfigData | null>(null);
+  const { toast } = useToast();
+
+  // Fetch current configuration
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('zoho-config');
+        
+        if (error) {
+          console.error('Error fetching Zoho config:', error);
+          toast({
+            title: 'Error',
+            description: 'Failed to fetch existing Zoho configuration',
+            variant: 'destructive'
+          });
+          return;
+        }
+        
+        if (data.configured && data.config) {
+          setConfigured(true);
+          setExistingConfig(data.config);
+          setClientId(data.config.clientId || '');
+          setOrganizationId(data.config.organizationId || '');
+        }
+      } catch (err) {
+        console.error('Error in fetchConfig:', err);
+      }
+    };
+    
+    fetchConfig();
+  }, [toast]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('zoho-config', {
+        body: {
+          clientId,
+          clientSecret,
+          refreshToken,
+          organizationId
+        }
+      });
+      
+      if (error) {
+        console.error('Error saving Zoho config:', error);
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to save Zoho configuration',
+          variant: 'destructive'
+        });
+        return;
+      }
+      
+      toast({
+        title: 'Success',
+        description: 'Zoho Books integration configured successfully'
+      });
+      
+      setConfigured(true);
+      setClientSecret('');
+      setRefreshToken('');
+      
+      if (onConfigSaved) {
+        onConfigSaved();
+      }
+    } catch (err: any) {
+      console.error('Error in handleSubmit:', err);
+      toast({
+        title: 'Error',
+        description: err.message || 'An unexpected error occurred',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card className="w-full max-w-2xl mx-auto">
+      <CardHeader>
+        <CardTitle>Zoho Books Configuration</CardTitle>
+        <CardDescription>
+          {configured 
+            ? `Zoho Books is configured with client ID: ${existingConfig?.clientId}. Last updated: ${new Date(existingConfig?.updatedAt || '').toLocaleString()}`
+            : 'Enter your Zoho Books API credentials below to connect.'}
+        </CardDescription>
+      </CardHeader>
+      <form onSubmit={handleSubmit}>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="clientId">Client ID</Label>
+            <Input
+              id="clientId"
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
+              required
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="clientSecret">Client Secret</Label>
+            <Input
+              id="clientSecret"
+              type="password"
+              value={clientSecret}
+              onChange={(e) => setClientSecret(e.target.value)}
+              required={!configured}
+              placeholder={configured ? "••••••••" : ""}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="refreshToken">Refresh Token</Label>
+            <Input
+              id="refreshToken"
+              type="password"
+              value={refreshToken}
+              onChange={(e) => setRefreshToken(e.target.value)}
+              required={!configured}
+              placeholder={configured ? "••••••••" : ""}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="organizationId">Organization ID</Label>
+            <Input
+              id="organizationId"
+              value={organizationId}
+              onChange={(e) => setOrganizationId(e.target.value)}
+              required
+            />
+          </div>
+        </CardContent>
+        
+        <CardFooter className="flex justify-between">
+          <p className="text-sm text-muted-foreground">
+            {configured ? 'Update your Zoho Books integration settings' : 'Connect to Zoho Books API'}
+          </p>
+          <Button type="submit" disabled={loading}>
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : configured ? 'Update Configuration' : 'Save Configuration'}
+          </Button>
+        </CardFooter>
+      </form>
+    </Card>
+  );
+};
+
+export default ZohoConfig;

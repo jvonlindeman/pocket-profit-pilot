@@ -9,7 +9,78 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      cached_transactions: {
+        Row: {
+          amount: number
+          category: string
+          date: string
+          description: string | null
+          external_id: string
+          id: string
+          source: string
+          sync_date: string
+          type: string
+        }
+        Insert: {
+          amount: number
+          category: string
+          date: string
+          description?: string | null
+          external_id: string
+          id?: string
+          source: string
+          sync_date?: string
+          type: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          date?: string
+          description?: string | null
+          external_id?: string
+          id?: string
+          source?: string
+          sync_date?: string
+          type?: string
+        }
+        Relationships: []
+      }
+      zoho_integration: {
+        Row: {
+          access_token: string | null
+          client_id: string
+          client_secret: string
+          created_at: string
+          id: string
+          organization_id: string | null
+          refresh_token: string
+          token_expires_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token?: string | null
+          client_id: string
+          client_secret: string
+          created_at?: string
+          id?: string
+          organization_id?: string | null
+          refresh_token: string
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string | null
+          client_id?: string
+          client_secret?: string
+          created_at?: string
+          id?: string
+          organization_id?: string | null
+          refresh_token?: string
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

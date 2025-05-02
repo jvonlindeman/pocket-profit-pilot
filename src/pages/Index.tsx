@@ -8,7 +8,8 @@ import ProfitAnalysis from '@/components/Dashboard/ProfitAnalysis';
 import TransactionList from '@/components/Dashboard/TransactionList';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Settings } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const Index = () => {
   const {
@@ -17,7 +18,8 @@ const Index = () => {
     financialData,
     loading,
     error,
-    getCurrentMonthRange
+    getCurrentMonthRange,
+    refreshData
   } = useFinanceData();
 
   // Formateamos fechas para títulos
@@ -34,10 +36,7 @@ const Index = () => {
 
   // Manejador para actualizar datos
   const handleRefresh = () => {
-    // En una aplicación real, aquí se recargarían los datos
-    console.log('Recargando datos...');
-    // Simplemente volvemos a establecer el mismo rango para forzar la recarga
-    updateDateRange({ ...dateRange });
+    refreshData(true);
   };
 
   return (
@@ -50,12 +49,20 @@ const Index = () => {
               <h1 className="text-2xl font-bold text-gray-900">Analizador Financiero</h1>
               <p className="mt-1 text-sm text-gray-500">Análisis de ingresos y gastos para tu agencia</p>
             </div>
-            <div className="mt-4 md:mt-0 w-full md:w-64">
-              <DateRangePicker
-                dateRange={dateRange}
-                onRangeChange={updateDateRange}
-                getCurrentMonthRange={getCurrentMonthRange}
-              />
+            <div className="mt-4 md:mt-0 flex items-center space-x-3">
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/settings">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Configuración
+                </Link>
+              </Button>
+              <div className="w-full md:w-64">
+                <DateRangePicker
+                  dateRange={dateRange}
+                  onRangeChange={updateDateRange}
+                  getCurrentMonthRange={getCurrentMonthRange}
+                />
+              </div>
             </div>
           </div>
         </div>
