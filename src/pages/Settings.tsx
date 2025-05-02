@@ -34,10 +34,10 @@ const Settings = () => {
         <div className="space-y-6">
           <Alert>
             <Info className="h-4 w-4" />
-            <AlertTitle>Zoho Books Integration</AlertTitle>
+            <AlertTitle>Información sobre la integración con Zoho Books</AlertTitle>
             <AlertDescription>
-              You've provided a refresh token via direct input. To complete the setup, fill in your Client ID, 
-              Client Secret, and Organization ID below.
+              Para completar la configuración, asegúrate de proporcionar tu Client ID, Client Secret y Organization ID de Zoho Books. 
+              El Refresh Token ya ha sido pre-llenado con el valor más reciente.
             </AlertDescription>
           </Alert>
 

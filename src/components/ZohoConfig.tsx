@@ -39,6 +39,9 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
 
+  // Set default refresh token from the user's input
+  const defaultRefreshToken = '1000.e43c417017e3052b5b62e1b9b49ade73.591f8e648553ddf2d54346d862772edd';
+
   // Fetch current configuration
   useEffect(() => {
     const fetchConfig = async () => {
@@ -68,6 +71,14 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
           setExistingConfig(data.config);
           setClientId(data.config.clientId || '');
           setOrganizationId(data.config.organizationId || '');
+          
+          // Pre-fill refresh token if not configured yet or if we're updating
+          if (!refreshToken) {
+            setRefreshToken(defaultRefreshToken);
+          }
+        } else {
+          // If not configured, set default refresh token
+          setRefreshToken(defaultRefreshToken);
         }
       } catch (err) {
         console.error('Error in fetchConfig:', err);
@@ -88,7 +99,7 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
         description: 'Refresh token has been pre-filled from OAuth flow'
       });
     }
-  }, [toast, searchParams]);
+  }, [toast, searchParams, defaultRefreshToken, refreshToken]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,15 +107,29 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
     setError(null);
     
     try {
-      console.log('Saving Zoho config to edge function...');
+      // Validate required fields for new configuration
+      if (!configured && (!clientId || !clientSecret || !refreshToken || !organizationId)) {
+        setError('All fields are required for initial configuration');
+        return;
+      }
+      
+      // Validate required fields for updating configuration
+      if (configured && (!clientId || !refreshToken || !organizationId)) {
+        setError('Client ID, Refresh Token, and Organization ID are required');
+        return;
+      }
+      
+      const configData = {
+        clientId,
+        clientSecret: clientSecret || undefined, // Only send if provided
+        refreshToken,
+        organizationId
+      };
+      
+      console.log('Saving Zoho config to edge function...', configData);
       const { data, error } = await supabase.functions.invoke('zoho-config', {
         method: 'POST',
-        body: {
-          clientId,
-          clientSecret,
-          refreshToken,
-          organizationId
-        }
+        body: configData
       });
       
       console.log('Zoho config save response:', { data, error });
@@ -127,7 +152,6 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
       
       setConfigured(true);
       setClientSecret('');
-      setRefreshToken('');
       
       if (onConfigSaved) {
         onConfigSaved();
@@ -215,6 +239,11 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
               required={!configured}
               placeholder={configured ? "••••••••" : ""}
             />
+            {configured && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Leave blank to keep existing client secret
+              </p>
+            )}
           </div>
           
           <div className="space-y-2">
@@ -224,8 +253,8 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
               type="password"
               value={refreshToken}
               onChange={(e) => setRefreshToken(e.target.value)}
-              required={!configured}
-              placeholder={configured ? "••••••••" : ""}
+              required
+              placeholder="Enter refresh token"
             />
             {refreshToken && (
               <p className="text-xs text-muted-foreground mt-1">
