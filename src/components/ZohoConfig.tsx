@@ -12,9 +12,10 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSearchParams } from 'react-router-dom';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface ZohoConfigProps {
   onConfigSaved?: () => void;
@@ -34,12 +35,15 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
   const [loading, setLoading] = useState(false);
   const [configured, setConfigured] = useState(false);
   const [existingConfig, setExistingConfig] = useState<ZohoConfigData | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
 
   // Fetch current configuration
   useEffect(() => {
     const fetchConfig = async () => {
+      setLoading(true);
+      setError(null);
       try {
         const { data, error } = await supabase.functions.invoke('zoho-config');
         
@@ -61,6 +65,8 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
         }
       } catch (err) {
         console.error('Error in fetchConfig:', err);
+      } finally {
+        setLoading(false);
       }
     };
     
@@ -80,6 +86,7 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     
     try {
       const { data, error } = await supabase.functions.invoke('zoho-config', {
@@ -93,6 +100,7 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
       
       if (error) {
         console.error('Error saving Zoho config:', error);
+        setError(error.message || 'Failed to save Zoho configuration');
         toast({
           title: 'Error',
           description: error.message || 'Failed to save Zoho configuration',
@@ -115,6 +123,7 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
       }
     } catch (err: any) {
       console.error('Error in handleSubmit:', err);
+      setError(err.message || 'An unexpected error occurred');
       toast({
         title: 'Error',
         description: err.message || 'An unexpected error occurred',
@@ -136,6 +145,15 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
+        {error && (
+          <CardContent>
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          </CardContent>
+        )}
+        
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="clientId">Client ID</Label>
@@ -169,9 +187,11 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
               required={!configured}
               placeholder={configured ? "••••••••" : ""}
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              You've already provided a refresh token: {refreshToken.substring(0, 10)}...
-            </p>
+            {refreshToken && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Refresh token provided: {refreshToken.substring(0, 5)}...{refreshToken.substring(refreshToken.length - 5)}
+              </p>
+            )}
           </div>
           
           <div className="space-y-2">

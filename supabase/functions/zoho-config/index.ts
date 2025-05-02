@@ -67,7 +67,26 @@ serve(async (req: Request) => {
   // Handle POST request to update config
   if (req.method === "POST") {
     try {
-      const { clientId, clientSecret, refreshToken, organizationId }: ZohoConfigRequest = await req.json();
+      // Safely handle parsing the request body
+      let body;
+      try {
+        const text = await req.text();
+        if (!text) {
+          return new Response(
+            JSON.stringify({ error: "Empty request body" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        body = JSON.parse(text);
+      } catch (parseError) {
+        console.error("Error parsing request body:", parseError);
+        return new Response(
+          JSON.stringify({ error: "Invalid JSON in request body" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      const { clientId, clientSecret, refreshToken, organizationId } = body as ZohoConfigRequest;
 
       if (!clientId || !clientSecret || !refreshToken || !organizationId) {
         return new Response(
