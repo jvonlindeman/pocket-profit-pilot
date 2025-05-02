@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
@@ -133,7 +132,10 @@ const Index = () => {
             )}
 
             {/* Resumen financiero */}
-            <FinanceSummary summary={financialData.summary} />
+            <FinanceSummary 
+              summary={financialData.summary} 
+              expenseCategories={financialData.expenseByCategory} 
+            />
 
             {/* Gráficos */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
