@@ -180,7 +180,8 @@ serve(async (req: Request) => {
     
     // Use the correct Zoho API domain with region
     const region = tokenData.region || "com";
-    const zohoApiUrl = `https://books.zoho.${region}/api/v3/banktransactions?organization_id=${tokenData.organization_id}&from_date=${formattedStartDate}&to_date=${formattedEndDate}`;
+    // Modified: Use the correct zohoapis domain format instead of just books.zoho.com
+    const zohoApiUrl = `https://books.zohoapis.${region}/api/v3/banktransactions?organization_id=${tokenData.organization_id}&from_date=${formattedStartDate}&to_date=${formattedEndDate}`;
     
     console.log("Calling Zoho Books API:", zohoApiUrl);
     

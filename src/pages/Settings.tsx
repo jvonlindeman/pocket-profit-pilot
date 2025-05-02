@@ -2,7 +2,7 @@
 import React from 'react';
 import ZohoConfig from '@/components/ZohoConfig';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Info } from 'lucide-react';
+import { ArrowLeft, Info, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -38,6 +38,21 @@ const Settings = () => {
             <AlertDescription>
               Para completar la configuración, asegúrate de proporcionar tu Client ID, Client Secret y Organization ID de Zoho Books. 
               El Refresh Token ya ha sido pre-llenado con el valor más reciente.
+            </AlertDescription>
+          </Alert>
+
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Solución de problemas</AlertTitle>
+            <AlertDescription className="space-y-2">
+              <p>Si estás experimentando el error <strong>"Failed to fetch Zoho transactions"</strong>, verifica:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Que el Refresh Token tenga el scope <code>ZohoBooks.fullaccess.all</code></li>
+                <li>Que hayas ingresado el Client Secret correctamente</li>
+                <li>Que el Organization ID sea válido</li>
+                <li>Que tu cuenta de Zoho Books esté activa</li>
+              </ul>
+              <p>Después de actualizar la configuración, vuelve al Dashboard para probar nuevamente.</p>
             </AlertDescription>
           </Alert>
 
