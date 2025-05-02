@@ -9,6 +9,9 @@ export interface ZohoServiceStatus {
   lastUpdated?: string;
 }
 
+// Helper function to get the current year
+const getCurrentYear = () => new Date().getFullYear();
+
 // Real implementation that connects to Zoho Books API
 const ZohoService = {
   // Get configuration status
@@ -34,6 +37,8 @@ const ZohoService = {
   // Get transactions within a date range
   getTransactions: async (startDate: Date, endDate: Date, forceRefresh = false): Promise<Transaction[]> => {
     try {
+      console.log("ZohoService: Fetching transactions from", startDate, "to", endDate);
+      
       // Check if Zoho is configured
       const status = await ZohoService.getStatus();
       
@@ -62,6 +67,7 @@ const ZohoService = {
         return ZohoService.getMockTransactions(startDate, endDate);
       }
       
+      console.log("ZohoService: Received data from API:", data);
       return data as Transaction[];
     } catch (err) {
       console.error('Error in getTransactions:', err);
@@ -77,12 +83,14 @@ const ZohoService = {
   
   // Mock data for fallback when API fails or for development
   getMockTransactions: async (startDate: Date, endDate: Date): Promise<Transaction[]> => {
-    // Original mock data
+    // Original mock data with updated years
     const zohoMockData: Transaction[] = [
       {
         id: "zoho-1",
-        date: "2023-05-01",
+        date: `${getCurrentYear()}-05-01`,
         amount: 2500,
+        original_amount: 2500,
+        currency: "USD",
         description: "Cliente ABC - Servicio de marketing",
         category: "Ingresos por servicio",
         source: "Zoho",
@@ -90,8 +98,10 @@ const ZohoService = {
       },
       {
         id: "zoho-2",
-        date: "2023-05-05",
+        date: `${getCurrentYear()}-05-05`,
         amount: 1200,
+        original_amount: 1200,
+        currency: "USD",
         description: "Cliente XYZ - Consultoría",
         category: "Ingresos por consultoría",
         source: "Zoho",
@@ -99,8 +109,10 @@ const ZohoService = {
       },
       {
         id: "zoho-3",
-        date: "2023-05-07",
+        date: `${getCurrentYear()}-05-07`,
         amount: 350,
+        original_amount: 350,
+        currency: "USD",
         description: "Suscripción Adobe",
         category: "software",
         source: "Zoho",
@@ -108,8 +120,10 @@ const ZohoService = {
       },
       {
         id: "zoho-4",
-        date: "2023-05-10",
+        date: `${getCurrentYear()}-05-10`,
         amount: 780,
+        original_amount: 780,
+        currency: "USD",
         description: "Pago a diseñador freelance",
         category: "personal",
         source: "Zoho",
@@ -117,8 +131,10 @@ const ZohoService = {
       },
       {
         id: "zoho-5",
-        date: "2023-05-15",
+        date: `${getCurrentYear()}-05-15`,
         amount: 1500,
+        original_amount: 1500,
+        currency: "USD",
         description: "Cliente DEF - Servicio mensual",
         category: "Ingresos recurrentes",
         source: "Zoho",
@@ -126,8 +142,10 @@ const ZohoService = {
       },
       {
         id: "zoho-6",
-        date: "2023-05-18",
+        date: `${getCurrentYear()}-05-18`,
         amount: 250,
+        original_amount: 250,
+        currency: "USD",
         description: "Suscripción herramientas de análisis",
         category: "tools",
         source: "Zoho",
@@ -135,8 +153,10 @@ const ZohoService = {
       },
       {
         id: "zoho-7",
-        date: "2023-05-20",
+        date: `${getCurrentYear()}-05-20`,
         amount: 2000,
+        original_amount: 2000,
+        currency: "USD",
         description: "Pago de salarios",
         category: "personal",
         source: "Zoho",
@@ -147,11 +167,17 @@ const ZohoService = {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 800));
 
+    console.log("ZohoService mock: Filtering transactions from", startDate, "to", endDate);
+
     // Filter the transactions by date
-    return zohoMockData.filter(tx => {
+    const filtered = zohoMockData.filter(tx => {
       const txDate = new Date(tx.date);
       return txDate >= startDate && txDate <= endDate;
     });
+    
+    console.log("ZohoService mock: Found transactions:", filtered.length);
+    
+    return filtered;
   }
 };
 

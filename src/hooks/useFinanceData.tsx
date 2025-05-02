@@ -32,16 +32,19 @@ export const useFinanceData = (initialDateRange?: DateRange) => {
 
   // Función para actualizar el rango de fechas
   const updateDateRange = (newRange: DateRange) => {
+    console.log("Updating date range to:", newRange);
     setDateRange(newRange);
   };
   
   // Función para forzar la actualización de datos
   const refreshData = (forceRefresh = false) => {
+    console.log("Forcing data refresh, forceRefresh =", forceRefresh);
     fetchData(dateRange.startDate, dateRange.endDate, forceRefresh);
   };
 
   // Función para obtener los datos
   const fetchData = async (startDate: Date, endDate: Date, forceRefresh = false) => {
+    console.log("Fetching data from", startDate, "to", endDate, "forceRefresh =", forceRefresh);
     setLoading(true);
     setError(null);
     try {
@@ -49,12 +52,16 @@ export const useFinanceData = (initialDateRange?: DateRange) => {
       const zohoTransactions = await ZohoService.getTransactions(startDate, endDate, forceRefresh);
       const stripeTransactions = await StripeService.getTransactions(startDate, endDate);
       
+      console.log("Zoho transactions:", zohoTransactions.length);
+      console.log("Stripe transactions:", stripeTransactions.length);
+      
       // Combinamos los resultados
       const allTransactions = [...zohoTransactions, ...stripeTransactions];
       
       // Ordenamos por fecha
       allTransactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       
+      console.log("Combined transactions:", allTransactions.length);
       setTransactions(allTransactions);
     } catch (err: any) {
       console.error('Error fetching financial data:', err);
@@ -72,18 +79,25 @@ export const useFinanceData = (initialDateRange?: DateRange) => {
 
   // Efecto para cargar datos cuando cambia el rango de fechas
   useEffect(() => {
+    console.log("Date range changed, fetching new data");
     fetchData(dateRange.startDate, dateRange.endDate);
   }, [dateRange]);
 
   // Calculamos el resumen financiero basado en las transacciones
   const financialSummary = useMemo<FinancialSummary>(() => {
-    const totalIncome = transactions
-      .filter(tx => tx.type === 'income')
-      .reduce((sum, tx) => sum + tx.amount, 0);
+    console.log("Recalculating financial summary with", transactions.length, "transactions");
     
-    const totalExpense = transactions
-      .filter(tx => tx.type === 'expense')
-      .reduce((sum, tx) => sum + tx.amount, 0);
+    const incomeTransactions = transactions.filter(tx => tx.type === 'income');
+    const expenseTransactions = transactions.filter(tx => tx.type === 'expense');
+    
+    console.log("Income transactions:", incomeTransactions.length);
+    console.log("Expense transactions:", expenseTransactions.length);
+    
+    const totalIncome = incomeTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+    const totalExpense = expenseTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+    
+    console.log("Total income:", totalIncome);
+    console.log("Total expense:", totalExpense);
     
     const profit = totalIncome - totalExpense;
     const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0;
@@ -143,10 +157,16 @@ export const useFinanceData = (initialDateRange?: DateRange) => {
     // Obtenemos todas las fechas en el rango
     const dates: Date[] = [];
     const currentDate = new Date(dateRange.startDate);
-    while (currentDate <= dateRange.endDate) {
+    const endDateValue = new Date(dateRange.endDate);
+    
+    console.log("Preparing daily data from", currentDate, "to", endDateValue);
+    
+    while (currentDate <= endDateValue) {
       dates.push(new Date(currentDate));
       currentDate.setDate(currentDate.getDate() + 1);
     }
+    
+    console.log("Total days in range:", dates.length);
     
     // Inicializamos datos para ingresos y gastos
     const incomeMap: Record<string, number> = {};
@@ -183,22 +203,35 @@ export const useFinanceData = (initialDateRange?: DateRange) => {
     return { income, expense };
   }, [transactions, dateRange]);
 
-  // Datos mensuales (simplificado para el ejemplo)
+  // Datos mensuales (usaremos los datos actuales para el último mes)
   const monthlyData = useMemo(() => {
-    // Para una implementación real, aquí se agregarían los datos por mes
-    // Este es un ejemplo simplificado
+    const currentMonth = new Date().getMonth();
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    
+    // Crear un array de los últimos 5 meses
+    const lastMonthsLabels = [];
+    for (let i = 4; i >= 0; i--) {
+      const monthIndex = (currentMonth - i + 12) % 12; // Ensure it's always positive
+      lastMonthsLabels.push(months[monthIndex]);
+    }
+    
+    // Valores de ejemplo para los meses anteriores
+    const incomeValues = [12500, 15000, 13200, 16700, financialSummary.totalIncome];
+    const expenseValues = [8200, 9500, 7800, 10200, financialSummary.totalExpense];
+    const profitValues = incomeValues.map((inc, idx) => inc - expenseValues[idx]);
+    
     return {
       income: {
-        labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May'],
-        values: [12500, 15000, 13200, 16700, financialSummary.totalIncome]
+        labels: lastMonthsLabels,
+        values: incomeValues
       },
       expense: {
-        labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May'],
-        values: [8200, 9500, 7800, 10200, financialSummary.totalExpense]
+        labels: lastMonthsLabels,
+        values: expenseValues
       },
       profit: {
-        labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May'],
-        values: [4300, 5500, 5400, 6500, financialSummary.profit]
+        labels: lastMonthsLabels,
+        values: profitValues
       }
     };
   }, [financialSummary]);

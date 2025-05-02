@@ -2,11 +2,14 @@
 import { Transaction } from "../types/financial";
 import { supabase } from "@/integrations/supabase/client";
 
-// Mock data for Stripe
+// Helper function to get the current year
+const getCurrentYear = () => new Date().getFullYear();
+
+// Mock data for Stripe with dates in current year
 const stripeMockData: Transaction[] = [
   {
     id: "stripe-1",
-    date: "2023-05-02",
+    date: `${getCurrentYear()}-05-02`,
     amount: 1999.99,
     original_amount: 1999.99,
     currency: "USD",
@@ -17,7 +20,7 @@ const stripeMockData: Transaction[] = [
   },
   {
     id: "stripe-2",
-    date: "2023-05-08",
+    date: `${getCurrentYear()}-05-08`,
     amount: 599.99,
     original_amount: 599.99,
     currency: "USD",
@@ -28,7 +31,7 @@ const stripeMockData: Transaction[] = [
   },
   {
     id: "stripe-3",
-    date: "2023-05-12",
+    date: `${getCurrentYear()}-05-12`,
     amount: 29.99,
     original_amount: 29.99,
     currency: "USD",
@@ -39,7 +42,7 @@ const stripeMockData: Transaction[] = [
   },
   {
     id: "stripe-4",
-    date: "2023-05-15",
+    date: `${getCurrentYear()}-05-15`,
     amount: 999.99,
     original_amount: 999.99,
     currency: "USD",
@@ -50,7 +53,7 @@ const stripeMockData: Transaction[] = [
   },
   {
     id: "stripe-5",
-    date: "2023-05-22",
+    date: `${getCurrentYear()}-05-22`,
     amount: 1299.99,
     original_amount: 1299.99,
     currency: "USD",
@@ -61,7 +64,7 @@ const stripeMockData: Transaction[] = [
   },
   {
     id: "stripe-6",
-    date: "2023-05-25",
+    date: `${getCurrentYear()}-05-25`,
     amount: 25.99,
     original_amount: 25.99,
     currency: "USD",
@@ -96,12 +99,16 @@ export const StripeService = {
     
     // Simulate a delay for API call
     await new Promise(resolve => setTimeout(resolve, 600));
+    
+    console.log("StripeService: Fetching transactions from", startDate, "to", endDate);
 
     // Filter the transactions by date
     const filteredTransactions = stripeMockData.filter(tx => {
       const txDate = new Date(tx.date);
       return txDate >= startDate && txDate <= endDate;
     });
+    
+    console.log("StripeService: Found transactions:", filteredTransactions.length);
     
     return filteredTransactions;
   },

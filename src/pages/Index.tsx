@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
 import RevenueChart from '@/components/Dashboard/RevenueChart';
@@ -10,6 +10,7 @@ import { useFinanceData } from '@/hooks/useFinanceData';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Settings } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
   const {
@@ -21,6 +22,31 @@ const Index = () => {
     getCurrentMonthRange,
     refreshData
   } = useFinanceData();
+  
+  const { toast } = useToast();
+
+  // Efecto para cargar datos iniciales y mostrar notificación
+  useEffect(() => {
+    console.log("Index component mounted, initial data load");
+    
+    // Mostrar toast de bienvenida
+    toast({
+      title: 'Cargando datos financieros',
+      description: 'Obteniendo datos de Zoho Books y Stripe',
+    });
+  }, []);
+
+  // Logs para depuración
+  useEffect(() => {
+    if (financialData) {
+      console.log("Financial data updated:", {
+        totalIncome: financialData.summary.totalIncome,
+        totalExpense: financialData.summary.totalExpense,
+        profit: financialData.summary.profit,
+        transactionCount: financialData.transactions.length
+      });
+    }
+  }, [financialData]);
 
   // Formateamos fechas para títulos
   const formatDateForTitle = (date: Date) => {
@@ -36,6 +62,11 @@ const Index = () => {
 
   // Manejador para actualizar datos
   const handleRefresh = () => {
+    console.log("Manual refresh requested");
+    toast({
+      title: 'Actualizando datos',
+      description: 'Obteniendo datos más recientes...',
+    });
     refreshData(true);
   };
 
@@ -92,6 +123,14 @@ const Index = () => {
                 <RefreshCw className="h-4 w-4 mr-2" /> Actualizar
               </Button>
             </div>
+
+            {/* Información de depuración */}
+            {financialData.transactions.length === 0 && (
+              <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg p-4 mb-6">
+                <p className="font-medium">No hay transacciones para el periodo seleccionado.</p>
+                <p className="mt-1 text-sm">Intenta seleccionar un periodo diferente o verificar la configuración de Zoho Books.</p>
+              </div>
+            )}
 
             {/* Resumen financiero */}
             <FinanceSummary summary={financialData.summary} />

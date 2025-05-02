@@ -33,10 +33,10 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({ summary }) => {
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-medium text-gray-500">Ingresos Totales (USD)</h3>
             <div className="p-2 bg-green-50 rounded-full">
-              <ArrowUpIcon className="h-4 w-4 text-finance-income" />
+              <ArrowUpIcon className="h-4 w-4 text-green-500" />
             </div>
           </div>
-          <div className="text-2xl font-bold income-text animate-value">
+          <div className="text-2xl font-bold text-green-500 animate-value">
             {formatCurrency(summary.totalIncome)}
           </div>
         </CardContent>
@@ -48,10 +48,10 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({ summary }) => {
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-medium text-gray-500">Gastos Totales (USD)</h3>
             <div className="p-2 bg-red-50 rounded-full">
-              <ArrowDownIcon className="h-4 w-4 text-finance-expense" />
+              <ArrowDownIcon className="h-4 w-4 text-red-500" />
             </div>
           </div>
-          <div className="text-2xl font-bold expense-text animate-value">
+          <div className="text-2xl font-bold text-red-500 animate-value">
             {formatCurrency(summary.totalExpense)}
           </div>
         </CardContent>
@@ -63,11 +63,11 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({ summary }) => {
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-medium text-gray-500">Beneficio Neto (USD)</h3>
             <div className="p-2 bg-blue-50 rounded-full">
-              <TrendingUpIcon className="h-4 w-4 text-finance-profit" />
+              <TrendingUpIcon className="h-4 w-4 text-blue-500" />
             </div>
           </div>
           <div className="flex items-end justify-between">
-            <div className="text-2xl font-bold profit-text animate-value">
+            <div className="text-2xl font-bold text-blue-500 animate-value">
               {formatCurrency(summary.profit)}
             </div>
             <div className={`text-sm font-medium ml-2 ${summary.profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
