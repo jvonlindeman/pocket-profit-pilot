@@ -13,57 +13,13 @@ const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as stri
 
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
+// The make.com webhook URL
+const makeWebhookUrl = "https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihlmx22";
+
 interface TransactionRequest {
   startDate: string;
   endDate: string;
   forceRefresh?: boolean;
-}
-
-// Format transaction data from Zoho to match our database schema
-function formatTransaction(transaction: any, source = 'Zoho') {
-  // Determine if it's income or expense based on transaction type
-  const isIncome = transaction.transaction_type === 'customer_payment' || 
-                  transaction.transaction_type === 'sales_invoice' ||
-                  transaction.transaction_type === 'credit_note';
-  
-  // Get the amount (we assume all amounts are in USD)
-  const amount = Math.abs(parseFloat(transaction.amount || transaction.total || '0'));
-  
-  return {
-    external_id: transaction.transaction_id || `zoho-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-    date: transaction.date,
-    amount: amount,
-    description: transaction.reference_number || transaction.transaction_number || 'Zoho Transaction',
-    category: transaction.account_name || transaction.transaction_type || 'Uncategorized',
-    type: isIncome ? 'income' : 'expense',
-    source: source,
-    sync_date: new Date().toISOString()
-  };
-}
-
-// Helper function to implement retry logic
-async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 2): Promise<Response> {
-  let lastError: any;
-  
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      if (attempt > 0) {
-        console.log(`Retry attempt ${attempt} for ${url}`);
-        // Exponential backoff: wait longer with each retry (300ms, 900ms, 2700ms, etc.)
-        await new Promise(resolve => setTimeout(resolve, 300 * Math.pow(3, attempt - 1)));
-      }
-      
-      console.log(`Fetching URL: ${url} (attempt ${attempt})`);
-      const response = await fetch(url, options);
-      console.log(`Response status: ${response.status}`);
-      return response;
-    } catch (err) {
-      console.error(`Attempt ${attempt} failed:`, err);
-      lastError = err;
-    }
-  }
-  
-  throw lastError || new Error(`Failed to fetch after ${maxRetries} retries`);
 }
 
 serve(async (req: Request) => {
@@ -133,223 +89,99 @@ serve(async (req: Request) => {
       }
     }
     
-    // No cached data or force refresh, fetch new data from Zoho
-    console.log("Fetching fresh data from Zoho API");
+    // No cached data or force refresh, fetch new data from make.com webhook
+    console.log("Fetching fresh data from make.com webhook");
     
-    // Get Zoho access token
-    console.log("Calling zoho-tokens function");
-    const tokenResponse = await fetchWithRetry(`${supabaseUrl}/functions/v1/zoho-tokens`, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${supabaseServiceRoleKey}`,
-      }
-    });
-    
-    if (!tokenResponse.ok) {
-      const errorText = await tokenResponse.text();
-      console.error("Failed to get Zoho token:", errorText);
-      return new Response(
-        JSON.stringify({ error: "Failed to authenticate with Zoho", details: errorText }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    let tokenData;
-    try {
-      tokenData = await tokenResponse.json();
-      console.log("Zoho token response:", JSON.stringify(tokenData));
-    } catch (e) {
-      console.error("Failed to parse token response:", e);
-      const rawText = await tokenResponse.text();
-      console.log("Raw token response:", rawText);
-      return new Response(
-        JSON.stringify({ error: "Failed to parse token response", details: rawText }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    
-    if (!tokenData.access_token || !tokenData.organization_id) {
-      console.error("Invalid token data:", tokenData);
-      return new Response(
-        JSON.stringify({ error: "Invalid Zoho credentials", details: "Missing access token or organization ID" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    
-    // Format dates for Zoho API (YYYY-MM-DD format)
+    // Format dates for the webhook (YYYY-MM-DD format)
     const formattedStartDate = new Date(startDate).toISOString().split('T')[0];
     const formattedEndDate = new Date(endDate).toISOString().split('T')[0];
     
-    // FIXED: Use the correct API URL format for US accounts
-    // For US accounts: https://www.zohoapis.com/books/v3/
-    
-    // First, do a test API call to check authentication and connection
-    // Use a simple organizations endpoint which is more reliable
-    const testApiUrl = `https://www.zohoapis.com/books/v3/organizations/${tokenData.organization_id}`;
-    
-    console.log("Testing Zoho Books API connectivity:", testApiUrl);
-    
-    // Test API access first
-    try {
-      const testResponse = await fetchWithRetry(testApiUrl, {
-        method: "GET",
-        headers: {
-          "Authorization": `Zoho-oauthtoken ${tokenData.access_token}`,
-          "Content-Type": "application/json"
-        }
-      });
-      
-      console.log(`Test API response status: ${testResponse.status}`);
-      
-      if (!testResponse.ok) {
-        const testErrorText = await testResponse.text();
-        console.error("Failed connection test to Zoho Books API:", testErrorText);
-        
-        let errorMessage = "Failed to connect to Zoho Books API";
-        
-        // Better error handling for specific issues
-        if (testErrorText.includes("invalid_token")) {
-          errorMessage = "Invalid access token. Please regenerate your refresh token.";
-        } else if (testErrorText.includes("expired")) {
-          errorMessage = "Access token has expired. Please try again.";
-        } else if (testErrorText.includes("invalid_organization")) {
-          errorMessage = "Invalid Organization ID. Please check your Zoho Books settings.";
-        }
-        
-        return new Response(
-          JSON.stringify({ 
-            error: errorMessage, 
-            details: testErrorText,
-            url: testApiUrl
-          }),
-          { status: testResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      
-      // Try to parse the response to ensure it's valid JSON
-      const testData = await testResponse.json();
-      console.log("Test API connection successful. Organization data:", JSON.stringify(testData).substring(0, 200) + "...");
-      
-      // If we get here, the organization call worked, which confirms our auth is good
-    } catch (testError) {
-      console.error("Error testing API connection:", testError);
-      return new Response(
-        JSON.stringify({ 
-          error: "Error connecting to Zoho Books API", 
-          details: testError.message,
-          url: testApiUrl
-        }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    
-    // Now proceed with the transactions API call - FIXED URL for US accounts
-    const zohoApiUrl = `https://www.zohoapis.com/books/v3/banktransactions?organization_id=${tokenData.organization_id}&from_date=${formattedStartDate}&to_date=${formattedEndDate}`;
-    
-    console.log("Calling Zoho Books API:", zohoApiUrl);
-    
-    // Use the fetchWithRetry helper for better reliability
-    const zohoResponse = await fetchWithRetry(zohoApiUrl, {
-      method: "GET",
+    // Call the make.com webhook
+    console.log("Calling make.com webhook:", makeWebhookUrl);
+    const webhookResponse = await fetch(makeWebhookUrl, {
+      method: "POST",
       headers: {
-        "Authorization": `Zoho-oauthtoken ${tokenData.access_token}`,
-        "Content-Type": "application/json"
-      }
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        startDate: formattedStartDate,
+        endDate: formattedEndDate,
+        forceRefresh: forceRefresh
+      })
     });
     
-    // Log the complete response details for debugging
-    console.log(`Zoho API response status: ${zohoResponse.status}`);
-    console.log(`Zoho API response headers: ${JSON.stringify([...zohoResponse.headers])}`);
+    console.log(`make.com webhook response status: ${webhookResponse.status}`);
     
-    // Get the response body text first for debugging purposes
-    const responseText = await zohoResponse.text();
-    console.log(`Zoho API response: ${responseText}`);
-    
-    if (!zohoResponse.ok) {
-      console.error("Failed to fetch Zoho transactions:", responseText);
-      
-      // Better error handling for common Zoho API errors
-      let errorMessage = "Failed to fetch Zoho transactions";
-      
-      if (responseText.includes("invalid_token")) {
-        errorMessage = "Invalid token. Please check credentials and scope.";
-      } else if (responseText.includes("expired")) { 
-        errorMessage = "Token expired. Try refreshing your configuration.";
-      } else if (responseText.includes("invalid_organization")) {
-        errorMessage = "Invalid Organization ID. Verify the ID in your configuration.";
-      } else if (responseText.includes("domain")) {
-        errorMessage = "Incorrect Zoho API domain. Verify your region configuration.";
-      }
-      
+    if (!webhookResponse.ok) {
+      const errorText = await webhookResponse.text();
+      console.error("Failed to fetch data from make.com webhook:", errorText);
       return new Response(
         JSON.stringify({ 
-          error: errorMessage, 
-          details: responseText,
-          url: zohoApiUrl
+          error: "Failed to fetch data from make.com webhook", 
+          details: errorText 
         }),
-        { status: zohoResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: webhookResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     
-    let zohoData;
+    // Parse the webhook response
+    let transactions;
     try {
-      zohoData = JSON.parse(responseText);
+      const responseText = await webhookResponse.text();
+      console.log(`make.com webhook response: ${responseText}`);
+      transactions = JSON.parse(responseText);
     } catch (e) {
-      console.error("Failed to parse Zoho response:", e);
+      console.error("Failed to parse make.com webhook response:", e);
       return new Response(
-        JSON.stringify({ error: "Failed to parse Zoho response", details: responseText }),
+        JSON.stringify({ error: "Failed to parse make.com webhook response" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     
-    if (!zohoData.banktransactions) {
-      console.log("No transactions found in Zoho response:", zohoData);
-      // This might not be an error - just no transactions in the period
-      const transactions = [];
-      
-      // We'll still cache the empty result
-      console.log("Caching empty transaction result");
-      return new Response(
-        JSON.stringify(transactions),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    
-    // Format the transactions and prepare for caching
-    const transactions = zohoData.banktransactions.map((tx: any) => formatTransaction(tx));
-    
-    // Delete existing cached transactions for this date range and source
-    console.log("Deleting existing cached transactions");
-    const { error: deleteError } = await supabase
-      .from("cached_transactions")
-      .delete()
-      .eq("source", "Zoho")
-      .gte("date", startDate)
-      .lte("date", endDate);
-      
-    if (deleteError) {
-      console.error("Error deleting old cached transactions:", deleteError);
-    }
-    
-    // Insert new transactions into cache
-    if (transactions.length > 0) {
-      console.log("Caching new transactions:", transactions.length);
-      const { error: insertError } = await supabase
-        .from("cached_transactions")
-        .insert(transactions);
+    // If we get valid transactions, update the cache
+    if (Array.isArray(transactions) && transactions.length > 0) {
+      try {
+        // Delete existing cached transactions for this date range and source
+        console.log("Deleting existing cached transactions");
+        const { error: deleteError } = await supabase
+          .from("cached_transactions")
+          .delete()
+          .eq("source", "Zoho")
+          .gte("date", startDate)
+          .lte("date", endDate);
+          
+        if (deleteError) {
+          console.error("Error deleting old cached transactions:", deleteError);
+        }
         
-      if (insertError) {
-        console.error("Error caching transactions:", insertError);
-        return new Response(
-          JSON.stringify({ error: "Failed to cache transactions", details: insertError }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        // Add sync_date to transactions if not present
+        const now = new Date().toISOString();
+        const transactionsWithSyncDate = transactions.map(tx => ({
+          ...tx,
+          sync_date: tx.sync_date || now
+        }));
+        
+        // Insert new transactions into cache
+        console.log("Caching new transactions:", transactionsWithSyncDate.length);
+        const { error: insertError } = await supabase
+          .from("cached_transactions")
+          .insert(transactionsWithSyncDate);
+          
+        if (insertError) {
+          console.error("Error caching transactions:", insertError);
+          // We'll still return the transactions even if caching fails
+        }
+      } catch (cacheError) {
+        console.error("Error managing transaction cache:", cacheError);
+        // Continue and return the transactions even if caching fails
       }
+    } else {
+      console.log("No transactions returned from make.com webhook");
     }
     
-    console.log("Successfully fetched and cached transactions:", transactions.length);
+    console.log("Successfully fetched transactions from make.com webhook:", transactions?.length || 0);
     return new Response(
-      JSON.stringify(transactions),
+      JSON.stringify(transactions || []),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
     

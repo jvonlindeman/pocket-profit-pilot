@@ -1,3 +1,4 @@
+
 import React from 'react';
 import ZohoConfig from '@/components/ZohoConfig';
 import { Button } from '@/components/ui/button';
@@ -40,11 +41,12 @@ const Settings = () => {
             </AlertDescription>
           </Alert>
           
-          <Alert variant="success">
-            <CheckCircle className="h-4 w-4" />
-            <AlertTitle>Actualización de API</AlertTitle>
-            <AlertDescription>
-              La integración ha sido actualizada para usar correctamente la API de Zoho Books para cuentas de Estados Unidos.
+          <Alert variant="default" className="bg-green-50 border-green-200">
+            <CheckCircle className="h-4 w-4 text-green-500" />
+            <AlertTitle className="text-green-700">Nueva Integración con make.com</AlertTitle>
+            <AlertDescription className="text-green-700">
+              La integración ahora utiliza make.com como intermediario para conectar con Zoho Books, lo que mejora la estabilidad y la compatibilidad.
+              Toda la comunicación con Zoho Books se realiza a través del webhook de make.com.
             </AlertDescription>
           </Alert>
 
@@ -52,12 +54,13 @@ const Settings = () => {
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Solución de problemas</AlertTitle>
             <AlertDescription className="space-y-2">
-              <p>Si estás experimentando el error <strong>"Failed to fetch Zoho transactions"</strong>, verifica:</p>
+              <p>Si estás experimentando errores con la integración, verifica:</p>
               <ul className="list-disc pl-5 space-y-1">
                 <li>Que el Refresh Token tenga el scope <code className="bg-gray-700 text-white px-1 py-0.5 rounded">ZohoBooks.fullaccess.all</code></li>
                 <li>Que hayas ingresado el Client Secret correctamente</li>
                 <li>Que el Organization ID sea válido - encuéntralo en Zoho Books bajo Settings → Organizations</li>
                 <li>Que tu cuenta de Zoho Books esté activa y sea de Estados Unidos (región US)</li>
+                <li>Que la conexión con make.com esté funcionando correctamente (webhook URL: https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihlmx22)</li>
               </ul>
               <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
                 <p className="font-medium text-amber-800">Pasos para generar un nuevo Refresh Token:</p>
@@ -70,12 +73,12 @@ const Settings = () => {
                 </ol>
               </div>
               <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
-                <p className="font-medium text-blue-800">Notas importantes para cuentas de USA:</p>
+                <p className="font-medium text-blue-800">Sobre la integración con make.com:</p>
                 <ul className="list-disc ml-5 space-y-1 mt-2 text-blue-800">
-                  <li>La URL de autenticación debe ser <code className="bg-gray-700 text-white px-1 py-0.5 rounded">https://accounts.zoho.com</code> (sin region)</li>
-                  <li>La URL de API debe ser <code className="bg-gray-700 text-white px-1 py-0.5 rounded">https://www.zohoapis.com/books/v3</code></li>
-                  <li>Asegúrate de utilizar el Organization ID correcto de tu cuenta de Zoho Books US</li>
-                  <li>Esta aplicación está configurada para trabajar con cuentas de Zoho Books US</li>
+                  <li>Todas las comunicaciones con Zoho Books ahora pasan por make.com</li>
+                  <li>La configuración y credenciales se almacenan de forma segura en nuestra base de datos</li>
+                  <li>make.com se encarga de gestionar los tokens y las llamadas a la API de Zoho Books</li>
+                  <li>Esta aplicación está configurada para trabajar con el webhook de make.com en <code className="bg-gray-700 text-white px-1 py-0.5 rounded">https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihlmx22</code></li>
                 </ul>
               </div>
               <p className="mt-2">Después de actualizar la configuración, vuelve al Dashboard para probar nuevamente.</p>
@@ -83,7 +86,7 @@ const Settings = () => {
           </Alert>
 
           <section>
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Zoho Books</h2>
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Zoho Books (via make.com)</h2>
             <ZohoConfig />
           </section>
         </div>
@@ -93,7 +96,7 @@ const Settings = () => {
       <footer className="bg-white border-t border-gray-200 py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <p className="text-sm text-center text-gray-500">
-            Analizador Financiero para Agencias v1.0 • Datos obtenidos de Zoho Books y Stripe
+            Analizador Financiero para Agencias v1.0 • Datos obtenidos de Zoho Books (vía make.com) y Stripe
           </p>
         </div>
       </footer>

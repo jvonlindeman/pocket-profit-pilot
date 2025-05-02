@@ -13,31 +13,14 @@ const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as stri
 
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
+// The make.com webhook URL
+const makeWebhookUrl = "https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihlmx22";
+
 interface ZohoConfigRequest {
   clientId: string;
-  clientSecret: string;
+  clientSecret?: string;
   refreshToken: string;
   organizationId: string;
-}
-
-// Helper function to determine the Zoho API region from token or explicit setting
-function getZohoRegion(token: string): string {
-  // Force "com" as default for US accounts
-  let region = "com";
-  
-  // Only use token-based detection as a fallback
-  if (token.includes(".eu.")) {
-    region = "eu";
-  } else if (token.includes(".in.")) {
-    region = "in";
-  } else if (token.includes(".au.")) {
-    region = "au";
-  } else if (token.includes(".cn.")) {
-    region = "cn";
-  }
-  
-  console.log(`Using Zoho region: ${region} (for domain zoho.${region})`);
-  return region;
 }
 
 serve(async (req: Request) => {
@@ -93,7 +76,7 @@ serve(async (req: Request) => {
     try {
       console.log("Processing POST request to update Zoho configuration");
       // Safely handle parsing the request body
-      let body;
+      let body: ZohoConfigRequest;
       try {
         const text = await req.text();
         if (!text) {
@@ -112,7 +95,7 @@ serve(async (req: Request) => {
         );
       }
       
-      const { clientId, clientSecret, refreshToken, organizationId } = body as ZohoConfigRequest;
+      const { clientId, clientSecret, refreshToken, organizationId } = body;
 
       if (!clientId || !refreshToken || !organizationId) {
         console.error("Missing required fields in request body");
@@ -121,20 +104,6 @@ serve(async (req: Request) => {
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-
-      // Determine region (US accounts use "com")
-      const region = getZohoRegion(refreshToken);
-      
-      // Use the accounts.zoho.com for authentication (US accounts don't need region)
-      const tokenUrl = "https://accounts.zoho.com/oauth/v2/token";
-
-      // Validate the refresh token by trying to get an access token
-      const params = new URLSearchParams({
-        refresh_token: refreshToken,
-        client_id: clientId,
-        client_secret: clientSecret || "", // Allow empty when updating
-        grant_type: "refresh_token"
-      });
 
       // First check if we're just updating and need to get the existing client secret
       let finalClientSecret = clientSecret;
@@ -148,9 +117,6 @@ serve(async (req: Request) => {
         if (existingConfig && existingConfig.length > 0) {
           finalClientSecret = existingConfig[0].client_secret;
           console.log("Using existing client secret");
-          
-          // Update the params
-          params.set("client_secret", finalClientSecret);
         } else {
           return new Response(
             JSON.stringify({ error: "Client Secret is required for initial configuration" }),
@@ -159,88 +125,71 @@ serve(async (req: Request) => {
         }
       }
 
-      console.log("Validating Zoho credentials with refresh token at:", tokenUrl);
-      const response = await fetch(
-        tokenUrl,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded"
-          },
-          body: params
-        }
-      );
-
-      const responseData = await response.text(); // Use text() instead of json()
-      console.log(`Zoho token response status: ${response.status}`);
-      console.log(`Zoho token response: ${responseData}`);
-
-      if (!response.ok) {
-        let errorMessage = "Invalid Zoho credentials";
-        
-        // Try to provide more helpful error messages
-        if (responseData.includes("invalid_client")) {
-          errorMessage = "Invalid Client ID or Client Secret";
-        } else if (responseData.includes("invalid_grant")) {
-          errorMessage = "Invalid Refresh Token. Ensure it has the ZohoBooks.fullaccess.all scope";
-        } else if (response.status === 401) {
-          errorMessage = "Authentication failed. Please verify your credentials";
-        }
-        
-        console.error("Zoho token validation failed:", responseData);
+      // Call make.com webhook to validate the configuration
+      console.log("Calling make.com webhook to validate Zoho configuration:", makeWebhookUrl);
+      const webhookResponse = await fetch(makeWebhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "validateConfig",
+          clientId: clientId,
+          clientSecret: finalClientSecret,
+          refreshToken: refreshToken,
+          organizationId: organizationId
+        })
+      });
+      
+      console.log(`make.com webhook validation response status: ${webhookResponse.status}`);
+      
+      if (!webhookResponse.ok) {
+        const errorText = await webhookResponse.text();
+        console.error("Zoho configuration validation failed via make.com:", errorText);
         
         return new Response(
-          JSON.stringify({ error: errorMessage, details: responseData }),
+          JSON.stringify({ 
+            error: "Failed to validate Zoho configuration", 
+            details: errorText
+          }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Parse the response text as JSON
-      const tokenData = JSON.parse(responseData);
-
-      // Calculate expiry time
-      const now = new Date();
-      const expiresIn = tokenData.expires_in || 3600;
-      const expiryDate = new Date(now.getTime() + expiresIn * 1000);
-
+      // Parse the webhook validation response
+      let validationData;
       try {
-        // Now let's verify we can actually access Zoho Books with this token
-        // by making a simple API call to list organizations or another light endpoint
-        const verifyUrl = `https://www.zohoapis.com/books/v3/organizations`;
-        
-        console.log("Verifying Zoho Books API access with:", verifyUrl);
-        const verifyResponse = await fetch(
-          verifyUrl,
-          {
-            headers: {
-              "Authorization": `Zoho-oauthtoken ${tokenData.access_token}`,
-              "Content-Type": "application/json"
-            }
+        const responseText = await webhookResponse.text();
+        console.log(`make.com webhook validation response: ${responseText}`);
+        validationData = JSON.parse(responseText);
+      } catch (e) {
+        console.error("Failed to parse make.com webhook validation response:", e);
+        return new Response(
+          JSON.stringify({ error: "Failed to parse validation response" }),
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, "Content-Type": "application/json" } 
           }
         );
-        
-        const verifyResponseText = await verifyResponse.text();
-        console.log(`Zoho Books API verify response status: ${verifyResponse.status}`);
-        console.log(`Zoho Books API verify response: ${verifyResponseText}`);
-        
-        if (!verifyResponse.ok) {
-          let apiErrorMessage = "Could not access Zoho Books API";
-          
-          if (verifyResponseText.includes("invalid_token")) {
-            apiErrorMessage = "API token is invalid or has incorrect permissions";
-          } else if (verifyResponseText.includes("invalid_organization")) {
-            apiErrorMessage = "Invalid Organization ID";
-          }
-          
-          return new Response(
-            JSON.stringify({ 
-              error: apiErrorMessage, 
-              details: verifyResponseText,
-              note: "Authentication successful but API access failed. Check organization ID and API permissions."
-            }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
+      }
+      
+      if (!validationData.success) {
+        console.error("Validation failed:", validationData);
+        return new Response(
+          JSON.stringify({ 
+            error: validationData.error || "Validation failed", 
+            details: validationData.details || "Unknown error during validation"
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Everything is validated, now save to the database
+      try {
+        // Calculate token expiry from the validation data
+        const now = new Date();
+        const expiresIn = validationData.expires_in || 3600;
+        const expiryDate = new Date(now.getTime() + expiresIn * 1000);
 
         // First try to update existing config if it exists
         console.log("Checking for existing Zoho configuration");
@@ -257,7 +206,7 @@ serve(async (req: Request) => {
             client_id: clientId,
             refresh_token: refreshToken,
             organization_id: organizationId,
-            access_token: tokenData.access_token,
+            access_token: validationData.access_token,
             token_expires_at: expiryDate.toISOString(),
             updated_at: new Date().toISOString()
           };
@@ -282,7 +231,7 @@ serve(async (req: Request) => {
               client_secret: finalClientSecret,
               refresh_token: refreshToken,
               organization_id: organizationId,
-              access_token: tokenData.access_token,
+              access_token: validationData.access_token,
               token_expires_at: expiryDate.toISOString()
             })
             .select();
@@ -302,23 +251,19 @@ serve(async (req: Request) => {
         return new Response(
           JSON.stringify({ 
             success: true, 
-            message: "Zoho configuration saved and verified successfully",
+            message: "Zoho configuration saved and verified successfully via make.com",
             id: data[0].id
           }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
-      } catch (apiError: any) {
-        console.error("Error verifying Zoho Books API access:", apiError);
+      } catch (dbError) {
+        console.error("Database error:", dbError);
         return new Response(
-          JSON.stringify({ 
-            error: "Error verifying Zoho Books API access", 
-            details: apiError.message,
-            note: "Authentication successful but failed to verify API access"
-          }),
+          JSON.stringify({ error: "Database error", details: dbError.message }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error in zoho-config POST:", err);
       return new Response(
         JSON.stringify({ error: "Internal server error", details: err.message }),

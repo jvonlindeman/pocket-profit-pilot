@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSearchParams } from 'react-router-dom';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface ZohoConfigProps {
   onConfigSaved?: () => void;
@@ -106,7 +106,7 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setStatusMessage("Validando credenciales...");
+    setStatusMessage("Validando credenciales con make.com...");
     
     try {
       // Validate required fields for new configuration
@@ -130,9 +130,9 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
         organizationId
       };
 
-      setStatusMessage("Validando credenciales y probando conectividad con la API...");
+      setStatusMessage("Enviando credenciales a make.com y validando la conexión...");
       
-      console.log('Saving Zoho config to edge function...', configData);
+      console.log('Saving Zoho config via make.com webhook...', configData);
       const { data, error } = await supabase.functions.invoke('zoho-config', {
         method: 'POST',
         body: configData
@@ -152,15 +152,15 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
           } else if (error.details.includes('invalid_organization')) {
             setError('Organization ID is invalid. Please verify it in your Zoho Books account.');
           } else {
-            setError(error.message || 'Failed to save Zoho configuration');
+            setError(error.message || 'Failed to save Zoho configuration through make.com');
           }
         } else {
-          setError(error.message || 'Failed to save Zoho configuration');
+          setError(error.message || 'Failed to save Zoho configuration through make.com');
         }
         
         toast({
           title: 'Error',
-          description: error.message || 'Failed to save Zoho configuration',
+          description: error.message || 'Failed to save Zoho configuration through make.com',
           variant: 'destructive'
         });
         return;
@@ -168,7 +168,7 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
       
       toast({
         title: 'Success',
-        description: 'Zoho Books integration configured successfully'
+        description: 'Zoho Books integration configured successfully via make.com'
       });
       
       setConfigured(true);
@@ -182,10 +182,10 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
       window.location.reload();
     } catch (err: any) {
       console.error('Error in handleSubmit:', err);
-      setError(err.message || 'An unexpected error occurred');
+      setError(err.message || 'An unexpected error occurred with make.com webhook');
       toast({
         title: 'Error',
-        description: err.message || 'An unexpected error occurred',
+        description: err.message || 'An unexpected error occurred with make.com webhook',
         variant: 'destructive'
       });
     } finally {
@@ -216,7 +216,7 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
         <CardDescription>
           {configured 
             ? `Zoho Books is configured with client ID: ${existingConfig?.clientId}. Last updated: ${new Date(existingConfig?.updatedAt || '').toLocaleString()}`
-            : 'Enter your Zoho Books API credentials below to connect.'}
+            : 'Enter your Zoho Books API credentials below to connect via make.com.'}
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
@@ -250,6 +250,14 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
         )}
         
         <CardContent className="space-y-4">
+          <Alert className="mb-4">
+            <CheckCircle className="h-4 w-4" />
+            <AlertTitle>Make.com Integration</AlertTitle>
+            <AlertDescription>
+              This form will send your Zoho credentials to make.com (webhook URL: https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihlmx22) for processing.
+            </AlertDescription>
+          </Alert>
+
           <div className="space-y-2">
             <Label htmlFor="clientId">Client ID</Label>
             <Input
@@ -332,7 +340,7 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
         
         <CardFooter className="flex justify-between">
           <p className="text-sm text-muted-foreground">
-            {configured ? 'Update your Zoho Books integration settings' : 'Connect to Zoho Books API'}
+            {configured ? 'Update your Zoho Books integration settings via make.com' : 'Connect to Zoho Books API via make.com'}
           </p>
           <Button type="submit" disabled={loading}>
             {loading ? (

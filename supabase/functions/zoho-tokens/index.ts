@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -13,15 +12,8 @@ const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as stri
 
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-interface RefreshTokenRequest {
-  refreshToken?: string;
-}
-
-// Helper function to determine the Zoho API region from token or explicit setting
-function getZohoRegion(token: string): string {
-  // Always use "com" for US accounts
-  return "com";
-}
+// The make.com webhook URL
+const makeWebhookUrl = "https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihlmx22";
 
 serve(async (req: Request) => {
   console.log(`zoho-tokens function called with method: ${req.method}`);
@@ -57,15 +49,12 @@ serve(async (req: Request) => {
     if (integration.access_token && tokenExpiry > now) {
       console.log("Access token is still valid, returning it");
       
-      // Always use "com" for US accounts
-      const region = "com";
-      
       return new Response(
         JSON.stringify({ 
           access_token: integration.access_token,
           organization_id: integration.organization_id,
           expires_at: integration.token_expires_at,
-          region: region
+          region: "com" // Always use "com" for US accounts
         }),
         { 
           status: 200, 
@@ -74,18 +63,19 @@ serve(async (req: Request) => {
       );
     }
     
-    // Otherwise, refresh the token
-    console.log("Token expired, refreshing...");
+    // Otherwise, request a token refresh through make.com webhook
+    console.log("Token expired, requesting refresh through make.com webhook");
     
     const refreshToken = integration.refresh_token;
     const clientId = integration.client_id;
     const clientSecret = integration.client_secret;
+    const organizationId = integration.organization_id;
     
-    if (!refreshToken || !clientId || !clientSecret) {
+    if (!refreshToken || !clientId || !organizationId) {
       console.error("Missing Zoho credentials:", {
         hasRefreshToken: !!refreshToken,
         hasClientId: !!clientId,
-        hasClientSecret: !!clientSecret,
+        hasOrganizationId: !!organizationId
       });
       return new Response(
         JSON.stringify({ error: "Missing Zoho credentials" }),
@@ -96,62 +86,50 @@ serve(async (req: Request) => {
       );
     }
 
-    // Always use "com" for US accounts
-    const region = "com";
-    
-    // Always use accounts.zoho.com for authentication (US accounts)
-    const zohoTokenUrl = "https://accounts.zoho.com/oauth/v2/token";
-    
-    console.log(`Using Zoho OAuth endpoint: ${zohoTokenUrl}`);
-
-    const params = new URLSearchParams({
-      refresh_token: refreshToken,
-      client_id: clientId,
-      client_secret: clientSecret,
-      grant_type: "refresh_token"
+    // Call the make.com webhook to refresh the token
+    console.log("Calling make.com webhook for token refresh:", makeWebhookUrl);
+    const webhookResponse = await fetch(makeWebhookUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        action: "refreshToken",
+        refreshToken: refreshToken,
+        clientId: clientId,
+        clientSecret: clientSecret,
+        organizationId: organizationId
+      })
     });
-
-    console.log("Calling Zoho OAuth API to refresh token");
-    const response = await fetch(
-      zohoTokenUrl,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: params
-      }
-    );
-
-    const responseText = await response.text();
-    console.log(`Zoho token response status: ${response.status}`);
-    console.log(`Zoho token response headers: ${JSON.stringify([...response.headers])}`);
-    console.log(`Zoho token response: ${responseText}`);
     
-    if (!response.ok) {
-      console.error("Zoho token refresh failed:", responseText);
+    console.log(`make.com webhook response status: ${webhookResponse.status}`);
+    
+    if (!webhookResponse.ok) {
+      const errorText = await webhookResponse.text();
+      console.error("Token refresh through make.com webhook failed:", errorText);
       
       return new Response(
         JSON.stringify({ 
-          error: "Failed to refresh Zoho token", 
-          details: responseText,
-          status: response.status,
-          url: zohoTokenUrl 
+          error: "Failed to refresh Zoho token through make.com", 
+          details: errorText
         }),
         { 
-          status: response.status, 
+          status: webhookResponse.status, 
           headers: { ...corsHeaders, "Content-Type": "application/json" } 
         }
       );
     }
 
+    // Parse the webhook response
     let tokenData;
     try {
+      const responseText = await webhookResponse.text();
+      console.log(`make.com webhook token response: ${responseText}`);
       tokenData = JSON.parse(responseText);
     } catch (e) {
-      console.error("Failed to parse token response:", e);
+      console.error("Failed to parse make.com webhook token response:", e);
       return new Response(
-        JSON.stringify({ error: "Failed to parse token response", details: responseText }),
+        JSON.stringify({ error: "Failed to parse token response" }),
         { 
           status: 500, 
           headers: { ...corsHeaders, "Content-Type": "application/json" } 
@@ -159,12 +137,23 @@ serve(async (req: Request) => {
       );
     }
     
-    // Calculate expiry time (typically 1 hour = 3600 seconds)
+    if (!tokenData.access_token) {
+      console.error("Invalid token data from make.com webhook:", tokenData);
+      return new Response(
+        JSON.stringify({ error: "Invalid token data from make.com webhook" }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
+    
+    // Calculate expiry time (from token data or default to 1 hour)
     const expiresIn = tokenData.expires_in || 3600;
     const expiryDate = new Date(now.getTime() + expiresIn * 1000);
     
     // Update the database with the new token
-    console.log("Updating database with new access token");
+    console.log("Updating database with new access token from make.com webhook");
     const { error: updateError } = await supabase
       .from("zoho_integration")
       .update({
@@ -185,18 +174,18 @@ serve(async (req: Request) => {
       );
     }
     
-    console.log("Token refreshed successfully");
+    console.log("Token refreshed successfully via make.com webhook");
     return new Response(
       JSON.stringify({ 
         access_token: tokenData.access_token,
         organization_id: integration.organization_id,
         expires_at: expiryDate.toISOString(),
-        region: region
+        region: "com" // Always use "com" for US accounts
       }),
       { 
         status: 200, 
         headers: { ...corsHeaders, "Content-Type": "application/json" } 
-        }
+      }
     );
   } catch (err) {
     console.error("Error in zoho-tokens function:", err);
@@ -205,7 +194,7 @@ serve(async (req: Request) => {
       { 
         status: 500, 
         headers: { ...corsHeaders, "Content-Type": "application/json" } 
-        }
+      }
     );
   }
 });
