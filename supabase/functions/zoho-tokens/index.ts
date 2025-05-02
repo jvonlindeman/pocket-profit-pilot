@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -99,7 +100,7 @@ serve(async (req: Request) => {
     const region = "com";
     
     // Always use accounts.zoho.com for authentication (US accounts)
-    const zohoTokenUrl = `https://accounts.zoho.com/oauth/v2/token`;
+    const zohoTokenUrl = "https://accounts.zoho.com/oauth/v2/token";
     
     console.log(`Using Zoho OAuth endpoint: ${zohoTokenUrl}`);
 
@@ -195,7 +196,7 @@ serve(async (req: Request) => {
       { 
         status: 200, 
         headers: { ...corsHeaders, "Content-Type": "application/json" } 
-      }
+        }
     );
   } catch (err) {
     console.error("Error in zoho-tokens function:", err);

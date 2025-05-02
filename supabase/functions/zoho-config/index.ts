@@ -125,8 +125,8 @@ serve(async (req: Request) => {
       // Determine region (US accounts use "com")
       const region = getZohoRegion(refreshToken);
       
-      // Use the accounts.zoho.{region} for authentication
-      const tokenUrl = `https://accounts.zoho.${region}/oauth/v2/token`;
+      // Use the accounts.zoho.com for authentication (US accounts don't need region)
+      const tokenUrl = "https://accounts.zoho.com/oauth/v2/token";
 
       // Validate the refresh token by trying to get an access token
       const params = new URLSearchParams({
@@ -171,31 +171,32 @@ serve(async (req: Request) => {
         }
       );
 
-      const responseText = await response.text();
+      const responseData = await response.text(); // Use text() instead of json()
       console.log(`Zoho token response status: ${response.status}`);
-      console.log(`Zoho token response: ${responseText}`);
+      console.log(`Zoho token response: ${responseData}`);
 
       if (!response.ok) {
         let errorMessage = "Invalid Zoho credentials";
         
         // Try to provide more helpful error messages
-        if (responseText.includes("invalid_client")) {
+        if (responseData.includes("invalid_client")) {
           errorMessage = "Invalid Client ID or Client Secret";
-        } else if (responseText.includes("invalid_grant")) {
+        } else if (responseData.includes("invalid_grant")) {
           errorMessage = "Invalid Refresh Token. Ensure it has the ZohoBooks.fullaccess.all scope";
         } else if (response.status === 401) {
           errorMessage = "Authentication failed. Please verify your credentials";
         }
         
-        console.error("Zoho token validation failed:", errorText);
+        console.error("Zoho token validation failed:", responseData);
         
         return new Response(
-          JSON.stringify({ error: errorMessage, details: responseText }),
+          JSON.stringify({ error: errorMessage, details: responseData }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      const tokenData = await response.json();
+      // Parse the response text as JSON
+      const tokenData = JSON.parse(responseData);
 
       // Calculate expiry time
       const now = new Date();
@@ -205,7 +206,7 @@ serve(async (req: Request) => {
       try {
         // Now let's verify we can actually access Zoho Books with this token
         // by making a simple API call to list organizations or another light endpoint
-        const verifyUrl = `https://books.zohoapis.${region}/api/v3/organizations`;
+        const verifyUrl = `https://www.zohoapis.com/books/v3/organizations`;
         
         console.log("Verifying Zoho Books API access with:", verifyUrl);
         const verifyResponse = await fetch(
@@ -218,23 +219,23 @@ serve(async (req: Request) => {
           }
         );
         
-        const verifyText = await verifyResponse.text();
+        const verifyResponseText = await verifyResponse.text();
         console.log(`Zoho Books API verify response status: ${verifyResponse.status}`);
-        console.log(`Zoho Books API verify response: ${verifyText}`);
+        console.log(`Zoho Books API verify response: ${verifyResponseText}`);
         
         if (!verifyResponse.ok) {
           let apiErrorMessage = "Could not access Zoho Books API";
           
-          if (verifyText.includes("invalid_token")) {
+          if (verifyResponseText.includes("invalid_token")) {
             apiErrorMessage = "API token is invalid or has incorrect permissions";
-          } else if (verifyText.includes("invalid_organization")) {
+          } else if (verifyResponseText.includes("invalid_organization")) {
             apiErrorMessage = "Invalid Organization ID";
           }
           
           return new Response(
             JSON.stringify({ 
               error: apiErrorMessage, 
-              details: verifyText,
+              details: verifyResponseText,
               note: "Authentication successful but API access failed. Check organization ID and API permissions."
             }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }

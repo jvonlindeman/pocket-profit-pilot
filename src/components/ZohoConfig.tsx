@@ -106,18 +106,20 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setStatusMessage(null);
+    setStatusMessage("Validando credenciales...");
     
     try {
       // Validate required fields for new configuration
       if (!configured && (!clientId || !clientSecret || !refreshToken || !organizationId)) {
         setError('All fields are required for initial configuration');
+        setLoading(false);
         return;
       }
       
       // Validate required fields for updating configuration
       if (configured && (!clientId || !refreshToken || !organizationId)) {
         setError('Client ID, Refresh Token, and Organization ID are required');
+        setLoading(false);
         return;
       }
       
@@ -128,7 +130,7 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
         organizationId
       };
 
-      setStatusMessage("Validating credentials and testing API connectivity...");
+      setStatusMessage("Validando credenciales y probando conectividad con la API...");
       
       console.log('Saving Zoho config to edge function...', configData);
       const { data, error } = await supabase.functions.invoke('zoho-config', {
@@ -188,6 +190,7 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
       });
     } finally {
       setLoading(false);
+      setStatusMessage(null);
     }
   };
 
