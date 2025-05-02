@@ -45,7 +45,12 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
       setLoading(true);
       setError(null);
       try {
-        const { data, error } = await supabase.functions.invoke('zoho-config');
+        console.log('Fetching Zoho config from edge function...');
+        const { data, error } = await supabase.functions.invoke('zoho-config', {
+          method: 'GET'
+        });
+        
+        console.log('Zoho config response:', { data, error });
         
         if (error) {
           console.error('Error fetching Zoho config:', error);
@@ -91,7 +96,9 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
     setError(null);
     
     try {
+      console.log('Saving Zoho config to edge function...');
       const { data, error } = await supabase.functions.invoke('zoho-config', {
+        method: 'POST',
         body: {
           clientId,
           clientSecret,
@@ -99,6 +106,8 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
           organizationId
         }
       });
+      
+      console.log('Zoho config save response:', { data, error });
       
       if (error) {
         console.error('Error saving Zoho config:', error);

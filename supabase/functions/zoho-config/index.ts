@@ -21,6 +21,8 @@ interface ZohoConfigRequest {
 }
 
 serve(async (req: Request) => {
+  console.log(`zoho-config function called with method: ${req.method}`);
+  
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -29,6 +31,7 @@ serve(async (req: Request) => {
   // Handle GET request to fetch current config
   if (req.method === "GET") {
     try {
+      console.log("Processing GET request to fetch Zoho configuration");
       const { data, error } = await supabase
         .from("zoho_integration")
         .select("client_id, organization_id, created_at, updated_at")
@@ -44,6 +47,7 @@ serve(async (req: Request) => {
       }
 
       // Return sanitized data (without sensitive info)
+      console.log("Zoho config fetched successfully:", data && data.length > 0);
       return new Response(
         JSON.stringify({
           configured: data && data.length > 0,
@@ -67,11 +71,13 @@ serve(async (req: Request) => {
   // Handle POST request to update config
   if (req.method === "POST") {
     try {
+      console.log("Processing POST request to update Zoho configuration");
       // Safely handle parsing the request body
       let body;
       try {
         const text = await req.text();
         if (!text) {
+          console.error("Empty POST request body");
           return new Response(
             JSON.stringify({ error: "Empty request body" }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -89,6 +95,7 @@ serve(async (req: Request) => {
       const { clientId, clientSecret, refreshToken, organizationId } = body as ZohoConfigRequest;
 
       if (!clientId || !clientSecret || !refreshToken || !organizationId) {
+        console.error("Missing required fields in request body");
         return new Response(
           JSON.stringify({ error: "All fields are required" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -103,6 +110,7 @@ serve(async (req: Request) => {
         grant_type: "refresh_token"
       });
 
+      console.log("Validating Zoho credentials with refresh token");
       const response = await fetch(
         "https://accounts.zoho.com/oauth/v2/token",
         {
@@ -133,6 +141,7 @@ serve(async (req: Request) => {
 
       try {
         // First try to update existing config if it exists
+        console.log("Checking for existing Zoho configuration");
         const { data: existingConfig } = await supabase
           .from("zoho_integration")
           .select("id")
@@ -141,6 +150,7 @@ serve(async (req: Request) => {
         let result;
         if (existingConfig && existingConfig.length > 0) {
           // Update existing configuration
+          console.log("Updating existing Zoho configuration");
           result = await supabase
             .from("zoho_integration")
             .update({
@@ -156,6 +166,7 @@ serve(async (req: Request) => {
             .select();
         } else {
           // Insert new configuration
+          console.log("Creating new Zoho configuration");
           result = await supabase
             .from("zoho_integration")
             .insert({
@@ -179,6 +190,7 @@ serve(async (req: Request) => {
           );
         }
 
+        console.log("Zoho configuration saved successfully");
         return new Response(
           JSON.stringify({ 
             success: true, 
@@ -204,6 +216,7 @@ serve(async (req: Request) => {
   }
 
   // Handle unsupported methods
+  console.error(`Unsupported HTTP method: ${req.method}`);
   return new Response(
     JSON.stringify({ error: "Method not allowed" }),
     { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } }
