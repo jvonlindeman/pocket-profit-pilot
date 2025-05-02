@@ -12,6 +12,30 @@ export interface ZohoServiceStatus {
 // Helper function to get the current year
 const getCurrentYear = () => new Date().getFullYear();
 
+// Helper function to handle API errors and provide better user feedback
+const handleApiError = (error: any, message: string) => {
+  console.error(`ZohoService error: ${message}`, error);
+  
+  let errorMessage = message;
+  
+  // Extract more specific error messages from the Zoho API response if available
+  if (error?.details) {
+    if (typeof error.details === 'string' && error.details.includes('domain')) {
+      errorMessage = 'El API de Zoho requiere la región correcta. Por favor, verifique su configuración.';
+    } else if (error?.message) {
+      errorMessage = `${message}: ${error.message}`;
+    }
+  }
+  
+  toast({
+    title: 'Error',
+    description: errorMessage,
+    variant: 'destructive'
+  });
+  
+  return errorMessage;
+};
+
 // Real implementation that connects to Zoho Books API
 const ZohoService = {
   // Get configuration status
@@ -62,13 +86,7 @@ const ZohoService = {
       });
       
       if (error) {
-        console.error('Error fetching Zoho transactions:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to fetch Zoho transactions: ' + error.message,
-          variant: 'destructive'
-        });
-        // Fall back to mock data
+        const errorMessage = handleApiError(error, 'Failed to fetch Zoho transactions');
         console.warn('Falling back to mock data due to error');
         return ZohoService.getMockTransactions(startDate, endDate);
       }
@@ -76,12 +94,7 @@ const ZohoService = {
       console.log("ZohoService: Received data from API:", data);
       return data as Transaction[];
     } catch (err) {
-      console.error('Error in getTransactions:', err);
-      toast({
-        title: 'Error',
-        description: 'Failed to connect to Zoho Books API',
-        variant: 'destructive'
-      });
+      handleApiError(err, 'Failed to connect to Zoho Books API');
       // Fall back to mock data
       console.warn('Falling back to mock data due to exception');
       return ZohoService.getMockTransactions(startDate, endDate);

@@ -17,6 +17,24 @@ interface RefreshTokenRequest {
   refreshToken?: string;
 }
 
+// Helper function to determine the Zoho API region from token
+function getZohoRegion(token: string): string {
+  // Default region
+  let region = "com";
+  
+  // Try to detect region from token if possible
+  if (token.includes(".eu.")) {
+    region = "eu";
+  } else if (token.includes(".in.")) {
+    region = "in";
+  } else if (token.includes(".au.")) {
+    region = "au";
+  }
+  
+  console.log(`Detected Zoho region: ${region}`);
+  return region;
+}
+
 serve(async (req: Request) => {
   console.log(`zoho-tokens function called with method: ${req.method}`);
   
@@ -50,11 +68,16 @@ serve(async (req: Request) => {
     // If token is valid and not expired, return it
     if (integration.access_token && tokenExpiry > now) {
       console.log("Access token is still valid, returning it");
+      
+      // Detect region from refresh token
+      const region = getZohoRegion(integration.refresh_token);
+      
       return new Response(
         JSON.stringify({ 
           access_token: integration.access_token,
           organization_id: integration.organization_id,
-          expires_at: integration.token_expires_at
+          expires_at: integration.token_expires_at,
+          region: region
         }),
         { 
           status: 200, 
@@ -85,6 +108,12 @@ serve(async (req: Request) => {
       );
     }
 
+    // Detect region from refresh token
+    const region = getZohoRegion(refreshToken);
+    const zohoTokenUrl = `https://accounts.zoho.${region}/oauth/v2/token`;
+    
+    console.log(`Using Zoho OAuth endpoint: ${zohoTokenUrl}`);
+
     const params = new URLSearchParams({
       refresh_token: refreshToken,
       client_id: clientId,
@@ -94,7 +123,7 @@ serve(async (req: Request) => {
 
     console.log("Calling Zoho OAuth API to refresh token");
     const response = await fetch(
-      "https://accounts.zoho.com/oauth/v2/token",
+      zohoTokenUrl,
       {
         method: "POST",
         headers: {
@@ -104,12 +133,16 @@ serve(async (req: Request) => {
       }
     );
 
+    const responseText = await response.text();
+    console.log(`Zoho token response status: ${response.status}`);
+    console.log(`Zoho token response headers: ${JSON.stringify([...response.headers])}`);
+    console.log(`Zoho token response: ${responseText}`);
+    
     if (!response.ok) {
-      const errorResponse = await response.text();
-      console.error("Zoho token refresh failed:", errorResponse);
+      console.error("Zoho token refresh failed:", responseText);
       
       return new Response(
-        JSON.stringify({ error: "Failed to refresh Zoho token", details: errorResponse }),
+        JSON.stringify({ error: "Failed to refresh Zoho token", details: responseText }),
         { 
           status: response.status, 
           headers: { ...corsHeaders, "Content-Type": "application/json" } 
@@ -117,7 +150,19 @@ serve(async (req: Request) => {
       );
     }
 
-    const tokenData = await response.json();
+    let tokenData;
+    try {
+      tokenData = JSON.parse(responseText);
+    } catch (e) {
+      console.error("Failed to parse token response:", e);
+      return new Response(
+        JSON.stringify({ error: "Failed to parse token response", details: responseText }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
     
     // Calculate expiry time (typically 1 hour = 3600 seconds)
     const expiresIn = tokenData.expires_in || 3600;
@@ -150,7 +195,8 @@ serve(async (req: Request) => {
       JSON.stringify({ 
         access_token: tokenData.access_token,
         organization_id: integration.organization_id,
-        expires_at: expiryDate.toISOString()
+        expires_at: expiryDate.toISOString(),
+        region: region
       }),
       { 
         status: 200, 
