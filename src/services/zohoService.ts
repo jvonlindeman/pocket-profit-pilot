@@ -20,10 +20,15 @@ const handleApiError = (error: any, message: string) => {
   
   // Extract more specific error messages from the Zoho API response if available
   if (error?.details) {
-    if (typeof error.details === 'string' && error.details.includes('domain')) {
-      errorMessage = 'El API de Zoho requiere la región correcta. Por favor, verifique su configuración.';
-    } else if (error?.message) {
-      errorMessage = `${message}: ${error.message}`;
+    if (typeof error.details === 'string') {
+      // Check for common errors
+      if (error.details.includes('domain')) {
+        errorMessage = 'El API de Zoho requiere la región correcta. Por favor, verifique su configuración.';
+      } else if (error.details.includes('<!DOCTYPE html>')) {
+        errorMessage = 'El API de Zoho ha devuelto una página HTML en lugar de JSON. Verifique las credenciales y la configuración de región.';
+      } else if (error?.message) {
+        errorMessage = `${message}: ${error.message}`;
+      }
     }
   }
   

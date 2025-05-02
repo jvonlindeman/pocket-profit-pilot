@@ -36,7 +36,8 @@ function formatTransaction(transaction: any, source = 'Zoho') {
     description: transaction.reference_number || transaction.transaction_number || 'Zoho Transaction',
     category: transaction.account_name || transaction.transaction_type || 'Uncategorized',
     type: isIncome ? 'income' : 'expense',
-    source: source
+    source: source,
+    sync_date: new Date().toISOString()
   };
 }
 
@@ -142,25 +143,25 @@ serve(async (req: Request) => {
       }
     });
     
-    const tokenResponseText = await tokenResponse.text();
-    console.log(`Zoho token response status: ${tokenResponse.status}`);
-    console.log(`Zoho token response: ${tokenResponseText}`);
-    
     if (!tokenResponse.ok) {
-      console.error("Failed to get Zoho token:", tokenResponseText);
+      const errorText = await tokenResponse.text();
+      console.error("Failed to get Zoho token:", errorText);
       return new Response(
-        JSON.stringify({ error: "Failed to authenticate with Zoho", details: tokenResponseText }),
+        JSON.stringify({ error: "Failed to authenticate with Zoho", details: errorText }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    
+
     let tokenData;
     try {
-      tokenData = JSON.parse(tokenResponseText);
+      tokenData = await tokenResponse.json();
+      console.log("Zoho token response:", JSON.stringify(tokenData));
     } catch (e) {
       console.error("Failed to parse token response:", e);
+      const rawText = await tokenResponse.text();
+      console.log("Raw token response:", rawText);
       return new Response(
-        JSON.stringify({ error: "Failed to parse token response", details: tokenResponseText }),
+        JSON.stringify({ error: "Failed to parse token response", details: rawText }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -182,6 +183,8 @@ serve(async (req: Request) => {
     const zohoApiUrl = `https://zohoapis.${region}/books/v3/banktransactions?organization_id=${tokenData.organization_id}&from_date=${formattedStartDate}&to_date=${formattedEndDate}`;
     
     console.log("Calling Zoho Books API:", zohoApiUrl);
+    
+    // Use the fetchWithRetry helper for better reliability
     const zohoResponse = await fetchWithRetry(zohoApiUrl, {
       method: "GET",
       headers: {
@@ -190,32 +193,37 @@ serve(async (req: Request) => {
       }
     });
     
-    const zohoResponseText = await zohoResponse.text();
+    // Log the complete response details for debugging
     console.log(`Zoho API response status: ${zohoResponse.status}`);
     console.log(`Zoho API response headers: ${JSON.stringify([...zohoResponse.headers])}`);
-    console.log(`Zoho API response: ${zohoResponseText}`);
+    
+    // Get the response body text first for debugging purposes
+    const responseText = await zohoResponse.text();
+    console.log(`Zoho API response: ${responseText}`);
     
     if (!zohoResponse.ok) {
-      console.error("Failed to fetch Zoho transactions:", zohoResponseText);
+      console.error("Failed to fetch Zoho transactions:", responseText);
       
       // Better error handling for common Zoho API errors
-      const errorMessage = zohoResponseText.includes("domain") 
-        ? "Incorrect Zoho API domain. Please verify your region configuration."
-        : "Failed to fetch Zoho transactions";
+      let errorMessage = "Failed to fetch Zoho transactions";
+      
+      if (responseText.includes("domain")) {
+        errorMessage = "Incorrect Zoho API domain. Please verify your region configuration.";
+      }
       
       return new Response(
-        JSON.stringify({ error: errorMessage, details: zohoResponseText }),
+        JSON.stringify({ error: errorMessage, details: responseText }),
         { status: zohoResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     
     let zohoData;
     try {
-      zohoData = JSON.parse(zohoResponseText);
+      zohoData = JSON.parse(responseText);
     } catch (e) {
       console.error("Failed to parse Zoho response:", e);
       return new Response(
-        JSON.stringify({ error: "Failed to parse Zoho response", details: zohoResponseText }),
+        JSON.stringify({ error: "Failed to parse Zoho response", details: responseText }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
