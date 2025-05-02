@@ -72,23 +72,55 @@ const processTransactionData = (data: any[]): Transaction[] => {
   
   // Process the data based on the structure
   data.forEach((item: any, index: number) => {
-    // Check if the item is an array - this would be the income transactions
+    // Check if the item is an array - this would be the income transactions or bill payments
     if (Array.isArray(item)) {
-      // This is the income transactions array
-      item.forEach((incomeItem: any) => {
-        if (incomeItem && incomeItem.amount && incomeItem.customer_name) {
-          result.push({
-            id: `income-${incomeItem.customer_name.replace(/\s/g, '-')}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-            date: new Date().toISOString().split('T')[0], // Using current date since it's not in the data
-            amount: Number(incomeItem.amount) || 0,
-            description: `Ingreso de ${incomeItem.customer_name}`,
-            category: incomeItem.customer_name.includes("EMPLEADO") || incomeItem.customer_name.includes("CONTRATISTA") ? 
-              'Pagos a personal' : 'Ingresos',
-            source: 'Zoho',
-            type: 'income'
-          });
-        }
-      });
+      // Handle different array types based on their contents
+      
+      // Check if this is the income transactions array (items have customer_name and amount)
+      const isIncomeArray = item.length > 0 && item[0] && item[0].customer_name !== undefined && item[0].amount !== undefined;
+      
+      // Check if this is the bill payments array (items have vendor_name and total)
+      const isBillArray = item.length > 0 && item[0] && item[0].vendor_name !== undefined && item[0].total !== undefined;
+
+      if (isIncomeArray) {
+        // Process income transactions
+        item.forEach((incomeItem: any) => {
+          if (incomeItem && incomeItem.amount && incomeItem.customer_name) {
+            result.push({
+              id: `income-${incomeItem.customer_name.replace(/\s/g, '-')}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+              date: new Date().toISOString().split('T')[0], // Using current date since it's not in the data
+              amount: Number(incomeItem.amount) || 0,
+              description: `Ingreso de ${incomeItem.customer_name}`,
+              category: incomeItem.customer_name.includes("EMPLEADO") || incomeItem.customer_name.includes("CONTRATISTA") ? 
+                'Pagos a personal' : 'Ingresos',
+              source: 'Zoho',
+              type: 'income'
+            });
+          }
+        });
+      } else if (isBillArray) {
+        // Process bill payments
+        item.forEach((billItem: any) => {
+          if (billItem && billItem.total !== null && billItem.total !== undefined && billItem.vendor_name) {
+            const amount = Math.abs(Number(billItem.total) || 0);
+            
+            if (amount > 0) {
+              result.push({
+                id: `bill-payment-${billItem.vendor_name.replace(/\s/g, '-')}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                date: new Date().toISOString().split('T')[0],
+                amount,
+                description: `Pago a ${billItem.vendor_name}`,
+                category: billItem.vendor_name.includes("EMPLEADO") || 
+                       billItem.vendor_name.includes("CONTRATISTA") || 
+                       billItem.vendor_name.includes("NOMINA") ? 
+                        'Pagos a personal' : 'Pagos a proveedores',
+                source: 'Zoho',
+                type: 'expense'
+              });
+            }
+          }
+        });
+      }
     } else if (item && typeof item === 'object') {
       // This could be either an expense (with vendor_name) or a bill
       const isExpense = item.vendor_name !== undefined;
