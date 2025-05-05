@@ -25,14 +25,14 @@ export default function WebhookDebug({ dateRange, refreshDataFunction }: Webhook
     setError(null);
     
     try {
-      // Si tenemos una función de actualización externa, la usamos
+      // Primero actualizamos los datos usando la función de actualización global
+      // Esto asegura que ambos botones hagan el mismo proceso
       if (refreshDataFunction) {
-        console.log("Usando la función de actualización global");
-        // Llamar a refreshData pero no usar sus resultados, solo para mantener consistencia
+        console.log("Usando la función de actualización global para cargar datos");
         refreshDataFunction(true);
       }
       
-      // Obtener datos de respuesta crudos
+      // Luego obtenemos los datos crudos para mostrarlos en la UI de depuración
       const data = await ZohoService.getRawResponse(dateRange.startDate, dateRange.endDate);
       setRawData(data);
       console.log("Debug data received:", data);
