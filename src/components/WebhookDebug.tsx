@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,9 +11,10 @@ interface WebhookDebugProps {
     startDate: Date;
     endDate: Date;
   };
+  refreshDataFunction?: (forceRefresh: boolean) => void;
 }
 
-export default function WebhookDebug({ dateRange }: WebhookDebugProps) {
+export default function WebhookDebug({ dateRange, refreshDataFunction }: WebhookDebugProps) {
   const [loading, setLoading] = useState(false);
   const [rawData, setRawData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +25,13 @@ export default function WebhookDebug({ dateRange }: WebhookDebugProps) {
     setError(null);
     
     try {
+      // Si tenemos una función de actualización externa, la usamos
+      if (refreshDataFunction) {
+        console.log("Usando la función de actualización global");
+        // Llamar a refreshData pero no usar sus resultados, solo para mantener consistencia
+        refreshDataFunction(true);
+      }
+      
       // Obtener datos de respuesta crudos
       const data = await ZohoService.getRawResponse(dateRange.startDate, dateRange.endDate);
       setRawData(data);

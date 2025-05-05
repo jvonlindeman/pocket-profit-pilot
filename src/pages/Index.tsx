@@ -163,14 +163,17 @@ const Index = () => {
           </>
         )}
 
-        {/* Sección de depuración del webhook - siempre visible pero no carga automáticamente */}
+        {/* Sección de depuración del webhook - ahora con la función refreshData */}
         <div className="mt-8">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center">
             <Bug className="h-5 w-5 mr-2 text-amber-500" />
             Depuración del Webhook
           </h2>
           <div className="mt-2">
-            <WebhookDebug dateRange={dateRange} />
+            <WebhookDebug 
+              dateRange={dateRange} 
+              refreshDataFunction={refreshData}
+            />
           </div>
         </div>
       </main>
