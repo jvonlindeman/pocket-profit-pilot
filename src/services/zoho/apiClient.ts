@@ -1,6 +1,6 @@
 
 import { Transaction } from "../../types/financial";
-import { ensureValidDateFormat, handleApiError } from "./utils";
+import { ensureValidDateFormat, handleApiError, processTransactionData } from "./utils";
 import { getMockTransactions } from "./mockData";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -52,7 +52,7 @@ export const fetchTransactionsFromWebhook = async (
       return data;
     }
     
-    return processTransactionData(data);
+    return processRawTransactions(data);
   } catch (err) {
     handleApiError(err, 'Failed to connect to Supabase function');
     // Fall back to mock data
@@ -61,8 +61,8 @@ export const fetchTransactionsFromWebhook = async (
   }
 };
 
-// Helper function to process and normalize transaction data
-const processTransactionData = (data: any[]): Transaction[] => {
+// Helper function to process raw transaction data from the API into the Transaction type
+const processRawTransactions = (data: any[]): Transaction[] => {
   if (!Array.isArray(data)) {
     console.error("Expected array from webhook, received:", typeof data);
     return [];
