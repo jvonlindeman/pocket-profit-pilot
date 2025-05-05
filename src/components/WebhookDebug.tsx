@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -14,29 +14,35 @@ interface WebhookDebugProps {
 }
 
 export default function WebhookDebug({ dateRange }: WebhookDebugProps) {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [rawData, setRawData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Function to fetch raw data from the API
+  // Función para obtener los datos crudos del API
   const fetchDebugData = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      // Get raw response data
+      // Obtener datos de respuesta crudos
       const data = await ZohoService.getRawResponse(dateRange.startDate, dateRange.endDate);
       setRawData(data);
       console.log("Debug data received:", data);
     } catch (err: any) {
-      setError(err.message || "Unknown error occurred");
+      setError(err.message || "Error desconocido");
       console.error("Failed to fetch debug data:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Helper to determine if an item is an income array
+  // Cargar datos automáticamente al montar el componente o cuando cambie el rango de fechas
+  useEffect(() => {
+    console.log("WebhookDebug: Loading debug data automatically");
+    fetchDebugData();
+  }, [dateRange.startDate, dateRange.endDate]);
+
+  // Helper para determinar si un item es un array de ingresos
   const isIncomeArray = (item: any): boolean => {
     return Array.isArray(item) && 
            item.length > 0 && 
@@ -69,7 +75,7 @@ export default function WebhookDebug({ dateRange }: WebhookDebugProps) {
             {loading ? (
               <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Cargando...</>
             ) : (
-              <><RefreshCw className="h-4 w-4 mr-2" /> Obtener Datos</>
+              <><RefreshCw className="h-4 w-4 mr-2" /> Actualizar</>
             )}
           </Button>
         </div>
@@ -78,6 +84,12 @@ export default function WebhookDebug({ dateRange }: WebhookDebugProps) {
           <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-4 mb-4">
             <p className="font-medium">Error</p>
             <p className="text-sm">{error}</p>
+          </div>
+        )}
+
+        {loading && !rawData && (
+          <div className="flex justify-center items-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
           </div>
         )}
 
