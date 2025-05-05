@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
 import RevenueChart from '@/components/Dashboard/RevenueChart';
@@ -8,7 +8,7 @@ import ProfitAnalysis from '@/components/Dashboard/ProfitAnalysis';
 import TransactionList from '@/components/Dashboard/TransactionList';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Settings, Bug } from 'lucide-react';
+import { RefreshCw, Settings, Bug, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import WebhookDebug from '@/components/WebhookDebug';
@@ -21,33 +21,11 @@ const Index = () => {
     loading,
     error,
     getCurrentMonthRange,
-    refreshData
+    refreshData,
+    dataInitialized
   } = useFinanceData();
   
   const { toast } = useToast();
-
-  // Efecto para cargar datos iniciales y mostrar notificación
-  useEffect(() => {
-    console.log("Index component mounted, initial data load");
-    
-    // Mostrar toast de bienvenida
-    toast({
-      title: 'Cargando datos financieros',
-      description: 'Obteniendo datos de Zoho Books y Stripe',
-    });
-  }, []);
-
-  // Logs para depuración
-  useEffect(() => {
-    if (financialData) {
-      console.log("Financial data updated:", {
-        totalIncome: financialData.summary.totalIncome,
-        totalExpense: financialData.summary.totalExpense,
-        profit: financialData.summary.profit,
-        transactionCount: financialData.transactions.length
-      });
-    }
-  }, [financialData]);
 
   // Formateamos fechas para títulos
   const formatDateForTitle = (date: Date) => {
@@ -60,6 +38,15 @@ const Index = () => {
 
   // Título del periodo
   const periodTitle = `${formatDateForTitle(dateRange.startDate)} - ${formatDateForTitle(dateRange.endDate)}`;
+
+  // Manejador para cargar datos iniciales
+  const handleInitialLoad = () => {
+    toast({
+      title: 'Cargando datos financieros',
+      description: 'Obteniendo datos de Zoho Books y Stripe',
+    });
+    refreshData(true);
+  };
 
   // Manejador para actualizar datos
   const handleRefresh = () => {
@@ -102,18 +89,34 @@ const Index = () => {
 
       {/* Contenido principal */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {loading ? (
+        {!dataInitialized && (
+          <div className="flex flex-col items-center justify-center py-16 bg-white rounded-lg shadow-sm mb-6">
+            <h2 className="text-xl font-semibold text-gray-700 mb-4">Bienvenido al Analizador Financiero</h2>
+            <p className="text-gray-500 mb-6 text-center max-w-md">
+              Haz clic en el botón para cargar los datos financieros del periodo seleccionado.
+            </p>
+            <Button onClick={handleInitialLoad} className="gap-2">
+              <Play className="h-4 w-4" /> Cargar Datos Financieros
+            </Button>
+          </div>
+        )}
+        
+        {loading && (
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-finance-profit"></div>
           </div>
-        ) : error ? (
+        )}
+        
+        {error && (
           <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-4 mb-6">
             <p>{error}</p>
             <Button variant="outline" className="mt-2" onClick={handleRefresh}>
               <RefreshCw className="h-4 w-4 mr-2" /> Reintentar
             </Button>
           </div>
-        ) : (
+        )}
+        
+        {dataInitialized && !loading && !error && (
           <>
             {/* Periodo y botón de actualización */}
             <div className="flex justify-between items-center mb-6">
@@ -157,19 +160,19 @@ const Index = () => {
             <div className="mt-6">
               <TransactionList transactions={financialData.transactions} />
             </div>
-
-            {/* Sección de depuración del webhook */}
-            <div className="mt-8">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                <Bug className="h-5 w-5 mr-2 text-amber-500" />
-                Depuración del Webhook
-              </h2>
-              <div className="mt-2">
-                <WebhookDebug dateRange={dateRange} />
-              </div>
-            </div>
           </>
         )}
+
+        {/* Sección de depuración del webhook - siempre visible pero no carga automáticamente */}
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+            <Bug className="h-5 w-5 mr-2 text-amber-500" />
+            Depuración del Webhook
+          </h2>
+          <div className="mt-2">
+            <WebhookDebug dateRange={dateRange} />
+          </div>
+        </div>
       </main>
 
       {/* Pie de página */}

@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -14,7 +13,7 @@ interface WebhookDebugProps {
 }
 
 export default function WebhookDebug({ dateRange }: WebhookDebugProps) {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [rawData, setRawData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,12 +34,6 @@ export default function WebhookDebug({ dateRange }: WebhookDebugProps) {
       setLoading(false);
     }
   };
-
-  // Cargar datos automáticamente al montar el componente o cuando cambie el rango de fechas
-  useEffect(() => {
-    console.log("WebhookDebug: Loading debug data automatically");
-    fetchDebugData();
-  }, [dateRange.startDate, dateRange.endDate]);
 
   // Helper para determinar si un item es un array de ingresos
   const isIncomeArray = (item: any): boolean => {
@@ -75,7 +68,7 @@ export default function WebhookDebug({ dateRange }: WebhookDebugProps) {
             {loading ? (
               <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Cargando...</>
             ) : (
-              <><RefreshCw className="h-4 w-4 mr-2" /> Actualizar</>
+              <><RefreshCw className="h-4 w-4 mr-2" /> Cargar Datos</>
             )}
           </Button>
         </div>
@@ -87,13 +80,13 @@ export default function WebhookDebug({ dateRange }: WebhookDebugProps) {
           </div>
         )}
 
-        {loading && !rawData && (
+        {loading && (
           <div className="flex justify-center items-center py-8">
             <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
           </div>
         )}
 
-        {rawData && (
+        {rawData && !loading && (
           <Tabs defaultValue="formatted" className="w-full">
             <TabsList className="grid grid-cols-2 w-[200px]">
               <TabsTrigger value="formatted">Formateado</TabsTrigger>
