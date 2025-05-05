@@ -1,4 +1,3 @@
-
 import React from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
@@ -22,7 +21,8 @@ const Index = () => {
     error,
     getCurrentMonthRange,
     refreshData,
-    dataInitialized
+    dataInitialized,
+    rawResponse
   } = useFinanceData();
   
   const { toast } = useToast();
@@ -163,7 +163,7 @@ const Index = () => {
           </>
         )}
 
-        {/* Sección de depuración del webhook - ahora con la función refreshData */}
+        {/* Sección de depuración del webhook - ahora con la respuesta cruda */}
         <div className="mt-8">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center">
             <Bug className="h-5 w-5 mr-2 text-amber-500" />
@@ -173,6 +173,7 @@ const Index = () => {
             <WebhookDebug 
               dateRange={dateRange} 
               refreshDataFunction={refreshData}
+              rawResponse={rawResponse}
             />
           </div>
         </div>

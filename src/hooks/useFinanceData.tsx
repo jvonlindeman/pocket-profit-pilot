@@ -11,6 +11,7 @@ export const useFinanceData = () => {
   const [error, setError] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [dataInitialized, setDataInitialized] = useState<boolean>(false);
+  const [rawResponse, setRawResponse] = useState<any>(null);
   
   // Estado del rango de fechas
   const [dateRange, setDateRange] = useState(() => {
@@ -54,6 +55,11 @@ export const useFinanceData = () => {
         forceRefresh
       );
 
+      // Obtener la respuesta cruda actual para depuración
+      const rawData = ZohoService.getLastRawResponse();
+      setRawResponse(rawData);
+      console.log("Fetched raw response for debugging:", rawData);
+
       // Obtener transacciones de Stripe
       console.log("Fetching from Stripe:", dateRange.startDate, dateRange.endDate);
       const stripeData = await StripeService.getTransactions(
@@ -89,6 +95,7 @@ export const useFinanceData = () => {
     error,
     getCurrentMonthRange,
     refreshData,
-    dataInitialized
+    dataInitialized,
+    rawResponse
   };
 };

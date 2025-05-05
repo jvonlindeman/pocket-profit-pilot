@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,12 +12,21 @@ interface WebhookDebugProps {
     endDate: Date;
   };
   refreshDataFunction?: (forceRefresh: boolean) => void;
+  rawResponse?: any;
 }
 
-export default function WebhookDebug({ dateRange, refreshDataFunction }: WebhookDebugProps) {
+export default function WebhookDebug({ dateRange, refreshDataFunction, rawResponse }: WebhookDebugProps) {
   const [loading, setLoading] = useState(false);
   const [rawData, setRawData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Cuando cambia rawResponse desde el componente principal, actualizamos nuestro estado local
+  useEffect(() => {
+    if (rawResponse) {
+      setRawData(rawResponse);
+      console.log("WebhookDebug: Received rawResponse from parent:", rawResponse);
+    }
+  }, [rawResponse]);
 
   // Función para obtener los datos crudos del API
   const fetchDebugData = async () => {
@@ -30,9 +39,24 @@ export default function WebhookDebug({ dateRange, refreshDataFunction }: Webhook
       if (refreshDataFunction) {
         console.log("Usando la función de actualización global para cargar datos");
         refreshDataFunction(true);
+        
+        // Como refreshDataFunction ya actualiza rawResponse a través de useFinanceData,
+        // no necesitamos hacer una llamada adicional a ZohoService.getRawResponse
+        // La actualización sucederá a través del useEffect cuando se actualice el prop rawResponse
+        
+        // Esperamos un breve momento para que se complete la actualización
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Verificamos si ya tenemos datos a través del prop rawResponse
+        if (rawResponse) {
+          setRawData(rawResponse);
+          setLoading(false);
+          return;
+        }
       }
       
       // Luego obtenemos los datos crudos para mostrarlos en la UI de depuración
+      // Solo si no se actualizaron a través del prop rawResponse
       const data = await ZohoService.getRawResponse(dateRange.startDate, dateRange.endDate);
       setRawData(data);
       console.log("Debug data received:", data);
