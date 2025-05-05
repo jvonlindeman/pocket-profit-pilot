@@ -8,9 +8,10 @@ import ProfitAnalysis from '@/components/Dashboard/ProfitAnalysis';
 import TransactionList from '@/components/Dashboard/TransactionList';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Settings } from 'lucide-react';
+import { RefreshCw, Settings, Bug } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import WebhookDebug from '@/components/WebhookDebug';
 
 const Index = () => {
   const {
@@ -155,6 +156,17 @@ const Index = () => {
             {/* Listado de transacciones */}
             <div className="mt-6">
               <TransactionList transactions={financialData.transactions} />
+            </div>
+
+            {/* Sección de depuración del webhook */}
+            <div className="mt-8">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                <Bug className="h-5 w-5 mr-2 text-amber-500" />
+                Depuración del Webhook
+              </h2>
+              <div className="mt-2">
+                <WebhookDebug dateRange={dateRange} />
+              </div>
             </div>
           </>
         )}
