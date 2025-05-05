@@ -1,12 +1,12 @@
 
 import React from 'react';
 import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon } from 'lucide-react';
-import { FinancialSummary as FinanceSummaryType } from '@/types/financial';
+import { FinancialSummary, CategorySummary } from '@/types/financial';
 import { Card, CardContent } from "@/components/ui/card";
 
 interface FinanceSummaryProps {
-  summary: FinanceSummaryType;
-  expenseCategories?: {category: string, amount: number}[];
+  summary: FinancialSummary;
+  expenseCategories?: CategorySummary[];
 }
 
 const FinanceSummary: React.FC<FinanceSummaryProps> = ({ summary, expenseCategories = [] }) => {

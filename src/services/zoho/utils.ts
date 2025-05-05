@@ -1,6 +1,6 @@
 
 import { toast } from "@/hooks/use-toast";
-import { Transaction } from "@/types/financial";
+import { Transaction, FinancialSummary, CategorySummary, ChartData } from "@/types/financial";
 
 // Helper function to get the current year
 export const getCurrentYear = () => new Date().getFullYear();
@@ -34,16 +34,21 @@ export const processTransactionData = (data: Transaction[]) => {
   const result = {
     transactions: data,
     summary: {
-      income: 0,
-      expense: 0,
+      totalIncome: 0,
+      totalExpense: 0,
       profit: 0,
-    },
-    expenseByCategory: [] as { name: string; value: number }[],
+      profitMargin: 0,
+    } as FinancialSummary,
+    expenseByCategory: [] as CategorySummary[],
     dailyData: {
-      income: [] as { date: string; amount: number }[],
-      expense: [] as { date: string; amount: number }[],
+      income: { labels: [], values: [] } as ChartData,
+      expense: { labels: [], values: [] } as ChartData,
     },
-    monthlyData: [] as { month: string; income: number; expense: number; profit: number }[],
+    monthlyData: {
+      income: { labels: [], values: [] } as ChartData,
+      expense: { labels: [], values: [] } as ChartData,
+      profit: { labels: [], values: [] } as ChartData,
+    },
   };
   
   // If no data, return empty result
@@ -109,59 +114,73 @@ export const processTransactionData = (data: Transaction[]) => {
     }
   });
   
-  // Calculate profit
+  // Calculate profit and profit margin
   const profit = totalIncome - totalExpense;
+  const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0;
   
   // Format expense categories for the chart
   const formattedExpenseCategories = Object.keys(expenseCategories)
     .map((category) => ({
-      name: category,
-      value: expenseCategories[category],
+      category,
+      amount: expenseCategories[category],
+      percentage: totalExpense > 0 ? (expenseCategories[category] / totalExpense) * 100 : 0,
     }))
-    .sort((a, b) => b.value - a.value); // Sort by value in descending order
+    .sort((a, b) => b.amount - a.amount); // Sort by value in descending order
   
   // Format daily data for the chart
-  const formattedDailyIncome = Object.keys(dailyIncome)
-    .map((date) => ({
-      date,
-      amount: dailyIncome[date],
-    }))
-    .sort((a, b) => a.date.localeCompare(b.date)); // Sort by date
+  const sortedDailyDates = Object.keys(dailyIncome).concat(Object.keys(dailyExpense))
+    .filter((value, index, self) => self.indexOf(value) === index) // Get unique dates
+    .sort(); // Sort dates
   
-  const formattedDailyExpense = Object.keys(dailyExpense)
-    .map((date) => ({
-      date,
-      amount: dailyExpense[date],
-    }))
-    .sort((a, b) => a.date.localeCompare(b.date)); // Sort by date
+  const formattedDailyIncome = {
+    labels: sortedDailyDates,
+    values: sortedDailyDates.map(date => dailyIncome[date] || 0)
+  };
+  
+  const formattedDailyExpense = {
+    labels: sortedDailyDates,
+    values: sortedDailyDates.map(date => dailyExpense[date] || 0)
+  };
   
   // Format monthly data for the chart
-  const formattedMonthlyData = Object.keys(monthlyData)
-    .map((month) => {
-      const { income, expense } = monthlyData[month];
-      return {
-        month,
-        income,
-        expense,
-        profit: income - expense,
-      };
-    })
-    .sort((a, b) => a.month.localeCompare(b.month)); // Sort by month
+  const sortedMonths = Object.keys(monthlyData).sort();
   
-  // Return the formatted data
+  const formattedMonthlyIncome = {
+    labels: sortedMonths,
+    values: sortedMonths.map(month => monthlyData[month].income || 0)
+  };
+  
+  const formattedMonthlyExpense = {
+    labels: sortedMonths,
+    values: sortedMonths.map(month => monthlyData[month].expense || 0)
+  };
+  
+  const formattedMonthlyProfit = {
+    labels: sortedMonths,
+    values: sortedMonths.map(month => 
+      (monthlyData[month].income || 0) - (monthlyData[month].expense || 0)
+    )
+  };
+  
+  // Return the formatted data that matches our interfaces
   return {
     transactions: data,
     summary: {
-      income: totalIncome,
-      expense: totalExpense,
+      totalIncome,
+      totalExpense,
       profit,
+      profitMargin,
     },
     expenseByCategory: formattedExpenseCategories,
     dailyData: {
       income: formattedDailyIncome,
       expense: formattedDailyExpense,
     },
-    monthlyData: formattedMonthlyData,
+    monthlyData: {
+      income: formattedMonthlyIncome,
+      expense: formattedMonthlyExpense,
+      profit: formattedMonthlyProfit,
+    },
   };
 };
 
