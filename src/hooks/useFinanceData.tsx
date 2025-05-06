@@ -42,6 +42,14 @@ export const useFinanceData = () => {
   // Función para actualizar el rango de fechas
   const updateDateRange = useCallback((newRange: { startDate: Date; endDate: Date }) => {
     console.log("Date range updated:", newRange);
+    console.log("Exact date values:", {
+      startDate: newRange.startDate,
+      startISODate: newRange.startDate.toISOString(),
+      startISODateOnly: newRange.startDate.toISOString().split('T')[0],
+      endDate: newRange.endDate,
+      endISODate: newRange.endDate.toISOString(),
+      endISODateOnly: newRange.endDate.toISOString().split('T')[0],
+    });
     setDateRange(newRange);
   }, []);
 
@@ -73,19 +81,20 @@ export const useFinanceData = () => {
     setError(null);
 
     try {
-      // Log exact date objects and their string representations
-      console.log("Fetching from Zoho with dates:", {
+      // Log exact date objects and their string representations for debugging
+      const startDateFormatted = dateRange.startDate.toISOString().split('T')[0];
+      const endDateFormatted = dateRange.endDate.toISOString().split('T')[0];
+      
+      console.log("Fetching with exact dates:", {
         startDate: dateRange.startDate,
-        startDateISO: dateRange.startDate.toISOString(),
-        startDateString: dateRange.startDate.toISOString().split('T')[0],
+        startDateFormatted,
         endDate: dateRange.endDate,
-        endDateISO: dateRange.endDate.toISOString(),
-        endDateString: dateRange.endDate.toISOString().split('T')[0],
+        endDateFormatted
       });
       
       // Obtener transacciones de Zoho Books - usando las fechas exactas sin modificaciones
       const zohoData = await ZohoService.getTransactions(
-        dateRange.startDate,
+        dateRange.startDate, 
         dateRange.endDate,
         forceRefresh
       );
