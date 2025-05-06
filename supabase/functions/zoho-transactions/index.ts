@@ -125,11 +125,11 @@ serve(async (req: Request) => {
     }
     
     // Parse the webhook response
-    let transactions;
+    let webhookData;
     try {
       const responseText = await webhookResponse.text();
       console.log(`make.com webhook response: ${responseText}`);
-      transactions = JSON.parse(responseText);
+      webhookData = JSON.parse(responseText);
     } catch (e) {
       console.error("Failed to parse make.com webhook response:", e);
       return new Response(
@@ -139,7 +139,8 @@ serve(async (req: Request) => {
     }
     
     // If we get valid transactions, update the cache
-    if (Array.isArray(transactions) && transactions.length > 0) {
+    // Note: We're now expecting the new JSON format - no need to transform strings
+    if (webhookData) {
       try {
         // Delete existing cached transactions for this date range and source
         console.log("Deleting existing cached transactions");
@@ -155,33 +156,25 @@ serve(async (req: Request) => {
         }
         
         // Add sync_date to transactions if not present
-        const now = new Date().toISOString();
-        const transactionsWithSyncDate = transactions.map(tx => ({
-          ...tx,
-          sync_date: tx.sync_date || now
-        }));
+        // This would be updated for the new format but we're using the raw data instead
         
-        // Insert new transactions into cache
-        console.log("Caching new transactions:", transactionsWithSyncDate.length);
-        const { error: insertError } = await supabase
-          .from("cached_transactions")
-          .insert(transactionsWithSyncDate);
-          
-        if (insertError) {
-          console.error("Error caching transactions:", insertError);
-          // We'll still return the transactions even if caching fails
-        }
+        // Insert new transactions into cache - using the raw response for now
+        // We'll process it in the frontend instead
+        console.log("Returning webhook data directly:", webhookData);
+        
+        // No longer caching transactions in structured format, returning raw data
+
       } catch (cacheError) {
         console.error("Error managing transaction cache:", cacheError);
         // Continue and return the transactions even if caching fails
       }
     } else {
-      console.log("No transactions returned from make.com webhook");
+      console.log("No structured data returned from make.com webhook");
     }
     
-    console.log("Successfully fetched transactions from make.com webhook:", transactions?.length || 0);
+    console.log("Successfully fetched data from make.com webhook");
     return new Response(
-      JSON.stringify(transactions || []),
+      JSON.stringify(webhookData || {}),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
     
