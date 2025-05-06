@@ -20,6 +20,7 @@ export interface CategorySummary {
   category: string;
   amount: number;
   percentage: number;
+  date?: string; // Fecha opcional para los colaboradores
 }
 
 export interface DateRange {
@@ -52,4 +53,5 @@ export interface CollaboratorData {
   name: string;
   amount: number;
   percentage: number;
+  date?: string; // Fecha opcional para los colaboradores
 }

@@ -1,4 +1,3 @@
-
 import { Transaction } from "../../types/financial";
 import { ensureValidDateFormat, handleApiError } from "./utils";
 import { getMockTransactions } from "./mockData";
@@ -138,15 +137,18 @@ const processRawTransactions = (data: any): Transaction[] => {
     }
   }
   
-  // Process collaborator expenses (new format with proper array)
+  // Process collaborator expenses (new format with proper array) - Ahora con fechas
   if (Array.isArray(data.colaboradores)) {
     data.colaboradores.forEach((item: any, index: number) => {
       if (item && typeof item.total !== 'undefined' && item.vendor_name) {
         const amount = Number(item.total);
         if (amount > 0) {
+          // Usar la fecha del colaborador si está disponible, o la fecha actual
+          const collaboratorDate = item.date || new Date().toISOString().split('T')[0];
+          
           result.push({
             id: `colaborador-${item.vendor_name.replace(/\s/g, '-')}-${Date.now()}-${index}`,
-            date: new Date().toISOString().split('T')[0],
+            date: collaboratorDate,
             amount,
             description: `Pago a colaborador: ${item.vendor_name}`,
             category: 'Pagos a colaboradores',

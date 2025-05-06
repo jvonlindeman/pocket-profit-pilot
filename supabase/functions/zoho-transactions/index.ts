@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -261,16 +260,19 @@ serve(async (req: Request) => {
       }
     }
     
-    // Process collaborator expenses
+    // Process collaborator expenses - Ahora incluyendo fechas
     if (Array.isArray(webhookData.colaboradores)) {
       webhookData.colaboradores.forEach((item: any, index: number) => {
         if (item && typeof item.total !== 'undefined' && item.vendor_name) {
           const amount = Number(item.total);
           if (amount > 0) {
+            // Usar la fecha del colaborador si está disponible, o la fecha actual
+            const collaboratorDate = item.date || new Date().toISOString().split('T')[0];
+            
             transactions.push({
               id: `colaborador-${item.vendor_name.replace(/\s/g, '-')}-${Date.now()}-${index}`,
               external_id: `colaborador-${item.vendor_name.replace(/\s/g, '-')}-${Date.now()}-${index}`,
-              date: new Date().toISOString().split('T')[0],
+              date: collaboratorDate,
               amount,
               description: `Pago a colaborador: ${item.vendor_name}`,
               category: 'Pagos a colaboradores',

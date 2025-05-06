@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import ZohoService from '@/services/zohoService';
 import StripeService from '@/services/stripeService';
@@ -98,7 +97,9 @@ export const useFinanceData = () => {
       .filter((item: any) => item && typeof item.total !== 'undefined' && item.vendor_name)
       .map((item: any) => ({
         name: item.vendor_name,
-        amount: Number(item.total)
+        amount: Number(item.total),
+        // Extraer la fecha si está disponible
+        date: item.date || new Date().toISOString().split('T')[0] // Usar la fecha actual si no hay fecha
       }))
       .filter((item: any) => item.amount > 0);
 
@@ -109,7 +110,8 @@ export const useFinanceData = () => {
     const formattedData = validCollaborators.map((item: any) => ({
       category: item.name,
       amount: item.amount,
-      percentage: totalAmount > 0 ? (item.amount / totalAmount) * 100 : 0
+      percentage: totalAmount > 0 ? (item.amount / totalAmount) * 100 : 0,
+      date: item.date // Incluir la fecha en los datos formateados
     })).sort((a: any, b: any) => b.amount - a.amount);
     
     setCollaboratorExpenses(formattedData);
