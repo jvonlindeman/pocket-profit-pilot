@@ -8,6 +8,24 @@ interface WebhookDataTableProps {
 const WebhookDataTable: React.FC<WebhookDataTableProps> = ({ rawData }) => {
   if (!rawData) return null;
   
+  // Handle raw string response or raw_response property
+  if (typeof rawData === 'string' || (rawData.raw_response && typeof rawData.raw_response === 'string')) {
+    return (
+      <div className="bg-amber-50 p-3 rounded border border-amber-200 mb-4">
+        <h3 className="font-medium text-amber-800 mb-2">Respuesta sin formato estructurado</h3>
+        <p className="text-sm text-amber-700 mb-2">
+          La respuesta del webhook es una cadena de texto y no un objeto JSON estructurado.
+          Revisa la configuración de Make.com para asegurar que devuelve un objeto JSON válido.
+        </p>
+        <div className="bg-white/60 p-2 rounded border border-amber-100 max-h-[200px] overflow-auto">
+          <pre className="text-xs break-words whitespace-pre-wrap">
+            {typeof rawData === 'string' ? rawData : rawData.raw_response}
+          </pre>
+        </div>
+      </div>
+    );
+  }
+  
   // Extract the different sections of the data
   const { stripe, colaboradores, expenses, payments } = rawData;
   
@@ -105,11 +123,29 @@ const WebhookDataTable: React.FC<WebhookDataTableProps> = ({ rawData }) => {
           </>
         )}
         
+        {/* Error message section */}
+        {rawData.error && (
+          <tr className="bg-red-50">
+            <td className="p-2 border-b font-medium" colSpan={3}>Error</td>
+            <tr>
+              <td className="p-2 border-b pl-5" colSpan={3}>{rawData.error}</td>
+            </tr>
+            {rawData.details && (
+              <tr>
+                <td className="p-2 border-b pl-5 text-sm text-gray-600" colSpan={3}>
+                  Detalles: {rawData.details}
+                </td>
+              </tr>
+            )}
+          </tr>
+        )}
+        
         {/* If no recognized data structure */}
         {!stripe && 
          !Array.isArray(colaboradores) && 
          !Array.isArray(expenses) && 
-         !Array.isArray(payments) && (
+         !Array.isArray(payments) && 
+         !rawData.error && (
           <tr>
             <td colSpan={3} className="p-2 border-b text-amber-700">
               La estructura de datos no sigue el formato esperado. Consulta la pestaña de JSON Crudo.

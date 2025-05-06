@@ -118,30 +118,47 @@ serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ 
           error: "Failed to fetch data from make.com webhook", 
-          details: errorText 
+          details: errorText,
+          raw_response: errorText
         }),
         { status: webhookResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     
+    // Get the raw response text
+    const responseText = await webhookResponse.text();
+    console.log(`make.com webhook raw response: ${responseText}`);
+    
     // Parse the webhook response
     let webhookData;
+    let originalResponse = responseText;
+    
     try {
-      const responseText = await webhookResponse.text();
-      console.log(`make.com webhook response: ${responseText}`);
+      // First try direct parsing
+      webhookData = JSON.parse(responseText);
+      console.log("Successfully parsed JSON directly");
+    } catch (parseError) {
+      console.log("Initial JSON parse failed, attempting to fix format");
       
-      // The response text should already be a valid JSON format now, but let's handle potential issues
       try {
-        // First try direct parsing
-        webhookData = JSON.parse(responseText);
-      } catch (parseError) {
-        // If direct parsing fails, try to fix common issues
-        console.log("Initial JSON parse failed, attempting to fix format");
-        
         // Create a properly formatted JSON structure
         let fixedJson = responseText.trim();
         
-        // Special handling for collaboradores field if it's a string instead of an array
+        // Handle the case where the response is a string that needs to be parsed
+        if (fixedJson.startsWith('"') && fixedJson.endsWith('"')) {
+          try {
+            // It might be a JSON string inside a string, try to parse the inner string
+            const unescapedJson = JSON.parse(fixedJson);
+            if (typeof unescapedJson === 'string') {
+              console.log("Detected JSON string inside string, attempting to parse inner content");
+              fixedJson = unescapedJson;
+            }
+          } catch (e) {
+            console.error("Error unescaping JSON string:", e);
+          }
+        }
+        
+        // Special handling for colaboradores field if it's a string instead of an array
         if (fixedJson.includes('"colaboradores": "')) {
           fixedJson = fixedJson.replace(
             /"colaboradores": "([^"]*)"/g, 
@@ -150,9 +167,16 @@ serve(async (req: Request) => {
                 // Convert the string into a proper array by extracting objects
                 const items = captured.match(/\{"key":\d+,"value":\{[^}]+\}\}/g) || [];
                 const properArray = items.map(item => {
-                  const parsed = JSON.parse(item);
-                  return parsed.value;
-                });
+                  // Need to handle escaped quotes in the string
+                  const cleanedItem = item.replace(/\\"/g, '"');
+                  try {
+                    const parsed = JSON.parse(cleanedItem);
+                    return parsed.value;
+                  } catch (e) {
+                    console.error("Error parsing item:", cleanedItem, e);
+                    return null;
+                  }
+                }).filter(Boolean);
                 return `"colaboradores": ${JSON.stringify(properArray)}`;
               } catch (e) {
                 console.error("Error converting colaboradores to array:", e);
@@ -171,9 +195,16 @@ serve(async (req: Request) => {
                 // Convert the string into a proper array by extracting objects
                 const items = captured.match(/\{"key":\d+,"value":\{[^}]+\}\}/g) || [];
                 const properArray = items.map(item => {
-                  const parsed = JSON.parse(item);
-                  return parsed.value;
-                });
+                  // Need to handle escaped quotes in the string
+                  const cleanedItem = item.replace(/\\"/g, '"');
+                  try {
+                    const parsed = JSON.parse(cleanedItem);
+                    return parsed.value;
+                  } catch (e) {
+                    console.error("Error parsing item:", cleanedItem, e);
+                    return null;
+                  }
+                }).filter(Boolean);
                 return `"expenses": ${JSON.stringify(properArray)}`;
               } catch (e) {
                 console.error("Error converting expenses to array:", e);
@@ -192,9 +223,16 @@ serve(async (req: Request) => {
                 // Convert the string into a proper array by extracting objects
                 const items = captured.match(/\{"key":\d+,"value":\{[^}]+\}\}/g) || [];
                 const properArray = items.map(item => {
-                  const parsed = JSON.parse(item);
-                  return parsed.value;
-                });
+                  // Need to handle escaped quotes in the string
+                  const cleanedItem = item.replace(/\\"/g, '"');
+                  try {
+                    const parsed = JSON.parse(cleanedItem);
+                    return parsed.value;
+                  } catch (e) {
+                    console.error("Error parsing item:", cleanedItem, e);
+                    return null;
+                  }
+                }).filter(Boolean);
                 return `"payments": ${JSON.stringify(properArray)}`;
               } catch (e) {
                 console.error("Error converting payments to array:", e);
@@ -210,24 +248,41 @@ serve(async (req: Request) => {
           console.log("Successfully parsed fixed JSON");
         } catch (secondParseError) {
           console.error("Failed to parse fixed JSON:", secondParseError);
-          throw new Error("Could not parse webhook response even after fixing");
+          
+          // As a fallback, return a structured response with the raw text
+          return new Response(
+            JSON.stringify({ 
+              raw_response: originalResponse,
+              error: "Could not parse webhook response",
+              details: "The response from make.com could not be parsed as valid JSON."
+            }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
         }
+      } catch (fixError) {
+        console.error("Error during fix attempt:", fixError);
+        
+        // As a fallback, return a structured response with the raw text
+        return new Response(
+          JSON.stringify({ 
+            raw_response: originalResponse,
+            error: "Could not process webhook response",
+            details: fixError instanceof Error ? fixError.message : "Unknown error"
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
-    } catch (e) {
-      console.error("Failed to parse make.com webhook response:", e);
-      return new Response(
-        JSON.stringify({ 
-          error: "Failed to parse make.com webhook response", 
-          details: e instanceof Error ? e.message : "Unknown error",
-          suggestion: "El formato JSON de la respuesta del webhook parece incorrecto. Asegúrate que los arrays estén formateados correctamente."
-        }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
     }
+    
+    // Add the original response to the data for debugging
+    const responseData = {
+      ...webhookData,
+      raw_response: originalResponse
+    };
     
     console.log("Successfully fetched and parsed data from make.com webhook");
     return new Response(
-      JSON.stringify(webhookData || {}),
+      JSON.stringify(responseData),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
     

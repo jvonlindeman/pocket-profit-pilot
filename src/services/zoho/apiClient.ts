@@ -37,12 +37,12 @@ export const fetchTransactionsFromWebhook = async (
       
       const errorMessage = handleApiError({details: error.message}, 'Failed to fetch Zoho transactions from Supabase cache');
       console.warn('Falling back to mock data due to error');
-      return returnRawResponse ? { error: error.message } : getMockTransactions(startDate, endDate);
+      return returnRawResponse ? { error: error.message, raw_response: null } : getMockTransactions(startDate, endDate);
     }
     
     if (!data) {
       console.log("No transactions returned from Supabase function, using mock data");
-      return returnRawResponse ? { message: "No data returned", data: null } : getMockTransactions(startDate, endDate);
+      return returnRawResponse ? { message: "No data returned", data: null, raw_response: null } : getMockTransactions(startDate, endDate);
     }
     
     console.log("ZohoService: Received data from Supabase function:", data);
@@ -57,7 +57,7 @@ export const fetchTransactionsFromWebhook = async (
     handleApiError(err, 'Failed to connect to Supabase function');
     // Fall back to mock data
     console.warn('Falling back to mock data due to exception');
-    return returnRawResponse ? { error: err instanceof Error ? err.message : 'Unknown error' } : getMockTransactions(startDate, endDate);
+    return returnRawResponse ? { error: err instanceof Error ? err.message : 'Unknown error', raw_response: null } : getMockTransactions(startDate, endDate);
   }
 };
 
@@ -69,6 +69,12 @@ const processRawTransactions = (data: any): Transaction[] => {
   }
   
   const result: Transaction[] = [];
+  
+  // If we received a raw_response instead of structured data, log it but return empty array
+  if (data.raw_response && (!data.stripe && !data.colaboradores && !data.expenses && !data.payments)) {
+    console.error("Received raw_response but no structured data:", data.raw_response);
+    return [];
+  }
   
   // Process Stripe income if available (new format)
   if (data.stripe) {

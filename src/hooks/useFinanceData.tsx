@@ -55,7 +55,7 @@ export const useFinanceData = () => {
         forceRefresh
       );
 
-      // Obtener la respuesta cruda actual para depuración
+      // Obtener la respuesta cruda actual para depuración inmediatamente después
       const rawData = ZohoService.getLastRawResponse();
       setRawResponse(rawData);
       console.log("Fetched raw response for debugging:", rawData);
@@ -77,6 +77,13 @@ export const useFinanceData = () => {
     } catch (err: any) {
       console.error("Error fetching financial data:", err);
       setError(err.message || "Error al cargar los datos financieros");
+      
+      // Asegurarnos de obtener cualquier respuesta cruda para depuración incluso en caso de error
+      const rawData = ZohoService.getLastRawResponse();
+      if (rawData) {
+        setRawResponse(rawData);
+        console.log("Set raw response after error:", rawData);
+      }
     } finally {
       setLoading(false);
     }

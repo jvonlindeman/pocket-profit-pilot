@@ -10,18 +10,49 @@ let lastRawResponse: any = null;
 const ZohoService = {
   // Get transactions within a date range
   getTransactions: async (startDate: Date, endDate: Date, forceRefresh = false): Promise<Transaction[]> => {
-    // Obtener datos y guardar la respuesta cruda
-    const response = await fetchTransactionsFromWebhook(startDate, endDate, forceRefresh, true);
-    lastRawResponse = response;
-    
-    // Procesar las transacciones normalmente
-    return fetchTransactionsFromWebhook(startDate, endDate, forceRefresh);
+    try {
+      // First get the raw response for debugging
+      const rawResponse = await fetchTransactionsFromWebhook(startDate, endDate, forceRefresh, true);
+      
+      // Store the raw response for debugging regardless of whether it has errors
+      if (rawResponse) {
+        console.log("ZohoService: Storing raw response for debug purposes");
+        lastRawResponse = rawResponse;
+      }
+      
+      // Process transactions normally
+      // If there was an error in the raw response, this will return mock data as a fallback
+      return await fetchTransactionsFromWebhook(startDate, endDate, forceRefresh);
+    } catch (error) {
+      console.error("ZohoService: Error in getTransactions", error);
+      // Ensure we have something in lastRawResponse for debugging
+      if (!lastRawResponse) {
+        lastRawResponse = { error: error instanceof Error ? error.message : "Unknown error" };
+      }
+      return getMockTransactions(startDate, endDate);
+    }
   },
   
   // Force refresh transactions and bypass cache
   forceRefresh: async (startDate: Date, endDate: Date): Promise<Transaction[]> => {
     console.log("ZohoService: Force refreshing transactions from", startDate, "to", endDate);
-    return fetchTransactionsFromWebhook(startDate, endDate, true);
+    try {
+      // First get the raw response for debugging
+      const rawResponse = await fetchTransactionsFromWebhook(startDate, endDate, true, true);
+      
+      // Store the raw response
+      if (rawResponse) {
+        lastRawResponse = rawResponse;
+      }
+      
+      return fetchTransactionsFromWebhook(startDate, endDate, true);
+    } catch (error) {
+      console.error("ZohoService: Error in forceRefresh", error);
+      if (!lastRawResponse) {
+        lastRawResponse = { error: error instanceof Error ? error.message : "Unknown error" };
+      }
+      return getMockTransactions(startDate, endDate);
+    }
   },
   
   // Get raw webhook response data for debugging
@@ -31,12 +62,18 @@ const ZohoService = {
     // Si tenemos una respuesta guardada, la devolvemos
     if (lastRawResponse) {
       console.log("ZohoService: Returning cached raw response");
-      const cachedResponse = lastRawResponse;
-      return cachedResponse;
+      return lastRawResponse;
     }
     
     // Si no hay respuesta guardada, obtenemos una nueva
-    return fetchTransactionsFromWebhook(startDate, endDate, true, true);
+    try {
+      const response = await fetchTransactionsFromWebhook(startDate, endDate, true, true);
+      lastRawResponse = response;
+      return response;
+    } catch (error) {
+      console.error("ZohoService: Error getting raw response", error);
+      return { error: error instanceof Error ? error.message : "Unknown error" };
+    }
   },
   
   // Obtener la última respuesta cruda sin hacer ninguna llamada

@@ -16,6 +16,7 @@ const WebhookErrorDisplay: React.FC<WebhookErrorDisplayProps> = ({ error }) => {
   const isJsonError = error.includes('JSON') || error.includes('parse');
   const isConnectionError = error.includes('connect') || error.includes('fetch') || error.includes('network');
   const isAuthError = error.includes('auth') || error.includes('unauthorized') || error.includes('permission');
+  const isStringFormatError = error.includes('string') || error.includes('format') || error.includes('structure');
   
   const copyExampleToClipboard = () => {
     const example = `{
@@ -87,6 +88,34 @@ const WebhookErrorDisplay: React.FC<WebhookErrorDisplayProps> = ({ error }) => {
                   >
                     Copiar ejemplo
                   </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {isStringFormatError && (
+          <div className="mt-3 pt-3 border-t border-red-300">
+            <div className="flex items-start">
+              <HelpCircle className="h-4 w-4 mt-0.5 mr-1 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="font-medium text-sm">Problema con respuesta en formato string</p>
+                <p className="text-xs mt-1">
+                  La respuesta del webhook es una cadena de texto en lugar del formato JSON esperado. Esto puede ocurrir cuando:
+                </p>
+                <ul className="list-disc text-xs ml-4 mt-1 space-y-1">
+                  <li>Make.com devuelve una cadena de texto en lugar de un objeto JSON</li>
+                  <li>Los datos están escapados incorrectamente (dobles comillas, caracteres especiales)</li>
+                  <li>La respuesta contiene caracteres no válidos para JSON</li>
+                </ul>
+                
+                <div className="mt-3 bg-amber-50 p-2 rounded text-xs">
+                  <p className="font-medium mb-1">Soluciones:</p>
+                  <ul className="list-disc text-xs ml-4 mt-1 space-y-1">
+                    <li>Verificar la configuración de Make.com para que devuelva JSON válido</li>
+                    <li>Revisar en la pestaña "JSON Crudo" para ver exactamente qué está devolviendo</li>
+                    <li>Actualizar el webhook con el botón "Cargar Datos" podría resolver el problema</li>
+                  </ul>
                 </div>
               </div>
             </div>
