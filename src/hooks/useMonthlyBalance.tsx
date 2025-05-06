@@ -40,11 +40,34 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       }
 
       setMonthlyBalance(data || null);
+      return data || null;
     } catch (err: any) {
       console.error("Error fetching monthly balance:", err);
       setError(err.message || "Error al cargar el balance mensual");
+      return null;
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Check if a balance exists for the current month
+  const checkBalanceExists = async (): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase
+        .from('monthly_balances')
+        .select('id')
+        .eq('month_year', currentMonthYear)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error checking monthly balance:", error);
+        return false;
+      }
+
+      return !!data;
+    } catch (err) {
+      console.error("Error in checkBalanceExists:", err);
+      return false;
     }
   };
 
@@ -92,6 +115,8 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
           description: `Se creó el balance inicial de ${format(currentDate, 'MMMM yyyy')}`,
         });
       }
+      
+      return true;
     } catch (err: any) {
       console.error("Error updating monthly balance:", err);
       setError(err.message || "Error al actualizar el balance mensual");
@@ -101,6 +126,8 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
         description: "No se pudo actualizar el balance mensual",
         variant: "destructive",
       });
+      
+      return false;
     } finally {
       setLoading(false);
     }
@@ -117,6 +144,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     monthlyBalance,
     updateMonthlyBalance,
     fetchMonthlyBalance,
+    checkBalanceExists,
     currentMonthYear,
   };
 };

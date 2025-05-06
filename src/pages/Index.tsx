@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
 import RevenueChart from '@/components/Dashboard/RevenueChart';
@@ -8,7 +8,9 @@ import CollaboratorChart from '@/components/Dashboard/CollaboratorChart';
 import ProfitAnalysis from '@/components/Dashboard/ProfitAnalysis';
 import TransactionList from '@/components/Dashboard/TransactionList';
 import MonthlyBalanceEditor from '@/components/Dashboard/MonthlyBalanceEditor';
+import InitialBalanceDialog from '@/components/Dashboard/InitialBalanceDialog';
 import { useFinanceData } from '@/hooks/useFinanceData';
+import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Settings, Bug, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -32,6 +34,8 @@ const Index = () => {
     collaboratorExpenses
   } = useFinanceData();
   
+  const [showBalanceDialog, setShowBalanceDialog] = useState(false);
+  const { checkBalanceExists } = useMonthlyBalance({ currentDate: dateRange.startDate });
   const { toast } = useToast();
 
   // Formateamos fechas para títulos
@@ -47,10 +51,28 @@ const Index = () => {
   const periodTitle = `${formatDateForTitle(dateRange.startDate)} - ${formatDateForTitle(dateRange.endDate)}`;
 
   // Manejador para cargar datos iniciales
-  const handleInitialLoad = () => {
+  const handleInitialLoad = async () => {
+    // Check if we need to set the initial balance first
+    const balanceExists = await checkBalanceExists();
+    
+    if (!balanceExists) {
+      // Show dialog to set initial balance
+      setShowBalanceDialog(true);
+    } else {
+      // Balance already exists, just load data
+      toast({
+        title: 'Cargando datos financieros',
+        description: 'Obteniendo datos de Zoho Books y Stripe',
+      });
+      refreshData(true);
+    }
+  };
+
+  // Handle balance saved in dialog
+  const handleBalanceSaved = () => {
     toast({
-      title: 'Cargando datos financieros',
-      description: 'Obteniendo datos de Zoho Books y Stripe',
+      title: 'Balance inicial guardado',
+      description: 'Cargando datos financieros...',
     });
     refreshData(true);
   };
@@ -78,6 +100,14 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Dialog to set initial balance */}
+      <InitialBalanceDialog 
+        open={showBalanceDialog} 
+        onOpenChange={setShowBalanceDialog} 
+        currentDate={dateRange.startDate}
+        onBalanceSaved={handleBalanceSaved}
+      />
+      
       {/* Cabecera del Dashboard */}
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
