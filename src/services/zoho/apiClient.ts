@@ -118,9 +118,11 @@ const processRawTransactions = (data: any): Transaction[] => {
   }
   
   // Process regular expenses (new format with proper array)
+  // MODIFIED: Filter out expenses with category "Impuestos"
   if (Array.isArray(data.expenses)) {
     data.expenses.forEach((item: any) => {
-      if (item && typeof item.total !== 'undefined') {
+      // Skip expenses with account_name "Impuestos"
+      if (item && typeof item.total !== 'undefined' && item.account_name !== "Impuestos") {
         const amount = Number(item.total);
         if (amount > 0) {
           result.push({

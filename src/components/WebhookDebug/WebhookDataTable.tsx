@@ -77,14 +77,24 @@ const WebhookDataTable: React.FC<WebhookDataTableProps> = ({ rawData }) => {
         {Array.isArray(expenses) && expenses.length > 0 && (
           <>
             <tr className="bg-red-50">
-              <td className="p-2 border-b font-medium" colSpan={3}>Gastos ({expenses.length})</td>
+              <td className="p-2 border-b font-medium" colSpan={3}>
+                Gastos ({expenses.length})
+                <span className="text-xs ml-2 font-normal text-gray-500">
+                  (Impuestos excluidos de los cálculos)
+                </span>
+              </td>
             </tr>
             {expenses.slice(0, 5).map((exp, index) => (
-              <tr key={`exp-${index}`}>
+              <tr key={`exp-${index}`} className={exp.account_name === "Impuestos" ? "bg-gray-50" : ""}>
                 <td className="p-2 border-b pl-5">{index + 1}</td>
                 <td className="p-2 border-b">{exp.account_name || "N/A"}</td>
                 <td className="p-2 border-b">
                   {exp.vendor_name || "Sin proveedor"}: {exp.total} ({exp.date})
+                  {exp.account_name === "Impuestos" && (
+                    <span className="ml-2 text-xs text-gray-500 italic">
+                      (Excluido de cálculos)
+                    </span>
+                  )}
                 </td>
               </tr>
             ))}
