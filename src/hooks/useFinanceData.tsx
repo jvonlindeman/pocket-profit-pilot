@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import ZohoService from '@/services/zohoService';
 import StripeService from '@/services/stripeService';
@@ -18,10 +19,11 @@ export const useFinanceData = () => {
   // Estado del rango de fechas - configurado para mostrar desde el último día del mes anterior hasta el último día del mes actual
   const [dateRange, setDateRange] = useState(() => {
     const today = new Date();
-    // Último día del mes anterior
+    // Último día del mes anterior - no añadir +1 al mes para compensar
     const startDate = endOfMonth(subMonths(today, 1));
     // Último día del mes actual
     const endDate = endOfMonth(today);
+    console.log("Initial date range:", startDate, "to", endDate);
     return { startDate, endDate };
   });
 
@@ -71,8 +73,17 @@ export const useFinanceData = () => {
     setError(null);
 
     try {
+      // Log exact date objects and their string representations
+      console.log("Fetching from Zoho with dates:", {
+        startDate: dateRange.startDate,
+        startDateISO: dateRange.startDate.toISOString(),
+        startDateString: dateRange.startDate.toISOString().split('T')[0],
+        endDate: dateRange.endDate,
+        endDateISO: dateRange.endDate.toISOString(),
+        endDateString: dateRange.endDate.toISOString().split('T')[0],
+      });
+      
       // Obtener transacciones de Zoho Books
-      console.log("Fetching from Zoho:", dateRange.startDate, dateRange.endDate);
       const zohoData = await ZohoService.getTransactions(
         dateRange.startDate,
         dateRange.endDate,

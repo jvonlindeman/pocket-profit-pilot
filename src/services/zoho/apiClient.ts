@@ -1,3 +1,4 @@
+
 import { Transaction } from "../../types/financial";
 import { ensureValidDateFormat, handleApiError } from "./utils";
 import { getMockTransactions } from "./mockData";
@@ -17,9 +18,11 @@ export const fetchTransactionsFromWebhook = async (
     console.log("ZohoService: Fetching transactions from", startDate, "to", endDate);
     
     // Format dates for the API (YYYY-MM-DD format)
+    // Using proper date formatting that preserves the exact dates we want
     const formattedStartDate = startDate.toISOString().split('T')[0];
     const formattedEndDate = endDate.toISOString().split('T')[0];
     
+    console.log("ZohoService: Formatted dates for API request:", formattedStartDate, "to", formattedEndDate);
     console.log("ZohoService: Calling Supabase edge function for cached transactions");
     
     // Call the Supabase edge function instead of make.com webhook directly

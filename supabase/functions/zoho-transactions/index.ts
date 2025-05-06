@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -102,9 +101,11 @@ serve(async (req: Request) => {
     // No cached data or force refresh, fetch new data from make.com webhook
     console.log("Fetching fresh data from make.com webhook");
     
-    // Format dates for the webhook (YYYY-MM-DD format)
+    // Format dates for the webhook - ensure we're using YYYY-MM-DD format
     const formattedStartDate = new Date(startDate).toISOString().split('T')[0];
     const formattedEndDate = new Date(endDate).toISOString().split('T')[0];
+    
+    console.log("Formatted dates for webhook:", formattedStartDate, "to", formattedEndDate);
     
     // Call the make.com webhook
     console.log("Calling make.com webhook:", makeWebhookUrl);
