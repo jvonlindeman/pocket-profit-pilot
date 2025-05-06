@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { format, subMonths, startOfMonth, endOfMonth, subDays, startOfYear } from 'date-fns';
+import { format, endOfMonth, subMonths, startOfMonth, subDays, startOfYear } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { DateRange } from '@/types/financial';
@@ -121,6 +121,25 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
     setIsOpen(false);
   };
 
+  // Último día del mes anterior hasta último día del mes actual (nuevo método)
+  const setPreviousMonthEndToCurrentMonthEnd = () => {
+    const today = new Date();
+    const lastDayPreviousMonth = endOfMonth(subMonths(today, 1));
+    const lastDayCurrMonth = endOfMonth(today);
+    
+    const newRange = {
+      startDate: lastDayPreviousMonth,
+      endDate: lastDayCurrMonth
+    };
+    
+    onRangeChange(newRange);
+    setTempRange({
+      from: lastDayPreviousMonth,
+      to: lastDayCurrMonth
+    });
+    setIsOpen(false);
+  };
+
   // Último mes completo hasta mes actual
   const setPreviousAndCurrentMonth = () => {
     const today = new Date();
@@ -162,13 +181,13 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
                 <div className="flex justify-between items-center">
                   <h4 className="font-medium">Seleccionar rango</h4>
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setLastMonth()}>
+                    <Button size="sm" variant="outline" onClick={setLastMonth}>
                       Mes pasado
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => setPreviousAndCurrentMonth()}>
+                    <Button size="sm" variant="outline" onClick={setPreviousAndCurrentMonth}>
                       Mes anterior + actual
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => resetToCurrentMonth()}>
+                    <Button size="sm" variant="outline" onClick={resetToCurrentMonth}>
                       Mes actual
                     </Button>
                   </div>
@@ -194,8 +213,8 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
                 <Button variant="outline" onClick={() => setIsOpen(false)}>
                   Cancelar
                 </Button>
-                <Button variant="outline" onClick={() => setThisYear()}>
-                  Este año
+                <Button variant="outline" onClick={setPreviousMonthEndToCurrentMonthEnd}>
+                  Fin mes anterior a fin actual
                 </Button>
                 <Button onClick={handleRangeChange}>
                   Aplicar
@@ -216,6 +235,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
             <DropdownMenuItem onClick={setLastMonth}>Mes pasado</DropdownMenuItem>
             <DropdownMenuItem onClick={setPreviousAndCurrentMonth}>Mes anterior + actual</DropdownMenuItem>
             <DropdownMenuItem onClick={setLast30Days}>Últimos 30 días</DropdownMenuItem>
+            <DropdownMenuItem onClick={setPreviousMonthEndToCurrentMonthEnd}>Fin mes anterior a fin actual</DropdownMenuItem>
             <DropdownMenuItem onClick={setThisYear}>Este año</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

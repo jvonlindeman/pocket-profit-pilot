@@ -1,9 +1,9 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import ZohoService from '@/services/zohoService';
 import StripeService from '@/services/stripeService';
 import { Transaction } from '@/types/financial';
 import { processTransactionData } from '@/services/zoho/utils';
+import { endOfMonth, subMonths } from 'date-fns';
 
 export const useFinanceData = () => {
   // Estados
@@ -15,13 +15,13 @@ export const useFinanceData = () => {
   const [stripeIncome, setStripeIncome] = useState<number>(0);
   const [regularIncome, setRegularIncome] = useState<number>(0);
   
-  // Estado del rango de fechas - ahora configurado para mostrar desde el primer día del mes anterior hasta el último día del mes actual
+  // Estado del rango de fechas - configurado para mostrar desde el último día del mes anterior hasta el último día del mes actual
   const [dateRange, setDateRange] = useState(() => {
     const today = new Date();
-    // Primer día del mes anterior
-    const startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    // Último día del mes anterior
+    const startDate = endOfMonth(subMonths(today, 1));
     // Último día del mes actual
-    const endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const endDate = endOfMonth(today);
     return { startDate, endDate };
   });
 
@@ -33,7 +33,7 @@ export const useFinanceData = () => {
     const today = new Date();
     return {
       startDate: new Date(today.getFullYear(), today.getMonth(), 1),
-      endDate: new Date(today.getFullYear(), today.getMonth() + 1, 0)
+      endDate: endOfMonth(today)
     };
   }, []);
 
