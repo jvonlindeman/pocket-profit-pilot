@@ -153,11 +153,6 @@ const Index = () => {
               </div>
             )}
 
-            {/* Nuevo componente de depuración de solicitud al webhook */}
-            <div className="mb-6">
-              <WebhookRequestDebug dateRange={dateRange} />
-            </div>
-
             {/* Resumen financiero */}
             <FinanceSummary 
               summary={financialData.summary} 
@@ -207,6 +202,11 @@ const Index = () => {
               refreshDataFunction={refreshData}
               rawResponse={rawResponse}
             />
+          </div>
+          
+          {/* Movido aquí: Componente de depuración de solicitud al webhook */}
+          <div className="mt-6">
+            <WebhookRequestDebug dateRange={dateRange} />
           </div>
         </div>
       </main>
