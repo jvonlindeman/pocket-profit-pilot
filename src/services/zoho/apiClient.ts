@@ -7,6 +7,11 @@ import { supabase } from "@/integrations/supabase/client";
 // The make.com webhook URL - kept as fallback if necessary
 const makeWebhookUrl = "https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihlmx22";
 
+// Format date in YYYY-MM-DD format without timezone shifts
+const formatDateYYYYMMDD = (date: Date): string => {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+
 // Function to call the Supabase edge function which handles caching
 export const fetchTransactionsFromWebhook = async (
   startDate: Date, 
@@ -23,18 +28,14 @@ export const fetchTransactionsFromWebhook = async (
       endDateType: typeof endDate
     });
     
-    // Format dates for the API (YYYY-MM-DD format)
-    // CRITICAL FIX: Ensure we're preserving the exact date without timezone adjustments
-    // Use toISOString and split to get YYYY-MM-DD format
-    const formattedStartDate = startDate.toISOString().split('T')[0];
-    const formattedEndDate = endDate.toISOString().split('T')[0];
+    // Format dates using our custom formatter to avoid timezone shifts
+    const formattedStartDate = formatDateYYYYMMDD(startDate);
+    const formattedEndDate = formatDateYYYYMMDD(endDate);
     
     console.log("ZohoService: Formatted dates for webhook request:", {
       startDate: startDate,
-      startDateISO: startDate.toISOString(),
       formattedStartDate,
       endDate: endDate,
-      endDateISO: endDate.toISOString(),
       formattedEndDate
     });
     

@@ -30,6 +30,11 @@ export const useFinanceData = () => {
   // Datos financieros procesados
   const financialData = processTransactionData(transactions);
 
+  // Function to format date in YYYY-MM-DD format without timezone shifts
+  const formatDateYYYYMMDD = (date: Date): string => {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  };
+
   // Obtener el rango del mes actual
   const getCurrentMonthRange = useCallback(() => {
     const today = new Date();
@@ -44,26 +49,14 @@ export const useFinanceData = () => {
     console.log("Date range updated:", newRange);
     console.log("Exact date values:", {
       startDate: newRange.startDate,
-      startISODate: newRange.startDate.toISOString(),
-      startISODateOnly: newRange.startDate.toISOString().split('T')[0],
       endDate: newRange.endDate,
-      endISODate: newRange.endDate.toISOString(),
-      endISODateOnly: newRange.endDate.toISOString().split('T')[0],
+      startDateFormatted: formatDateYYYYMMDD(newRange.startDate),
+      endDateFormatted: formatDateYYYYMMDD(newRange.endDate)
     });
     
-    // CRITICAL FIX: Preserve the exact time from datepicker without any modifications
-    // Create shallow copies to avoid timezone adjustments
+    // Create shallow copies to preserve the exact selected dates
     const preservedStartDate = new Date(newRange.startDate);
     const preservedEndDate = new Date(newRange.endDate);
-    
-    // Set exact hours to noon to avoid any timezone issues
-    preservedStartDate.setHours(12, 0, 0, 0);
-    preservedEndDate.setHours(12, 0, 0, 0);
-    
-    console.log("Preserved dates to prevent shifts:", {
-      preservedStartDate,
-      preservedEndDate
-    });
     
     setDateRange({
       startDate: preservedStartDate,
@@ -99,21 +92,20 @@ export const useFinanceData = () => {
     setError(null);
 
     try {
-      // Log exact date objects for debugging - show both datepicker dates and what we're sending
+      // Log exact date objects for debugging
       console.log("Original dateRange from datepicker:", {
         startDate: dateRange.startDate,
         endDate: dateRange.endDate
       });
       
-      // Important: Ensure we're not modifying the dates when formatting them
-      // Use UTC methods to prevent timezone shifts
-      const startDateFormatted = dateRange.startDate.toISOString().split('T')[0];
-      const endDateFormatted = dateRange.endDate.toISOString().split('T')[0];
+      // Format dates using our custom formatter to avoid timezone shifts
+      const startDateFormatted = formatDateYYYYMMDD(dateRange.startDate);
+      const endDateFormatted = formatDateYYYYMMDD(dateRange.endDate);
       
-      console.log("Fetching with exact dates:", {
-        startDate: dateRange.startDate,
+      console.log("Fetching with exact formatted dates:", {
+        startDateRaw: dateRange.startDate,
         startDateFormatted,
-        endDate: dateRange.endDate,
+        endDateRaw: dateRange.endDate,
         endDateFormatted
       });
       

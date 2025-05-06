@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -61,7 +62,7 @@ serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ error: "Invalid JSON in request body" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+        );
     }
     
     const { startDate, endDate, forceRefresh = false } = requestBody;

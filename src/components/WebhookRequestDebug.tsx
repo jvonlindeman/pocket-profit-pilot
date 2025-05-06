@@ -11,9 +11,14 @@ interface WebhookRequestDebugProps {
 }
 
 export default function WebhookRequestDebug({ dateRange }: WebhookRequestDebugProps) {
-  // Format dates exactly as they are sent to the webhook
-  const startDateFormatted = dateRange.startDate.toISOString().split('T')[0];
-  const endDateFormatted = dateRange.endDate.toISOString().split('T')[0];
+  // Format dates using a locale-aware approach that avoids timezone shifts
+  const formatDateYYYYMMDD = (date: Date): string => {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  };
+  
+  // Format dates exactly as they should be sent to the webhook
+  const startDateFormatted = formatDateYYYYMMDD(dateRange.startDate);
+  const endDateFormatted = formatDateYYYYMMDD(dateRange.endDate);
   
   // Additional formatting for debugging
   const startDateLocal = dateRange.startDate.toLocaleDateString();
@@ -70,10 +75,10 @@ export default function WebhookRequestDebug({ dateRange }: WebhookRequestDebugPr
               <strong>UI DatePicker</strong> → Selección: {startDateLocal} - {endDateLocal}
             </li>
             <li>
-              <strong>useFinanceData hook</strong> → Conversión a formato ISO: {startDateISOFull} - {endDateISOFull}
+              <strong>formatDateYYYYMMDD</strong> → Formato YYYY-MM-DD: {startDateFormatted} - {endDateFormatted}
             </li>
             <li>
-              <strong>apiClient.ts</strong> → Extracción de fecha YYYY-MM-DD: {startDateFormatted} - {endDateFormatted}
+              <strong>apiClient.ts</strong> → Extracción de fecha exacta: {startDateFormatted} - {endDateFormatted}
             </li>
             <li>
               <strong>zoho-transactions Edge Function</strong> → Envío exacto al webhook: {startDateFormatted} - {endDateFormatted}
@@ -98,6 +103,11 @@ export default function WebhookRequestDebug({ dateRange }: WebhookRequestDebugPr
                 <td className="p-2">{dateRange.endDate.toString()}</td>
               </tr>
               <tr>
+                <td className="p-2 font-medium">formatDateYYYYMMDD</td>
+                <td className="p-2">{startDateFormatted}</td>
+                <td className="p-2">{endDateFormatted}</td>
+              </tr>
+              <tr>
                 <td className="p-2 font-medium">getTime() (timestamp)</td>
                 <td className="p-2">{dateRange.startDate.getTime()}</td>
                 <td className="p-2">{dateRange.endDate.getTime()}</td>
@@ -114,8 +124,8 @@ export default function WebhookRequestDebug({ dateRange }: WebhookRequestDebugPr
               </tr>
               <tr>
                 <td className="p-2 font-medium">toISOString().split('T')[0]</td>
-                <td className="p-2">{startDateFormatted}</td>
-                <td className="p-2">{endDateFormatted}</td>
+                <td className="p-2">{startDateISOFull.split('T')[0]}</td>
+                <td className="p-2">{endDateISOFull.split('T')[0]}</td>
               </tr>
               <tr>
                 <td className="p-2 font-medium">toUTCString()</td>
