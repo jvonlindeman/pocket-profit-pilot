@@ -18,7 +18,7 @@ export const fetchTransactionsFromWebhook = async (
     console.log("ZohoService: Fetching transactions from", startDate, "to", endDate);
     
     // Format dates for the API (YYYY-MM-DD format)
-    // Using proper date formatting that preserves the exact dates we want
+    // Use exact dates without any modifications to prevent off-by-one errors
     const formattedStartDate = startDate.toISOString().split('T')[0];
     const formattedEndDate = endDate.toISOString().split('T')[0];
     

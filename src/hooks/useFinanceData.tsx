@@ -19,7 +19,7 @@ export const useFinanceData = () => {
   // Estado del rango de fechas - configurado para mostrar desde el último día del mes anterior hasta el último día del mes actual
   const [dateRange, setDateRange] = useState(() => {
     const today = new Date();
-    // Último día del mes anterior - no añadir +1 al mes para compensar
+    // Último día del mes anterior
     const startDate = endOfMonth(subMonths(today, 1));
     // Último día del mes actual
     const endDate = endOfMonth(today);
@@ -83,7 +83,7 @@ export const useFinanceData = () => {
         endDateString: dateRange.endDate.toISOString().split('T')[0],
       });
       
-      // Obtener transacciones de Zoho Books
+      // Obtener transacciones de Zoho Books - usando las fechas exactas sin modificaciones
       const zohoData = await ZohoService.getTransactions(
         dateRange.startDate,
         dateRange.endDate,
@@ -95,7 +95,7 @@ export const useFinanceData = () => {
       setRawResponse(rawData);
       console.log("Fetched raw response for debugging:", rawData);
 
-      // Obtener transacciones de Stripe
+      // Obtener transacciones de Stripe - usando las fechas exactas sin modificaciones
       console.log("Fetching from Stripe:", dateRange.startDate, dateRange.endDate);
       const stripeData = await StripeService.getTransactions(
         dateRange.startDate,
