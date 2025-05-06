@@ -15,11 +15,12 @@ export const useFinanceData = () => {
   const [stripeIncome, setStripeIncome] = useState<number>(0);
   const [regularIncome, setRegularIncome] = useState<number>(0);
   
-  // Estado del rango de fechas
+  // Estado del rango de fechas - ahora configurado para mostrar desde el primer día del mes anterior hasta el último día del mes actual
   const [dateRange, setDateRange] = useState(() => {
-    // Por defecto, usar el mes actual
     const today = new Date();
-    const startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    // Primer día del mes anterior
+    const startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    // Último día del mes actual
     const endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     return { startDate, endDate };
   });

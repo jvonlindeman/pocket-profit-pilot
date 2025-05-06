@@ -121,6 +121,25 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
     setIsOpen(false);
   };
 
+  // Último mes completo hasta mes actual
+  const setPreviousAndCurrentMonth = () => {
+    const today = new Date();
+    const firstDayLastMonth = startOfMonth(subMonths(today, 1));
+    const lastDayCurrentMonth = endOfMonth(today);
+    
+    const newRange = {
+      startDate: firstDayLastMonth,
+      endDate: lastDayCurrentMonth
+    };
+    
+    onRangeChange(newRange);
+    setTempRange({
+      from: firstDayLastMonth,
+      to: lastDayCurrentMonth
+    });
+    setIsOpen(false);
+  };
+
   return (
     <div className="relative">
       <div className="flex items-center space-x-2">
@@ -142,12 +161,12 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
               <div className="p-3 border-b">
                 <div className="flex justify-between items-center">
                   <h4 className="font-medium">Seleccionar rango</h4>
-                  <div className="flex space-x-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="outline" onClick={() => setLastMonth()}>
                       Mes pasado
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => setLast30Days()}>
-                      Últimos 30 días
+                    <Button size="sm" variant="outline" onClick={() => setPreviousAndCurrentMonth()}>
+                      Mes anterior + actual
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => resetToCurrentMonth()}>
                       Mes actual
@@ -195,6 +214,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
           <DropdownMenuContent align="end" className="bg-white">
             <DropdownMenuItem onClick={resetToCurrentMonth}>Mes actual</DropdownMenuItem>
             <DropdownMenuItem onClick={setLastMonth}>Mes pasado</DropdownMenuItem>
+            <DropdownMenuItem onClick={setPreviousAndCurrentMonth()}>Mes anterior + actual</DropdownMenuItem>
             <DropdownMenuItem onClick={setLast30Days}>Últimos 30 días</DropdownMenuItem>
             <DropdownMenuItem onClick={setThisYear}>Este año</DropdownMenuItem>
           </DropdownMenuContent>
