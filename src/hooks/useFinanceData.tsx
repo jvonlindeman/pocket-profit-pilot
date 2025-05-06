@@ -1,9 +1,11 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import ZohoService from '@/services/zohoService';
 import StripeService from '@/services/stripeService';
 import { Transaction } from '@/types/financial';
 import { processTransactionData } from '@/services/zoho/utils';
-import { endOfMonth, subMonths } from 'date-fns';
+import { endOfMonth, subMonths, format as formatDate } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
 
 export const useFinanceData = () => {
   // Estados
@@ -15,6 +17,7 @@ export const useFinanceData = () => {
   const [stripeIncome, setStripeIncome] = useState<number>(0);
   const [regularIncome, setRegularIncome] = useState<number>(0);
   const [collaboratorExpenses, setCollaboratorExpenses] = useState<any[]>([]);
+  const [startingBalance, setStartingBalance] = useState<number | undefined>(undefined);
   
   // Estado del rango de fechas - configurado para mostrar desde el último día del mes anterior hasta el último día del mes actual
   const [dateRange, setDateRange] = useState(() => {
@@ -28,7 +31,7 @@ export const useFinanceData = () => {
   });
 
   // Datos financieros procesados
-  const financialData = processTransactionData(transactions);
+  const financialData = processTransactionData(transactions, startingBalance);
 
   // Function to format date in YYYY-MM-DD format without timezone shifts
   const formatDateYYYYMMDD = (date: Date): string => {
@@ -62,7 +65,75 @@ export const useFinanceData = () => {
       startDate: preservedStartDate,
       endDate: preservedEndDate
     });
+
+    // Fetch monthly balance when date range changes
+    fetchMonthlyBalance(preservedStartDate);
   }, []);
+
+  // Fetch monthly balance for the selected month
+  const fetchMonthlyBalance = useCallback(async (date: Date) => {
+    try {
+      const monthYear = formatDate(date, 'yyyy-MM');
+      
+      const { data, error } = await supabase
+        .from('monthly_balances')
+        .select('*')
+        .eq('month_year', monthYear)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
+        console.error("Error fetching monthly balance:", error);
+      }
+
+      if (data) {
+        console.log("Fetched monthly balance:", data);
+        setStartingBalance(data.balance);
+      } else {
+        console.log("No monthly balance found for:", monthYear);
+        setStartingBalance(undefined);
+      }
+    } catch (err) {
+      console.error("Error in fetchMonthlyBalance:", err);
+    }
+  }, []);
+
+  // Update the starting balance
+  const updateStartingBalance = useCallback(async (balance: number, notes?: string) => {
+    try {
+      const monthYear = formatDate(dateRange.startDate, 'yyyy-MM');
+      
+      // Check if a record already exists
+      const { data: existingData } = await supabase
+        .from('monthly_balances')
+        .select('*')
+        .eq('month_year', monthYear)
+        .single();
+      
+      if (existingData) {
+        // Update existing record
+        await supabase
+          .from('monthly_balances')
+          .update({
+            balance,
+            notes: notes || existingData.notes,
+          })
+          .eq('month_year', monthYear);
+      } else {
+        // Create new record
+        await supabase
+          .from('monthly_balances')
+          .insert({
+            month_year: monthYear,
+            balance,
+            notes: notes || null,
+          });
+      }
+      
+      setStartingBalance(balance);
+    } catch (err) {
+      console.error("Error updating starting balance:", err);
+    }
+  }, [dateRange.startDate]);
 
   // Función para procesar y separar ingresos
   const processIncomeTypes = useCallback((transactions: Transaction[]) => {
@@ -122,6 +193,9 @@ export const useFinanceData = () => {
     setError(null);
 
     try {
+      // Also fetch the monthly balance for the selected date range
+      await fetchMonthlyBalance(dateRange.startDate);
+      
       // Log exact date objects for debugging
       console.log("Original dateRange from datepicker:", {
         startDate: dateRange.startDate,
@@ -184,7 +258,13 @@ export const useFinanceData = () => {
     } finally {
       setLoading(false);
     }
-  }, [dateRange.startDate, dateRange.endDate, processIncomeTypes, processCollaboratorData]);
+  }, [
+    dateRange.startDate, 
+    dateRange.endDate, 
+    processIncomeTypes, 
+    processCollaboratorData, 
+    fetchMonthlyBalance
+  ]);
 
   // Función pública para refrescar datos (forzando o no)
   const refreshData = useCallback((force = false) => {
@@ -203,6 +283,8 @@ export const useFinanceData = () => {
     rawResponse,
     stripeIncome,
     regularIncome,
-    collaboratorExpenses
+    collaboratorExpenses,
+    startingBalance,
+    updateStartingBalance
   };
 };

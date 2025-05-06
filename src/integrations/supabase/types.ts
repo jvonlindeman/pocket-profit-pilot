@@ -45,6 +45,33 @@ export type Database = {
         }
         Relationships: []
       }
+      monthly_balances: {
+        Row: {
+          balance: number
+          created_at: string
+          id: number
+          month_year: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          balance: number
+          created_at?: string
+          id?: number
+          month_year: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string
+          id?: number
+          month_year?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       zoho_integration: {
         Row: {
           access_token: string | null

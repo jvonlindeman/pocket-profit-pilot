@@ -7,6 +7,7 @@ import ExpenseChart from '@/components/Dashboard/ExpenseChart';
 import CollaboratorChart from '@/components/Dashboard/CollaboratorChart';
 import ProfitAnalysis from '@/components/Dashboard/ProfitAnalysis';
 import TransactionList from '@/components/Dashboard/TransactionList';
+import MonthlyBalanceEditor from '@/components/Dashboard/MonthlyBalanceEditor';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Settings, Bug, Play } from 'lucide-react';
@@ -152,6 +153,11 @@ const Index = () => {
                 <p className="mt-1 text-sm">Intenta seleccionar un periodo diferente o verificar la configuración de Zoho Books.</p>
               </div>
             )}
+
+            {/* Balance Mensual Inicial */}
+            <div className="mb-6">
+              <MonthlyBalanceEditor currentDate={dateRange.startDate} />
+            </div>
 
             {/* Resumen financiero */}
             <FinanceSummary 

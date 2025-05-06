@@ -12,10 +12,11 @@ export interface Transaction {
 export interface FinancialSummary {
   totalIncome: number;
   totalExpense: number;
-  collaboratorExpense: number; // New field for collaborator expenses
-  otherExpense: number; // New field for non-collaborator expenses
+  collaboratorExpense: number;
+  otherExpense: number;
   profit: number;
   profitMargin: number;
+  startingBalance?: number; // Added starting balance field
 }
 
 export interface CategorySummary {
@@ -56,4 +57,13 @@ export interface CollaboratorData {
   amount: number;
   percentage: number;
   date?: string; // Fecha opcional para los colaboradores
+}
+
+export interface MonthlyBalance {
+  id: number;
+  month_year: string;
+  balance: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 }

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, BadgeDollarSign, Users } from 'lucide-react';
+import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, BadgeDollarSign, Users, Scale } from 'lucide-react';
 import { FinancialSummary, CategorySummary } from '@/types/financial';
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -35,6 +35,21 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in">
+      {/* Balance Inicial */}
+      <Card className="finance-card">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-gray-500">Balance Inicial</h3>
+            <div className="p-2 bg-blue-50 rounded-full">
+              <Scale className="h-4 w-4 text-blue-500" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-blue-500 animate-value">
+            {summary.startingBalance !== undefined ? formatCurrency(summary.startingBalance) : "No establecido"}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Ingresos Stripe */}
       <Card className="finance-card">
         <CardContent className="p-6">

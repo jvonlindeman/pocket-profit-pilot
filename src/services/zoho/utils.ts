@@ -104,7 +104,7 @@ const calculateTotalByCategory = (transactions: Transaction[], type: 'income' | 
 };
 
 // Main function to process and format transaction data into a FinancialData object
-export const processTransactionData = (transactions: Transaction[]): FinancialData => {
+export const processTransactionData = (transactions: Transaction[], startingBalance?: number): FinancialData => {
   // Calcular income y expense total
   let totalIncome = 0;
   let totalExpense = 0;
@@ -126,8 +126,8 @@ export const processTransactionData = (transactions: Transaction[]): FinancialDa
     }
   });
 
-  // Calcular beneficio y margen
-  const profit = totalIncome - totalExpense;
+  // Include starting balance in profit calculation if provided
+  const profit = (startingBalance !== undefined ? startingBalance : 0) + totalIncome - totalExpense;
   const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0;
 
   // Crear objeto de resumen
@@ -137,7 +137,8 @@ export const processTransactionData = (transactions: Transaction[]): FinancialDa
     collaboratorExpense,
     otherExpense,
     profit,
-    profitMargin
+    profitMargin,
+    startingBalance
   };
 
   // Calcular datos por categoría
