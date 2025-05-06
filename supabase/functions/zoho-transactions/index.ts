@@ -130,37 +130,89 @@ serve(async (req: Request) => {
       const responseText = await webhookResponse.text();
       console.log(`make.com webhook response: ${responseText}`);
       
-      // Handle malformed JSON - Try to fix common issues with the response
-      // The issue is JSON arrays being represented as strings, requiring preprocessing
-      let fixedText = responseText;
-      
-      // Fix collaboradores array - look for string arrays and replace with proper JSON arrays
-      if (fixedText.includes('"colaboradores": "')) {
-        fixedText = fixedText.replace(/"colaboradores": "(.+?)"/, (match, p1) => {
-          // Replace escaped quotes with actual quotes
-          const unescaped = p1.replace(/\\"/g, '"');
-          // Wrap in array brackets
-          return `"colaboradores": [${unescaped}]`;
-        });
+      // The response text should already be a valid JSON format now, but let's handle potential issues
+      try {
+        // First try direct parsing
+        webhookData = JSON.parse(responseText);
+      } catch (parseError) {
+        // If direct parsing fails, try to fix common issues
+        console.log("Initial JSON parse failed, attempting to fix format");
+        
+        // Create a properly formatted JSON structure
+        let fixedJson = responseText.trim();
+        
+        // Special handling for collaboradores field if it's a string instead of an array
+        if (fixedJson.includes('"colaboradores": "')) {
+          fixedJson = fixedJson.replace(
+            /"colaboradores": "([^"]*)"/g, 
+            (match, captured) => {
+              try {
+                // Convert the string into a proper array by extracting objects
+                const items = captured.match(/\{"key":\d+,"value":\{[^}]+\}\}/g) || [];
+                const properArray = items.map(item => {
+                  const parsed = JSON.parse(item);
+                  return parsed.value;
+                });
+                return `"colaboradores": ${JSON.stringify(properArray)}`;
+              } catch (e) {
+                console.error("Error converting colaboradores to array:", e);
+                return '"colaboradores": []';
+              }
+            }
+          );
+        }
+        
+        // Special handling for expenses field if it's a string instead of an array
+        if (fixedJson.includes('"expenses": "')) {
+          fixedJson = fixedJson.replace(
+            /"expenses": "([^"]*)"/g, 
+            (match, captured) => {
+              try {
+                // Convert the string into a proper array by extracting objects
+                const items = captured.match(/\{"key":\d+,"value":\{[^}]+\}\}/g) || [];
+                const properArray = items.map(item => {
+                  const parsed = JSON.parse(item);
+                  return parsed.value;
+                });
+                return `"expenses": ${JSON.stringify(properArray)}`;
+              } catch (e) {
+                console.error("Error converting expenses to array:", e);
+                return '"expenses": []';
+              }
+            }
+          );
+        }
+        
+        // Special handling for payments field if it's a string instead of an array
+        if (fixedJson.includes('"payments": "')) {
+          fixedJson = fixedJson.replace(
+            /"payments": "([^"]*)"/g, 
+            (match, captured) => {
+              try {
+                // Convert the string into a proper array by extracting objects
+                const items = captured.match(/\{"key":\d+,"value":\{[^}]+\}\}/g) || [];
+                const properArray = items.map(item => {
+                  const parsed = JSON.parse(item);
+                  return parsed.value;
+                });
+                return `"payments": ${JSON.stringify(properArray)}`;
+              } catch (e) {
+                console.error("Error converting payments to array:", e);
+                return '"payments": []';
+              }
+            }
+          );
+        }
+        
+        // Try to parse the fixed JSON
+        try {
+          webhookData = JSON.parse(fixedJson);
+          console.log("Successfully parsed fixed JSON");
+        } catch (secondParseError) {
+          console.error("Failed to parse fixed JSON:", secondParseError);
+          throw new Error("Could not parse webhook response even after fixing");
+        }
       }
-      
-      // Fix expenses array
-      if (fixedText.includes('"expenses": "')) {
-        fixedText = fixedText.replace(/"expenses": "(.+?)"/, (match, p1) => {
-          const unescaped = p1.replace(/\\"/g, '"');
-          return `"expenses": [${unescaped}]`;
-        });
-      }
-      
-      // Fix payments array
-      if (fixedText.includes('"payments": "')) {
-        fixedText = fixedText.replace(/"payments": "(.+?)"/, (match, p1) => {
-          const unescaped = p1.replace(/\\"/g, '"');
-          return `"payments": [${unescaped}]`;
-        });
-      }
-      
-      webhookData = JSON.parse(fixedText);
     } catch (e) {
       console.error("Failed to parse make.com webhook response:", e);
       return new Response(

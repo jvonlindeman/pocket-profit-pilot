@@ -91,10 +91,10 @@ const processRawTransactions = (data: any): Transaction[] => {
     }
   }
   
-  // Process collaborator expenses (new format)
+  // Process collaborator expenses (new format with proper array)
   if (Array.isArray(data.colaboradores)) {
     data.colaboradores.forEach((item: any) => {
-      if (item && item.total && item.vendor_name) {
+      if (item && typeof item.total !== 'undefined' && item.vendor_name) {
         const amount = Number(item.total);
         if (amount > 0) {
           result.push({
@@ -111,10 +111,10 @@ const processRawTransactions = (data: any): Transaction[] => {
     });
   }
   
-  // Process regular expenses (new format)
+  // Process regular expenses (new format with proper array)
   if (Array.isArray(data.expenses)) {
     data.expenses.forEach((item: any) => {
-      if (item && item.total !== undefined && item.total !== null) {
+      if (item && typeof item.total !== 'undefined') {
         const amount = Number(item.total);
         if (amount > 0) {
           result.push({
@@ -133,10 +133,10 @@ const processRawTransactions = (data: any): Transaction[] => {
     });
   }
   
-  // Process payments (income) (new format)
+  // Process payments (income) (new format with proper array)
   if (Array.isArray(data.payments)) {
     data.payments.forEach((item: any) => {
-      if (item && item.amount !== undefined && item.amount !== null && item.customer_name) {
+      if (item && typeof item.amount !== 'undefined' && item.customer_name) {
         const amount = Number(item.amount);
         if (amount > 0) {
           result.push({
