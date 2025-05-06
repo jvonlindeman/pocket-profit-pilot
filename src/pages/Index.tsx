@@ -12,6 +12,7 @@ import { RefreshCw, Settings, Bug, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import WebhookDebug from '@/components/WebhookDebug';
+import WebhookRequestDebug from '@/components/WebhookRequestDebug';
 
 const Index = () => {
   const {
@@ -149,6 +150,11 @@ const Index = () => {
                 <p className="mt-1 text-sm">Intenta seleccionar un periodo diferente o verificar la configuración de Zoho Books.</p>
               </div>
             )}
+
+            {/* Nuevo componente de depuración de solicitud al webhook */}
+            <div className="mb-6">
+              <WebhookRequestDebug dateRange={dateRange} />
+            </div>
 
             {/* Resumen financiero */}
             <FinanceSummary 
