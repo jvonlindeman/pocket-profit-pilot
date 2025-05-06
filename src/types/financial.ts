@@ -12,6 +12,8 @@ export interface Transaction {
 export interface FinancialSummary {
   totalIncome: number;
   totalExpense: number;
+  collaboratorExpense: number; // New field for collaborator expenses
+  otherExpense: number; // New field for non-collaborator expenses
   profit: number;
   profitMargin: number;
 }

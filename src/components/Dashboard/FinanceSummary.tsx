@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, BadgeDollarSign } from 'lucide-react';
+import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, BadgeDollarSign, Users } from 'lucide-react';
 import { FinancialSummary, CategorySummary } from '@/types/financial';
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -80,7 +80,37 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
         </CardContent>
       </Card>
 
-      {/* Gastos */}
+      {/* Gastos de Colaboradores */}
+      <Card className="finance-card">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-gray-500">Gastos Colaboradores</h3>
+            <div className="p-2 bg-amber-50 rounded-full">
+              <Users className="h-4 w-4 text-amber-500" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-amber-500 animate-value">
+            {formatCurrency(summary.collaboratorExpense || 0)}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Otros Gastos */}
+      <Card className="finance-card">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-gray-500">Otros Gastos</h3>
+            <div className="p-2 bg-red-50 rounded-full">
+              <ArrowDownIcon className="h-4 w-4 text-red-500" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-red-500 animate-value">
+            {formatCurrency(summary.otherExpense || 0)}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Gastos Totales */}
       <Card className="finance-card">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-2">
@@ -96,7 +126,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
       </Card>
 
       {/* Beneficio */}
-      <Card className="finance-card lg:col-span-4">
+      <Card className="finance-card">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-medium text-gray-500">Beneficio Neto</h3>
