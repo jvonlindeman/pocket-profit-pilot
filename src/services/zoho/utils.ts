@@ -1,5 +1,36 @@
+
 import { Transaction, FinancialData, ChartData, CategorySummary, FinancialSummary } from '@/types/financial';
 import { format, parse, parseISO } from 'date-fns';
+
+// Function to get the current year
+export const getCurrentYear = (): number => {
+  return new Date().getFullYear();
+};
+
+// Function to ensure dates are in the valid format
+export const ensureValidDateFormat = (dateStr: string): string => {
+  // Make sure the date is in YYYY-MM-DD format
+  if (!dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    console.warn(`Invalid date format: ${dateStr}, using current date`);
+    return format(new Date(), 'yyyy-MM-dd');
+  }
+  return dateStr;
+};
+
+// Function to handle API errors
+export const handleApiError = (err: any, message: string): string => {
+  console.error(`${message}:`, err);
+  
+  let errorMessage = message;
+  
+  if (err.details) {
+    errorMessage += `: ${err.details}`;
+  } else if (err.message) {
+    errorMessage += `: ${err.message}`;
+  } 
+  
+  return errorMessage;
+};
 
 // Function to calculate daily data for a set of transactions
 const calculateDailyData = (transactions: Transaction[]): { income: ChartData; expense: ChartData } => {
