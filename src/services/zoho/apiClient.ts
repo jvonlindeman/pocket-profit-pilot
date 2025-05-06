@@ -16,14 +16,29 @@ export const fetchTransactionsFromWebhook = async (
 ): Promise<Transaction[] | any> => {
   try {
     console.log("ZohoService: Fetching transactions from", startDate, "to", endDate);
+    console.log("ZohoService: Raw date objects:", {
+      startDateObj: startDate,
+      startDateType: typeof startDate,
+      endDateObj: endDate,
+      endDateType: typeof endDate
+    });
     
     // Format dates for the API (YYYY-MM-DD format)
-    // Use exact dates without any modifications to prevent off-by-one errors
+    // CRITICAL FIX: Ensure we're preserving the exact date without timezone adjustments
+    // Use toISOString and split to get YYYY-MM-DD format
     const formattedStartDate = startDate.toISOString().split('T')[0];
     const formattedEndDate = endDate.toISOString().split('T')[0];
     
-    console.log("ZohoService: Formatted dates for API request:", formattedStartDate, "to", formattedEndDate);
-    console.log("ZohoService: Calling Supabase edge function for cached transactions");
+    console.log("ZohoService: Formatted dates for webhook request:", {
+      startDate: startDate,
+      startDateISO: startDate.toISOString(),
+      formattedStartDate,
+      endDate: endDate,
+      endDateISO: endDate.toISOString(),
+      formattedEndDate
+    });
+    
+    console.log("ZohoService: Calling Supabase edge function with exact dates:", formattedStartDate, formattedEndDate);
     
     // Call the Supabase edge function instead of make.com webhook directly
     const { data, error } = await supabase.functions.invoke("zoho-transactions", {

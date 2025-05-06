@@ -14,6 +14,14 @@ export default function WebhookRequestDebug({ dateRange }: WebhookRequestDebugPr
   // Format dates exactly as they are sent to the webhook
   const startDateFormatted = dateRange.startDate.toISOString().split('T')[0];
   const endDateFormatted = dateRange.endDate.toISOString().split('T')[0];
+  
+  // Additional formatting for debugging
+  const startDateLocal = dateRange.startDate.toLocaleDateString();
+  const endDateLocal = dateRange.endDate.toLocaleDateString();
+  const startDateISOFull = dateRange.startDate.toISOString();
+  const endDateISOFull = dateRange.endDate.toISOString();
+  const startDateUTC = dateRange.startDate.toUTCString();
+  const endDateUTC = dateRange.endDate.toUTCString();
 
   return (
     <Card>
@@ -59,10 +67,10 @@ export default function WebhookRequestDebug({ dateRange }: WebhookRequestDebugPr
           <h3 className="font-medium text-amber-800 mb-2">Proceso de fechas:</h3>
           <ol className="list-decimal pl-5 space-y-2 text-sm text-amber-700">
             <li>
-              <strong>UI DatePicker</strong> → Selección: {dateRange.startDate.toLocaleDateString()} - {dateRange.endDate.toLocaleDateString()}
+              <strong>UI DatePicker</strong> → Selección: {startDateLocal} - {endDateLocal}
             </li>
             <li>
-              <strong>useFinanceData hook</strong> → Conversión a formato ISO: {dateRange.startDate.toISOString()} - {dateRange.endDate.toISOString()}
+              <strong>useFinanceData hook</strong> → Conversión a formato ISO: {startDateISOFull} - {endDateISOFull}
             </li>
             <li>
               <strong>apiClient.ts</strong> → Extracción de fecha YYYY-MM-DD: {startDateFormatted} - {endDateFormatted}
@@ -71,6 +79,61 @@ export default function WebhookRequestDebug({ dateRange }: WebhookRequestDebugPr
               <strong>zoho-transactions Edge Function</strong> → Envío exacto al webhook: {startDateFormatted} - {endDateFormatted}
             </li>
           </ol>
+        </div>
+        
+        <div className="bg-green-50 border border-green-100 rounded-md p-4 mt-4">
+          <h3 className="font-medium text-green-800 mb-2">Información detallada de fechas:</h3>
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="bg-green-100">
+                <th className="p-2 text-left">Formato</th>
+                <th className="p-2 text-left">Fecha inicial</th>
+                <th className="p-2 text-left">Fecha final</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="p-2 font-medium">Date object (toString)</td>
+                <td className="p-2">{dateRange.startDate.toString()}</td>
+                <td className="p-2">{dateRange.endDate.toString()}</td>
+              </tr>
+              <tr>
+                <td className="p-2 font-medium">getTime() (timestamp)</td>
+                <td className="p-2">{dateRange.startDate.getTime()}</td>
+                <td className="p-2">{dateRange.endDate.getTime()}</td>
+              </tr>
+              <tr>
+                <td className="p-2 font-medium">toLocaleDateString()</td>
+                <td className="p-2">{startDateLocal}</td>
+                <td className="p-2">{endDateLocal}</td>
+              </tr>
+              <tr>
+                <td className="p-2 font-medium">toISOString() (completo)</td>
+                <td className="p-2">{startDateISOFull}</td>
+                <td className="p-2">{endDateISOFull}</td>
+              </tr>
+              <tr>
+                <td className="p-2 font-medium">toISOString().split('T')[0]</td>
+                <td className="p-2">{startDateFormatted}</td>
+                <td className="p-2">{endDateFormatted}</td>
+              </tr>
+              <tr>
+                <td className="p-2 font-medium">toUTCString()</td>
+                <td className="p-2">{startDateUTC}</td>
+                <td className="p-2">{endDateUTC}</td>
+              </tr>
+              <tr>
+                <td className="p-2 font-medium">Día del mes</td>
+                <td className="p-2">{dateRange.startDate.getDate()}</td>
+                <td className="p-2">{dateRange.endDate.getDate()}</td>
+              </tr>
+              <tr>
+                <td className="p-2 font-medium">Mes (0-11)</td>
+                <td className="p-2">{dateRange.startDate.getMonth()}</td>
+                <td className="p-2">{dateRange.endDate.getMonth()}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </CardContent>
     </Card>

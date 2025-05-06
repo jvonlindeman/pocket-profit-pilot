@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { format, endOfMonth, subMonths, startOfMonth, subDays, startOfYear } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -47,21 +46,49 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
   // Handler para aplicar el cambio de rango de fechas
   const handleRangeChange = () => {
     if (tempRange.from && tempRange.to) {
+      // CRITICAL FIX: Ensure we preserve the exact dates without timezone issues
+      // Set time to noon to avoid any timezone shifts
+      const startDate = new Date(tempRange.from);
+      const endDate = new Date(tempRange.to);
+      
+      // Explicitly set time to noon to prevent timezone issues
+      startDate.setHours(12, 0, 0, 0);
+      endDate.setHours(12, 0, 0, 0);
+      
+      console.log("DateRangePicker - Selected exact dates:", {
+        startDate: startDate,
+        startDateISO: startDate.toISOString(),
+        endDate: endDate,
+        endDateISO: endDate.toISOString()
+      });
+      
       onRangeChange({
-        startDate: tempRange.from,
-        endDate: tempRange.to
+        startDate: startDate,
+        endDate: endDate
       });
       setIsOpen(false);
     }
   };
 
+  // Helper to consistently create dates with noon time to prevent timezone issues
+  const createStableDate = (date: Date): Date => {
+    const stableDate = new Date(date);
+    stableDate.setHours(12, 0, 0, 0);
+    return stableDate;
+  };
+
   // Resetear al mes actual
   const resetToCurrentMonth = () => {
     const currentMonth = getCurrentMonthRange();
-    onRangeChange(currentMonth);
+    const stableDates = {
+      startDate: createStableDate(currentMonth.startDate),
+      endDate: createStableDate(currentMonth.endDate)
+    };
+    
+    onRangeChange(stableDates);
     setTempRange({
-      from: currentMonth.startDate,
-      to: currentMonth.endDate
+      from: stableDates.startDate,
+      to: stableDates.endDate
     });
     setIsOpen(false);
   };
@@ -69,8 +96,8 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
   // Mes pasado
   const setLastMonth = () => {
     const today = new Date();
-    const firstDayLastMonth = startOfMonth(subMonths(today, 1));
-    const lastDayLastMonth = endOfMonth(subMonths(today, 1));
+    const firstDayLastMonth = createStableDate(startOfMonth(subMonths(today, 1)));
+    const lastDayLastMonth = createStableDate(endOfMonth(subMonths(today, 1)));
     
     const newRange = {
       startDate: firstDayLastMonth,
@@ -87,8 +114,8 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
 
   // Últimos 30 días
   const setLast30Days = () => {
-    const today = new Date();
-    const thirtyDaysAgo = subDays(today, 30);
+    const today = createStableDate(new Date());
+    const thirtyDaysAgo = createStableDate(subDays(today, 30));
     
     const newRange = {
       startDate: thirtyDaysAgo,
@@ -105,8 +132,8 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
 
   // Este año
   const setThisYear = () => {
-    const today = new Date();
-    const firstDayOfYear = startOfYear(today);
+    const today = createStableDate(new Date());
+    const firstDayOfYear = createStableDate(startOfYear(today));
     
     const newRange = {
       startDate: firstDayOfYear,
@@ -121,11 +148,11 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
     setIsOpen(false);
   };
 
-  // Último día del mes anterior hasta último día del mes actual (nuevo método)
+  // Último día del mes anterior hasta último día del mes actual
   const setPreviousMonthEndToCurrentMonthEnd = () => {
     const today = new Date();
-    const lastDayPreviousMonth = endOfMonth(subMonths(today, 1));
-    const lastDayCurrMonth = endOfMonth(today);
+    const lastDayPreviousMonth = createStableDate(endOfMonth(subMonths(today, 1)));
+    const lastDayCurrMonth = createStableDate(endOfMonth(today));
     
     const newRange = {
       startDate: lastDayPreviousMonth,
@@ -143,8 +170,8 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
   // Último mes completo hasta mes actual
   const setPreviousAndCurrentMonth = () => {
     const today = new Date();
-    const firstDayLastMonth = startOfMonth(subMonths(today, 1));
-    const lastDayCurrentMonth = endOfMonth(today);
+    const firstDayLastMonth = createStableDate(startOfMonth(subMonths(today, 1)));
+    const lastDayCurrentMonth = createStableDate(endOfMonth(today));
     
     const newRange = {
       startDate: firstDayLastMonth,

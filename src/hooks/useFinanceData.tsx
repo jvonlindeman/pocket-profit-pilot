@@ -50,7 +50,25 @@ export const useFinanceData = () => {
       endISODate: newRange.endDate.toISOString(),
       endISODateOnly: newRange.endDate.toISOString().split('T')[0],
     });
-    setDateRange(newRange);
+    
+    // CRITICAL FIX: Preserve the exact time from datepicker without any modifications
+    // Create shallow copies to avoid timezone adjustments
+    const preservedStartDate = new Date(newRange.startDate);
+    const preservedEndDate = new Date(newRange.endDate);
+    
+    // Set exact hours to noon to avoid any timezone issues
+    preservedStartDate.setHours(12, 0, 0, 0);
+    preservedEndDate.setHours(12, 0, 0, 0);
+    
+    console.log("Preserved dates to prevent shifts:", {
+      preservedStartDate,
+      preservedEndDate
+    });
+    
+    setDateRange({
+      startDate: preservedStartDate,
+      endDate: preservedEndDate
+    });
   }, []);
 
   // Función para procesar y separar ingresos
@@ -81,7 +99,14 @@ export const useFinanceData = () => {
     setError(null);
 
     try {
-      // Log exact date objects and their string representations for debugging
+      // Log exact date objects for debugging - show both datepicker dates and what we're sending
+      console.log("Original dateRange from datepicker:", {
+        startDate: dateRange.startDate,
+        endDate: dateRange.endDate
+      });
+      
+      // Important: Ensure we're not modifying the dates when formatting them
+      // Use UTC methods to prevent timezone shifts
       const startDateFormatted = dateRange.startDate.toISOString().split('T')[0];
       const endDateFormatted = dateRange.endDate.toISOString().split('T')[0];
       

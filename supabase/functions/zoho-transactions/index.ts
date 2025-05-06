@@ -55,7 +55,7 @@ serve(async (req: Request) => {
       }
       
       requestBody = JSON.parse(text);
-      console.log("Request body parsed:", requestBody);
+      console.log("Edge function received request body:", requestBody);
     } catch (parseError) {
       console.error("Error parsing request body:", parseError);
       return new Response(
@@ -65,6 +65,8 @@ serve(async (req: Request) => {
     }
     
     const { startDate, endDate, forceRefresh = false } = requestBody;
+    
+    console.log("Edge function parsed dates:", { startDate, endDate });
     
     if (!startDate || !endDate) {
       console.error("Missing start or end date");
@@ -99,30 +101,31 @@ serve(async (req: Request) => {
     }
     
     // No cached data or force refresh, fetch new data from make.com webhook
-    console.log("Fetching fresh data from make.com webhook");
+    console.log("Edge function fetching fresh data from make.com webhook");
     
-    // Use exactly the dates received without any modifications
-    // This is crucial - we pass the exact same dates received from the client
-    const formattedStartDate = startDate;
-    const formattedEndDate = endDate;
-    
-    console.log("Formatted dates for webhook:", formattedStartDate, "to", formattedEndDate);
+    // CRITICAL: Use exactly the dates received from the client without any modifications
+    // Log the exact dates that will be sent to the webhook
+    console.log("Edge function sending dates to webhook:", {
+      startDate,
+      endDate,
+      forceRefresh
+    });
     
     // Call the make.com webhook
-    console.log("Calling make.com webhook:", makeWebhookUrl);
+    console.log("Edge function calling make.com webhook:", makeWebhookUrl);
     const webhookResponse = await fetch(makeWebhookUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        startDate: formattedStartDate,
-        endDate: formattedEndDate,
+        startDate: startDate,
+        endDate: endDate,
         forceRefresh: forceRefresh
       })
     });
     
-    console.log(`make.com webhook response status: ${webhookResponse.status}`);
+    console.log(`Edge function: make.com webhook response status: ${webhookResponse.status}`);
     
     if (!webhookResponse.ok) {
       const errorText = await webhookResponse.text();
@@ -139,7 +142,7 @@ serve(async (req: Request) => {
     
     // Get the raw response text
     const responseText = await webhookResponse.text();
-    console.log(`make.com webhook raw response: ${responseText}`);
+    console.log(`Edge function: make.com webhook raw response: ${responseText}`);
     
     // Parse the webhook response
     let webhookData;
