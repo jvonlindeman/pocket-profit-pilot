@@ -18,11 +18,17 @@ const CollaboratorChart: React.FC<CollaboratorChartProps> = ({ collaboratorData 
     return colors[index % colors.length];
   };
 
-  // Preparamos datos para el gráfico
-  const chartData = collaboratorData.map((item) => ({
+  // Filtrar colaboradores excluyendo a los dueños de la empresa
+  const filteredData = collaboratorData.filter((item) => 
+    item.category !== 'Johan von Lindeman' && item.category !== 'Daniel Chen'
+  );
+
+  // Recalcular porcentajes basados en el nuevo total (después de filtrar)
+  const totalAmount = filteredData.reduce((sum, item) => sum + item.amount, 0);
+  const chartData = filteredData.map((item) => ({
     name: item.category,
     value: item.amount,
-    percentage: item.percentage.toFixed(1) + '%'
+    percentage: ((item.amount / totalAmount) * 100).toFixed(1) + '%'
   }));
 
   // Formateo de moneda (en USD)
@@ -46,6 +52,22 @@ const CollaboratorChart: React.FC<CollaboratorChartProps> = ({ collaboratorData 
     }
     return null;
   };
+
+  // Si no hay datos después de filtrar, mostrar un mensaje
+  if (chartData.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Distribución de Pagos a Colaboradores (USD)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center h-[250px] text-gray-500">
+            No hay datos de colaboradores para mostrar
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
