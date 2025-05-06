@@ -214,7 +214,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
           <DropdownMenuContent align="end" className="bg-white">
             <DropdownMenuItem onClick={resetToCurrentMonth}>Mes actual</DropdownMenuItem>
             <DropdownMenuItem onClick={setLastMonth}>Mes pasado</DropdownMenuItem>
-            <DropdownMenuItem onClick={setPreviousAndCurrentMonth()}>Mes anterior + actual</DropdownMenuItem>
+            <DropdownMenuItem onClick={setPreviousAndCurrentMonth}>Mes anterior + actual</DropdownMenuItem>
             <DropdownMenuItem onClick={setLast30Days}>Últimos 30 días</DropdownMenuItem>
             <DropdownMenuItem onClick={setThisYear}>Este año</DropdownMenuItem>
           </DropdownMenuContent>
