@@ -12,6 +12,8 @@ export const useFinanceData = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [dataInitialized, setDataInitialized] = useState<boolean>(false);
   const [rawResponse, setRawResponse] = useState<any>(null);
+  const [stripeIncome, setStripeIncome] = useState<number>(0);
+  const [regularIncome, setRegularIncome] = useState<number>(0);
   
   // Estado del rango de fechas
   const [dateRange, setDateRange] = useState(() => {
@@ -38,6 +40,27 @@ export const useFinanceData = () => {
   const updateDateRange = useCallback((newRange: { startDate: Date; endDate: Date }) => {
     console.log("Date range updated:", newRange);
     setDateRange(newRange);
+  }, []);
+
+  // Función para procesar y separar ingresos
+  const processIncomeTypes = useCallback((transactions: Transaction[]) => {
+    let stripeAmount = 0;
+    let regularAmount = 0;
+    
+    transactions.forEach(transaction => {
+      if (transaction.type === 'income') {
+        if (transaction.source === 'Stripe') {
+          stripeAmount += transaction.amount;
+        } else {
+          regularAmount += transaction.amount;
+        }
+      }
+    });
+    
+    setStripeIncome(stripeAmount);
+    setRegularIncome(regularAmount);
+    
+    return { stripeAmount, regularAmount };
   }, []);
 
   // Función para cargar los datos (ahora no se carga automáticamente)
@@ -71,6 +94,9 @@ export const useFinanceData = () => {
       const combinedData = [...zohoData, ...stripeData];
       console.log("Combined transactions:", combinedData.length);
       
+      // Procesar ingresos separados
+      processIncomeTypes(combinedData);
+      
       // Actualizar estado
       setTransactions(combinedData);
       setDataInitialized(true);
@@ -87,7 +113,7 @@ export const useFinanceData = () => {
     } finally {
       setLoading(false);
     }
-  }, [dateRange.startDate, dateRange.endDate]);
+  }, [dateRange.startDate, dateRange.endDate, processIncomeTypes]);
 
   // Función pública para refrescar datos (forzando o no)
   const refreshData = useCallback((force = false) => {
@@ -103,6 +129,8 @@ export const useFinanceData = () => {
     getCurrentMonthRange,
     refreshData,
     dataInitialized,
-    rawResponse
+    rawResponse,
+    stripeIncome,
+    regularIncome
   };
 };

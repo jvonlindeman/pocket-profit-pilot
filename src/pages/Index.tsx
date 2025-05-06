@@ -1,3 +1,4 @@
+
 import React from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
@@ -22,7 +23,9 @@ const Index = () => {
     getCurrentMonthRange,
     refreshData,
     dataInitialized,
-    rawResponse
+    rawResponse,
+    stripeIncome,
+    regularIncome
   } = useFinanceData();
   
   const { toast } = useToast();
@@ -56,6 +59,17 @@ const Index = () => {
       description: 'Obteniendo datos más recientes...',
     });
     refreshData(true);
+  };
+
+  // Prepare Stripe data for chart
+  const getStripeDataForChart = () => {
+    // Si solo hay un valor de Stripe para todo el período, distribúyelo a lo largo del gráfico
+    if (stripeIncome > 0) {
+      const labels = financialData.dailyData.income.labels;
+      const values = new Array(labels.length).fill(stripeIncome / labels.length);
+      return { labels, values };
+    }
+    return { labels: [], values: [] };
   };
 
   return (
@@ -139,14 +153,17 @@ const Index = () => {
             {/* Resumen financiero */}
             <FinanceSummary 
               summary={financialData.summary} 
-              expenseCategories={financialData.expenseByCategory} 
+              expenseCategories={financialData.expenseByCategory}
+              stripeIncome={stripeIncome}
+              regularIncome={regularIncome}
             />
 
             {/* Gráficos */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
               <RevenueChart 
                 incomeData={financialData.dailyData.income} 
-                expenseData={financialData.dailyData.expense} 
+                expenseData={financialData.dailyData.expense}
+                stripeData={getStripeDataForChart()}
               />
               <ExpenseChart expenseData={financialData.expenseByCategory} />
             </div>

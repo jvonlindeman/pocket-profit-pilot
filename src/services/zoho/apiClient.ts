@@ -98,6 +98,7 @@ const processRawTransactions = (data: any): Transaction[] => {
   }
   
   // Process collaborator expenses (new format with proper array)
+  // Asegurando que los colaboradores se incluyan como gastos
   if (Array.isArray(data.colaboradores)) {
     data.colaboradores.forEach((item: any) => {
       if (item && typeof item.total !== 'undefined' && item.vendor_name) {
