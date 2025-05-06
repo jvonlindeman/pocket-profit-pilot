@@ -28,8 +28,7 @@ const CollaboratorChart: React.FC<CollaboratorChartProps> = ({ collaboratorData 
   const chartData = filteredData.map((item) => ({
     name: item.category,
     value: item.amount,
-    percentage: ((item.amount / totalAmount) * 100).toFixed(1) + '%',
-    date: item.date || 'N/A'  // Incluimos la fecha, con un valor predeterminado si no existe
+    percentage: ((item.amount / totalAmount) * 100).toFixed(1) + '%'
   }));
 
   // Formateo de moneda (en USD)
@@ -40,6 +39,12 @@ const CollaboratorChart: React.FC<CollaboratorChartProps> = ({ collaboratorData 
     }).format(value);
   };
 
+  // Acortar nombres largos para la leyenda
+  const shortenName = (name: string, maxLength: number = 15) => {
+    if (name.length <= maxLength) return name;
+    return `${name.substring(0, maxLength)}...`;
+  };
+
   // Renderizado personalizado para el tooltip
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
@@ -48,9 +53,6 @@ const CollaboratorChart: React.FC<CollaboratorChartProps> = ({ collaboratorData 
           <p className="text-sm font-medium">{payload[0].name}</p>
           <p className="text-sm">{formatCurrency(payload[0].value)}</p>
           <p className="text-sm text-gray-500">{payload[0].payload.percentage}</p>
-          {payload[0].payload.date && payload[0].payload.date !== 'N/A' && (
-            <p className="text-xs text-gray-400">Fecha: {payload[0].payload.date}</p>
-          )}
         </div>
       );
     }
@@ -100,14 +102,12 @@ const CollaboratorChart: React.FC<CollaboratorChartProps> = ({ collaboratorData 
                 layout="vertical" 
                 verticalAlign="middle" 
                 align="right"
+                wrapperStyle={{ maxWidth: '40%', paddingLeft: '10px', overflowWrap: 'break-word' }}
                 formatter={(value, entry, index) => {
                   const item = chartData[index];
                   return (
-                    <span className="text-sm">
-                      {value} ({item.percentage})
-                      {item.date && item.date !== 'N/A' && (
-                        <span className="block text-xs text-gray-500">{item.date}</span>
-                      )}
+                    <span className="text-sm whitespace-normal">
+                      {shortenName(value)} ({item.percentage})
                     </span>
                   );
                 }}
