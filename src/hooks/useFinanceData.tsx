@@ -15,6 +15,7 @@ export const useFinanceData = () => {
   const [rawResponse, setRawResponse] = useState<any>(null);
   const [stripeIncome, setStripeIncome] = useState<number>(0);
   const [regularIncome, setRegularIncome] = useState<number>(0);
+  const [collaboratorExpenses, setCollaboratorExpenses] = useState<any[]>([]);
   
   // Estado del rango de fechas - configurado para mostrar desde el último día del mes anterior hasta el último día del mes actual
   const [dateRange, setDateRange] = useState(() => {
@@ -85,6 +86,36 @@ export const useFinanceData = () => {
     return { stripeAmount, regularAmount };
   }, []);
 
+  // Función para procesar datos de colaboradores
+  const processCollaboratorData = useCallback((rawResponse: any) => {
+    if (!rawResponse || !rawResponse.colaboradores || !Array.isArray(rawResponse.colaboradores)) {
+      setCollaboratorExpenses([]);
+      return [];
+    }
+
+    // Filtrar colaboradores con datos válidos
+    const validCollaborators = rawResponse.colaboradores
+      .filter((item: any) => item && typeof item.total !== 'undefined' && item.vendor_name)
+      .map((item: any) => ({
+        name: item.vendor_name,
+        amount: Number(item.total)
+      }))
+      .filter((item: any) => item.amount > 0);
+
+    // Calcular el total
+    const totalAmount = validCollaborators.reduce((sum: number, item: any) => sum + item.amount, 0);
+    
+    // Calcular porcentajes y formatear para el gráfico
+    const formattedData = validCollaborators.map((item: any) => ({
+      category: item.name,
+      amount: item.amount,
+      percentage: totalAmount > 0 ? (item.amount / totalAmount) * 100 : 0
+    })).sort((a: any, b: any) => b.amount - a.amount);
+    
+    setCollaboratorExpenses(formattedData);
+    return formattedData;
+  }, []);
+
   // Función para cargar los datos (ahora no se carga automáticamente)
   const fetchData = useCallback(async (forceRefresh = false) => {
     console.log("Fetching financial data...");
@@ -121,6 +152,9 @@ export const useFinanceData = () => {
       setRawResponse(rawData);
       console.log("Fetched raw response for debugging:", rawData);
 
+      // Procesar datos de colaboradores
+      processCollaboratorData(rawData);
+
       // Obtener transacciones de Stripe - usando las fechas exactas sin modificaciones
       console.log("Fetching from Stripe:", dateRange.startDate, dateRange.endDate);
       const stripeData = await StripeService.getTransactions(
@@ -151,7 +185,7 @@ export const useFinanceData = () => {
     } finally {
       setLoading(false);
     }
-  }, [dateRange.startDate, dateRange.endDate, processIncomeTypes]);
+  }, [dateRange.startDate, dateRange.endDate, processIncomeTypes, processCollaboratorData]);
 
   // Función pública para refrescar datos (forzando o no)
   const refreshData = useCallback((force = false) => {
@@ -169,6 +203,7 @@ export const useFinanceData = () => {
     dataInitialized,
     rawResponse,
     stripeIncome,
-    regularIncome
+    regularIncome,
+    collaboratorExpenses
   };
 };

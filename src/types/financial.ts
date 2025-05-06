@@ -47,3 +47,9 @@ export interface FinancialData {
     profit: ChartData;
   };
 }
+
+export interface CollaboratorData {
+  name: string;
+  amount: number;
+  percentage: number;
+}

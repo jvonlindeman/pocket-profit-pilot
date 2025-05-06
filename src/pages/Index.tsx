@@ -4,6 +4,7 @@ import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
 import RevenueChart from '@/components/Dashboard/RevenueChart';
 import ExpenseChart from '@/components/Dashboard/ExpenseChart';
+import CollaboratorChart from '@/components/Dashboard/CollaboratorChart';
 import ProfitAnalysis from '@/components/Dashboard/ProfitAnalysis';
 import TransactionList from '@/components/Dashboard/TransactionList';
 import { useFinanceData } from '@/hooks/useFinanceData';
@@ -26,7 +27,8 @@ const Index = () => {
     dataInitialized,
     rawResponse,
     stripeIncome,
-    regularIncome
+    regularIncome,
+    collaboratorExpenses
   } = useFinanceData();
   
   const { toast } = useToast();
@@ -173,6 +175,13 @@ const Index = () => {
               />
               <ExpenseChart expenseData={financialData.expenseByCategory} />
             </div>
+
+            {/* Nuevo gráfico de colaboradores */}
+            {collaboratorExpenses && collaboratorExpenses.length > 0 && (
+              <div className="mt-6">
+                <CollaboratorChart collaboratorData={collaboratorExpenses} />
+              </div>
+            )}
 
             {/* Análisis de rentabilidad */}
             <div className="mt-6">
