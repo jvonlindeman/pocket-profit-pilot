@@ -129,50 +129,51 @@ serve(async (req: Request) => {
     try {
       const responseText = await webhookResponse.text();
       console.log(`make.com webhook response: ${responseText}`);
-      webhookData = JSON.parse(responseText);
+      
+      // Handle malformed JSON - Try to fix common issues with the response
+      // The issue is JSON arrays being represented as strings, requiring preprocessing
+      let fixedText = responseText;
+      
+      // Fix collaboradores array - look for string arrays and replace with proper JSON arrays
+      if (fixedText.includes('"colaboradores": "')) {
+        fixedText = fixedText.replace(/"colaboradores": "(.+?)"/, (match, p1) => {
+          // Replace escaped quotes with actual quotes
+          const unescaped = p1.replace(/\\"/g, '"');
+          // Wrap in array brackets
+          return `"colaboradores": [${unescaped}]`;
+        });
+      }
+      
+      // Fix expenses array
+      if (fixedText.includes('"expenses": "')) {
+        fixedText = fixedText.replace(/"expenses": "(.+?)"/, (match, p1) => {
+          const unescaped = p1.replace(/\\"/g, '"');
+          return `"expenses": [${unescaped}]`;
+        });
+      }
+      
+      // Fix payments array
+      if (fixedText.includes('"payments": "')) {
+        fixedText = fixedText.replace(/"payments": "(.+?)"/, (match, p1) => {
+          const unescaped = p1.replace(/\\"/g, '"');
+          return `"payments": [${unescaped}]`;
+        });
+      }
+      
+      webhookData = JSON.parse(fixedText);
     } catch (e) {
       console.error("Failed to parse make.com webhook response:", e);
       return new Response(
-        JSON.stringify({ error: "Failed to parse make.com webhook response" }),
+        JSON.stringify({ 
+          error: "Failed to parse make.com webhook response", 
+          details: e instanceof Error ? e.message : "Unknown error",
+          suggestion: "El formato JSON de la respuesta del webhook parece incorrecto. Asegúrate que los arrays estén formateados correctamente."
+        }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     
-    // If we get valid transactions, update the cache
-    // Note: We're now expecting the new JSON format - no need to transform strings
-    if (webhookData) {
-      try {
-        // Delete existing cached transactions for this date range and source
-        console.log("Deleting existing cached transactions");
-        const { error: deleteError } = await supabase
-          .from("cached_transactions")
-          .delete()
-          .eq("source", "Zoho")
-          .gte("date", startDate)
-          .lte("date", endDate);
-          
-        if (deleteError) {
-          console.error("Error deleting old cached transactions:", deleteError);
-        }
-        
-        // Add sync_date to transactions if not present
-        // This would be updated for the new format but we're using the raw data instead
-        
-        // Insert new transactions into cache - using the raw response for now
-        // We'll process it in the frontend instead
-        console.log("Returning webhook data directly:", webhookData);
-        
-        // No longer caching transactions in structured format, returning raw data
-
-      } catch (cacheError) {
-        console.error("Error managing transaction cache:", cacheError);
-        // Continue and return the transactions even if caching fails
-      }
-    } else {
-      console.log("No structured data returned from make.com webhook");
-    }
-    
-    console.log("Successfully fetched data from make.com webhook");
+    console.log("Successfully fetched and parsed data from make.com webhook");
     return new Response(
       JSON.stringify(webhookData || {}),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -181,7 +182,10 @@ serve(async (req: Request) => {
   } catch (err) {
     console.error("Error in zoho-transactions function:", err);
     return new Response(
-      JSON.stringify({ error: "Internal server error", details: err.message }),
+      JSON.stringify({ 
+        error: "Internal server error", 
+        details: err instanceof Error ? err.message : "Unknown error" 
+      }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
