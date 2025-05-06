@@ -1,6 +1,5 @@
-
 import { Transaction } from "../../types/financial";
-import { ensureValidDateFormat, handleApiError, processTransactionData } from "./utils";
+import { ensureValidDateFormat, handleApiError } from "./utils";
 import { getMockTransactions } from "./mockData";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -52,6 +51,29 @@ export const fetchTransactionsFromWebhook = async (
       return data;
     }
     
+    // Check if we received cached transactions directly
+    if (Array.isArray(data) && data.length > 0 && 'type' in data[0] && 'source' in data[0]) {
+      console.log("Received cached transactions directly from Supabase");
+      
+      // Convert the cached transactions to our Transaction type
+      return data.map((tx: any) => ({
+        id: tx.id,
+        date: tx.date,
+        amount: Number(tx.amount),
+        description: tx.description || '',
+        category: tx.category,
+        source: tx.source,
+        type: tx.type
+      }));
+    }
+    
+    // If we received the processed webhook response, use the cached_transactions field
+    if (data.cached_transactions && Array.isArray(data.cached_transactions)) {
+      console.log("Using newly processed cached transactions");
+      return data.cached_transactions;
+    }
+    
+    // Otherwise, process the raw webhook response
     return processRawTransactions(data);
   } catch (err) {
     handleApiError(err, 'Failed to connect to Supabase function');
@@ -80,7 +102,7 @@ const processRawTransactions = (data: any): Transaction[] => {
   if (data.stripe) {
     try {
       // Parse the string to a number, handling comma as decimal separator
-      const stripeAmount = parseFloat(data.stripe.replace(".", "").replace(",", "."));
+      const stripeAmount = parseFloat(String(data.stripe).replace(".", "").replace(",", "."));
       if (!isNaN(stripeAmount) && stripeAmount > 0) {
         result.push({
           id: `stripe-income-${Date.now()}`,
@@ -98,14 +120,13 @@ const processRawTransactions = (data: any): Transaction[] => {
   }
   
   // Process collaborator expenses (new format with proper array)
-  // Asegurando que los colaboradores se incluyan como gastos
   if (Array.isArray(data.colaboradores)) {
-    data.colaboradores.forEach((item: any) => {
+    data.colaboradores.forEach((item: any, index: number) => {
       if (item && typeof item.total !== 'undefined' && item.vendor_name) {
         const amount = Number(item.total);
         if (amount > 0) {
           result.push({
-            id: `colaborador-${item.vendor_name.replace(/\s/g, '-')}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            id: `colaborador-${item.vendor_name.replace(/\s/g, '-')}-${Date.now()}-${index}`,
             date: new Date().toISOString().split('T')[0],
             amount,
             description: `Pago a colaborador: ${item.vendor_name}`,
@@ -119,15 +140,15 @@ const processRawTransactions = (data: any): Transaction[] => {
   }
   
   // Process regular expenses (new format with proper array)
-  // MODIFIED: Filter out expenses with category "Impuestos"
+  // Filter out expenses with category "Impuestos"
   if (Array.isArray(data.expenses)) {
-    data.expenses.forEach((item: any) => {
+    data.expenses.forEach((item: any, index: number) => {
       // Skip expenses with account_name "Impuestos"
       if (item && typeof item.total !== 'undefined' && item.account_name !== "Impuestos") {
         const amount = Number(item.total);
         if (amount > 0) {
           result.push({
-            id: `expense-${(item.vendor_name || item.account_name || '').replace(/\s/g, '-')}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            id: `expense-${(item.vendor_name || item.account_name || '').replace(/\s/g, '-')}-${Date.now()}-${index}`,
             date: item.date || new Date().toISOString().split('T')[0],
             amount,
             description: item.vendor_name 
@@ -144,12 +165,12 @@ const processRawTransactions = (data: any): Transaction[] => {
   
   // Process payments (income) (new format with proper array)
   if (Array.isArray(data.payments)) {
-    data.payments.forEach((item: any) => {
+    data.payments.forEach((item: any, index: number) => {
       if (item && typeof item.amount !== 'undefined' && item.customer_name) {
         const amount = Number(item.amount);
         if (amount > 0) {
           result.push({
-            id: `income-${item.customer_name.replace(/\s/g, '-')}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            id: `income-${item.customer_name.replace(/\s/g, '-')}-${Date.now()}-${index}`,
             date: item.date || new Date().toISOString().split('T')[0],
             amount,
             description: `Ingreso de ${item.customer_name}`,

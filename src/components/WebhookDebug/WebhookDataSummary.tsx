@@ -5,81 +5,99 @@ interface WebhookDataSummaryProps {
   rawData: any;
 }
 
-const WebhookDataSummary: React.FC<WebhookDataSummaryProps> = ({ rawData }) => {
-  if (!rawData) return null;
+export default function WebhookDataSummary({ rawData }: WebhookDataSummaryProps) {
+  // Function to count the number of items in a specific category
+  const countItems = (data: any, type: string) => {
+    if (!data) return 0;
+    
+    // If the data is an array of cached transactions
+    if (Array.isArray(data) && data.length > 0 && 'type' in data[0]) {
+      return data.filter(item => item.type === type).length;
+    }
+    
+    // If dealing with newly processed cached transactions
+    if (data.cached_transactions && Array.isArray(data.cached_transactions)) {
+      return data.cached_transactions.filter((item: any) => item.type === type).length;
+    }
+    
+    // Using raw webhook data
+    let count = 0;
+    
+    // Count stripe income
+    if (type === 'income' && data.stripe) {
+      count += 1; // Stripe income is counted as one item
+    }
+    
+    // Count regular income (payments)
+    if (type === 'income' && Array.isArray(data.payments)) {
+      count += data.payments.length;
+    }
+    
+    // Count expenses
+    if (type === 'expense') {
+      // Count collaborator expenses
+      if (Array.isArray(data.colaboradores)) {
+        count += data.colaboradores.length;
+      }
+      
+      // Count regular expenses (excluding "Impuestos")
+      if (Array.isArray(data.expenses)) {
+        count += data.expenses.filter((exp: any) => exp.account_name !== "Impuestos").length;
+      }
+    }
+    
+    return count;
+  };
   
-  // Handle string responses
-  if (typeof rawData === 'string') {
-    return (
-      <div className="mb-4 p-2 bg-amber-50 border border-amber-100 rounded">
-        <p className="text-sm text-amber-800 font-medium">Respuesta sin estructura</p>
-        <p className="text-xs text-amber-700 mt-1">
-          La respuesta del webhook es una cadena de texto sin formato estructurado.
-        </p>
-      </div>
-    );
-  }
+  // Function to check if data is from cache
+  const isFromCache = (data: any) => {
+    // Check if the data is an array of cached transactions
+    if (Array.isArray(data) && data.length > 0 && 'sync_date' in data[0]) {
+      return true;
+    }
+    
+    return false;
+  };
   
-  // Handle raw_response property
-  if (rawData.raw_response && typeof rawData.raw_response === 'string' && 
-      (!rawData.stripe && !rawData.colaboradores && !rawData.expenses && !rawData.payments)) {
-    return (
-      <div className="mb-4 p-2 bg-amber-50 border border-amber-100 rounded">
-        <p className="text-sm text-amber-800 font-medium">Respuesta sin estructura procesable</p>
-        <p className="text-xs text-amber-700 mt-1">
-          La respuesta del webhook contiene datos sin procesar que no siguen el formato esperado.
-        </p>
-      </div>
-    );
-  }
+  // Get cache information
+  const getCacheInfo = (data: any) => {
+    if (!isFromCache(data)) return null;
+    
+    // If the data is an array of cached transactions
+    if (Array.isArray(data) && data.length > 0 && 'sync_date' in data[0]) {
+      const latestSync = new Date(Math.max(...data.map(tx => new Date(tx.sync_date).getTime())));
+      return {
+        timestamp: latestSync,
+        count: data.length
+      };
+    }
+    
+    return null;
+  };
   
-  // Handle error response
-  if (rawData.error) {
-    return (
-      <div className="mb-4 p-2 bg-red-50 border border-red-100 rounded">
-        <p className="text-sm text-red-800 font-medium">Error en la respuesta</p>
-        <p className="text-xs text-red-700 mt-1">
-          {rawData.error}
-          {rawData.details && (
-            <span className="block mt-1">Detalles: {rawData.details}</span>
-          )}
-        </p>
-      </div>
-    );
-  }
-  
-  // Count the number of items in each category
-  const stripeAmount = rawData.stripe;
-  const colaboradoresCount = Array.isArray(rawData.colaboradores) ? rawData.colaboradores.length : 0;
-  const expensesCount = Array.isArray(rawData.expenses) ? rawData.expenses.length : 0;
-  const taxExpensesCount = Array.isArray(rawData.expenses) 
-    ? rawData.expenses.filter((exp: any) => exp.account_name === "Impuestos").length 
-    : 0;
-  const paymentsCount = Array.isArray(rawData.payments) ? rawData.payments.length : 0;
+  const cacheInfo = getCacheInfo(rawData);
+  const incomeCount = countItems(rawData, 'income');
+  const expenseCount = countItems(rawData, 'expense');
   
   return (
     <div className="mb-4 p-2 bg-blue-50 border border-blue-100 rounded">
-      <p className="text-sm text-blue-800 font-medium">Resumen de la Estructura</p>
-      <p className="text-xs text-blue-700 mt-1">
-        Respuesta de Webhook con {colaboradoresCount + expensesCount + paymentsCount} elementos y Stripe.
-      </p>
-      <ul className="text-xs text-blue-700 mt-1 list-disc pl-5">
-        {stripeAmount && <li>Stripe: {stripeAmount}</li>}
-        {colaboradoresCount > 0 && <li>Colaboradores: {colaboradoresCount} elementos</li>}
-        {expensesCount > 0 && (
-          <li>
-            Gastos: {expensesCount} elementos
-            {taxExpensesCount > 0 && (
-              <span className="text-xs text-gray-600 italic"> 
-                (incluye {taxExpensesCount} de Impuestos que se excluyen de los cálculos)
-              </span>
-            )}
-          </li>
-        )}
-        {paymentsCount > 0 && <li>Ingresos: {paymentsCount} elementos</li>}
-      </ul>
+      <p className="text-sm text-blue-800 font-medium">Resumen de Datos</p>
+      
+      {cacheInfo ? (
+        <div className="mt-1 text-xs text-blue-700 bg-blue-100 p-1 rounded border border-blue-200 mb-2">
+          <p className="font-semibold">Datos obtenidos de caché</p>
+          <p>Última sincronización: {cacheInfo.timestamp.toLocaleString()}</p>
+          <p>Total de transacciones cacheadas: {cacheInfo.count}</p>
+        </div>
+      ) : (
+        <p className="mt-1 text-xs text-blue-700">Datos obtenidos directamente de la API</p>
+      )}
+      
+      <div className="mt-1 text-xs text-blue-700">
+        <p>Total Ingresos: {incomeCount}</p>
+        <p>Total Gastos: {expenseCount}</p>
+        <p>Total Transacciones: {incomeCount + expenseCount}</p>
+      </div>
     </div>
   );
-};
-
-export default WebhookDataSummary;
+}
