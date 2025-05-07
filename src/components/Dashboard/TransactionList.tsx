@@ -131,12 +131,15 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefre
             </TableBody>
           </Table>
         </CardContent>
-        <CardFooter className="bg-gray-50 border-t text-sm text-gray-500">
+        <CardFooter className="bg-gray-50 border-t text-sm text-gray-500 flex justify-between">
           <div>
             Mostrando {filteredTransactions.length} {filteredTransactions.length === 1 ? 'transacción' : 'transacciones'}
             {filter !== 'all' && (
-              <> ({filter === 'income' ? 'ingresos' : 'gastos'}) de {transactions.length} total</>
+              <> ({filter === 'income' ? 'ingresos' : 'gastos'})</>
             )}
+          </div>
+          <div>
+            Total: {transactions.length} {transactions.length === 1 ? 'transacción' : 'transacciones'} en período seleccionado
           </div>
         </CardFooter>
       </Card>
