@@ -1,7 +1,8 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { format as formatDate } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { MonthlyBalance } from '@/types/financial';
 
 interface UseMonthlyBalanceProps {
   currentDate: Date;
@@ -12,6 +13,10 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
   const [error, setError] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   const [notes, setNotes] = useState<string | null>(null);
+  const [monthlyBalance, setMonthlyBalance] = useState<MonthlyBalance | null>(null);
+  
+  // Format the current month-year
+  const currentMonthYear = formatDate(currentDate, 'yyyy-MM');
 
   // Function to check if a balance exists for the current month
   const checkBalanceExists = useCallback(async (): Promise<boolean> => {
@@ -34,6 +39,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       if (data) {
         setBalance(data.balance);
         setNotes(data.notes);
+        setMonthlyBalance(data as MonthlyBalance);
         return true;
       }
       
@@ -100,6 +106,17 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       setBalance(value);
       setNotes(noteText || null);
       
+      // Fetch the updated data to update the monthlyBalance state
+      const { data: updatedData } = await supabase
+        .from('monthly_balances')
+        .select('*')
+        .eq('month_year', monthYear)
+        .single();
+        
+      if (updatedData) {
+        setMonthlyBalance(updatedData as MonthlyBalance);
+      }
+      
       return true;
     } catch (err) {
       console.error("Error in saveBalance:", err);
@@ -110,6 +127,14 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     }
   }, [currentDate]);
 
+  // For backward compatibility with existing code
+  const updateMonthlyBalance = saveBalance;
+
+  // Load data when currentDate changes
+  useEffect(() => {
+    checkBalanceExists();
+  }, [currentDate, checkBalanceExists]);
+
   return {
     loading,
     error,
@@ -117,5 +142,8 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     notes,
     checkBalanceExists,
     saveBalance,
+    updateMonthlyBalance, // Alias for saveBalance for backward compatibility
+    monthlyBalance,
+    currentMonthYear
   };
 };

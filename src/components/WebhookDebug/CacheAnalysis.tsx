@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, RefreshCw, CalendarIcon, DatabaseIcon } from 'lucide-react';
-import ZohoService from '@/services/zohoService';
 import { supabase } from '@/integrations/supabase/client';
 
 interface CacheAnalysisProps {
@@ -15,6 +14,16 @@ interface MonthStats {
   lastDate: string | null;
   count: number;
   formattedMonth: string;
+}
+
+// Response types for the Supabase RPC functions
+interface MonthYearResult {
+  month_year: string;
+}
+
+interface DateRangeResult {
+  min_date: string | null;
+  max_date: string | null;
 }
 
 // Format month-year string for display
@@ -47,7 +56,7 @@ const CacheAnalysis: React.FC<CacheAnalysisProps> = ({ onUpdate }) => {
     try {
       // First get all unique month-years
       const { data: monthsData, error: monthsError } = await supabase
-        .rpc('get_unique_months_with_transactions');
+        .rpc<MonthYearResult>('get_unique_months_with_transactions');
       
       if (monthsError) {
         throw new Error(`Error getting unique months: ${monthsError.message}`);
@@ -69,7 +78,7 @@ const CacheAnalysis: React.FC<CacheAnalysisProps> = ({ onUpdate }) => {
         
         // Get first and last date for this month
         const { data: dateRangeData, error: dateRangeError } = await supabase
-          .rpc('get_month_transaction_range', { month_year_param: monthYear });
+          .rpc<DateRangeResult>('get_month_transaction_range', { month_year_param: monthYear });
           
         if (dateRangeError) {
           console.error(`Error getting date range for ${monthYear}:`, dateRangeError);

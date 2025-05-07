@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { MonthlyBalance } from '@/types/financial';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription } from '@/components/ui/form';
 import { useForm } from 'react-hook-form';
@@ -43,25 +42,26 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
   const {
     loading,
     error,
+    balance,
+    notes,
+    saveBalance,
     monthlyBalance,
-    updateMonthlyBalance,
-    currentMonthYear,
   } = useMonthlyBalance({ currentDate });
 
   // Update form values when data is loaded
   useEffect(() => {
-    if (monthlyBalance) {
+    if (balance !== null) {
       form.reset({
-        balance: monthlyBalance.balance,
-        notes: monthlyBalance.notes || '',
+        balance: balance,
+        notes: notes || '',
       });
       
       // Notify parent component if needed
       if (onBalanceChange) {
-        onBalanceChange(monthlyBalance.balance);
+        onBalanceChange(balance);
       }
     }
-  }, [monthlyBalance, form, onBalanceChange]);
+  }, [balance, notes, form, onBalanceChange]);
 
   // Format month name in Spanish
   const formattedMonth = format(currentDate, 'MMMM yyyy', { locale: es });
@@ -69,7 +69,7 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
 
   // Handle form submission
   const onSubmit = (data: FormValues) => {
-    updateMonthlyBalance(data.balance, data.notes);
+    saveBalance(data.balance, data.notes);
     
     // Notify parent component if needed
     if (onBalanceChange) {
@@ -129,7 +129,7 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
               className="w-full"
               disabled={loading}
             >
-              {monthlyBalance ? 'Actualizar Balance' : 'Guardar Balance'}
+              {balance !== null ? 'Actualizar Balance' : 'Guardar Balance'}
             </Button>
           </form>
         </Form>

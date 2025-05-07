@@ -5,7 +5,7 @@ RETURNS TABLE (month_year text)
 LANGUAGE sql
 SECURITY DEFINER
 AS $$
-  SELECT DISTINCT substring(date, 1, 7) as month_year
+  SELECT DISTINCT substring(date::text, 1, 7) as month_year
   FROM cached_transactions
   ORDER BY month_year DESC;
 $$;
@@ -17,8 +17,9 @@ LANGUAGE sql
 SECURITY DEFINER
 AS $$
   SELECT 
-    MIN(date) as min_date,
-    MAX(date) as max_date
+    MIN(date::text) as min_date,
+    MAX(date::text) as max_date
   FROM cached_transactions
-  WHERE date LIKE (month_year_param || '-%');
+  WHERE date::text LIKE (month_year_param || '-%');
 $$;
+

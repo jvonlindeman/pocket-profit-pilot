@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -39,7 +38,7 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
   currentDate,
   onBalanceSaved
 }) => {
-  const { updateMonthlyBalance, loading } = useMonthlyBalance({ currentDate });
+  const { saveBalance, loading } = useMonthlyBalance({ currentDate });
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -54,7 +53,7 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
   const capitalizedMonth = formattedMonth.charAt(0).toUpperCase() + formattedMonth.slice(1);
 
   const onSubmit = async (data: FormValues) => {
-    const success = await updateMonthlyBalance(data.balance, data.notes);
+    const success = await saveBalance(data.balance, data.notes);
     if (success) {
       onOpenChange(false);
       onBalanceSaved();
