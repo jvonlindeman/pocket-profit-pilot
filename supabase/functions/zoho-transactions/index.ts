@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -67,48 +68,40 @@ const isCacheFresh = (cachedData: any[], maxHoursOld = 24, requestStartDate: str
 };
 
 // Improved cache coverage check that doesn't require a transaction for every day
-// Instead, check if we have data that spans the entire date range
 const cacheCoversDateRange = (cachedData: any[], startDate: string, endDate: string): boolean => {
   if (!cachedData || cachedData.length === 0) return false;
   
-  // Convert all dates to Date objects for easier comparison
-  const transactions = cachedData.map(tx => ({
-    ...tx,
-    dateObj: new Date(tx.date)
-  }));
-  
   // Get the earliest and latest dates in the cache
-  const dates = transactions.map(tx => tx.dateObj);
-  const earliestDate = new Date(Math.min(...dates.getTime()));
-  const latestDate = new Date(Math.max(...dates.getTime()));
+  const cachedDates = cachedData.map(tx => new Date(tx.date));
+  const earliestCachedDate = new Date(Math.min(...cachedDates.map(date => date.getTime())));
+  const latestCachedDate = new Date(Math.max(...cachedDates.map(date => date.getTime())));
   
   const requestStart = new Date(startDate);
   const requestEnd = new Date(endDate);
   
   // Check if the cache spans the entire requested date range
-  const spansDateRange = earliestDate <= requestStart && latestDate >= requestEnd;
+  const spansDateRange = earliestCachedDate <= requestStart && latestCachedDate >= requestEnd;
   
   // Also check if we have a reasonable sample of different transaction types
-  // Specifically, we want to make sure we have both income and expense transactions
-  const hasIncomeTransactions = transactions.some(tx => tx.type === 'income');
-  const hasExpenseTransactions = transactions.some(tx => tx.type === 'expense');
+  const hasIncomeTransactions = cachedData.some(tx => tx.type === 'income');
+  const hasExpenseTransactions = cachedData.some(tx => tx.type === 'expense');
   
   // For Zoho and Stripe sources
-  const hasZohoTransactions = transactions.some(tx => tx.source === 'Zoho');
-  const hasStripeTransactions = transactions.some(tx => 
-    tx.source === 'Stripe' || transactions.length > 10 // If we have many transactions, we might not need Stripe data
+  const hasZohoTransactions = cachedData.some(tx => tx.source === 'Zoho');
+  const hasStripeTransactions = cachedData.some(tx => 
+    tx.source === 'Stripe' || cachedData.length > 10 // If we have many transactions, we might not need Stripe data
   );
   
   // Log coverage details for debugging
   console.log(`Cache coverage check - Range ${startDate} to ${endDate}:`, {
     spansDateRange,
-    transactionCount: transactions.length,
+    transactionCount: cachedData.length,
     hasIncomeTransactions,
     hasExpenseTransactions,
     hasZohoTransactions,
     hasStripeTransactions,
-    earliestCachedDate: earliestDate.toISOString().split('T')[0],
-    latestCachedDate: latestDate.toISOString().split('T')[0],
+    earliestCachedDate: earliestCachedDate.toISOString().split('T')[0],
+    latestCachedDate: latestCachedDate.toISOString().split('T')[0],
     requestStartDate: requestStart.toISOString().split('T')[0],
     requestEndDate: requestEnd.toISOString().split('T')[0]
   });
@@ -243,7 +236,7 @@ serve(async (req: Request) => {
     
     // Get the raw response text
     const responseText = await webhookResponse.text();
-    console.log(`Edge function: make.com webhook raw response: ${responseText}`);
+    console.log(`Edge function: make.com webhook raw response: ${responseText.substring(0, 500)}...`);
     
     // Parse the webhook response
     let webhookData;
@@ -477,60 +470,79 @@ serve(async (req: Request) => {
       });
     }
     
-    console.log(`Processed ${transactions.length} transactions`);
+    console.log(`Processed ${transactions.length} transactions for date range ${startDate} to ${endDate}`);
     
-    // Insert transactions into cache with improved error handling for upsert conflicts
+    // IMPROVED CACHING STRATEGY
     if (transactions.length > 0) {
-      console.log("Storing transactions in cache");
-      
       try {
+        console.log(`Caching ${transactions.length} transactions for date range ${startDate} to ${endDate}`);
+        
         // Create an array with transactions enriched with sync_date
         const transactionsWithSyncDate = transactions.map(tx => ({
           ...tx,
           sync_date: new Date().toISOString()
         }));
         
-        // To avoid the ON CONFLICT DO UPDATE command error, use a different strategy:
-        // 1. First delete existing transactions in the date range if they conflict with our new ones
-        const externalIds = transactionsWithSyncDate.map(tx => tx.external_id);
+        // FIRST: Delete ALL existing transactions for the requested date range
+        // This fixes the issue where transactions might not be updated when date range changes
+        console.log(`Clearing all existing transactions in date range ${startDate} to ${endDate} before inserting new ones`);
         
-        if (externalIds.length > 0) {
-          console.log(`Removing potential conflicts for ${externalIds.length} transactions before inserting`);
-          const { error: deleteError } = await supabase
-            .from("cached_transactions")
-            .delete()
-            .in("external_id", externalIds);
+        const { error: deleteRangeError } = await supabase
+          .from("cached_transactions")
+          .delete()
+          .gte("date", startDate)
+          .lte("date", endDate);
+        
+        if (deleteRangeError) {
+          console.error("Error clearing transactions in date range:", deleteRangeError);
+          // Continue with insert even if delete fails
+        }
+        
+        // Now insert all new transactions
+        console.log(`Inserting ${transactionsWithSyncDate.length} transactions into cache`);
+        
+        // Break into smaller batches to avoid any size limitations
+        const batchSize = 50;
+        const batches = [];
+        
+        for (let i = 0; i < transactionsWithSyncDate.length; i += batchSize) {
+          batches.push(transactionsWithSyncDate.slice(i, i + batchSize));
+        }
+        
+        console.log(`Split into ${batches.length} batches for insertion`);
+        
+        // Process each batch
+        for (let i = 0; i < batches.length; i++) {
+          const batch = batches[i];
+          console.log(`Inserting batch ${i + 1} of ${batches.length} with ${batch.length} transactions`);
           
-          if (deleteError) {
-            console.error("Error removing potential transaction conflicts:", deleteError);
+          const { error: insertError } = await supabase
+            .from("cached_transactions")
+            .insert(batch);
+          
+          if (insertError) {
+            console.error(`Error inserting batch ${i + 1}:`, insertError);
+          } else {
+            console.log(`Successfully inserted batch ${i + 1}`);
           }
         }
         
-        // 2. Now perform the insert without the conflicting records
-        const { error: insertError } = await supabase
-          .from("cached_transactions")
-          .insert(transactionsWithSyncDate);
-        
-        if (insertError) {
-          console.error("Error inserting transactions:", insertError);
-        } else {
-          console.log("Successfully inserted transactions");
-        }
+        console.log(`Cache update completed for date range ${startDate} to ${endDate}`);
       } catch (dbError) {
-        console.error("Database error when storing transactions:", dbError);
+        console.error(`Database error when storing transactions for range ${startDate} to ${endDate}:`, dbError);
       }
     }
     
     // Add the original response to the data for debugging
     const responseData = {
       ...webhookData,
-      raw_response: originalResponse,
+      raw_response: originalResponse.substring(0, 1000) + (originalResponse.length > 1000 ? '...[truncated]' : ''),
       cached_transactions: transactions,
       fromCache: false,
       cached: false
     };
     
-    console.log("Successfully fetched and processed data");
+    console.log(`Successfully fetched and processed data for range ${startDate} to ${endDate}`);
     return new Response(
       JSON.stringify(responseData),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -547,3 +559,4 @@ serve(async (req: Request) => {
     );
   }
 });
+

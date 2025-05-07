@@ -30,17 +30,25 @@ interface TransactionListProps {
   transactions: Transaction[];
   onRefresh?: () => void;
   isLoading?: boolean;
+  startDate?: Date;
+  endDate?: Date;
 }
 
-const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefresh, isLoading = false }) => {
+const TransactionList: React.FC<TransactionListProps> = ({ 
+  transactions, 
+  onRefresh, 
+  isLoading = false,
+  startDate,
+  endDate
+}) => {
   const [filter, setFilter] = useState<'all' | 'income' | 'expense'>('all');
   
-  // Aplicamos filtro
+  // Apply filter
   const filteredTransactions = filter === 'all' 
     ? transactions 
     : transactions.filter(tx => tx.type === filter);
 
-  // Formato de fecha
+  // Format date
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
@@ -58,13 +66,28 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefre
     }
   };
 
-  // Formato de moneda (ahora mostramos en USD por defecto)
+  // Format currency
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD'
     }).format(amount);
   };
+
+  // Calculate totals
+  const getTotals = () => {
+    const incomeTotal = transactions
+      .filter(tx => tx.type === 'income')
+      .reduce((sum, tx) => sum + tx.amount, 0);
+      
+    const expenseTotal = transactions
+      .filter(tx => tx.type === 'expense')
+      .reduce((sum, tx) => sum + tx.amount, 0);
+      
+    return { incomeTotal, expenseTotal, netTotal: incomeTotal - expenseTotal };
+  };
+  
+  const totals = getTotals();
 
   // Handle refresh button click
   const handleRefresh = () => {
@@ -76,7 +99,12 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefre
   return (
     <>
       {onRefresh && (
-        <CacheStats onRefresh={handleRefresh} isLoading={isLoading || false} />
+        <CacheStats 
+          onRefresh={handleRefresh} 
+          isLoading={isLoading || false} 
+          startDate={startDate}
+          endDate={endDate}
+        />
       )}
       <Card>
         <CardHeader>
@@ -131,14 +159,27 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefre
             </TableBody>
           </Table>
         </CardContent>
-        <CardFooter className="bg-gray-50 border-t text-sm text-gray-500 flex justify-between">
-          <div>
-            Mostrando {filteredTransactions.length} {filteredTransactions.length === 1 ? 'transacción' : 'transacciones'}
-            {filter !== 'all' && (
-              <> ({filter === 'income' ? 'ingresos' : 'gastos'})</>
-            )}
+        <CardFooter className="bg-gray-50 border-t text-sm text-gray-500 flex flex-col sm:flex-row sm:justify-between p-4">
+          <div className="mb-2 sm:mb-0">
+            <span>
+              Mostrando {filteredTransactions.length} {filteredTransactions.length === 1 ? 'transacción' : 'transacciones'}
+              {filter !== 'all' && (
+                <> ({filter === 'income' ? 'ingresos' : 'gastos'})</>
+              )}
+            </span>
           </div>
-          <div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4">
+            <div className="text-blue-600 font-medium">
+              Ingresos: {formatCurrency(totals.incomeTotal)}
+            </div>
+            <div className="text-red-600 font-medium">
+              Gastos: {formatCurrency(totals.expenseTotal)}
+            </div>
+            <div className={`font-semibold ${totals.netTotal >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              Neto: {formatCurrency(totals.netTotal)}
+            </div>
+          </div>
+          <div className="mt-2 sm:mt-0 text-gray-400">
             Total: {transactions.length} {transactions.length === 1 ? 'transacción' : 'transacciones'} en período seleccionado
           </div>
         </CardFooter>

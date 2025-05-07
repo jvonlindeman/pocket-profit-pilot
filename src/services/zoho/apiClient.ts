@@ -1,3 +1,4 @@
+
 import { Transaction } from "../../types/financial";
 import { ensureValidDateFormat, handleApiError } from "./utils";
 import { getMockTransactions } from "./mockData";
@@ -44,9 +45,9 @@ const isCacheFresh = (cachedData: any[], maxHoursOld = 24): boolean => {
   const earliestCachedDate = new Date(Math.min(...cachedData.map(tx => new Date(tx.date).getTime())));
   
   // For current month data, use 1 hour; for historical data, use maxHoursOld (default 24 hours)
-  const freshnessPeriod = (earliestCachedDate.getMonth() === today.getMonth() && 
-                           earliestCachedDate.getFullYear() === today.getFullYear()) 
-                           ? 1 : maxHoursOld;
+  const isCurrentMonth = (earliestCachedDate.getMonth() === today.getMonth() && 
+                         earliestCachedDate.getFullYear() === today.getFullYear());
+  const freshnessPeriod = isCurrentMonth ? 1 : maxHoursOld;
   
   console.log(`ZohoService: Cache age: ${cacheAgeHours.toFixed(2)} hours, freshness threshold: ${freshnessPeriod} hours`);
   
@@ -99,11 +100,9 @@ const cacheCoversDateRange = (cachedData: any[], startDate: string, endDate: str
                          hasZohoTransactions &&
                          (hasStripeTransactions || !isCurrentMonth || cachedData.length > 10);
   
-  const covered = hasGoodCoverage;
+  console.log(`ZohoService: Cache coverage result: ${hasGoodCoverage ? "Complete coverage" : "Incomplete coverage"}`);
   
-  console.log(`ZohoService: Cache coverage result: ${covered ? "Complete coverage" : "Incomplete coverage"}`);
-  
-  return covered;
+  return hasGoodCoverage;
 };
 
 // Function to call the Supabase edge function which handles caching
@@ -116,6 +115,8 @@ export const fetchTransactionsFromWebhook = async (
   try {
     console.log("ZohoService: Fetching transactions from", startDate, "to", endDate, 
       forceRefresh ? "with force refresh" : "using cache if available");
+    
+    // Log exact date objects for debugging
     console.log("ZohoService: Raw date objects:", {
       startDateObj: startDate,
       startDateType: typeof startDate,
@@ -158,7 +159,12 @@ export const fetchTransactionsFromWebhook = async (
             return { 
               cached: true, 
               fromCache: true,
-              data: cachedData 
+              data: cachedData,
+              cachedTransactionCount: cachedData.length,
+              dateRange: {
+                startDate: formattedStartDate,
+                endDate: formattedEndDate
+              }
             };
           }
           
@@ -201,7 +207,12 @@ export const fetchTransactionsFromWebhook = async (
               cached: true, 
               fromCache: true,
               error: error.message,
-              data: fallbackCache 
+              data: fallbackCache,
+              cachedTransactionCount: fallbackCache.length,
+              dateRange: {
+                startDate: formattedStartDate,
+                endDate: formattedEndDate
+              }
             };
           }
           
@@ -220,11 +231,18 @@ export const fetchTransactionsFromWebhook = async (
     }
     
     console.log("ZohoService: Received data from Supabase function:", 
-      data.fromCache ? "From Cache" : "Fresh data from webhook");
+      data.fromCache ? "From Cache" : "Fresh data from webhook", 
+      data.cached_transactions ? `with ${data.cached_transactions.length} transactions` : "");
     
     // Return raw response for debugging if requested
     if (returnRawResponse) {
-      return data;
+      return {
+        ...data,
+        dateRange: {
+          startDate: formattedStartDate,
+          endDate: formattedEndDate
+        }
+      };
     }
     
     // Use the processed transactions provided by the edge function
@@ -371,3 +389,4 @@ const processRawTransactions = (data: any): Transaction[] => {
   // Sort by date (newer first)
   return result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 };
+

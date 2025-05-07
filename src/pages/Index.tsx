@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
@@ -221,7 +220,13 @@ const Index = () => {
 
             {/* Listado de transacciones */}
             <div className="mt-6">
-              <TransactionList transactions={financialData.transactions} />
+              <TransactionList 
+                transactions={financialData.transactions} 
+                onRefresh={handleRefresh}
+                isLoading={loading}
+                startDate={dateRange.startDate}
+                endDate={dateRange.endDate}
+              />
             </div>
           </>
         )}

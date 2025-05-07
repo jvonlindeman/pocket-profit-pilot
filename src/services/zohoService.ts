@@ -1,3 +1,4 @@
+
 import { Transaction } from "../types/financial";
 import { fetchTransactionsFromWebhook } from "./zoho/apiClient";
 import { getMockTransactions } from "./zoho/mockData";
@@ -12,6 +13,7 @@ let cacheStats = {
   misses: 0,
   errors: 0,
   lastRefresh: new Date(),
+  cachedRanges: {} as Record<string, Date> // Track which date ranges have been cached and when
 };
 
 // Helper function to normalize source to match Transaction type
@@ -24,6 +26,13 @@ const normalizeType = (type: string): 'income' | 'expense' => {
   return type === 'income' ? 'income' : 'expense';
 };
 
+// Helper to create a date range key for caching
+const createDateRangeKey = (startDate: Date, endDate: Date): string => {
+  const start = startDate.toISOString().split('T')[0];
+  const end = endDate.toISOString().split('T')[0];
+  return `${start}_${end}`;
+};
+
 // Implementation that connects to Zoho Books API via make.com webhook
 const ZohoService = {
   // Get transactions within a date range
@@ -32,12 +41,37 @@ const ZohoService = {
       console.log("ZohoService: Getting transactions for", startDate, "to", endDate, 
         forceRefresh ? "with force refresh" : "using cache if available");
       
+      // Track the requested date range to know if we've fetched it before
+      const rangeKey = createDateRangeKey(startDate, endDate);
+      
+      // Check if we should auto-refresh based on how long ago we cached this date range
+      if (!forceRefresh && cacheStats.cachedRanges[rangeKey]) {
+        const cacheTime = cacheStats.cachedRanges[rangeKey];
+        const cacheAge = Date.now() - cacheTime.getTime();
+        const isCurrentMonth = startDate.getMonth() === new Date().getMonth() && 
+                               startDate.getFullYear() === new Date().getFullYear();
+        
+        // Auto-refresh current month data after 1 hour, historical data after 24 hours
+        const refreshThresholdHours = isCurrentMonth ? 1 : 24;
+        const shouldAutoRefresh = cacheAge > refreshThresholdHours * 60 * 60 * 1000;
+        
+        if (shouldAutoRefresh) {
+          console.log(`ZohoService: Auto-refreshing ${isCurrentMonth ? 'current month' : 'historical'} data after ${refreshThresholdHours} hours`);
+          forceRefresh = true;
+        }
+      }
+      
       // Call the API client with the returnRawResponse option to get both raw response and processed data
       const response = await fetchTransactionsFromWebhook(startDate, endDate, forceRefresh, true);
       
       // Store the raw response for debugging
       if (response) {
         lastRawResponse = response;
+      }
+      
+      // If this was successful (with or without cache), record the date range as cached
+      if (response && !response.error) {
+        cacheStats.cachedRanges[rangeKey] = new Date();
       }
       
       // Check if we got a cache hit
@@ -174,6 +208,10 @@ const ZohoService = {
   forceRefresh: async (startDate: Date, endDate: Date): Promise<Transaction[]> => {
     console.log("ZohoService: Force refreshing transactions from", startDate, "to", endDate);
     
+    // Track the requested date range as freshly cached
+    const rangeKey = createDateRangeKey(startDate, endDate);
+    cacheStats.cachedRanges[rangeKey] = new Date();
+    
     // Use true for forceRefresh to bypass cache and true for returnRawResponse
     const response = await fetchTransactionsFromWebhook(startDate, endDate, true, true);
     
@@ -260,12 +298,48 @@ const ZohoService = {
   
   // Get cache statistics
   getCacheStats: (): any => {
+    const cachedRangeCount = Object.keys(cacheStats.cachedRanges).length;
+    
     return {
       ...cacheStats,
       hitRate: cacheStats.hits + cacheStats.misses > 0 ? 
         (cacheStats.hits / (cacheStats.hits + cacheStats.misses) * 100).toFixed(1) + '%' : 'N/A',
-      lastRefreshRelative: `${Math.round((Date.now() - cacheStats.lastRefresh.getTime()) / 60000)} minutes ago`
+      lastRefreshRelative: `${Math.round((Date.now() - cacheStats.lastRefresh.getTime()) / 60000)} minutes ago`,
+      cachedRangeCount
     };
+  },
+  
+  // Clear specific date range from cache
+  clearCacheForDateRange: async (startDate: Date, endDate: Date): Promise<boolean> => {
+    try {
+      console.log(`ZohoService: Clearing cache for date range ${startDate.toISOString()} to ${endDate.toISOString()}`);
+      
+      // Format dates for DB query
+      const formattedStartDate = startDate.toISOString().split('T')[0];
+      const formattedEndDate = endDate.toISOString().split('T')[0];
+      
+      // Delete all transactions in the date range
+      const { error } = await supabase
+        .from("cached_transactions")
+        .delete()
+        .gte("date", formattedStartDate)
+        .lte("date", endDate.toISOString().split('T')[0]);
+      
+      if (error) {
+        console.error("ZohoService: Error clearing cache for date range", error);
+        return false;
+      }
+      
+      // Remove from tracking
+      const rangeKey = createDateRangeKey(startDate, endDate);
+      delete cacheStats.cachedRanges[rangeKey];
+      
+      console.log(`ZohoService: Successfully cleared cache for range ${formattedStartDate} to ${formattedEndDate}`);
+      return true;
+    } catch (error) {
+      console.error("ZohoService: Error in clearCacheForDateRange", error);
+      return false;
+    }
   },
   
   // Check for stale cache and refresh if needed
@@ -314,7 +388,29 @@ const ZohoService = {
     } catch (error) {
       console.error("ZohoService: Error checking cache age", error);
     }
+  },
+  
+  // Get count of transactions in database for a specific date range
+  getCachedTransactionCount: async (startDate: Date, endDate: Date): Promise<number> => {
+    try {
+      const { count, error } = await supabase
+        .from("cached_transactions")
+        .select("*", { count: 'exact', head: true })
+        .gte("date", startDate.toISOString().split('T')[0])
+        .lte("date", endDate.toISOString().split('T')[0]);
+        
+      if (error) {
+        console.error("ZohoService: Error getting cached transaction count", error);
+        return 0;
+      }
+      
+      return count || 0;
+    } catch (error) {
+      console.error("ZohoService: Error in getCachedTransactionCount", error);
+      return 0;
+    }
   }
 };
 
 export default ZohoService;
+
