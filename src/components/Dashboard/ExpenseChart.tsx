@@ -9,6 +9,11 @@ interface ExpenseChartProps {
 }
 
 const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenseData }) => {
+  // Filtramos los pagos a colaboradores de los datos
+  const filteredExpenseData = expenseData.filter(item => 
+    item.category.toLowerCase() !== 'pagos a colaboradores'
+  );
+
   // Colores personalizados según categorías
   const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
@@ -22,7 +27,7 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenseData }) => {
   };
 
   // Preparamos datos para el gráfico
-  const chartData = expenseData.map((item) => ({
+  const chartData = filteredExpenseData.map((item) => ({
     name: item.category,
     value: item.amount,
     percentage: item.percentage.toFixed(1) + '%'
