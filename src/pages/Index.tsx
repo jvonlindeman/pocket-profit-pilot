@@ -10,6 +10,7 @@ import TransactionList from '@/components/Dashboard/TransactionList';
 import MonthlyBalanceEditor from '@/components/Dashboard/MonthlyBalanceEditor';
 import InitialBalanceDialog from '@/components/Dashboard/InitialBalanceDialog';
 import { useFinanceData } from '@/hooks/useFinanceData';
+import { useMonthlyBalance } from '@/hooks/useMonthlyBalance'; // Added missing import
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Settings, Bug, Play, RotateCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
