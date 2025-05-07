@@ -15,6 +15,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
 import {
   Select,
@@ -130,6 +131,14 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefre
             </TableBody>
           </Table>
         </CardContent>
+        <CardFooter className="bg-gray-50 border-t text-sm text-gray-500">
+          <div>
+            Mostrando {filteredTransactions.length} {filteredTransactions.length === 1 ? 'transacción' : 'transacciones'}
+            {filter !== 'all' && (
+              <> ({filter === 'income' ? 'ingresos' : 'gastos'}) de {transactions.length} total</>
+            )}
+          </div>
+        </CardFooter>
       </Card>
     </>
   );
