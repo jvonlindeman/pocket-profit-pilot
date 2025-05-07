@@ -22,4 +22,3 @@ AS $$
   FROM cached_transactions
   WHERE date::text LIKE (month_year_param || '-%');
 $$;
-
