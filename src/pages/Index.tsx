@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
@@ -9,13 +10,13 @@ import TransactionList from '@/components/Dashboard/TransactionList';
 import MonthlyBalanceEditor from '@/components/Dashboard/MonthlyBalanceEditor';
 import InitialBalanceDialog from '@/components/Dashboard/InitialBalanceDialog';
 import { useFinanceData } from '@/hooks/useFinanceData';
-import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Settings, Bug, Play } from 'lucide-react';
+import { RefreshCw, Settings, Bug, Play, RotateCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import WebhookDebug from '@/components/WebhookDebug';
 import WebhookRequestDebug from '@/components/WebhookRequestDebug';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const Index = () => {
   const {
@@ -30,7 +31,8 @@ const Index = () => {
     rawResponse,
     stripeIncome,
     regularIncome,
-    collaboratorExpenses
+    collaboratorExpenses,
+    usingCachedData
   } = useFinanceData();
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
@@ -76,14 +78,24 @@ const Index = () => {
     refreshData(true);
   };
 
-  // Manejador para actualizar datos
+  // Manejador para actualizar datos (modificado para usar caché)
   const handleRefresh = () => {
-    console.log("Manual refresh requested");
+    console.log("Standard refresh requested (will use cache if available)");
     toast({
       title: 'Actualizando datos',
       description: 'Obteniendo datos más recientes...',
     });
-    refreshData(true);
+    refreshData(false); // Changed from true to false to use the cache when available
+  };
+
+  // Manejador para forzar actualización desde API
+  const handleForceRefresh = () => {
+    console.log("Force refresh requested (bypassing cache)");
+    toast({
+      title: 'Forzando actualización',
+      description: 'Obteniendo datos directamente de la API...',
+    });
+    refreshData(true); // Force refresh from API
   };
 
   // Prepare Stripe data for chart
@@ -165,15 +177,49 @@ const Index = () => {
         
         {dataInitialized && !loading && !error && (
           <>
-            {/* Periodo y botón de actualización */}
+            {/* Periodo y botones de actualización */}
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-semibold text-gray-700">
                 Periodo: <span className="text-gray-900">{periodTitle}</span>
               </h2>
-              <Button variant="outline" size="sm" onClick={handleRefresh}>
-                <RefreshCw className="h-4 w-4 mr-2" /> Actualizar
-              </Button>
+              <div className="flex space-x-2">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="sm" onClick={handleRefresh}>
+                        <RefreshCw className="h-4 w-4 mr-2" /> Actualizar
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Actualizar usando caché cuando esté disponible</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="sm" onClick={handleForceRefresh}>
+                        <RotateCw className="h-4 w-4 mr-2" /> Forzar actualización
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Ignorar caché y obtener datos frescos de la API</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
             </div>
+
+            {/* Indicador de caché */}
+            {usingCachedData && (
+              <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-lg p-2 text-sm mb-6">
+                <p className="font-medium flex items-center">
+                  <RefreshCw className="h-4 w-4 mr-2" /> 
+                  Usando datos en caché. Para datos completamente actualizados, use "Forzar actualización".
+                </p>
+              </div>
+            )}
 
             {/* Información de depuración */}
             {financialData.transactions.length === 0 && (

@@ -2,13 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Bug } from 'lucide-react';
+import { Loader2, Bug, RefreshCw } from 'lucide-react';
 import ZohoService from '@/services/zohoService';
 import WebhookDebugHeader from './WebhookDebugHeader';
 import WebhookErrorDisplay from './WebhookErrorDisplay';
 import WebhookDataSummary from './WebhookDataSummary';
 import WebhookDataTable from './WebhookDataTable';
 import WebhookRawData from './WebhookRawData';
+import { Badge } from '@/components/ui/badge';
 
 interface WebhookDebugProps {
   dateRange: {
@@ -100,12 +101,21 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
     checkCacheCount();
   }, [dateRange.startDate, dateRange.endDate]);
 
+  // Determine if data is from cache
+  const isFromCache = rawData && (rawData.fromCache || rawData.cached);
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Bug className="h-5 w-5 text-amber-500" />
           Depuración de Webhook Zoho
+          {isFromCache && (
+            <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700 border-blue-200">
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Datos en caché
+            </Badge>
+          )}
         </CardTitle>
         <CardDescription>
           Ver la respuesta cruda del webhook para detectar problemas
