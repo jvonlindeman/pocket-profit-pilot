@@ -23,6 +23,7 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
   const [loading, setLoading] = useState(false);
   const [rawData, setRawData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cacheStats, setCacheStats] = useState<any>(null);
 
   // Update local state when rawResponse from parent changes
   useEffect(() => {
@@ -30,6 +31,10 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
       setRawData(rawResponse);
       console.log("WebhookDebug: Received rawResponse from parent:", rawResponse);
     }
+    
+    // Get cache statistics
+    const stats = ZohoService.getCacheStats();
+    setCacheStats(stats);
   }, [rawResponse]);
 
   // Fetch debug data from API
@@ -38,6 +43,10 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
     setError(null);
     
     try {
+      // Get cache statistics
+      const stats = ZohoService.getCacheStats();
+      setCacheStats(stats);
+      
       // Use the global refresh function if available
       if (refreshDataFunction) {
         console.log("Usando la función de actualización global para cargar datos");
@@ -66,6 +75,31 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
     }
   };
 
+  // Additional function to check cached transaction count
+  const checkCacheCount = async () => {
+    try {
+      const count = await ZohoService.getCachedTransactionCount(
+        dateRange.startDate,
+        dateRange.endDate
+      );
+      
+      console.log(`WebhookDebug: Found ${count} cached transactions for date range`);
+      
+      if (count === 0) {
+        setError(`No cached transactions found for date range ${dateRange.startDate.toLocaleDateString()} to ${dateRange.endDate.toLocaleDateString()}`);
+      } else {
+        setError(null);
+      }
+    } catch (err: any) {
+      console.error("Error checking cache count:", err);
+    }
+  };
+
+  // Call checkCacheCount when dateRange changes
+  useEffect(() => {
+    checkCacheCount();
+  }, [dateRange.startDate, dateRange.endDate]);
+
   return (
     <Card>
       <CardHeader>
@@ -80,6 +114,20 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
       <CardContent>
         <WebhookDebugHeader loading={loading} onFetchData={fetchDebugData} />
         <WebhookErrorDisplay error={error} />
+
+        {cacheStats && (
+          <div className="text-xs text-gray-500 mb-2 bg-gray-100 p-2 rounded-md">
+            <div className="font-semibold">Estado del caché:</div>
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              <div>Aciertos: {cacheStats.hits}</div>
+              <div>Fallos: {cacheStats.misses}</div>
+              <div>Tasa de aciertos: {cacheStats.hitRate}</div>
+              <div>Errores: {cacheStats.errors}</div>
+              <div>Rangos en caché: {cacheStats.cachedRangeCount}</div>
+              <div>Última actualización: {cacheStats.lastRefreshRelative}</div>
+            </div>
+          </div>
+        )}
 
         {loading && (
           <div className="flex justify-center items-center py-8">

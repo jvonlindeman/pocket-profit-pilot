@@ -128,7 +128,7 @@ const fixDateFormat = (dateString: string): string => {
     return new Date().toISOString().split('T')[0];
   }
   
-  // If the year is in the future (like 2025), replace with current year
+  // If the year is in the future (like beyond 2025), replace with current year
   const currentYear = new Date().getFullYear();
   if (date.getFullYear() > currentYear) {
     const correctedDate = new Date(date);
@@ -585,7 +585,7 @@ serve(async (req: Request) => {
         let successfulInserts = 0;
         let failedInserts = 0;
         
-        // Process each batch
+        // Process each batch - FIX: Remove the .select("count") that causes errors
         for (let i = 0; i < batches.length; i++) {
           const batch = batches[i];
           console.log(`Inserting batch ${i + 1} of ${batches.length} with ${batch.length} transactions`);
@@ -600,10 +600,10 @@ serve(async (req: Request) => {
               }))
             );
             
-            const { error: insertError, count } = await supabase
+            // FIX: Remove the .select("count") call that causes the SQL error
+            const { error: insertError } = await supabase
               .from("cached_transactions")
-              .insert(batch)
-              .select("count");
+              .insert(batch);
             
             if (insertError) {
               console.error(`Error inserting batch ${i + 1}:`, insertError);
@@ -634,7 +634,7 @@ serve(async (req: Request) => {
                 console.log(`Individually inserted ${individualSuccesses} out of ${batch.length} transactions`);
               }
             } else {
-              console.log(`Successfully inserted batch ${i + 1}: ${count} records`);
+              console.log(`Successfully inserted batch ${i + 1}: ${batch.length} records`);
               successfulInserts += batch.length;
             }
           } catch (batchError) {

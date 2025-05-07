@@ -77,14 +77,25 @@ const ZohoService = {
       // First check if we have cached transactions in the database
       if (!forceRefresh) {
         try {
+          // Add more debugging for cache lookup
+          console.log(`ZohoService: Querying cache for date range ${formattedStartDate} to ${formattedEndDate}`);
+          
           const { data: cachedTransactions, error } = await supabase
             .from("cached_transactions")
             .select("*")
             .gte("date", formattedStartDate)
             .lte("date", formattedEndDate);
           
+          if (error) {
+            console.error("ZohoService: Error querying cache:", error);
+          }
+          
           if (!error && cachedTransactions && cachedTransactions.length > 0) {
             console.log(`ZohoService: Found ${cachedTransactions.length} cached transactions in database`);
+            
+            // Additional logging for date coverage
+            const dateSet = new Set(cachedTransactions.map(tx => tx.date));
+            console.log(`ZohoService: Cache covers ${dateSet.size} unique dates: ${Array.from(dateSet).slice(0, 10).join(', ')}${dateSet.size > 10 ? '...' : ''}`);
             
             // Check if the data is recent enough based on the date range
             const currentMonth = new Date().getMonth() === startDate.getMonth() && 
@@ -102,6 +113,19 @@ const ZohoService = {
             const cacheAgeHours = cacheAge / (1000 * 60 * 60);
             
             console.log(`ZohoService: Cache age: ${cacheAgeHours.toFixed(2)} hours, freshness threshold: ${maxHoursOld} hours`);
+            
+            // Count transactions by month to verify coverage
+            const monthCounts: Record<string, number> = {};
+            cachedTransactions.forEach(tx => {
+              const monthYear = tx.date.substring(0, 7); // YYYY-MM
+              monthCounts[monthYear] = (monthCounts[monthYear] || 0) + 1;
+            });
+            console.log("ZohoService: Cache distribution by month:", monthCounts);
+            
+            // Check start and end date coverage specifically
+            const hasStartDate = cachedTransactions.some(tx => tx.date === formattedStartDate);
+            const hasEndDate = cachedTransactions.some(tx => tx.date === formattedEndDate);
+            console.log(`ZohoService: Cache coverage at boundaries - Has start date: ${hasStartDate}, Has end date: ${hasEndDate}`);
             
             if (cacheAgeHours < maxHoursOld) {
               // Cache is fresh, use it
@@ -494,6 +518,8 @@ const ZohoService = {
               .then(() => console.log("ZohoService: Background cache refresh completed"))
               .catch(err => console.error("ZohoService: Background cache refresh failed", err));
           }, 100);
+        } else {
+          console.log(`ZohoService: Cache is fresh (less than ${refreshThresholdHours} hours old)`);
         }
       } else {
         // No cached data, do an immediate refresh
