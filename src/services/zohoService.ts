@@ -32,7 +32,7 @@ const ZohoService = {
       console.log("ZohoService: Getting transactions for", startDate, "to", endDate, 
         forceRefresh ? "with force refresh" : "using cache if available");
       
-      // Call the API client with the returnRawResponse option only once
+      // Call the API client with the returnRawResponse option to get both raw response and processed data
       const response = await fetchTransactionsFromWebhook(startDate, endDate, forceRefresh, true);
       
       // Store the raw response for debugging
@@ -88,13 +88,41 @@ const ZohoService = {
           
           return normalizedTransactions;
         }
+      }
+      
+      // If we received processed transactions, extract them
+      // This block handles the case where we got data but neither the cache nor cached_transactions format
+      if (response) {
+        // If we have data property as an array, use that
+        if (response.data && Array.isArray(response.data)) {
+          const normalizedTransactions: Transaction[] = response.data.map(tx => ({
+            id: tx.id,
+            date: tx.date,
+            amount: Number(tx.amount),
+            description: tx.description || '',
+            category: tx.category,
+            source: normalizeSource(tx.source),
+            type: normalizeType(tx.type)
+          }));
+          
+          console.log(`ZohoService: Using data.data array with ${normalizedTransactions.length} transactions`);
+          return normalizedTransactions;
+        }
         
-        // If no processed transactions, try to extract them from the response or fall back to mock data
-        const transactions = await fetchTransactionsFromWebhook(startDate, endDate, forceRefresh);
-        
-        if (transactions && transactions.length > 0) {
-          console.log(`ZohoService: Successfully processed ${transactions.length} transactions`);
-          return transactions;
+        // Otherwise, if the response itself is an array, use that (from the single call to fetchTransactions)
+        if (Array.isArray(response)) {
+          const normalizedTransactions: Transaction[] = response.map(tx => ({
+            id: tx.id,
+            date: tx.date,
+            amount: Number(tx.amount),
+            description: tx.description || '',
+            category: tx.category,
+            source: normalizeSource(tx.source),
+            type: normalizeType(tx.type)
+          }));
+          
+          console.log(`ZohoService: Using direct array response with ${normalizedTransactions.length} transactions`);
+          return normalizedTransactions;
         }
       }
       
@@ -146,7 +174,7 @@ const ZohoService = {
   forceRefresh: async (startDate: Date, endDate: Date): Promise<Transaction[]> => {
     console.log("ZohoService: Force refreshing transactions from", startDate, "to", endDate);
     
-    // Single call with returnRawResponse = true to get both raw response and processed data
+    // Use true for forceRefresh to bypass cache and true for returnRawResponse
     const response = await fetchTransactionsFromWebhook(startDate, endDate, true, true);
     
     // Store the raw response for debugging
@@ -155,14 +183,43 @@ const ZohoService = {
     }
     
     cacheStats.lastRefresh = new Date();
+    cacheStats.misses++; // Count as cache miss since we're forcing refresh
     
-    // Return processed transactions directly if available
+    // If we received processed transactions, use those
     if (response && response.cached_transactions && Array.isArray(response.cached_transactions)) {
-      return response.cached_transactions;
+      console.log("ZohoService: Using processed transactions from force refresh response");
+      return response.cached_transactions.map(tx => ({
+        id: tx.id,
+        date: tx.date,
+        amount: Number(tx.amount),
+        description: tx.description || '',
+        category: tx.category,
+        source: normalizeSource(tx.source),
+        type: normalizeType(tx.type)
+      }));
     }
     
-    // Otherwise use the standard method to process the transactions
-    const transactions = await fetchTransactionsFromWebhook(startDate, endDate, true);
+    // If response is just an array of transactions
+    if (Array.isArray(response)) {
+      return response;
+    }
+    
+    // If we have data property
+    if (response && response.data && Array.isArray(response.data)) {
+      return response.data.map(tx => ({
+        id: tx.id,
+        date: tx.date,
+        amount: Number(tx.amount),
+        description: tx.description || '',
+        category: tx.category,
+        source: normalizeSource(tx.source),
+        type: normalizeType(tx.type)
+      }));
+    }
+    
+    // If all else fails, make a direct call without raw response
+    console.log("ZohoService: Force refresh - Response format unexpected, making direct call");
+    const transactions = await fetchTransactionsFromWebhook(startDate, endDate, true, false);
     return transactions;
   },
   
@@ -176,7 +233,7 @@ const ZohoService = {
       return lastRawResponse;
     }
     
-    // Si no hay respuesta guardada, obtenemos una nueva
+    // Si no hay respuesta guardada, obtenemos una nueva con force refresh
     try {
       const response = await fetchTransactionsFromWebhook(startDate, endDate, true, true);
       lastRawResponse = response;
@@ -214,6 +271,7 @@ const ZohoService = {
   // Check for stale cache and refresh if needed
   checkAndRefreshCache: async (startDate: Date, endDate: Date): Promise<void> => {
     try {
+      // Get cached data for the date range
       const { data: cachedTransactions } = await supabase
         .from("cached_transactions")
         .select("sync_date")
@@ -222,13 +280,21 @@ const ZohoService = {
         .order('sync_date', { ascending: false })
         .limit(1);
       
+      // Determine refresh threshold based on whether it's historical or current data
+      const today = new Date();
+      const isCurrentMonth = startDate.getMonth() === today.getMonth() && 
+                           startDate.getFullYear() === today.getFullYear();
+      
+      // Use shorter window (2 hours) for current month, longer (7 days) for historical
+      const refreshThresholdHours = isCurrentMonth ? 2 : 168; // 168 hours = 7 days
+      
       if (cachedTransactions && cachedTransactions.length > 0) {
         const latestSync = new Date(cachedTransactions[0].sync_date);
-        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+        const thresholdTime = new Date(Date.now() - refreshThresholdHours * 60 * 60 * 1000);
         
-        // If cache is more than 2 hours old, refresh in the background
-        if (latestSync < twoHoursAgo) {
-          console.log("ZohoService: Cache is stale, refreshing in background");
+        // If cache is older than our threshold, refresh in the background
+        if (latestSync < thresholdTime) {
+          console.log(`ZohoService: Cache is stale (${refreshThresholdHours} hour threshold), refreshing in background`);
           // Use setTimeout to make this non-blocking
           setTimeout(() => {
             ZohoService.forceRefresh(startDate, endDate)
@@ -236,6 +302,14 @@ const ZohoService = {
               .catch(err => console.error("ZohoService: Background cache refresh failed", err));
           }, 100);
         }
+      } else {
+        // No cached data, do an immediate refresh
+        console.log("ZohoService: No cached data found, refreshing in background");
+        setTimeout(() => {
+          ZohoService.forceRefresh(startDate, endDate)
+            .then(() => console.log("ZohoService: Background cache refresh for missing data completed"))
+            .catch(err => console.error("ZohoService: Background cache refresh for missing data failed", err));
+        }, 100);
       }
     } catch (error) {
       console.error("ZohoService: Error checking cache age", error);

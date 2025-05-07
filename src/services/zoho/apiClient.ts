@@ -1,3 +1,4 @@
+
 import { Transaction } from "../../types/financial";
 import { ensureValidDateFormat, handleApiError } from "./utils";
 import { getMockTransactions } from "./mockData";
@@ -31,36 +32,77 @@ const transformCachedToTransaction = (cachedData: any[]): Transaction[] => {
   }));
 };
 
-// Check if cache is fresh (less than specified hours old)
-const isCacheFresh = (cachedData: any[], maxHoursOld = 1): boolean => {
+// Check if cache is fresh based on how old the data is and whether it's current or historical
+const isCacheFresh = (cachedData: any[], maxHoursOld = 24): boolean => {
   if (!cachedData || cachedData.length === 0) return false;
   
   const latestSync = new Date(Math.max(...cachedData.map(tx => new Date(tx.sync_date).getTime())));
   const cacheAge = Date.now() - latestSync.getTime();
   const cacheAgeHours = cacheAge / (1000 * 60 * 60);
   
-  console.log(`ZohoService: Cache age: ${cacheAgeHours.toFixed(2)} hours`);
+  // Check if we're looking at current month data
+  const today = new Date();
+  const earliestCachedDate = new Date(Math.min(...cachedData.map(tx => new Date(tx.date).getTime())));
   
-  return cacheAgeHours < maxHoursOld;
+  // For current month data, use 1 hour; for historical data, use maxHoursOld (default 24 hours)
+  const freshnessPeriod = (earliestCachedDate.getMonth() === today.getMonth() && 
+                           earliestCachedDate.getFullYear() === today.getFullYear()) 
+                           ? 1 : maxHoursOld;
+  
+  console.log(`ZohoService: Cache age: ${cacheAgeHours.toFixed(2)} hours, freshness threshold: ${freshnessPeriod} hours`);
+  
+  return cacheAgeHours < freshnessPeriod;
 };
 
-// Check if cache covers the entire date range
+// Improved cache coverage check
 const cacheCoversDateRange = (cachedData: any[], startDate: string, endDate: string): boolean => {
   if (!cachedData || cachedData.length === 0) return false;
   
   // Get the earliest and latest dates in the cache
-  const cachedDates = cachedData.map(tx => tx.date);
-  const earliestCachedDate = new Date(Math.min(...cachedDates.map(d => new Date(d).getTime())));
-  const latestCachedDate = new Date(Math.max(...cachedDates.map(d => new Date(d).getTime())));
+  const cachedDates = cachedData.map(tx => new Date(tx.date));
+  const earliestCachedDate = new Date(Math.min(...cachedDates.getTime()));
+  const latestCachedDate = new Date(Math.max(...cachedDates.getTime()));
   
   const requestStart = new Date(startDate);
   const requestEnd = new Date(endDate);
   
-  // Check if cache covers the entire range
-  const covered = earliestCachedDate <= requestStart && latestCachedDate >= requestEnd;
+  // Check if the cache spans the entire requested date range
+  const spansDateRange = earliestCachedDate <= requestStart && latestCachedDate >= requestEnd;
   
-  console.log(`ZohoService: Cache coverage check - Range ${startDate} to ${endDate}:`, 
-    covered ? "Complete coverage" : "Incomplete coverage");
+  // Also check if we have a reasonable sample of different transaction types
+  const hasIncomeTransactions = cachedData.some(tx => tx.type === 'income');
+  const hasExpenseTransactions = cachedData.some(tx => tx.type === 'expense');
+  const hasZohoTransactions = cachedData.some(tx => tx.source === 'Zoho');
+  const hasStripeTransactions = cachedData.some(tx => tx.source === 'Stripe');
+  
+  // Log coverage details for debugging
+  console.log(`ZohoService: Cache coverage check - Range ${startDate} to ${endDate}:`, {
+    spansDateRange,
+    transactionCount: cachedData.length,
+    hasIncomeTransactions,
+    hasExpenseTransactions,
+    hasZohoTransactions,
+    hasStripeTransactions,
+    earliestCachedDate: earliestCachedDate.toISOString().split('T')[0],
+    latestCachedDate: latestCachedDate.toISOString().split('T')[0],
+    requestStartDate: requestStart.toISOString().split('T')[0], 
+    requestEndDate: requestEnd.toISOString().split('T')[0]
+  });
+  
+  // We consider the cache complete if it spans the date range and has representative transaction types
+  // For old months we won't be too strict about having stripe data since it might not be relevant
+  const isCurrentMonth = (requestStart.getMonth() === new Date().getMonth() && 
+                          requestStart.getFullYear() === new Date().getFullYear());
+                          
+  const hasGoodCoverage = spansDateRange && 
+                         hasIncomeTransactions && 
+                         hasExpenseTransactions && 
+                         hasZohoTransactions &&
+                         (hasStripeTransactions || !isCurrentMonth || cachedData.length > 10);
+  
+  const covered = hasGoodCoverage;
+  
+  console.log(`ZohoService: Cache coverage result: ${covered ? "Complete coverage" : "Incomplete coverage"}`);
   
   return covered;
 };
@@ -73,7 +115,8 @@ export const fetchTransactionsFromWebhook = async (
   returnRawResponse = false
 ): Promise<Transaction[] | any> => {
   try {
-    console.log("ZohoService: Fetching transactions from", startDate, "to", endDate);
+    console.log("ZohoService: Fetching transactions from", startDate, "to", endDate, 
+      forceRefresh ? "with force refresh" : "using cache if available");
     console.log("ZohoService: Raw date objects:", {
       startDateObj: startDate,
       startDateType: typeof startDate,
@@ -89,10 +132,9 @@ export const fetchTransactionsFromWebhook = async (
       startDate: startDate,
       formattedStartDate,
       endDate: endDate,
-      formattedEndDate
+      formattedEndDate,
+      forceRefresh: forceRefresh
     });
-    
-    console.log("ZohoService: Calling Supabase edge function with exact dates:", formattedStartDate, formattedEndDate);
     
     // Check for cached data directly unless forceRefresh is true
     if (!forceRefresh) {
@@ -107,7 +149,7 @@ export const fetchTransactionsFromWebhook = async (
         console.log("ZohoService: Found cached data, found", cachedData.length, "transactions");
         
         // Check if the cache is fresh and covers the entire date range
-        const isFresh = isCacheFresh(cachedData);
+        const isFresh = isCacheFresh(cachedData, 24); // Use 24 hours as default freshness period
         const fullCoverage = cacheCoversDateRange(cachedData, formattedStartDate, formattedEndDate);
         
         if (isFresh && fullCoverage) {
@@ -132,12 +174,13 @@ export const fetchTransactionsFromWebhook = async (
       console.log("ZohoService: Force refresh requested, bypassing cache");
     }
     
-    // Call the Supabase edge function instead of make.com webhook directly
+    // Call the Supabase edge function with proper forceRefresh parameter
+    console.log("ZohoService: Calling Supabase edge function with forceRefresh =", forceRefresh);
     const { data, error } = await supabase.functions.invoke("zoho-transactions", {
       body: {
         startDate: formattedStartDate,
         endDate: formattedEndDate,
-        forceRefresh
+        forceRefresh: forceRefresh
       }
     });
     
@@ -185,20 +228,27 @@ export const fetchTransactionsFromWebhook = async (
       return data;
     }
     
-    // If we received processed transactions directly, use those
-    if (Array.isArray(data) && data.length > 0 && 'type' in data[0] && 'source' in data[0]) {
-      console.log("Received processed transactions directly from Supabase");
-      return transformCachedToTransaction(data);
-    }
-    
-    // If we received the processed webhook response, use the cached_transactions field
+    // Use the processed transactions provided by the edge function
     if (data.cached_transactions && Array.isArray(data.cached_transactions)) {
       console.log("Using processed transactions from response");
       return transformCachedToTransaction(data.cached_transactions);
     }
     
-    // Otherwise, process the raw webhook response
-    return processRawTransactions(data);
+    // If we have data in the expected format, use it
+    if (Array.isArray(data) && data.length > 0 && 'type' in data[0] && 'source' in data[0]) {
+      console.log("Received transactions directly from Supabase");
+      return transformCachedToTransaction(data);
+    }
+    
+    // If response contains cached data, use it
+    if (data.data && Array.isArray(data.data)) {
+      console.log("Using data from response");
+      return transformCachedToTransaction(data.data);
+    }
+    
+    // If all else fails, use mock data
+    console.warn('No valid transactions in response, falling back to mock data');
+    return getMockTransactions(startDate, endDate);
   } catch (err) {
     handleApiError(err, 'Failed to connect to Supabase function');
     // Fall back to mock data

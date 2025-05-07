@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -44,52 +43,84 @@ const generateConsistentId = (transaction: Partial<Transaction>, index: number):
   return `${source.toLowerCase()}-${type.toLowerCase()}-${date}-${identifier}`;
 };
 
-// Check if cache is fresh (less than specified hours old)
-const isCacheFresh = (cachedData: any[], maxHoursOld = 1): boolean => {
+// Check if cache is fresh based on how old the data is
+// For current month data, use a shorter window (1 hour)
+// For historical data, use a longer window (24 hours)
+const isCacheFresh = (cachedData: any[], maxHoursOld = 24, requestStartDate: string = ''): boolean => {
   if (!cachedData || cachedData.length === 0) return false;
   
   const latestSync = new Date(Math.max(...cachedData.map(tx => new Date(tx.sync_date).getTime())));
   const cacheAge = Date.now() - latestSync.getTime();
   const cacheAgeHours = cacheAge / (1000 * 60 * 60);
   
-  console.log(`Cache age: ${cacheAgeHours.toFixed(2)} hours`);
+  // If it's the current month, use a shorter freshness window
+  const today = new Date();
+  const currentMonthYear = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  const requestMonthYear = requestStartDate.substring(0, 7); // Extract YYYY-MM from date
   
-  return cacheAgeHours < maxHoursOld;
+  // For current month data, use 1 hour; for historical data, use maxHoursOld (default 24 hours)
+  const freshnessPeriod = (requestMonthYear === currentMonthYear) ? 1 : maxHoursOld;
+  
+  console.log(`Cache age: ${cacheAgeHours.toFixed(2)} hours, freshness threshold: ${freshnessPeriod} hours`);
+  
+  return cacheAgeHours < freshnessPeriod;
 };
 
-// Check if cache covers the entire date range
+// Improved cache coverage check that doesn't require a transaction for every day
+// Instead, check if we have data that spans the entire date range
 const cacheCoversDateRange = (cachedData: any[], startDate: string, endDate: string): boolean => {
   if (!cachedData || cachedData.length === 0) return false;
   
-  // Get unique dates in the cache
-  const uniqueDates = new Set(cachedData.map(tx => tx.date));
+  // Convert all dates to Date objects for easier comparison
+  const transactions = cachedData.map(tx => ({
+    ...tx,
+    dateObj: new Date(tx.date)
+  }));
   
-  // Generate all dates in the requested range
-  const allDates = new Set<string>();
-  const current = new Date(startDate);
-  const end = new Date(endDate);
+  // Get the earliest and latest dates in the cache
+  const dates = transactions.map(tx => tx.dateObj);
+  const earliestDate = new Date(Math.min(...dates.getTime()));
+  const latestDate = new Date(Math.max(...dates.getTime()));
   
-  while (current <= end) {
-    allDates.add(current.toISOString().split('T')[0]);
-    current.setDate(current.getDate() + 1);
-  }
+  const requestStart = new Date(startDate);
+  const requestEnd = new Date(endDate);
   
-  // Check if there's at least one transaction for each date
-  // This is a simple heuristic, might need refinement
-  let hasAllDates = true;
-  for (const date of allDates) {
-    if (!uniqueDates.has(date)) {
-      hasAllDates = false;
-      console.log(`Missing cache data for date: ${date}`);
-      break;
-    }
-  }
+  // Check if the cache spans the entire requested date range
+  const spansDateRange = earliestDate <= requestStart && latestDate >= requestEnd;
   
-  // Also check for specific types of transactions on each day
-  // For example, check if we have both income and expense data for each date
-  // This is a more sophisticated check that could be implemented
-
-  return hasAllDates;
+  // Also check if we have a reasonable sample of different transaction types
+  // Specifically, we want to make sure we have both income and expense transactions
+  const hasIncomeTransactions = transactions.some(tx => tx.type === 'income');
+  const hasExpenseTransactions = transactions.some(tx => tx.type === 'expense');
+  
+  // For Zoho and Stripe sources
+  const hasZohoTransactions = transactions.some(tx => tx.source === 'Zoho');
+  const hasStripeTransactions = transactions.some(tx => 
+    tx.source === 'Stripe' || transactions.length > 10 // If we have many transactions, we might not need Stripe data
+  );
+  
+  // Log coverage details for debugging
+  console.log(`Cache coverage check - Range ${startDate} to ${endDate}:`, {
+    spansDateRange,
+    transactionCount: transactions.length,
+    hasIncomeTransactions,
+    hasExpenseTransactions,
+    hasZohoTransactions,
+    hasStripeTransactions,
+    earliestCachedDate: earliestDate.toISOString().split('T')[0],
+    latestCachedDate: latestDate.toISOString().split('T')[0],
+    requestStartDate: requestStart.toISOString().split('T')[0],
+    requestEndDate: requestEnd.toISOString().split('T')[0]
+  });
+  
+  // We consider the cache complete if it spans the date range and has representative transaction types
+  const hasGoodCoverage = spansDateRange && 
+    hasIncomeTransactions && 
+    hasExpenseTransactions && 
+    hasZohoTransactions &&
+    hasStripeTransactions;
+    
+  return hasGoodCoverage;
 };
 
 serve(async (req: Request) => {
@@ -126,7 +157,7 @@ serve(async (req: Request) => {
     
     const { startDate, endDate, forceRefresh = false } = requestBody;
     
-    console.log("Edge function parsed dates:", { startDate, endDate });
+    console.log("Edge function parsed dates:", { startDate, endDate, forceRefresh });
     
     if (!startDate || !endDate) {
       console.error("Missing start or end date");
@@ -146,8 +177,8 @@ serve(async (req: Request) => {
         .lte("date", endDate);
         
       if (!cacheError && cachedTransactions && cachedTransactions.length > 0) {
-        // Check if the data is recent (within the last hour) and covers the entire range
-        const isFresh = isCacheFresh(cachedTransactions);
+        // Check if the data is recent and covers the entire range
+        const isFresh = isCacheFresh(cachedTransactions, 24, startDate);
         const fullCoverage = cacheCoversDateRange(cachedTransactions, startDate, endDate);
         
         if (isFresh && fullCoverage) {
@@ -166,6 +197,8 @@ serve(async (req: Request) => {
       } else {
         console.log("No cached data found or cache error:", cacheError);
       }
+    } else {
+      console.log("Force refresh requested, bypassing cache completely");
     }
     
     // No cached data or force refresh, fetch new data from make.com webhook
@@ -446,30 +479,42 @@ serve(async (req: Request) => {
     
     console.log(`Processed ${transactions.length} transactions`);
     
-    // Insert transactions into cache
+    // Insert transactions into cache with improved error handling for upsert conflicts
     if (transactions.length > 0) {
       console.log("Storing transactions in cache");
       
       try {
-        // Use upsert to handle duplicates based on external_id
-        // First create an array with transactions enriched with sync_date
+        // Create an array with transactions enriched with sync_date
         const transactionsWithSyncDate = transactions.map(tx => ({
           ...tx,
           sync_date: new Date().toISOString()
         }));
         
-        // Use on-conflict for external_id to avoid duplicate errors
+        // To avoid the ON CONFLICT DO UPDATE command error, use a different strategy:
+        // 1. First delete existing transactions in the date range if they conflict with our new ones
+        const externalIds = transactionsWithSyncDate.map(tx => tx.external_id);
+        
+        if (externalIds.length > 0) {
+          console.log(`Removing potential conflicts for ${externalIds.length} transactions before inserting`);
+          const { error: deleteError } = await supabase
+            .from("cached_transactions")
+            .delete()
+            .in("external_id", externalIds);
+          
+          if (deleteError) {
+            console.error("Error removing potential transaction conflicts:", deleteError);
+          }
+        }
+        
+        // 2. Now perform the insert without the conflicting records
         const { error: insertError } = await supabase
           .from("cached_transactions")
-          .upsert(transactionsWithSyncDate, { 
-            onConflict: 'external_id',
-            ignoreDuplicates: false
-          });
+          .insert(transactionsWithSyncDate);
         
         if (insertError) {
-          console.error("Error caching transactions:", insertError);
+          console.error("Error inserting transactions:", insertError);
         } else {
-          console.log("Successfully cached transactions");
+          console.log("Successfully inserted transactions");
         }
       } catch (dbError) {
         console.error("Database error when storing transactions:", dbError);
