@@ -1,4 +1,3 @@
-
 import { Transaction } from "../../types/financial";
 import { ensureValidDateFormat, handleApiError } from "./utils";
 import { getMockTransactions } from "./mockData";
@@ -60,8 +59,8 @@ const cacheCoversDateRange = (cachedData: any[], startDate: string, endDate: str
   
   // Get the earliest and latest dates in the cache
   const cachedDates = cachedData.map(tx => new Date(tx.date));
-  const earliestCachedDate = new Date(Math.min(...cachedDates.getTime()));
-  const latestCachedDate = new Date(Math.max(...cachedDates.getTime()));
+  const earliestCachedDate = new Date(Math.min(...cachedDates.map(date => date.getTime())));
+  const latestCachedDate = new Date(Math.max(...cachedDates.map(date => date.getTime())));
   
   const requestStart = new Date(startDate);
   const requestEnd = new Date(endDate);
