@@ -7,6 +7,26 @@ import { processTransactionData } from '@/services/zoho/utils';
 import { endOfMonth, subMonths, format as formatDate } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 
+// Format date in YYYY-MM-DD format without timezone shifts
+const formatDateYYYYMMDD = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// Fix date to ensure it's in the correct year
+const fixDateYear = (date: Date): Date => {
+  const currentYear = new Date().getFullYear();
+  if (date.getFullYear() > currentYear) {
+    const correctedDate = new Date(date);
+    correctedDate.setFullYear(currentYear);
+    console.log(`useFinanceData: Corrected future date from ${date.toISOString()} to ${correctedDate.toISOString()}`);
+    return correctedDate;
+  }
+  return date;
+};
+
 export const useFinanceData = () => {
   // Estados
   const [loading, setLoading] = useState<boolean>(false);
@@ -23,10 +43,20 @@ export const useFinanceData = () => {
   // Estado del rango de fechas - configurado para mostrar desde el último día del mes anterior hasta el último día del mes actual
   const [dateRange, setDateRange] = useState(() => {
     const today = new Date();
+    const currentYear = today.getFullYear();
+    
     // Último día del mes anterior
     const startDate = endOfMonth(subMonths(today, 1));
+    if (startDate.getFullYear() > currentYear) {
+      startDate.setFullYear(currentYear);
+    }
+    
     // Último día del mes actual
     const endDate = endOfMonth(today);
+    if (endDate.getFullYear() > currentYear) {
+      endDate.setFullYear(currentYear);
+    }
+    
     console.log("Initial date range:", startDate, "to", endDate);
     return { startDate, endDate };
   });
@@ -34,49 +64,58 @@ export const useFinanceData = () => {
   // Datos financieros procesados
   const financialData = processTransactionData(transactions, startingBalance);
 
-  // Function to format date in YYYY-MM-DD format without timezone shifts
-  const formatDateYYYYMMDD = (date: Date): string => {
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-  };
-
   // Obtener el rango del mes actual
   const getCurrentMonthRange = useCallback(() => {
     const today = new Date();
-    return {
-      startDate: new Date(today.getFullYear(), today.getMonth(), 1),
-      endDate: endOfMonth(today)
-    };
+    const currentYear = today.getFullYear(); // Get current year
+    
+    const startDate = new Date(currentYear, today.getMonth(), 1);
+    const endDate = endOfMonth(today);
+    
+    // Ensure both dates are in the current year
+    if (startDate.getFullYear() > currentYear) {
+      startDate.setFullYear(currentYear);
+    }
+    
+    if (endDate.getFullYear() > currentYear) {
+      endDate.setFullYear(currentYear);
+    }
+    
+    return { startDate, endDate };
   }, []);
 
   // Función para actualizar el rango de fechas
   const updateDateRange = useCallback((newRange: { startDate: Date; endDate: Date }) => {
     console.log("Date range updated:", newRange);
-    console.log("Exact date values:", {
-      startDate: newRange.startDate,
-      endDate: newRange.endDate,
-      startDateFormatted: formatDateYYYYMMDD(newRange.startDate),
-      endDateFormatted: formatDateYYYYMMDD(newRange.endDate)
+    
+    // Fix any dates in the future year
+    const startDate = fixDateYear(new Date(newRange.startDate));
+    const endDate = fixDateYear(new Date(newRange.endDate));
+    
+    console.log("Corrected date values:", {
+      startDate: startDate,
+      endDate: endDate,
+      startDateFormatted: formatDateYYYYMMDD(startDate),
+      endDateFormatted: formatDateYYYYMMDD(endDate)
     });
     
-    // Create shallow copies to preserve the exact selected dates
-    const preservedStartDate = new Date(newRange.startDate);
-    const preservedEndDate = new Date(newRange.endDate);
-    
     setDateRange({
-      startDate: preservedStartDate,
-      endDate: preservedEndDate
+      startDate,
+      endDate
     });
 
     // Fetch monthly balance when date range changes
-    fetchMonthlyBalance(preservedStartDate);
+    fetchMonthlyBalance(startDate);
     
     // Check if we need to refresh the cache
-    ZohoService.checkAndRefreshCache(preservedStartDate, preservedEndDate);
+    ZohoService.checkAndRefreshCache(startDate, endDate);
   }, []);
 
   // Fetch monthly balance for the selected month
   const fetchMonthlyBalance = useCallback(async (date: Date) => {
     try {
+      // Ensure date is in current year
+      date = fixDateYear(date);
       const monthYear = formatDate(date, 'yyyy-MM');
       
       const { data, error } = await supabase
@@ -104,7 +143,9 @@ export const useFinanceData = () => {
   // Update the starting balance
   const updateStartingBalance = useCallback(async (balance: number, notes?: string) => {
     try {
-      const monthYear = formatDate(dateRange.startDate, 'yyyy-MM');
+      // Ensure date is in current year
+      const correctedDate = fixDateYear(dateRange.startDate);
+      const monthYear = formatDate(correctedDate, 'yyyy-MM');
       
       // Check if a record already exists
       const { data: existingData } = await supabase
@@ -198,8 +239,12 @@ export const useFinanceData = () => {
     setUsingCachedData(false);
 
     try {
+      // Fix any dates in the future year
+      const startDate = fixDateYear(new Date(dateRange.startDate));
+      const endDate = fixDateYear(new Date(dateRange.endDate));
+      
       // Also fetch the monthly balance for the selected date range
-      await fetchMonthlyBalance(dateRange.startDate);
+      await fetchMonthlyBalance(startDate);
       
       // Log exact date objects for debugging
       console.log("Original dateRange from datepicker:", {
@@ -207,21 +252,25 @@ export const useFinanceData = () => {
         endDate: dateRange.endDate
       });
       
-      // Format dates using our custom formatter to avoid timezone shifts
-      const startDateFormatted = formatDateYYYYMMDD(dateRange.startDate);
-      const endDateFormatted = formatDateYYYYMMDD(dateRange.endDate);
-      
-      console.log("Fetching with exact formatted dates:", {
-        startDateRaw: dateRange.startDate,
-        startDateFormatted,
-        endDateRaw: dateRange.endDate,
-        endDateFormatted
+      console.log("Corrected dates:", {
+        startDate,
+        endDate,
+        startDateFormatted: formatDateYYYYMMDD(startDate),
+        endDateFormatted: formatDateYYYYMMDD(endDate)
       });
       
-      // Obtener transacciones de Zoho Books - usando las fechas exactas sin modificaciones
+      // Before making any requests, clean up any future year dates if this is the first time loading
+      if (!dataInitialized) {
+        const cleanedCount = await ZohoService.cleanupFutureDates();
+        if (cleanedCount > 0) {
+          console.log(`useFinanceData: Cleaned up ${cleanedCount} transactions with future dates`);
+        }
+      }
+      
+      // Obtener transacciones de Zoho Books - usando las fechas corregidas
       const zohoData = await ZohoService.getTransactions(
-        dateRange.startDate, 
-        dateRange.endDate,
+        startDate, 
+        endDate,
         forceRefresh
       );
 
@@ -240,11 +289,11 @@ export const useFinanceData = () => {
       // Procesar datos de colaboradores
       processCollaboratorData(rawData);
 
-      // Obtener transacciones de Stripe - usando las fechas exactas sin modificaciones
-      console.log("Fetching from Stripe:", dateRange.startDate, dateRange.endDate);
+      // Obtener transacciones de Stripe - usando las fechas corregidas
+      console.log("Fetching from Stripe:", startDate, endDate);
       const stripeData = await StripeService.getTransactions(
-        dateRange.startDate,
-        dateRange.endDate
+        startDate,
+        endDate
       );
 
       // Combinar los datos
@@ -275,7 +324,8 @@ export const useFinanceData = () => {
     dateRange.endDate, 
     processIncomeTypes, 
     processCollaboratorData, 
-    fetchMonthlyBalance
+    fetchMonthlyBalance,
+    dataInitialized
   ]);
 
   // Función pública para refrescar datos (forzando o no)

@@ -107,13 +107,37 @@ const cacheCoversDateRange = (cachedData: any[], startDate: string, endDate: str
   });
   
   // We consider the cache complete if it spans the date range and has representative transaction types
-  const hasGoodCoverage = spansDateRange && 
+  // Make the coverage check more lenient - if we have a good number of transactions and they appear to cover
+  // the date range (even if not exact), consider it sufficient
+  const hasGoodCoverage = (spansDateRange || cachedData.length > 20) && 
     hasIncomeTransactions && 
     hasExpenseTransactions && 
-    hasZohoTransactions &&
-    hasStripeTransactions;
+    hasZohoTransactions;
     
   return hasGoodCoverage;
+};
+
+// Format date to ensure correct year - corrects dates from incorrect years (like 2025)
+const fixDateFormat = (dateString: string): string => {
+  // Parse the date string
+  const date = new Date(dateString);
+  
+  // Check if the date is valid
+  if (isNaN(date.getTime())) {
+    console.log(`Invalid date string: ${dateString}, using current date`);
+    return new Date().toISOString().split('T')[0];
+  }
+  
+  // If the year is in the future (like 2025), replace with current year
+  const currentYear = new Date().getFullYear();
+  if (date.getFullYear() > currentYear) {
+    const correctedDate = new Date(date);
+    correctedDate.setFullYear(currentYear);
+    console.log(`Corrected future date from ${dateString} to ${correctedDate.toISOString().split('T')[0]}`);
+    return correctedDate.toISOString().split('T')[0];
+  }
+  
+  return dateString;
 };
 
 serve(async (req: Request) => {
@@ -335,13 +359,33 @@ serve(async (req: Request) => {
     // Process the data into transactions
     const transactions: Transaction[] = [];
     
+    // Current year to ensure dates are correct
+    const currentYear = new Date().getFullYear();
+    
     // Process Stripe income if available
     if (webhookData.stripe) {
       try {
         const stripeAmount = parseFloat(String(webhookData.stripe).replace(".", "").replace(",", "."));
         if (!isNaN(stripeAmount) && stripeAmount > 0) {
+          // Use current date but ensure it's within the requested range
+          const today = new Date();
+          today.setHours(0, 0, 0, 0); // Normalize to start of day
+          
+          // If today is outside of range, use end date
+          let stripeDate = today;
+          const requestEndDate = new Date(endDate);
+          const requestStartDate = new Date(startDate);
+          
+          if (today > requestEndDate) {
+            stripeDate = requestEndDate;
+          } else if (today < requestStartDate) {
+            stripeDate = requestStartDate;
+          }
+          
+          const stripeDateString = stripeDate.toISOString().split('T')[0];
+          
           const stripeTransaction = {
-            date: new Date().toISOString().split('T')[0],
+            date: stripeDateString,
             amount: stripeAmount,
             description: 'Ingresos de Stripe',
             category: 'Ingresos por plataforma',
@@ -373,7 +417,10 @@ serve(async (req: Request) => {
           const amount = Number(item.total);
           if (amount > 0) {
             // Usar la fecha del colaborador si está disponible, o la fecha actual
-            const collaboratorDate = item.date || new Date().toISOString().split('T')[0];
+            let collaboratorDate = item.date || new Date().toISOString().split('T')[0];
+            
+            // Fix any incorrect year in the date (like 2025)
+            collaboratorDate = fixDateFormat(collaboratorDate);
             
             const collaboratorTransaction = {
               date: collaboratorDate,
@@ -406,7 +453,11 @@ serve(async (req: Request) => {
         if (item && typeof item.total !== 'undefined' && item.account_name !== "Impuestos") {
           const amount = Number(item.total);
           if (amount > 0) {
-            const expenseDate = item.date || new Date().toISOString().split('T')[0];
+            let expenseDate = item.date || new Date().toISOString().split('T')[0];
+            
+            // Fix any incorrect year in the date (like 2025)
+            expenseDate = fixDateFormat(expenseDate);
+            
             const vendorName = item.vendor_name || '';
             const accountName = item.account_name || 'Gastos generales';
             
@@ -443,7 +494,11 @@ serve(async (req: Request) => {
         if (item && typeof item.amount !== 'undefined' && item.customer_name) {
           const amount = Number(item.amount);
           if (amount > 0) {
-            const paymentDate = item.date || new Date().toISOString().split('T')[0];
+            let paymentDate = item.date || new Date().toISOString().split('T')[0];
+            
+            // Fix any incorrect year in the date (like 2025)
+            paymentDate = fixDateFormat(paymentDate);
+            
             const customerName = item.customer_name;
             const invoiceId = item.invoice_id || '';
             
@@ -488,6 +543,19 @@ serve(async (req: Request) => {
         // First, delete all existing transactions for this date range
         console.log(`Clearing all existing transactions in date range ${startDate} to ${endDate} before inserting new ones`);
         
+        // Add debug info to see what's being deleted
+        const { data: existingTransactions, error: fetchError } = await supabase
+          .from("cached_transactions")
+          .select("id, date, external_id")
+          .gte("date", startDate)
+          .lte("date", endDate);
+          
+        if (fetchError) {
+          console.error("Error fetching existing transactions:", fetchError);
+        } else {
+          console.log(`Found ${existingTransactions?.length || 0} existing transactions in the date range to be cleared`);
+        }
+        
         const { error: deleteRangeError } = await supabase
           .from("cached_transactions")
           .delete()
@@ -497,6 +565,8 @@ serve(async (req: Request) => {
         if (deleteRangeError) {
           console.error("Error clearing transactions in date range:", deleteRangeError);
           // Continue with insert even if delete fails
+        } else {
+          console.log("Successfully cleared existing transactions in the date range");
         }
         
         // Now insert all new transactions in batches
@@ -512,32 +582,68 @@ serve(async (req: Request) => {
         
         console.log(`Split into ${batches.length} batches for insertion`);
         
+        let successfulInserts = 0;
+        let failedInserts = 0;
+        
         // Process each batch
         for (let i = 0; i < batches.length; i++) {
           const batch = batches[i];
           console.log(`Inserting batch ${i + 1} of ${batches.length} with ${batch.length} transactions`);
           
           try {
-            const { error: insertError } = await supabase
+            // Log the first few transactions in the batch for debugging
+            console.log("Sample transactions from batch:", 
+              batch.slice(0, 2).map(tx => ({
+                id: tx.id,
+                date: tx.date,
+                external_id: tx.external_id
+              }))
+            );
+            
+            const { error: insertError, count } = await supabase
               .from("cached_transactions")
-              .insert(batch);
+              .insert(batch)
+              .select("count");
             
             if (insertError) {
               console.error(`Error inserting batch ${i + 1}:`, insertError);
+              failedInserts += batch.length;
               
-              // If the error is due to conflicts, log but continue
+              // If the error is due to conflicts, try inserting records one by one
               if (insertError.code === '23505') { // Unique constraint violation
-                console.log(`Some transactions in batch ${i + 1} already exist, continuing with next batch`);
+                console.log(`Some transactions in batch ${i + 1} already exist, trying individual inserts`);
+                
+                // Try inserting one by one
+                let individualSuccesses = 0;
+                for (const transaction of batch) {
+                  try {
+                    const { error: singleInsertError } = await supabase
+                      .from("cached_transactions")
+                      .insert([transaction]);
+                      
+                    if (!singleInsertError) {
+                      individualSuccesses++;
+                      successfulInserts++;
+                      failedInserts--;
+                    }
+                  } catch (err) {
+                    // Individual insert failed, just continue
+                  }
+                }
+                
+                console.log(`Individually inserted ${individualSuccesses} out of ${batch.length} transactions`);
               }
             } else {
-              console.log(`Successfully inserted batch ${i + 1}`);
+              console.log(`Successfully inserted batch ${i + 1}: ${count} records`);
+              successfulInserts += batch.length;
             }
           } catch (batchError) {
             console.error(`Error processing batch ${i + 1}:`, batchError);
+            failedInserts += batch.length;
           }
         }
         
-        console.log(`Cache update completed for date range ${startDate} to ${endDate}`);
+        console.log(`Cache update completed for date range ${startDate} to ${endDate}: ${successfulInserts} inserted, ${failedInserts} failed`);
       } catch (dbError) {
         console.error(`Database error when storing transactions for range ${startDate} to ${endDate}:`, dbError);
       }
