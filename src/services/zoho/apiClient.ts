@@ -31,6 +31,40 @@ const transformCachedToTransaction = (cachedData: any[]): Transaction[] => {
   }));
 };
 
+// Check if cache is fresh (less than specified hours old)
+const isCacheFresh = (cachedData: any[], maxHoursOld = 1): boolean => {
+  if (!cachedData || cachedData.length === 0) return false;
+  
+  const latestSync = new Date(Math.max(...cachedData.map(tx => new Date(tx.sync_date).getTime())));
+  const cacheAge = Date.now() - latestSync.getTime();
+  const cacheAgeHours = cacheAge / (1000 * 60 * 60);
+  
+  console.log(`ZohoService: Cache age: ${cacheAgeHours.toFixed(2)} hours`);
+  
+  return cacheAgeHours < maxHoursOld;
+};
+
+// Check if cache covers the entire date range
+const cacheCoversDateRange = (cachedData: any[], startDate: string, endDate: string): boolean => {
+  if (!cachedData || cachedData.length === 0) return false;
+  
+  // Get the earliest and latest dates in the cache
+  const cachedDates = cachedData.map(tx => tx.date);
+  const earliestCachedDate = new Date(Math.min(...cachedDates.map(d => new Date(d).getTime())));
+  const latestCachedDate = new Date(Math.max(...cachedDates.map(d => new Date(d).getTime())));
+  
+  const requestStart = new Date(startDate);
+  const requestEnd = new Date(endDate);
+  
+  // Check if cache covers the entire range
+  const covered = earliestCachedDate <= requestStart && latestCachedDate >= requestEnd;
+  
+  console.log(`ZohoService: Cache coverage check - Range ${startDate} to ${endDate}:`, 
+    covered ? "Complete coverage" : "Incomplete coverage");
+  
+  return covered;
+};
+
 // Function to call the Supabase edge function which handles caching
 export const fetchTransactionsFromWebhook = async (
   startDate: Date, 
@@ -60,7 +94,7 @@ export const fetchTransactionsFromWebhook = async (
     
     console.log("ZohoService: Calling Supabase edge function with exact dates:", formattedStartDate, formattedEndDate);
     
-    // First try to get data from the cache directly unless forceRefresh is true
+    // Check for cached data directly unless forceRefresh is true
     if (!forceRefresh) {
       console.log("ZohoService: Checking for cached data first");
       const { data: cachedData, error: cacheError } = await supabase
@@ -70,25 +104,27 @@ export const fetchTransactionsFromWebhook = async (
         .lte("date", formattedEndDate);
         
       if (!cacheError && cachedData && cachedData.length > 0) {
-        console.log("ZohoService: Found cached data, returning", cachedData.length, "transactions");
+        console.log("ZohoService: Found cached data, found", cachedData.length, "transactions");
         
-        // Calculate cache age from most recent sync_date
-        const latestSync = new Date(Math.max(...cachedData.map(tx => new Date(tx.sync_date).getTime())));
-        const cacheAge = Date.now() - latestSync.getTime();
-        const cacheAgeHours = cacheAge / (1000 * 60 * 60);
+        // Check if the cache is fresh and covers the entire date range
+        const isFresh = isCacheFresh(cachedData);
+        const fullCoverage = cacheCoversDateRange(cachedData, formattedStartDate, formattedEndDate);
         
-        console.log(`ZohoService: Cache age: ${cacheAgeHours.toFixed(2)} hours`);
-        
-        // If cache is fresh (less than 1 hour old), return it directly
-        if (cacheAgeHours < 1) {
+        if (isFresh && fullCoverage) {
+          console.log("ZohoService: Using fresh and complete cache data");
+          
           if (returnRawResponse) {
-            return { cached: true, data: cachedData };
+            return { 
+              cached: true, 
+              fromCache: true,
+              data: cachedData 
+            };
           }
           
           return transformCachedToTransaction(cachedData);
         }
         
-        console.log("ZohoService: Cache data is stale, fetching fresh data but will use cache if fetch fails");
+        console.log(`ZohoService: Cache ${!isFresh ? 'is stale' : ''} ${!fullCoverage ? 'has incomplete coverage' : ''}, fetching fresh data`);
       } else {
         console.log("ZohoService: No cached data found or cache error:", cacheError);
       }
@@ -121,6 +157,7 @@ export const fetchTransactionsFromWebhook = async (
           if (returnRawResponse) {
             return { 
               cached: true, 
+              fromCache: true,
               error: error.message,
               data: fallbackCache 
             };
@@ -140,35 +177,24 @@ export const fetchTransactionsFromWebhook = async (
       return returnRawResponse ? { message: "No data returned", data: null, raw_response: null } : getMockTransactions(startDate, endDate);
     }
     
-    console.log("ZohoService: Received data from Supabase function:", data);
+    console.log("ZohoService: Received data from Supabase function:", 
+      data.fromCache ? "From Cache" : "Fresh data from webhook");
     
     // Return raw response for debugging if requested
     if (returnRawResponse) {
       return data;
     }
     
-    // Check if we received cached transactions directly
+    // If we received processed transactions directly, use those
     if (Array.isArray(data) && data.length > 0 && 'type' in data[0] && 'source' in data[0]) {
-      console.log("Received cached transactions directly from Supabase");
-      
+      console.log("Received processed transactions directly from Supabase");
       return transformCachedToTransaction(data);
     }
     
     // If we received the processed webhook response, use the cached_transactions field
     if (data.cached_transactions && Array.isArray(data.cached_transactions)) {
-      console.log("Using newly processed cached transactions");
-      
-      const normalizedTransactions: Transaction[] = data.cached_transactions.map((tx: any) => ({
-        id: tx.id,
-        date: tx.date,
-        amount: Number(tx.amount),
-        description: tx.description || '',
-        category: tx.category,
-        source: normalizeSource(tx.source),
-        type: normalizeType(tx.type)
-      }));
-      
-      return normalizedTransactions;
+      console.log("Using processed transactions from response");
+      return transformCachedToTransaction(data.cached_transactions);
     }
     
     // Otherwise, process the raw webhook response

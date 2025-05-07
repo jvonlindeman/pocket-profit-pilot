@@ -44,6 +44,54 @@ const generateConsistentId = (transaction: Partial<Transaction>, index: number):
   return `${source.toLowerCase()}-${type.toLowerCase()}-${date}-${identifier}`;
 };
 
+// Check if cache is fresh (less than specified hours old)
+const isCacheFresh = (cachedData: any[], maxHoursOld = 1): boolean => {
+  if (!cachedData || cachedData.length === 0) return false;
+  
+  const latestSync = new Date(Math.max(...cachedData.map(tx => new Date(tx.sync_date).getTime())));
+  const cacheAge = Date.now() - latestSync.getTime();
+  const cacheAgeHours = cacheAge / (1000 * 60 * 60);
+  
+  console.log(`Cache age: ${cacheAgeHours.toFixed(2)} hours`);
+  
+  return cacheAgeHours < maxHoursOld;
+};
+
+// Check if cache covers the entire date range
+const cacheCoversDateRange = (cachedData: any[], startDate: string, endDate: string): boolean => {
+  if (!cachedData || cachedData.length === 0) return false;
+  
+  // Get unique dates in the cache
+  const uniqueDates = new Set(cachedData.map(tx => tx.date));
+  
+  // Generate all dates in the requested range
+  const allDates = new Set<string>();
+  const current = new Date(startDate);
+  const end = new Date(endDate);
+  
+  while (current <= end) {
+    allDates.add(current.toISOString().split('T')[0]);
+    current.setDate(current.getDate() + 1);
+  }
+  
+  // Check if there's at least one transaction for each date
+  // This is a simple heuristic, might need refinement
+  let hasAllDates = true;
+  for (const date of allDates) {
+    if (!uniqueDates.has(date)) {
+      hasAllDates = false;
+      console.log(`Missing cache data for date: ${date}`);
+      break;
+    }
+  }
+  
+  // Also check for specific types of transactions on each day
+  // For example, check if we have both income and expense data for each date
+  // This is a more sophisticated check that could be implemented
+
+  return hasAllDates;
+};
+
 serve(async (req: Request) => {
   console.log(`zoho-transactions function called with method: ${req.method}`);
   
@@ -98,17 +146,25 @@ serve(async (req: Request) => {
         .lte("date", endDate);
         
       if (!cacheError && cachedTransactions && cachedTransactions.length > 0) {
-        // Check if the data is recent (within the last hour)
-        const latestSync = new Date(Math.max(...cachedTransactions.map(tx => new Date(tx.sync_date).getTime())));
-        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+        // Check if the data is recent (within the last hour) and covers the entire range
+        const isFresh = isCacheFresh(cachedTransactions);
+        const fullCoverage = cacheCoversDateRange(cachedTransactions, startDate, endDate);
         
-        if (latestSync > oneHourAgo) {
-          console.log("Returning cached transactions:", cachedTransactions.length);
+        if (isFresh && fullCoverage) {
+          console.log("Returning fresh and complete cached transactions:", cachedTransactions.length);
           return new Response(
-            JSON.stringify(cachedTransactions),
+            JSON.stringify({
+              fromCache: true,
+              cached: true,
+              data: cachedTransactions
+            }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
+        
+        console.log(`Cache ${!isFresh ? 'is stale' : ''} ${!fullCoverage ? 'has incomplete coverage' : ''}, fetching fresh data`);
+      } else {
+        console.log("No cached data found or cache error:", cacheError);
       }
     }
     
@@ -275,7 +331,7 @@ serve(async (req: Request) => {
             ...stripeTransaction,
             id,
             external_id: externalId
-          });
+          } as Transaction);
         }
       } catch (e) {
         console.error("Error processing Stripe income:", e);
@@ -310,7 +366,7 @@ serve(async (req: Request) => {
               ...collaboratorTransaction,
               id,
               external_id: externalId
-            });
+            } as Transaction);
           }
         }
       });
@@ -347,7 +403,7 @@ serve(async (req: Request) => {
               ...expenseTransaction,
               id,
               external_id: externalId
-            });
+            } as Transaction);
           }
         }
       });
@@ -382,7 +438,7 @@ serve(async (req: Request) => {
               ...incomeTransaction,
               id,
               external_id: externalId
-            });
+            } as Transaction);
           }
         }
       });
@@ -396,18 +452,19 @@ serve(async (req: Request) => {
       
       try {
         // Use upsert to handle duplicates based on external_id
+        // First create an array with transactions enriched with sync_date
+        const transactionsWithSyncDate = transactions.map(tx => ({
+          ...tx,
+          sync_date: new Date().toISOString()
+        }));
+        
+        // Use on-conflict for external_id to avoid duplicate errors
         const { error: insertError } = await supabase
           .from("cached_transactions")
-          .upsert(
-            transactions.map(tx => ({
-              ...tx,
-              sync_date: new Date().toISOString()
-            })),
-            { 
-              onConflict: 'external_id',
-              ignoreDuplicates: false
-            }
-          );
+          .upsert(transactionsWithSyncDate, { 
+            onConflict: 'external_id',
+            ignoreDuplicates: false
+          });
         
         if (insertError) {
           console.error("Error caching transactions:", insertError);
@@ -423,7 +480,9 @@ serve(async (req: Request) => {
     const responseData = {
       ...webhookData,
       raw_response: originalResponse,
-      cached_transactions: transactions
+      cached_transactions: transactions,
+      fromCache: false,
+      cached: false
     };
     
     console.log("Successfully fetched and processed data");
