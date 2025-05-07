@@ -95,7 +95,7 @@ const CacheStats: React.FC<CacheStatsProps> = ({ onRefresh, isLoading, startDate
   const getHitRateVariant = () => {
     if (stats.hitRate === 'N/A') return "outline";
     const hitRateNum = parseFloat(stats.hitRate);
-    if (hitRateNum >= 80) return "success";
+    if (hitRateNum >= 80) return "default"; // Changed from "success" to "default"
     if (hitRateNum >= 50) return "default";
     return "secondary";
   };
@@ -163,7 +163,10 @@ const CacheStats: React.FC<CacheStatsProps> = ({ onRefresh, isLoading, startDate
         <div className="flex justify-between items-center mt-3 text-xs">
           <div>
             <span className="text-gray-500 mr-1">Cache hit rate:</span>
-            <Badge variant={getHitRateVariant()} className={`font-mono ${getHitRateVariant() === 'success' ? 'bg-green-100 text-green-800' : ''}`}>
+            <Badge 
+              variant={getHitRateVariant()} 
+              className={`font-mono ${parseFloat(stats.hitRate) >= 80 ? 'bg-green-100 text-green-800' : ''}`}
+            >
               {stats.hitRate}
             </Badge>
           </div>
@@ -193,7 +196,10 @@ const CacheStats: React.FC<CacheStatsProps> = ({ onRefresh, isLoading, startDate
                 <span>Checking cache...</span>
               ) : (
                 cachedCount !== null ? (
-                  <Badge variant={cachedCount > 0 ? "default" : "outline"} className={`${cachedCount > 0 ? 'bg-green-100 text-green-800' : ''}`}>
+                  <Badge 
+                    variant={cachedCount > 0 ? "default" : "outline"} 
+                    className={`${cachedCount > 0 ? 'bg-green-100 text-green-800' : ''}`}
+                  >
                     {cachedCount} transactions cached
                   </Badge>
                 ) : (
