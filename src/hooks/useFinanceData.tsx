@@ -27,6 +27,12 @@ const fixDateYear = (date: Date): Date => {
   return date;
 };
 
+// Check if a date range is in the past (historical data)
+const isHistoricalDateRange = (startDate: Date, endDate: Date): boolean => {
+  const today = new Date();
+  return endDate < today;
+};
+
 export const useFinanceData = () => {
   // Estados
   const [loading, setLoading] = useState<boolean>(false);
@@ -231,6 +237,14 @@ export const useFinanceData = () => {
     return formattedData;
   }, []);
 
+  // Check if a date range is historical (fully in the past)
+  const isHistorical = useCallback((startDate: Date, endDate: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // normalize to start of day
+    
+    return endDate < today;
+  }, []);
+
   // Función para cargar los datos (ahora no se carga automáticamente)
   const fetchData = useCallback(async (forceRefresh = false) => {
     console.log("Fetching financial data...");
@@ -259,6 +273,15 @@ export const useFinanceData = () => {
         endDateFormatted: formatDateYYYYMMDD(endDate)
       });
       
+      // Check if we're loading historical data (past months)
+      const loadingHistoricalData = isHistorical(startDate, endDate);
+      
+      // If we're looking at historical data and not forcing a refresh,
+      // prefer using cached data even more strongly (higher chance of returning cache)
+      const effectiveForceRefresh = loadingHistoricalData ? forceRefresh : forceRefresh;
+      
+      console.log(`Loading ${loadingHistoricalData ? 'historical' : 'current'} data, forceRefresh=${effectiveForceRefresh}`);
+      
       // Before making any requests, clean up any future year dates if this is the first time loading
       if (!dataInitialized) {
         const cleanedCount = await ZohoService.cleanupFutureDates();
@@ -271,12 +294,12 @@ export const useFinanceData = () => {
       const zohoData = await ZohoService.getTransactions(
         startDate, 
         endDate,
-        forceRefresh
+        effectiveForceRefresh // Use the adjusted forceRefresh value
       );
 
       // Detectar si estamos usando datos en caché basado en la respuesta
       const rawResponseData = ZohoService.getLastRawResponse();
-      if (rawResponseData && rawResponseData.cached) {
+      if (rawResponseData && rawResponseData.fromCache) {
         console.log("Using cached data from previous response");
         setUsingCachedData(true);
       }
@@ -325,7 +348,8 @@ export const useFinanceData = () => {
     processIncomeTypes, 
     processCollaboratorData, 
     fetchMonthlyBalance,
-    dataInitialized
+    dataInitialized,
+    isHistorical
   ]);
 
   // Función pública para refrescar datos (forzando o no)

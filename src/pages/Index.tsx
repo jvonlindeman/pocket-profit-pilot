@@ -66,7 +66,7 @@ const Index = () => {
         title: 'Cargando datos financieros',
         description: 'Obteniendo datos de Zoho Books y Stripe',
       });
-      refreshData(true);
+      refreshData(false); // Changed to false - try to use cache first
     }
   };
 
@@ -76,17 +76,17 @@ const Index = () => {
       title: 'Balance inicial guardado',
       description: 'Cargando datos financieros...',
     });
-    refreshData(true);
+    refreshData(false); // Changed to false - try to use cache first
   };
 
-  // Manejador para actualizar datos (modificado para usar caché)
+  // Manejador para actualizar datos
   const handleRefresh = () => {
     console.log("Standard refresh requested (will use cache if available)");
     toast({
       title: 'Actualizando datos',
       description: 'Obteniendo datos más recientes...',
     });
-    refreshData(false); // Changed from true to false to use the cache when available
+    refreshData(false); // Use the cache when available
   };
 
   // Manejador para forzar actualización desde API

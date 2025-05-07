@@ -106,13 +106,20 @@ const cacheCoversDateRange = (cachedData: any[], startDate: string, endDate: str
     requestEndDate: requestEnd.toISOString().split('T')[0]
   });
   
-  // We consider the cache complete if it spans the date range and has representative transaction types
-  // Make the coverage check more lenient - if we have a good number of transactions and they appear to cover
-  // the date range (even if not exact), consider it sufficient
-  const hasGoodCoverage = (spansDateRange || cachedData.length > 20) && 
+  // Make the coverage check more lenient for historical months
+  // If we have transactions that cover the entire month (especially for past months),
+  // we should consider the cache valid
+  const isHistoricalMonth = new Date() > new Date(endDate);
+  
+  const hasGoodCoverage = (
+    // Either spans the date range or has significant number of transactions for historical data
+    (spansDateRange || (isHistoricalMonth && cachedData.length > 20)) && 
+    // Always require both income and expense transactions
     hasIncomeTransactions && 
     hasExpenseTransactions && 
-    hasZohoTransactions;
+    // Always require Zoho data
+    hasZohoTransactions
+  );
     
   return hasGoodCoverage;
 };
@@ -169,7 +176,7 @@ serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ error: "Invalid JSON in request body" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      );
     }
     
     const { startDate, endDate, forceRefresh = false } = requestBody;
@@ -184,43 +191,40 @@ serve(async (req: Request) => {
       );
     }
     
-    // Check if we have cached data for this date range and don't need to refresh
-    if (!forceRefresh) {
-      console.log("Checking for cached transactions");
-      const { data: cachedTransactions, error: cacheError } = await supabase
-        .from("cached_transactions")
-        .select("*")
-        .gte("date", startDate)
-        .lte("date", endDate);
-        
-      if (!cacheError && cachedTransactions && cachedTransactions.length > 0) {
-        console.log(`Found ${cachedTransactions.length} cached transactions for range ${startDate} to ${endDate}`);
-        
-        // Check if the data is recent and covers the entire range
-        const isFresh = isCacheFresh(cachedTransactions, 24, startDate);
-        const fullCoverage = cacheCoversDateRange(cachedTransactions, startDate, endDate);
-        
-        if (isFresh && fullCoverage) {
-          console.log("Returning fresh and complete cached transactions:", cachedTransactions.length);
-          return new Response(
-            JSON.stringify({
-              fromCache: true,
-              cached: true,
-              data: cachedTransactions
-            }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        
-        console.log(`Cache ${!isFresh ? 'is stale' : ''} ${!fullCoverage ? 'has incomplete coverage' : ''}, fetching fresh data`);
-      } else {
-        console.log("No cached data found or cache error:", cacheError);
+    // Always check if we have cached data for this date range
+    console.log("Checking for cached transactions");
+    const { data: cachedTransactions, error: cacheError } = await supabase
+      .from("cached_transactions")
+      .select("*")
+      .gte("date", startDate)
+      .lte("date", endDate);
+      
+    if (!cacheError && cachedTransactions && cachedTransactions.length > 0) {
+      console.log(`Found ${cachedTransactions.length} cached transactions for range ${startDate} to ${endDate}`);
+      
+      // Check if the data is recent and covers the entire range
+      const isFresh = isCacheFresh(cachedTransactions, 24, startDate);
+      const fullCoverage = cacheCoversDateRange(cachedTransactions, startDate, endDate);
+      
+      // If not forcing refresh AND cache is fresh AND has full coverage, return cached data
+      if (!forceRefresh && isFresh && fullCoverage) {
+        console.log("Returning fresh and complete cached transactions:", cachedTransactions.length);
+        return new Response(
+          JSON.stringify({
+            fromCache: true,
+            cached: true,
+            data: cachedTransactions
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
+      
+      console.log(`Cache ${!isFresh ? 'is stale' : ''} ${!fullCoverage ? 'has incomplete coverage' : ''} ${forceRefresh ? 'force refresh requested' : ''}, fetching fresh data`);
     } else {
-      console.log("Force refresh requested, bypassing cache completely");
+      console.log("No cached data found or cache error:", cacheError);
     }
     
-    // No cached data or force refresh, fetch new data from make.com webhook
+    // Force refresh requested or no suitable cached data, fetch new data from make.com webhook
     console.log("Edge function fetching fresh data from make.com webhook");
     
     // CRITICAL: Use exactly the dates received from the client without any modifications
