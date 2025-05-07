@@ -1,4 +1,3 @@
-
 import { Transaction } from "../types/financial";
 import { fetchTransactionsFromWebhook } from "./zoho/apiClient";
 import { getMockTransactions } from "./zoho/mockData";
@@ -44,24 +43,118 @@ const ZohoService = {
       // Track the requested date range to know if we've fetched it before
       const rangeKey = createDateRangeKey(startDate, endDate);
       
-      // Check if we should auto-refresh based on how long ago we cached this date range
-      if (!forceRefresh && cacheStats.cachedRanges[rangeKey]) {
-        const cacheTime = cacheStats.cachedRanges[rangeKey];
-        const cacheAge = Date.now() - cacheTime.getTime();
-        const isCurrentMonth = startDate.getMonth() === new Date().getMonth() && 
-                               startDate.getFullYear() === new Date().getFullYear();
+      // First check if we have cached transactions in the database
+      if (!forceRefresh) {
+        // Format dates for DB query
+        const formattedStartDate = startDate.toISOString().split('T')[0];
+        const formattedEndDate = endDate.toISOString().split('T')[0];
         
-        // Auto-refresh current month data after 1 hour, historical data after 24 hours
-        const refreshThresholdHours = isCurrentMonth ? 1 : 24;
-        const shouldAutoRefresh = cacheAge > refreshThresholdHours * 60 * 60 * 1000;
-        
-        if (shouldAutoRefresh) {
-          console.log(`ZohoService: Auto-refreshing ${isCurrentMonth ? 'current month' : 'historical'} data after ${refreshThresholdHours} hours`);
-          forceRefresh = true;
+        try {
+          const { data: cachedTransactions, error } = await supabase
+            .from("cached_transactions")
+            .select("*")
+            .gte("date", formattedStartDate)
+            .lte("date", formattedEndDate);
+          
+          if (!error && cachedTransactions && cachedTransactions.length > 0) {
+            console.log(`ZohoService: Found ${cachedTransactions.length} cached transactions in database`);
+            
+            // Check if the data is recent enough based on the date range
+            const currentMonth = new Date().getMonth() === startDate.getMonth() && 
+                               new Date().getFullYear() === startDate.getFullYear();
+            
+            // For current month data, we use a shorter freshness window (2 hours)
+            // For historical data, we use a longer freshness window (48 hours)
+            const maxHoursOld = currentMonth ? 2 : 48;
+            
+            // Get the most recent sync date from cached transactions
+            const latestSync = new Date(Math.max(...cachedTransactions.map(tx => 
+              new Date(tx.sync_date).getTime())));
+            
+            const cacheAge = Date.now() - latestSync.getTime();
+            const cacheAgeHours = cacheAge / (1000 * 60 * 60);
+            
+            console.log(`ZohoService: Cache age: ${cacheAgeHours.toFixed(2)} hours, freshness threshold: ${maxHoursOld} hours`);
+            
+            if (cacheAgeHours < maxHoursOld) {
+              // Cache is fresh, use it
+              console.log(`ZohoService: Using fresh cached data (${cacheAgeHours.toFixed(2)} hours old)`);
+              
+              // Update cache stats
+              cacheStats.hits++;
+              cacheStats.cachedRanges[rangeKey] = latestSync;
+              
+              // Transform cached data to Transaction type
+              const normalizedTransactions: Transaction[] = cachedTransactions.map(tx => ({
+                id: tx.id,
+                date: tx.date,
+                amount: Number(tx.amount),
+                description: tx.description || '',
+                category: tx.category,
+                source: normalizeSource(tx.source),
+                type: normalizeType(tx.type)
+              }));
+              
+              // Store the last response for debugging
+              lastRawResponse = {
+                cached: true,
+                fromCache: true,
+                cachedTime: latestSync,
+                data: cachedTransactions
+              };
+              
+              return normalizedTransactions;
+            } else {
+              // Cache is stale, refresh in the background
+              console.log(`ZohoService: Cache is stale (${cacheAgeHours.toFixed(2)} hours old > ${maxHoursOld}), refreshing`);
+              
+              // Return the stale data immediately but trigger a refresh in the background
+              const normalizedTransactions: Transaction[] = cachedTransactions.map(tx => ({
+                id: tx.id,
+                date: tx.date,
+                amount: Number(tx.amount),
+                description: tx.description || '',
+                category: tx.category,
+                source: normalizeSource(tx.source),
+                type: normalizeType(tx.type)
+              }));
+              
+              // Trigger a background refresh
+              setTimeout(() => {
+                console.log("ZohoService: Starting background cache refresh");
+                ZohoService.forceRefresh(startDate, endDate)
+                  .then(() => console.log("ZohoService: Background refresh completed"))
+                  .catch(err => console.error("ZohoService: Background refresh failed", err));
+              }, 100);
+              
+              // Update cache stats
+              cacheStats.hits++;
+              
+              // Store the last response for debugging
+              lastRawResponse = {
+                cached: true,
+                fromCache: true,
+                stale: true,
+                cachedTime: latestSync,
+                data: cachedTransactions
+              };
+              
+              return normalizedTransactions;
+            }
+          } else {
+            console.log("ZohoService: No cached transactions found in database or error:", error);
+          }
+        } catch (dbError) {
+          console.error("ZohoService: Error checking database cache:", dbError);
         }
       }
       
-      // Call the API client with the returnRawResponse option to get both raw response and processed data
+      // No valid cache or force refresh, fetch from API
+      cacheStats.misses++;
+      cacheStats.lastRefresh = new Date();
+      
+      // Call the API client with the returnRawResponse option
+      console.log("ZohoService: Fetching from API");
       const response = await fetchTransactionsFromWebhook(startDate, endDate, forceRefresh, true);
       
       // Store the raw response for debugging
@@ -69,95 +162,59 @@ const ZohoService = {
         lastRawResponse = response;
       }
       
-      // If this was successful (with or without cache), record the date range as cached
+      // If this was successful, record the date range as cached
       if (response && !response.error) {
         cacheStats.cachedRanges[rangeKey] = new Date();
       }
       
-      // Check if we got a cache hit
-      if (response && response.cached) {
-        // Update cache stats
-        cacheStats.hits++;
-        if (response.data && response.data.length > 0 && response.data[0].sync_date) {
-          const latestSync = new Date(Math.max(...response.data.map(tx => new Date(tx.sync_date).getTime())));
-          cacheStats.lastRefresh = latestSync;
-        }
+      // Process the response based on its format
+      if (response && response.cached_transactions && Array.isArray(response.cached_transactions)) {
+        console.log(`ZohoService: Using ${response.cached_transactions.length} transactions from response`);
         
-        console.log("ZohoService: Using cached data, processed", 
-          response.data ? response.data.length : 0, "transactions");
+        const normalizedTransactions: Transaction[] = response.cached_transactions.map(tx => ({
+          id: tx.id,
+          date: tx.date,
+          amount: Number(tx.amount),
+          description: tx.description || '',
+          category: tx.category,
+          source: normalizeSource(tx.source),
+          type: normalizeType(tx.type)
+        }));
         
-        // If raw response contains data directly, transform and return it
-        if (response.data && Array.isArray(response.data)) {
-          const normalizedTransactions: Transaction[] = response.data.map(tx => ({
-            id: tx.id,
-            date: tx.date,
-            amount: Number(tx.amount),
-            description: tx.description || '',
-            category: tx.category,
-            source: normalizeSource(tx.source),
-            type: normalizeType(tx.type)
-          }));
-          
-          return normalizedTransactions;
-        }
-      } else {
-        // No cache hit, it's a fresh response
-        cacheStats.misses++;
-        cacheStats.lastRefresh = new Date();
-        
-        // If response contains cached_transactions, use those
-        if (response && response.cached_transactions && Array.isArray(response.cached_transactions)) {
-          console.log("ZohoService: Using freshly fetched and processed data,", 
-            response.cached_transactions.length, "transactions");
-            
-          const normalizedTransactions: Transaction[] = response.cached_transactions.map(tx => ({
-            id: tx.id,
-            date: tx.date,
-            amount: Number(tx.amount),
-            description: tx.description || '',
-            category: tx.category,
-            source: normalizeSource(tx.source),
-            type: normalizeType(tx.type)
-          }));
-          
-          return normalizedTransactions;
-        }
+        return normalizedTransactions;
       }
       
-      // If we received processed transactions, extract them
-      // This block handles the case where we got data but neither the cache nor cached_transactions format
-      if (response) {
-        // If we have data property as an array, use that
-        if (response.data && Array.isArray(response.data)) {
-          const normalizedTransactions: Transaction[] = response.data.map(tx => ({
-            id: tx.id,
-            date: tx.date,
-            amount: Number(tx.amount),
-            description: tx.description || '',
-            category: tx.category,
-            source: normalizeSource(tx.source),
-            type: normalizeType(tx.type)
-          }));
-          
-          console.log(`ZohoService: Using data.data array with ${normalizedTransactions.length} transactions`);
-          return normalizedTransactions;
-        }
+      // Check other possible response formats
+      if (response && response.data && Array.isArray(response.data)) {
+        console.log(`ZohoService: Using ${response.data.length} transactions from response.data`);
         
-        // Otherwise, if the response itself is an array, use that (from the single call to fetchTransactions)
-        if (Array.isArray(response)) {
-          const normalizedTransactions: Transaction[] = response.map(tx => ({
-            id: tx.id,
-            date: tx.date,
-            amount: Number(tx.amount),
-            description: tx.description || '',
-            category: tx.category,
-            source: normalizeSource(tx.source),
-            type: normalizeType(tx.type)
-          }));
-          
-          console.log(`ZohoService: Using direct array response with ${normalizedTransactions.length} transactions`);
-          return normalizedTransactions;
-        }
+        const normalizedTransactions: Transaction[] = response.data.map(tx => ({
+          id: tx.id,
+          date: tx.date,
+          amount: Number(tx.amount),
+          description: tx.description || '',
+          category: tx.category,
+          source: normalizeSource(tx.source),
+          type: normalizeType(tx.type)
+        }));
+        
+        return normalizedTransactions;
+      }
+      
+      if (Array.isArray(response)) {
+        console.log(`ZohoService: Using ${response.length} transactions from direct array response`);
+        
+        const normalizedTransactions: Transaction[] = response.map(tx => ({
+          id: tx.id,
+          date: tx.date,
+          amount: Number(tx.amount),
+          description: tx.description || '',
+          category: tx.category,
+          source: normalizeSource(tx.source),
+          type: normalizeType(tx.type)
+        }));
+        
+        return normalizedTransactions;
       }
       
       // If all else fails, use mock data
@@ -174,16 +231,18 @@ const ZohoService = {
       
       // Try to get transactions from cache as fallback
       try {
+        const formattedStartDate = startDate.toISOString().split('T')[0];
+        const formattedEndDate = endDate.toISOString().split('T')[0];
+        
         const { data: fallbackCache } = await supabase
           .from("cached_transactions")
           .select("*")
-          .gte("date", startDate.toISOString().split('T')[0])
-          .lte("date", endDate.toISOString().split('T')[0]);
+          .gte("date", formattedStartDate)
+          .lte("date", formattedEndDate);
           
         if (fallbackCache && fallbackCache.length > 0) {
-          console.log("ZohoService: Using cache as fallback after error");
+          console.log(`ZohoService: Using ${fallbackCache.length} transactions from fallback cache after error`);
           
-          // Transform fallback cache data to match Transaction type
           const normalizedTransactions: Transaction[] = fallbackCache.map(tx => ({
             id: tx.id,
             date: tx.date,
@@ -210,7 +269,6 @@ const ZohoService = {
     
     // Track the requested date range as freshly cached
     const rangeKey = createDateRangeKey(startDate, endDate);
-    cacheStats.cachedRanges[rangeKey] = new Date();
     
     // Use true for forceRefresh to bypass cache and true for returnRawResponse
     const response = await fetchTransactionsFromWebhook(startDate, endDate, true, true);
@@ -223,9 +281,13 @@ const ZohoService = {
     cacheStats.lastRefresh = new Date();
     cacheStats.misses++; // Count as cache miss since we're forcing refresh
     
-    // If we received processed transactions, use those
+    // If successful, update the cached ranges
+    if (response && !response.error) {
+      cacheStats.cachedRanges[rangeKey] = new Date();
+    }
+    
+    // Process the response based on its format
     if (response && response.cached_transactions && Array.isArray(response.cached_transactions)) {
-      console.log("ZohoService: Using processed transactions from force refresh response");
       return response.cached_transactions.map(tx => ({
         id: tx.id,
         date: tx.date,
@@ -237,12 +299,6 @@ const ZohoService = {
       }));
     }
     
-    // If response is just an array of transactions
-    if (Array.isArray(response)) {
-      return response;
-    }
-    
-    // If we have data property
     if (response && response.data && Array.isArray(response.data)) {
       return response.data.map(tx => ({
         id: tx.id,
@@ -255,10 +311,12 @@ const ZohoService = {
       }));
     }
     
-    // If all else fails, make a direct call without raw response
-    console.log("ZohoService: Force refresh - Response format unexpected, making direct call");
-    const transactions = await fetchTransactionsFromWebhook(startDate, endDate, true, false);
-    return transactions;
+    if (Array.isArray(response)) {
+      return response;
+    }
+    
+    console.log("ZohoService: Force refresh - Unexpected response format");
+    return [];
   },
   
   // Get raw webhook response data for debugging
@@ -283,27 +341,27 @@ const ZohoService = {
     }
   },
   
-  // Obtener la última respuesta cruda sin hacer ninguna llamada
+  // Get the last raw response without making a new call
   getLastRawResponse: (): any => {
     return lastRawResponse;
   },
   
-  // Establecer la respuesta cruda manualmente (útil para actualizar desde componentes)
+  // Set the last raw response manually
   setLastRawResponse: (data: any): void => {
     lastRawResponse = data;
   },
   
-  // Mock data for fallback when API fails or for development
+  // Mock data fallback
   getMockTransactions,
   
   // Get cache statistics
   getCacheStats: (): any => {
     const cachedRangeCount = Object.keys(cacheStats.cachedRanges).length;
+    const total = cacheStats.hits + cacheStats.misses;
     
     return {
       ...cacheStats,
-      hitRate: cacheStats.hits + cacheStats.misses > 0 ? 
-        (cacheStats.hits / (cacheStats.hits + cacheStats.misses) * 100).toFixed(1) + '%' : 'N/A',
+      hitRate: total > 0 ? (cacheStats.hits / total * 100).toFixed(1) + '%' : '0.0%',
       lastRefreshRelative: `${Math.round((Date.now() - cacheStats.lastRefresh.getTime()) / 60000)} minutes ago`,
       cachedRangeCount
     };
@@ -323,7 +381,7 @@ const ZohoService = {
         .from("cached_transactions")
         .delete()
         .gte("date", formattedStartDate)
-        .lte("date", endDate.toISOString().split('T')[0]);
+        .lte("date", formattedEndDate);
       
       if (error) {
         console.error("ZohoService: Error clearing cache for date range", error);
@@ -393,11 +451,15 @@ const ZohoService = {
   // Get count of transactions in database for a specific date range
   getCachedTransactionCount: async (startDate: Date, endDate: Date): Promise<number> => {
     try {
+      // Format dates for DB query
+      const formattedStartDate = startDate.toISOString().split('T')[0];
+      const formattedEndDate = endDate.toISOString().split('T')[0];
+      
       const { count, error } = await supabase
         .from("cached_transactions")
         .select("*", { count: 'exact', head: true })
-        .gte("date", startDate.toISOString().split('T')[0])
-        .lte("date", endDate.toISOString().split('T')[0]);
+        .gte("date", formattedStartDate)
+        .lte("date", formattedEndDate);
         
       if (error) {
         console.error("ZohoService: Error getting cached transaction count", error);
@@ -413,4 +475,3 @@ const ZohoService = {
 };
 
 export default ZohoService;
-

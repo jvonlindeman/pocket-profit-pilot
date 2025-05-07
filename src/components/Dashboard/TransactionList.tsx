@@ -95,6 +95,10 @@ const TransactionList: React.FC<TransactionListProps> = ({
       onRefresh();
     }
   };
+  
+  // Count transactions by type
+  const incomeTransactions = transactions.filter(tx => tx.type === 'income').length;
+  const expenseTransactions = transactions.filter(tx => tx.type === 'expense').length;
 
   return (
     <>
@@ -118,9 +122,9 @@ const TransactionList: React.FC<TransactionListProps> = ({
                 <SelectValue placeholder="Filtrar por tipo" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="income">Ingresos</SelectItem>
-                <SelectItem value="expense">Gastos</SelectItem>
+                <SelectItem value="all">Todos ({transactions.length})</SelectItem>
+                <SelectItem value="income">Ingresos ({incomeTransactions})</SelectItem>
+                <SelectItem value="expense">Gastos ({expenseTransactions})</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -162,7 +166,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
         <CardFooter className="bg-gray-50 border-t text-sm text-gray-500 flex flex-col sm:flex-row sm:justify-between p-4">
           <div className="mb-2 sm:mb-0">
             <span>
-              Mostrando {filteredTransactions.length} {filteredTransactions.length === 1 ? 'transacción' : 'transacciones'}
+              Mostrando {filteredTransactions.length} de {transactions.length} transacciones
               {filter !== 'all' && (
                 <> ({filter === 'income' ? 'ingresos' : 'gastos'})</>
               )}
@@ -170,17 +174,14 @@ const TransactionList: React.FC<TransactionListProps> = ({
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4">
             <div className="text-blue-600 font-medium">
-              Ingresos: {formatCurrency(totals.incomeTotal)}
+              Ingresos: {formatCurrency(totals.incomeTotal)} ({incomeTransactions})
             </div>
             <div className="text-red-600 font-medium">
-              Gastos: {formatCurrency(totals.expenseTotal)}
+              Gastos: {formatCurrency(totals.expenseTotal)} ({expenseTransactions})
             </div>
             <div className={`font-semibold ${totals.netTotal >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               Neto: {formatCurrency(totals.netTotal)}
             </div>
-          </div>
-          <div className="mt-2 sm:mt-0 text-gray-400">
-            Total: {transactions.length} {transactions.length === 1 ? 'transacción' : 'transacciones'} en período seleccionado
           </div>
         </CardFooter>
       </Card>

@@ -170,6 +170,8 @@ serve(async (req: Request) => {
         .lte("date", endDate);
         
       if (!cacheError && cachedTransactions && cachedTransactions.length > 0) {
+        console.log(`Found ${cachedTransactions.length} cached transactions for range ${startDate} to ${endDate}`);
+        
         // Check if the data is recent and covers the entire range
         const isFresh = isCacheFresh(cachedTransactions, 24, startDate);
         const fullCoverage = cacheCoversDateRange(cachedTransactions, startDate, endDate);
@@ -483,8 +485,7 @@ serve(async (req: Request) => {
           sync_date: new Date().toISOString()
         }));
         
-        // FIRST: Delete ALL existing transactions for the requested date range
-        // This fixes the issue where transactions might not be updated when date range changes
+        // First, delete all existing transactions for this date range
         console.log(`Clearing all existing transactions in date range ${startDate} to ${endDate} before inserting new ones`);
         
         const { error: deleteRangeError } = await supabase
@@ -498,7 +499,7 @@ serve(async (req: Request) => {
           // Continue with insert even if delete fails
         }
         
-        // Now insert all new transactions
+        // Now insert all new transactions in batches
         console.log(`Inserting ${transactionsWithSyncDate.length} transactions into cache`);
         
         // Break into smaller batches to avoid any size limitations
@@ -516,14 +517,23 @@ serve(async (req: Request) => {
           const batch = batches[i];
           console.log(`Inserting batch ${i + 1} of ${batches.length} with ${batch.length} transactions`);
           
-          const { error: insertError } = await supabase
-            .from("cached_transactions")
-            .insert(batch);
-          
-          if (insertError) {
-            console.error(`Error inserting batch ${i + 1}:`, insertError);
-          } else {
-            console.log(`Successfully inserted batch ${i + 1}`);
+          try {
+            const { error: insertError } = await supabase
+              .from("cached_transactions")
+              .insert(batch);
+            
+            if (insertError) {
+              console.error(`Error inserting batch ${i + 1}:`, insertError);
+              
+              // If the error is due to conflicts, log but continue
+              if (insertError.code === '23505') { // Unique constraint violation
+                console.log(`Some transactions in batch ${i + 1} already exist, continuing with next batch`);
+              }
+            } else {
+              console.log(`Successfully inserted batch ${i + 1}`);
+            }
+          } catch (batchError) {
+            console.error(`Error processing batch ${i + 1}:`, batchError);
           }
         }
         
@@ -559,4 +569,3 @@ serve(async (req: Request) => {
     );
   }
 });
-

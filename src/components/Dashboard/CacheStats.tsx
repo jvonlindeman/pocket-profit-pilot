@@ -1,11 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, RefreshCcw, Database, AlertTriangle, Trash2 } from 'lucide-react';
 import ZohoService from '@/services/zohoService';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useToast } from '@/hooks/use-toast';
 
 interface CacheStatsProps {
   onRefresh: () => void;
@@ -26,21 +27,22 @@ const CacheStats: React.FC<CacheStatsProps> = ({ onRefresh, isLoading, startDate
   
   const [cachedCount, setCachedCount] = useState<number | null>(null);
   const [isCacheLoading, setIsCacheLoading] = useState<boolean>(false);
+  const { toast } = useToast();
 
-  React.useEffect(() => {
+  useEffect(() => {
     // Update stats when component mounts
     setStats(ZohoService.getCacheStats());
     
-    // Update stats every 30 seconds
+    // Update stats every 15 seconds
     const interval = setInterval(() => {
       setStats(ZohoService.getCacheStats());
-    }, 30000);
+    }, 15000);
     
     return () => clearInterval(interval);
   }, []);
   
   // Check if we have cached data for the current date range
-  React.useEffect(() => {
+  useEffect(() => {
     if (startDate && endDate) {
       checkCachedCount();
     }
@@ -69,14 +71,33 @@ const CacheStats: React.FC<CacheStatsProps> = ({ onRefresh, isLoading, startDate
     setIsCacheLoading(true);
     try {
       await ZohoService.clearCacheForDateRange(startDate, endDate);
+      toast({
+        title: "Cache cleared",
+        description: `Cache cleared for ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`,
+        variant: "default"
+      });
       // Set count to 0 and trigger a refresh
       setCachedCount(0);
       onRefresh(); // Refresh to fetch fresh data
     } catch (err) {
       console.error("Error clearing cache:", err);
+      toast({
+        title: "Error clearing cache",
+        description: "There was a problem clearing the cache",
+        variant: "destructive"
+      });
     } finally {
       setIsCacheLoading(false);
     }
+  };
+  
+  // Calculate appropriate variant for the hit rate badge
+  const getHitRateVariant = () => {
+    if (stats.hitRate === 'N/A') return "outline";
+    const hitRateNum = parseFloat(stats.hitRate);
+    if (hitRateNum >= 80) return "success";
+    if (hitRateNum >= 50) return "default";
+    return "secondary";
   };
 
   return (
@@ -114,7 +135,7 @@ const CacheStats: React.FC<CacheStatsProps> = ({ onRefresh, isLoading, startDate
               disabled={isLoading || isCacheLoading}
               className="h-8 px-2"
             >
-              <RefreshCcw className="h-3.5 w-3.5 mr-1" />
+              <RefreshCcw className={`h-3.5 w-3.5 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
               <span className="text-xs">Refresh</span>
             </Button>
           </div>
@@ -142,7 +163,7 @@ const CacheStats: React.FC<CacheStatsProps> = ({ onRefresh, isLoading, startDate
         <div className="flex justify-between items-center mt-3 text-xs">
           <div>
             <span className="text-gray-500 mr-1">Cache hit rate:</span>
-            <Badge variant={stats.hitRate === 'N/A' || parseInt(stats.hitRate) < 50 ? "outline" : "default"} className="font-mono">
+            <Badge variant={getHitRateVariant()} className={`font-mono ${getHitRateVariant() === 'success' ? 'bg-green-100 text-green-800' : ''}`}>
               {stats.hitRate}
             </Badge>
           </div>
