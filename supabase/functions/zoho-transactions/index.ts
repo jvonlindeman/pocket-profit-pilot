@@ -147,6 +147,102 @@ const fixDateFormat = (dateString: string): string => {
   return dateString;
 };
 
+// NEW: Find the latest transaction date in cache for a month
+const findLatestTransactionDate = async (monthYear: string): Promise<string | null> => {
+  try {
+    console.log(`Finding latest transaction date for month ${monthYear}`);
+    
+    // Get all transactions for the specified month, ordered by date descending
+    const { data: latestTransactions, error } = await supabase
+      .from("cached_transactions")
+      .select("date")
+      .like("date", `${monthYear}-%`) // Matches YYYY-MM-% pattern
+      .order("date", { ascending: false })
+      .limit(1);
+      
+    if (error) {
+      console.error("Error finding latest transaction date:", error);
+      return null;
+    }
+    
+    if (latestTransactions && latestTransactions.length > 0) {
+      const latestDate = latestTransactions[0].date;
+      console.log(`Latest transaction date found for ${monthYear}: ${latestDate}`);
+      return latestDate;
+    }
+    
+    console.log(`No transactions found for month ${monthYear}`);
+    return null;
+  } catch (err) {
+    console.error("Error in findLatestTransactionDate:", err);
+    return null;
+  }
+};
+
+// NEW: Check cache coverage for a month
+const getMonthCacheStats = async (monthYear: string): Promise<{
+  hasData: boolean;
+  firstDate: string | null;
+  lastDate: string | null;
+  transactionCount: number;
+}> => {
+  try {
+    console.log(`Getting cache stats for month ${monthYear}`);
+    
+    // Get count of transactions for this month
+    const { count, error: countError } = await supabase
+      .from("cached_transactions")
+      .select("id", { count: 'exact', head: true })
+      .like("date", `${monthYear}-%`);
+      
+    if (countError) {
+      console.error("Error counting transactions:", countError);
+      return { hasData: false, firstDate: null, lastDate: null, transactionCount: 0 };
+    }
+    
+    if (!count || count === 0) {
+      console.log(`No cached data for month ${monthYear}`);
+      return { hasData: false, firstDate: null, lastDate: null, transactionCount: 0 };
+    }
+    
+    // Get earliest date
+    const { data: earliest, error: earliestError } = await supabase
+      .from("cached_transactions")
+      .select("date")
+      .like("date", `${monthYear}-%`)
+      .order("date", { ascending: true })
+      .limit(1);
+      
+    // Get latest date
+    const { data: latest, error: latestError } = await supabase
+      .from("cached_transactions")
+      .select("date")
+      .like("date", `${monthYear}-%`)
+      .order("date", { ascending: false })
+      .limit(1);
+    
+    if (earliestError || latestError) {
+      console.error("Error getting date range:", earliestError || latestError);
+      return { hasData: true, firstDate: null, lastDate: null, transactionCount: count };
+    }
+    
+    const firstDate = earliest && earliest.length > 0 ? earliest[0].date : null;
+    const lastDate = latest && latest.length > 0 ? latest[0].date : null;
+    
+    console.log(`Month ${monthYear} cache stats: ${count} transactions from ${firstDate} to ${lastDate}`);
+    
+    return {
+      hasData: true,
+      firstDate,
+      lastDate,
+      transactionCount: count
+    };
+  } catch (err) {
+    console.error("Error in getMonthCacheStats:", err);
+    return { hasData: false, firstDate: null, lastDate: null, transactionCount: 0 };
+  }
+};
+
 serve(async (req: Request) => {
   console.log(`zoho-transactions function called with method: ${req.method}`);
   
@@ -213,13 +309,189 @@ serve(async (req: Request) => {
           JSON.stringify({
             fromCache: true,
             cached: true,
-            data: cachedTransactions
+            data: cachedTransactions,
+            cacheStats: {
+              isFresh,
+              fullCoverage,
+              cachedCount: cachedTransactions.length
+            }
           }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       
-      console.log(`Cache ${!isFresh ? 'is stale' : ''} ${!fullCoverage ? 'has incomplete coverage' : ''} ${forceRefresh ? 'force refresh requested' : ''}, fetching fresh data`);
+      console.log(`Cache ${!isFresh ? 'is stale' : ''} ${!fullCoverage ? 'has incomplete coverage' : ''} ${forceRefresh ? 'force refresh requested' : ''}`);
+      
+      // NEW: Smart partial cache check logic
+      // If we're not forcing a refresh, check if we can do a partial refresh
+      if (!forceRefresh) {
+        // Get the month-year from the request dates 
+        const startMonthYear = startDate.substring(0, 7); // YYYY-MM
+        const endMonthYear = endDate.substring(0, 7); // YYYY-MM
+        
+        // If we're requesting data for a single month, we can try to optimize
+        if (startMonthYear === endMonthYear) {
+          console.log(`Request is for a single month: ${startMonthYear}`);
+          
+          // Get cache stats for this month
+          const monthStats = await getMonthCacheStats(startMonthYear);
+          
+          if (monthStats.hasData && monthStats.lastDate) {
+            console.log(`Found ${monthStats.transactionCount} cached transactions for month ${startMonthYear}`);
+            console.log(`Date range in cache: ${monthStats.firstDate} to ${monthStats.lastDate}`);
+            
+            // If the cache has data up to at least one day before the requested end date,
+            // we can do a partial refresh starting from the day after the last cached day
+            const lastCachedDate = new Date(monthStats.lastDate);
+            const requestEndDate = new Date(endDate);
+            
+            if (lastCachedDate < requestEndDate) {
+              // Calculate the next day after the last cached day
+              const nextDayAfterCache = new Date(lastCachedDate);
+              nextDayAfterCache.setDate(nextDayAfterCache.getDate() + 1);
+              
+              const newStartDate = nextDayAfterCache.toISOString().split('T')[0];
+              
+              console.log(`Performing partial refresh: ${newStartDate} to ${endDate}`);
+              
+              // Call make.com webhook with the partial date range
+              console.log("Calling make.com webhook with partial date range");
+              const webhookResponse = await fetch(makeWebhookUrl, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  startDate: newStartDate,
+                  endDate: endDate,
+                  forceRefresh: true // Force refresh the partial range
+                })
+              });
+              
+              if (!webhookResponse.ok) {
+                const errorText = await webhookResponse.text();
+                console.error("Failed to fetch partial data:", errorText);
+                
+                // Return the cached data with a warning about partial refresh failure
+                return new Response(
+                  JSON.stringify({ 
+                    partialRefreshFailed: true,
+                    fromCache: true,
+                    cached: true,
+                    data: cachedTransactions,
+                    cacheStats: {
+                      isFresh,
+                      fullCoverage: false,
+                      partialRefreshAttempted: true,
+                      cachedCount: cachedTransactions.length,
+                      cachedDateRange: {
+                        start: monthStats.firstDate,
+                        end: monthStats.lastDate
+                      }
+                    }
+                  }),
+                  { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                );
+              }
+              
+              // Process the partial refresh response
+              const responseText = await webhookResponse.text();
+              let webhookData;
+              
+              try {
+                webhookData = JSON.parse(responseText);
+              } catch (parseError) {
+                console.error("Error parsing webhook response:", parseError);
+                
+                // Return the cached data with a warning
+                return new Response(
+                  JSON.stringify({ 
+                    partialRefreshParseError: true,
+                    fromCache: true,
+                    cached: true,
+                    data: cachedTransactions,
+                    raw_response: responseText.substring(0, 1000),
+                    cacheStats: {
+                      isFresh,
+                      fullCoverage: false,
+                      partialRefreshAttempted: true,
+                      cachedCount: cachedTransactions.length
+                    }
+                  }),
+                  { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                );
+              }
+              
+              // Process the new transactions from the partial refresh
+              const newTransactions: Transaction[] = [];
+              
+              // Process new transactions from webhook response
+              if (webhookData.cached_transactions && Array.isArray(webhookData.cached_transactions)) {
+                console.log(`Got ${webhookData.cached_transactions.length} new transactions from partial refresh`);
+                
+                // Add each new transaction with sync date
+                const transactionsWithSyncDate = webhookData.cached_transactions.map((tx: any) => ({
+                  ...tx,
+                  sync_date: new Date().toISOString()
+                }));
+                
+                // Insert new transactions
+                if (transactionsWithSyncDate.length > 0) {
+                  try {
+                    const { error: insertError } = await supabase
+                      .from("cached_transactions")
+                      .insert(transactionsWithSyncDate);
+                      
+                    if (insertError) {
+                      console.error("Error inserting new transactions:", insertError);
+                    } else {
+                      console.log(`Successfully inserted ${transactionsWithSyncDate.length} new transactions`);
+                    }
+                  } catch (insertErr) {
+                    console.error("Error in batch insert:", insertErr);
+                  }
+                }
+                
+                newTransactions.push(...webhookData.cached_transactions);
+              }
+              
+              // Get all transactions for the date range now that we've updated the cache
+              const { data: updatedTransactions, error: updatedError } = await supabase
+                .from("cached_transactions")
+                .select("*")
+                .gte("date", startDate)
+                .lte("date", endDate);
+                
+              if (updatedError) {
+                console.error("Error getting updated transactions:", updatedError);
+              }
+              
+              // Return the combined result
+              return new Response(
+                JSON.stringify({
+                  partialRefresh: true,
+                  fromCache: true,
+                  cached: true,
+                  data: updatedTransactions || [...cachedTransactions, ...newTransactions],
+                  newTransactionsCount: newTransactions.length,
+                  raw_response: webhookData,
+                  cacheStats: {
+                    isFresh: true, // It's fresh because we just updated it
+                    fullCoverage: true, // It has full coverage because we got the missing part
+                    partialRefreshSuccess: true,
+                    cachedCount: cachedTransactions.length,
+                    newCount: newTransactions.length,
+                    totalCount: (updatedTransactions ? updatedTransactions.length : cachedTransactions.length + newTransactions.length)
+                  }
+                }),
+                { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+              );
+            } else {
+              console.log("Cache already covers the requested date range, attempting full refresh anyway");
+            }
+          }
+        }
+      }
     } else {
       console.log("No cached data found or cache error:", cacheError);
     }
@@ -533,7 +805,8 @@ serve(async (req: Request) => {
     
     console.log(`Processed ${transactions.length} transactions for date range ${startDate} to ${endDate}`);
     
-    // IMPROVED CACHING STRATEGY
+    // IMPROVED CACHING STRATEGY - Instead of clearing all existing transactions first,
+    // we'll check each transaction if it exists and only insert new ones
     if (transactions.length > 0) {
       try {
         console.log(`Caching ${transactions.length} transactions for date range ${startDate} to ${endDate}`);
@@ -544,38 +817,7 @@ serve(async (req: Request) => {
           sync_date: new Date().toISOString()
         }));
         
-        // First, delete all existing transactions for this date range
-        console.log(`Clearing all existing transactions in date range ${startDate} to ${endDate} before inserting new ones`);
-        
-        // Add debug info to see what's being deleted
-        const { data: existingTransactions, error: fetchError } = await supabase
-          .from("cached_transactions")
-          .select("id, date, external_id")
-          .gte("date", startDate)
-          .lte("date", endDate);
-          
-        if (fetchError) {
-          console.error("Error fetching existing transactions:", fetchError);
-        } else {
-          console.log(`Found ${existingTransactions?.length || 0} existing transactions in the date range to be cleared`);
-        }
-        
-        const { error: deleteRangeError } = await supabase
-          .from("cached_transactions")
-          .delete()
-          .gte("date", startDate)
-          .lte("date", endDate);
-        
-        if (deleteRangeError) {
-          console.error("Error clearing transactions in date range:", deleteRangeError);
-          // Continue with insert even if delete fails
-        } else {
-          console.log("Successfully cleared existing transactions in the date range");
-        }
-        
-        // Now insert all new transactions in batches
-        console.log(`Inserting ${transactionsWithSyncDate.length} transactions into cache`);
-        
+        // NEW APPROACH: Don't delete existing transactions, just insert new ones or update existing
         // Break into smaller batches to avoid any size limitations
         const batchSize = 50;
         const batches = [];
@@ -589,61 +831,48 @@ serve(async (req: Request) => {
         let successfulInserts = 0;
         let failedInserts = 0;
         
-        // Process each batch - FIX: Remove the .select("count") that causes errors
+        // Process each batch - Insert new transactions
         for (let i = 0; i < batches.length; i++) {
           const batch = batches[i];
-          console.log(`Inserting batch ${i + 1} of ${batches.length} with ${batch.length} transactions`);
+          console.log(`Processing batch ${i + 1} of ${batches.length} with ${batch.length} transactions`);
           
-          try {
-            // Log the first few transactions in the batch for debugging
-            console.log("Sample transactions from batch:", 
-              batch.slice(0, 2).map(tx => ({
-                id: tx.id,
-                date: tx.date,
-                external_id: tx.external_id
-              }))
-            );
+          // Extract external IDs for this batch to check if they exist
+          const externalIds = batch.map(tx => tx.external_id);
+          
+          // Check which transactions already exist
+          const { data: existingTransactions, error: checkError } = await supabase
+            .from("cached_transactions")
+            .select("external_id")
+            .in("external_id", externalIds);
             
-            // FIX: Remove the .select("count") call that causes the SQL error
-            const { error: insertError } = await supabase
-              .from("cached_transactions")
-              .insert(batch);
-            
-            if (insertError) {
-              console.error(`Error inserting batch ${i + 1}:`, insertError);
-              failedInserts += batch.length;
-              
-              // If the error is due to conflicts, try inserting records one by one
-              if (insertError.code === '23505') { // Unique constraint violation
-                console.log(`Some transactions in batch ${i + 1} already exist, trying individual inserts`);
+          if (checkError) {
+            console.error(`Error checking existing transactions in batch ${i + 1}:`, checkError);
+          }
+          
+          // Filter out transactions that already exist
+          const existingExternalIds = new Set(existingTransactions?.map(tx => tx.external_id) || []);
+          const newTransactions = batch.filter(tx => !existingExternalIds.has(tx.external_id));
+          
+          console.log(`Batch ${i + 1}: ${existingExternalIds.size} already exist, ${newTransactions.length} are new`);
+          
+          // Only insert new transactions
+          if (newTransactions.length > 0) {
+            try {
+              const { error: insertError } = await supabase
+                .from("cached_transactions")
+                .insert(newTransactions);
                 
-                // Try inserting one by one
-                let individualSuccesses = 0;
-                for (const transaction of batch) {
-                  try {
-                    const { error: singleInsertError } = await supabase
-                      .from("cached_transactions")
-                      .insert([transaction]);
-                      
-                    if (!singleInsertError) {
-                      individualSuccesses++;
-                      successfulInserts++;
-                      failedInserts--;
-                    }
-                  } catch (err) {
-                    // Individual insert failed, just continue
-                  }
-                }
-                
-                console.log(`Individually inserted ${individualSuccesses} out of ${batch.length} transactions`);
+              if (insertError) {
+                console.error(`Error inserting new transactions in batch ${i + 1}:`, insertError);
+                failedInserts += newTransactions.length;
+              } else {
+                console.log(`Successfully inserted ${newTransactions.length} new transactions in batch ${i + 1}`);
+                successfulInserts += newTransactions.length;
               }
-            } else {
-              console.log(`Successfully inserted batch ${i + 1}: ${batch.length} records`);
-              successfulInserts += batch.length;
+            } catch (batchError) {
+              console.error(`Error in batch ${i + 1} insert:`, batchError);
+              failedInserts += newTransactions.length;
             }
-          } catch (batchError) {
-            console.error(`Error processing batch ${i + 1}:`, batchError);
-            failedInserts += batch.length;
           }
         }
         

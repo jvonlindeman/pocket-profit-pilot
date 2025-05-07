@@ -11,3 +11,4 @@ verify_jwt = false
 [[functions]]
 name = "zoho-transactions"
 verify_jwt = false
+

@@ -2,13 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Bug, RefreshCw } from 'lucide-react';
+import { Loader2, Bug, RefreshCw, Database } from 'lucide-react';
 import ZohoService from '@/services/zohoService';
 import WebhookDebugHeader from './WebhookDebugHeader';
 import WebhookErrorDisplay from './WebhookErrorDisplay';
 import WebhookDataSummary from './WebhookDataSummary';
 import WebhookDataTable from './WebhookDataTable';
 import WebhookRawData from './WebhookRawData';
+import CacheAnalysis from './CacheAnalysis';
 import { Badge } from '@/components/ui/badge';
 
 interface WebhookDebugProps {
@@ -25,6 +26,7 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
   const [rawData, setRawData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [cacheStats, setCacheStats] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState('formatted');
 
   // Update local state when rawResponse from parent changes
   useEffect(() => {
@@ -103,6 +105,7 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
 
   // Determine if data is from cache
   const isFromCache = rawData && (rawData.fromCache || rawData.cached);
+  const isPartialRefresh = rawData && rawData.partialRefresh;
 
   return (
     <Card>
@@ -110,15 +113,21 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
         <CardTitle className="flex items-center gap-2">
           <Bug className="h-5 w-5 text-amber-500" />
           Depuración de Webhook Zoho
-          {isFromCache && (
+          {isFromCache && !isPartialRefresh && (
             <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700 border-blue-200">
               <RefreshCw className="h-3 w-3 mr-1" />
               Datos en caché
             </Badge>
           )}
+          {isPartialRefresh && (
+            <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-200">
+              <Database className="h-3 w-3 mr-1" />
+              Refresco parcial
+            </Badge>
+          )}
         </CardTitle>
         <CardDescription>
-          Ver la respuesta cruda del webhook para detectar problemas
+          Ver la respuesta cruda del webhook y estadísticas de caché para detectar problemas
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -145,20 +154,36 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
           </div>
         )}
 
-        {rawData && !loading && (
-          <Tabs defaultValue="formatted" className="w-full">
-            <TabsList className="grid grid-cols-2 w-[200px]">
+        {!loading && (
+          <Tabs defaultValue={activeTab} className="w-full" onValueChange={setActiveTab}>
+            <TabsList className="grid grid-cols-3 w-[300px]">
               <TabsTrigger value="formatted">Formateado</TabsTrigger>
               <TabsTrigger value="raw">JSON Crudo</TabsTrigger>
+              <TabsTrigger value="cache">Análisis Caché</TabsTrigger>
             </TabsList>
             <TabsContent value="formatted" className="p-0">
-              <div className="border rounded-md p-4 mt-2 bg-gray-50 max-h-[400px] overflow-auto">
-                <WebhookDataSummary rawData={rawData} />
-                <WebhookDataTable rawData={rawData} />
-              </div>
+              {rawData ? (
+                <div className="border rounded-md p-4 mt-2 bg-gray-50 max-h-[400px] overflow-auto">
+                  <WebhookDataSummary rawData={rawData} />
+                  <WebhookDataTable rawData={rawData} />
+                </div>
+              ) : (
+                <div className="border rounded-md p-4 mt-2 bg-gray-50 text-center text-gray-500">
+                  No hay datos disponibles
+                </div>
+              )}
             </TabsContent>
             <TabsContent value="raw" className="p-0">
-              <WebhookRawData rawData={rawData} />
+              {rawData ? (
+                <WebhookRawData rawData={rawData} />
+              ) : (
+                <div className="border rounded-md p-4 mt-2 bg-gray-50 text-center text-gray-500">
+                  No hay datos disponibles
+                </div>
+              )}
+            </TabsContent>
+            <TabsContent value="cache" className="p-0">
+              <CacheAnalysis />
             </TabsContent>
           </Tabs>
         )}

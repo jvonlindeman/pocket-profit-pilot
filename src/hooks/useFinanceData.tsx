@@ -45,6 +45,8 @@ export const useFinanceData = () => {
   const [collaboratorExpenses, setCollaboratorExpenses] = useState<any[]>([]);
   const [startingBalance, setStartingBalance] = useState<number | undefined>(undefined);
   const [usingCachedData, setUsingCachedData] = useState<boolean>(false);
+  const [partialRefresh, setPartialRefresh] = useState<boolean>(false);
+  const [cacheStats, setCacheStats] = useState<any>(null);
   
   // Estado del rango de fechas - configurado para mostrar desde el último día del mes anterior hasta el último día del mes actual
   const [dateRange, setDateRange] = useState(() => {
@@ -245,12 +247,39 @@ export const useFinanceData = () => {
     return endDate < today;
   }, []);
 
+  // Parse cache statistics from API response
+  const parseCacheStats = useCallback((response: any) => {
+    if (!response) return null;
+    
+    let stats = null;
+    
+    // Check for different response formats that might contain cache stats
+    if (response.cacheStats) {
+      stats = response.cacheStats;
+    } else if (response.partialRefresh) {
+      stats = {
+        partialRefresh: true,
+        newCount: response.newTransactionsCount || 0,
+        cachedCount: response.data?.length || 0
+      };
+    }
+    
+    // If we found stats, save them
+    if (stats) {
+      setCacheStats(stats);
+    }
+    
+    return stats;
+  }, []);
+  
   // Función para cargar los datos (ahora no se carga automáticamente)
   const fetchData = useCallback(async (forceRefresh = false) => {
     console.log("Fetching financial data...");
     setLoading(true);
     setError(null);
     setUsingCachedData(false);
+    setPartialRefresh(false);
+    setCacheStats(null);
 
     try {
       // Fix any dates in the future year
@@ -297,17 +326,25 @@ export const useFinanceData = () => {
         effectiveForceRefresh // Use the adjusted forceRefresh value
       );
 
-      // Detectar si estamos usando datos en caché basado en la respuesta
-      const rawResponseData = ZohoService.getLastRawResponse();
-      if (rawResponseData && rawResponseData.fromCache) {
-        console.log("Using cached data from previous response");
-        setUsingCachedData(true);
-      }
-
       // Obtener la respuesta cruda actual para depuración inmediatamente después
       const rawData = ZohoService.getLastRawResponse();
       setRawResponse(rawData);
       console.log("Fetched raw response for debugging:", rawData);
+      
+      // Check for partial refresh
+      if (rawData && rawData.partialRefresh) {
+        console.log("Detected partial refresh in response");
+        setPartialRefresh(true);
+      }
+      
+      // Parse cache stats if available
+      parseCacheStats(rawData);
+
+      // Detectar si estamos usando datos en caché basado en la respuesta
+      if (rawData && (rawData.fromCache || rawData.cached)) {
+        console.log("Using cached data from previous response");
+        setUsingCachedData(true);
+      }
 
       // Procesar datos de colaboradores
       processCollaboratorData(rawData);
@@ -349,7 +386,8 @@ export const useFinanceData = () => {
     processCollaboratorData, 
     fetchMonthlyBalance,
     dataInitialized,
-    isHistorical
+    isHistorical,
+    parseCacheStats
   ]);
 
   // Función pública para refrescar datos (forzando o no)
@@ -372,6 +410,8 @@ export const useFinanceData = () => {
     collaboratorExpenses,
     startingBalance,
     updateStartingBalance,
-    usingCachedData
+    usingCachedData,
+    partialRefresh,
+    cacheStats
   };
 };

@@ -10,14 +10,15 @@ import TransactionList from '@/components/Dashboard/TransactionList';
 import MonthlyBalanceEditor from '@/components/Dashboard/MonthlyBalanceEditor';
 import InitialBalanceDialog from '@/components/Dashboard/InitialBalanceDialog';
 import { useFinanceData } from '@/hooks/useFinanceData';
-import { useMonthlyBalance } from '@/hooks/useMonthlyBalance'; // Added missing import
+import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Settings, Bug, Play, RotateCw } from 'lucide-react';
+import { RefreshCw, Settings, Bug, Play, RotateCw, Database } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import WebhookDebug from '@/components/WebhookDebug';
 import WebhookRequestDebug from '@/components/WebhookRequestDebug';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
 
 const Index = () => {
   const {
@@ -33,7 +34,9 @@ const Index = () => {
     stripeIncome,
     regularIncome,
     collaboratorExpenses,
-    usingCachedData
+    usingCachedData,
+    partialRefresh,
+    cacheStats
   } = useFinanceData();
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
@@ -66,7 +69,7 @@ const Index = () => {
         title: 'Cargando datos financieros',
         description: 'Obteniendo datos de Zoho Books y Stripe',
       });
-      refreshData(false); // Changed to false - try to use cache first
+      refreshData(false); // Use cache when available
     }
   };
 
@@ -76,7 +79,7 @@ const Index = () => {
       title: 'Balance inicial guardado',
       description: 'Cargando datos financieros...',
     });
-    refreshData(false); // Changed to false - try to use cache first
+    refreshData(false); // Use cache when available
   };
 
   // Manejador para actualizar datos
@@ -213,11 +216,26 @@ const Index = () => {
             </div>
 
             {/* Indicador de caché */}
-            {usingCachedData && (
+            {usingCachedData && !partialRefresh && (
               <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-lg p-2 text-sm mb-6">
                 <p className="font-medium flex items-center">
                   <RefreshCw className="h-4 w-4 mr-2" /> 
                   Usando datos en caché. Para datos completamente actualizados, use "Forzar actualización".
+                </p>
+              </div>
+            )}
+
+            {/* Indicador de refresco parcial */}
+            {partialRefresh && (
+              <div className="bg-green-50 border border-green-200 text-green-800 rounded-lg p-2 text-sm mb-6">
+                <p className="font-medium flex items-center">
+                  <Database className="h-4 w-4 mr-2" /> 
+                  Actualización parcial: se usó caché para datos existentes y se obtuvieron solo los datos nuevos.
+                  {cacheStats && (
+                    <Badge variant="outline" className="ml-2 bg-white border-green-200">
+                      {cacheStats.newCount} nuevas transacciones
+                    </Badge>
+                  )}
                 </p>
               </div>
             )}
