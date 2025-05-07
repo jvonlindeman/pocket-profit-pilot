@@ -15,6 +15,16 @@ let cacheStats = {
   lastRefresh: new Date(),
 };
 
+// Helper function to normalize source to match Transaction type
+const normalizeSource = (source: string): 'Zoho' | 'Stripe' => {
+  return source === 'Stripe' ? 'Stripe' : 'Zoho';
+};
+
+// Helper function to normalize transaction type
+const normalizeType = (type: string): 'income' | 'expense' => {
+  return type === 'income' ? 'income' : 'expense';
+};
+
 // Implementation that connects to Zoho Books API via make.com webhook
 const ZohoService = {
   // Get transactions within a date range
@@ -38,7 +48,19 @@ const ZohoService = {
             console.log("ZohoService: Using direct cache hit:", cachedTransactions.length, "transactions");
             cacheStats.hits++;
             cacheStats.lastRefresh = latestSync;
-            return cachedTransactions;
+            
+            // Transform and normalize the cached data to match Transaction type
+            const normalizedTransactions: Transaction[] = cachedTransactions.map(tx => ({
+              id: tx.id,
+              date: tx.date,
+              amount: Number(tx.amount),
+              description: tx.description || '',
+              category: tx.category,
+              source: normalizeSource(tx.source),
+              type: normalizeType(tx.type)
+            }));
+            
+            return normalizedTransactions;
           } else {
             console.log("ZohoService: Cache is stale, fetching fresh data");
           }
@@ -61,7 +83,17 @@ const ZohoService = {
       if (rawResponse && rawResponse.cached && Array.isArray(rawResponse.data)) {
         console.log("ZohoService: Received cached data from edge function");
         cacheStats.hits++;
-        return rawResponse.data;
+        
+        // Normalize the source field to match Transaction type
+        const normalizedTransactions: Transaction[] = rawResponse.data.map(tx => ({
+          ...tx,
+          amount: Number(tx.amount),
+          source: normalizeSource(tx.source),
+          type: normalizeType(tx.type),
+          description: tx.description || ''
+        }));
+        
+        return normalizedTransactions;
       }
       
       // Process transactions normally
@@ -94,7 +126,19 @@ const ZohoService = {
           
         if (fallbackCache && fallbackCache.length > 0) {
           console.log("ZohoService: Using cache as fallback after error");
-          return fallbackCache;
+          
+          // Transform fallback cache data to match Transaction type
+          const normalizedTransactions: Transaction[] = fallbackCache.map(tx => ({
+            id: tx.id,
+            date: tx.date,
+            amount: Number(tx.amount),
+            description: tx.description || '',
+            category: tx.category,
+            source: normalizeSource(tx.source),
+            type: normalizeType(tx.type)
+          }));
+          
+          return normalizedTransactions;
         }
       } catch (fallbackError) {
         console.error("ZohoService: Error getting fallback cache", fallbackError);

@@ -1,4 +1,3 @@
-
 import { Transaction } from "../../types/financial";
 import { ensureValidDateFormat, handleApiError } from "./utils";
 import { getMockTransactions } from "./mockData";
@@ -7,6 +6,29 @@ import { supabase } from "@/integrations/supabase/client";
 // Format date in YYYY-MM-DD format without timezone shifts
 const formatDateYYYYMMDD = (date: Date): string => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+
+// Helper function to ensure source is either 'Zoho' or 'Stripe'
+const normalizeSource = (source: string): 'Zoho' | 'Stripe' => {
+  return source === 'Stripe' ? 'Stripe' : 'Zoho';
+};
+
+// Helper function to normalize transaction type
+const normalizeType = (type: string): 'income' | 'expense' => {
+  return type === 'income' ? 'income' : 'expense';
+};
+
+// Transform database records to Transaction objects
+const transformCachedToTransaction = (cachedData: any[]): Transaction[] => {
+  return cachedData.map(tx => ({
+    id: tx.id,
+    date: tx.date,
+    amount: Number(tx.amount),
+    description: tx.description || '',
+    category: tx.category,
+    source: normalizeSource(tx.source),
+    type: normalizeType(tx.type)
+  }));
 };
 
 // Function to call the Supabase edge function which handles caching
@@ -62,7 +84,8 @@ export const fetchTransactionsFromWebhook = async (
           if (returnRawResponse) {
             return { cached: true, data: cachedData };
           }
-          return cachedData;
+          
+          return transformCachedToTransaction(cachedData);
         }
         
         console.log("ZohoService: Cache data is stale, fetching fresh data but will use cache if fetch fails");
@@ -102,7 +125,8 @@ export const fetchTransactionsFromWebhook = async (
               data: fallbackCache 
             };
           }
-          return fallbackCache;
+          
+          return transformCachedToTransaction(fallbackCache);
         }
       }
       
@@ -127,22 +151,24 @@ export const fetchTransactionsFromWebhook = async (
     if (Array.isArray(data) && data.length > 0 && 'type' in data[0] && 'source' in data[0]) {
       console.log("Received cached transactions directly from Supabase");
       
-      // Convert the cached transactions to our Transaction type
-      return data.map((tx: any) => ({
-        id: tx.id,
-        date: tx.date,
-        amount: Number(tx.amount),
-        description: tx.description || '',
-        category: tx.category,
-        source: tx.source,
-        type: tx.type
-      }));
+      return transformCachedToTransaction(data);
     }
     
     // If we received the processed webhook response, use the cached_transactions field
     if (data.cached_transactions && Array.isArray(data.cached_transactions)) {
       console.log("Using newly processed cached transactions");
-      return data.cached_transactions;
+      
+      const normalizedTransactions: Transaction[] = data.cached_transactions.map((tx: any) => ({
+        id: tx.id,
+        date: tx.date,
+        amount: Number(tx.amount),
+        description: tx.description || '',
+        category: tx.category,
+        source: normalizeSource(tx.source),
+        type: normalizeType(tx.type)
+      }));
+      
+      return normalizedTransactions;
     }
     
     // Otherwise, process the raw webhook response
