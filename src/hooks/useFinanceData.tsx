@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import ZohoService from '@/services/zohoService';
 import StripeService from '@/services/stripeService';
@@ -17,6 +18,7 @@ export const useFinanceData = () => {
   const [regularIncome, setRegularIncome] = useState<number>(0);
   const [collaboratorExpenses, setCollaboratorExpenses] = useState<any[]>([]);
   const [startingBalance, setStartingBalance] = useState<number | undefined>(undefined);
+  const [usingCachedData, setUsingCachedData] = useState<boolean>(false);
   
   // Estado del rango de fechas - configurado para mostrar desde el último día del mes anterior hasta el último día del mes actual
   const [dateRange, setDateRange] = useState(() => {
@@ -67,6 +69,9 @@ export const useFinanceData = () => {
 
     // Fetch monthly balance when date range changes
     fetchMonthlyBalance(preservedStartDate);
+    
+    // Check if we need to refresh the cache
+    ZohoService.checkAndRefreshCache(preservedStartDate, preservedEndDate);
   }, []);
 
   // Fetch monthly balance for the selected month
@@ -190,6 +195,7 @@ export const useFinanceData = () => {
     console.log("Fetching financial data...");
     setLoading(true);
     setError(null);
+    setUsingCachedData(false);
 
     try {
       // Also fetch the monthly balance for the selected date range
@@ -218,6 +224,13 @@ export const useFinanceData = () => {
         dateRange.endDate,
         forceRefresh
       );
+
+      // Detectar si estamos usando datos en caché basado en la respuesta
+      const rawResponseData = ZohoService.getLastRawResponse();
+      if (rawResponseData && rawResponseData.cached) {
+        console.log("Using cached data from previous response");
+        setUsingCachedData(true);
+      }
 
       // Obtener la respuesta cruda actual para depuración inmediatamente después
       const rawData = ZohoService.getLastRawResponse();
@@ -284,6 +297,7 @@ export const useFinanceData = () => {
     regularIncome,
     collaboratorExpenses,
     startingBalance,
-    updateStartingBalance
+    updateStartingBalance,
+    usingCachedData
   };
 };

@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -31,6 +32,17 @@ interface Transaction {
   source: string;
   type: string;
 }
+
+// Generate a consistent ID for a transaction based on its properties
+const generateConsistentId = (transaction: Partial<Transaction>, index: number): string => {
+  const source = transaction.source || 'unknown';
+  const type = transaction.type || 'unknown';
+  const date = transaction.date || new Date().toISOString().split('T')[0];
+  const identifier = transaction.external_id || 
+                    `${transaction.customer_name || transaction.vendor_name || 'unknown'}-${transaction.amount || 0}`;
+  
+  return `${source.toLowerCase()}-${type.toLowerCase()}-${date}-${identifier}`;
+};
 
 serve(async (req: Request) => {
   console.log(`zoho-transactions function called with method: ${req.method}`);
@@ -244,15 +256,25 @@ serve(async (req: Request) => {
       try {
         const stripeAmount = parseFloat(String(webhookData.stripe).replace(".", "").replace(",", "."));
         if (!isNaN(stripeAmount) && stripeAmount > 0) {
-          transactions.push({
-            id: `stripe-income-${Date.now()}`,
-            external_id: `stripe-income-${Date.now()}`,
+          const stripeTransaction = {
             date: new Date().toISOString().split('T')[0],
             amount: stripeAmount,
             description: 'Ingresos de Stripe',
             category: 'Ingresos por plataforma',
             source: 'Stripe',
             type: 'income'
+          };
+          
+          const externalId = `stripe-income-${stripeTransaction.date}-${stripeTransaction.amount}`;
+          const id = generateConsistentId(
+            { ...stripeTransaction, external_id: externalId }, 
+            0
+          );
+          
+          transactions.push({
+            ...stripeTransaction,
+            id,
+            external_id: externalId
           });
         }
       } catch (e) {
@@ -269,15 +291,25 @@ serve(async (req: Request) => {
             // Usar la fecha del colaborador si está disponible, o la fecha actual
             const collaboratorDate = item.date || new Date().toISOString().split('T')[0];
             
-            transactions.push({
-              id: `colaborador-${item.vendor_name.replace(/\s/g, '-')}-${Date.now()}-${index}`,
-              external_id: `colaborador-${item.vendor_name.replace(/\s/g, '-')}-${Date.now()}-${index}`,
+            const collaboratorTransaction = {
               date: collaboratorDate,
               amount,
               description: `Pago a colaborador: ${item.vendor_name}`,
               category: 'Pagos a colaboradores',
               source: 'Zoho',
               type: 'expense'
+            };
+            
+            const externalId = `colaborador-${item.vendor_name.replace(/\s/g, '-')}-${collaboratorDate}-${amount}`;
+            const id = generateConsistentId(
+              { ...collaboratorTransaction, external_id: externalId },
+              index
+            );
+            
+            transactions.push({
+              ...collaboratorTransaction,
+              id,
+              external_id: externalId
             });
           }
         }
@@ -290,17 +322,31 @@ serve(async (req: Request) => {
         if (item && typeof item.total !== 'undefined' && item.account_name !== "Impuestos") {
           const amount = Number(item.total);
           if (amount > 0) {
-            transactions.push({
-              id: `expense-${(item.vendor_name || item.account_name || '').replace(/\s/g, '-')}-${Date.now()}-${index}`,
-              external_id: `expense-${(item.vendor_name || item.account_name || '').replace(/\s/g, '-')}-${Date.now()}-${index}`,
-              date: item.date || new Date().toISOString().split('T')[0],
+            const expenseDate = item.date || new Date().toISOString().split('T')[0];
+            const vendorName = item.vendor_name || '';
+            const accountName = item.account_name || 'Gastos generales';
+            
+            const expenseTransaction = {
+              date: expenseDate,
               amount,
-              description: item.vendor_name 
-                ? `Pago a ${item.vendor_name}` 
-                : `${item.account_name || 'Gasto'}`,
-              category: item.account_name || 'Gastos generales',
+              description: vendorName 
+                ? `Pago a ${vendorName}` 
+                : `${accountName}`,
+              category: accountName,
               source: 'Zoho',
               type: 'expense'
+            };
+            
+            const externalId = `expense-${(vendorName || accountName || '').replace(/\s/g, '-')}-${expenseDate}-${amount}`;
+            const id = generateConsistentId(
+              { ...expenseTransaction, external_id: externalId },
+              index
+            );
+            
+            transactions.push({
+              ...expenseTransaction,
+              id,
+              external_id: externalId
             });
           }
         }
@@ -313,15 +359,29 @@ serve(async (req: Request) => {
         if (item && typeof item.amount !== 'undefined' && item.customer_name) {
           const amount = Number(item.amount);
           if (amount > 0) {
-            transactions.push({
-              id: `income-${item.customer_name.replace(/\s/g, '-')}-${Date.now()}-${index}`,
-              external_id: `income-${item.customer_name.replace(/\s/g, '-')}-${Date.now()}-${item.invoice_id || index}`,
-              date: item.date || new Date().toISOString().split('T')[0],
+            const paymentDate = item.date || new Date().toISOString().split('T')[0];
+            const customerName = item.customer_name;
+            const invoiceId = item.invoice_id || '';
+            
+            const incomeTransaction = {
+              date: paymentDate,
               amount,
-              description: `Ingreso de ${item.customer_name}`,
+              description: `Ingreso de ${customerName}`,
               category: 'Ingresos',
               source: 'Zoho',
               type: 'income'
+            };
+            
+            const externalId = `income-${customerName.replace(/\s/g, '-')}-${paymentDate}-${invoiceId || index}`;
+            const id = generateConsistentId(
+              { ...incomeTransaction, external_id: externalId },
+              index
+            );
+            
+            transactions.push({
+              ...incomeTransaction,
+              id,
+              external_id: externalId
             });
           }
         }
@@ -334,21 +394,28 @@ serve(async (req: Request) => {
     if (transactions.length > 0) {
       console.log("Storing transactions in cache");
       
-      // Use upsert to handle duplicates based on external_id
-      const { error: insertError } = await supabase
-        .from("cached_transactions")
-        .upsert(
-          transactions,
-          { 
-            onConflict: 'external_id',
-            ignoreDuplicates: false
-          }
-        );
-      
-      if (insertError) {
-        console.error("Error caching transactions:", insertError);
-      } else {
-        console.log("Successfully cached transactions");
+      try {
+        // Use upsert to handle duplicates based on external_id
+        const { error: insertError } = await supabase
+          .from("cached_transactions")
+          .upsert(
+            transactions.map(tx => ({
+              ...tx,
+              sync_date: new Date().toISOString()
+            })),
+            { 
+              onConflict: 'external_id',
+              ignoreDuplicates: false
+            }
+          );
+        
+        if (insertError) {
+          console.error("Error caching transactions:", insertError);
+        } else {
+          console.log("Successfully cached transactions");
+        }
+      } catch (dbError) {
+        console.error("Database error when storing transactions:", dbError);
       }
     }
     

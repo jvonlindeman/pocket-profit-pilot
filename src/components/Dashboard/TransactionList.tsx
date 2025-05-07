@@ -23,12 +23,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import CacheStats from './CacheStats';
 
 interface TransactionListProps {
   transactions: Transaction[];
+  onRefresh?: () => void;
+  isLoading?: boolean;
 }
 
-const TransactionList: React.FC<TransactionListProps> = ({ transactions }) => {
+const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefresh, isLoading = false }) => {
   const [filter, setFilter] = useState<'all' | 'income' | 'expense'>('all');
   
   // Aplicamos filtro
@@ -62,61 +65,73 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions }) => {
     }).format(amount);
   };
 
+  // Handle refresh button click
+  const handleRefresh = () => {
+    if (onRefresh) {
+      onRefresh();
+    }
+  };
+
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Transacciones</CardTitle>
-            <CardDescription>Lista detallada de ingresos y gastos en USD</CardDescription>
+    <>
+      {onRefresh && (
+        <CacheStats onRefresh={handleRefresh} isLoading={isLoading || false} />
+      )}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Transacciones</CardTitle>
+              <CardDescription>Lista detallada de ingresos y gastos en USD</CardDescription>
+            </div>
+            <Select value={filter} onValueChange={(value: any) => setFilter(value)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filtrar por tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="income">Ingresos</SelectItem>
+                <SelectItem value="expense">Gastos</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={filter} onValueChange={(value: any) => setFilter(value)}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filtrar por tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="income">Ingresos</SelectItem>
-              <SelectItem value="expense">Gastos</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <Table className="finance-table">
-          <TableHeader>
-            <TableRow>
-              <TableHead>Fecha</TableHead>
-              <TableHead>Descripción</TableHead>
-              <TableHead>Categoría</TableHead>
-              <TableHead>Fuente</TableHead>
-              <TableHead className="text-right">Importe (USD)</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredTransactions.length === 0 ? (
+        </CardHeader>
+        <CardContent>
+          <Table className="finance-table">
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-6 text-gray-500">
-                  No hay transacciones que mostrar
-                </TableCell>
+                <TableHead>Fecha</TableHead>
+                <TableHead>Descripción</TableHead>
+                <TableHead>Categoría</TableHead>
+                <TableHead>Fuente</TableHead>
+                <TableHead className="text-right">Importe (USD)</TableHead>
               </TableRow>
-            ) : (
-              filteredTransactions.map((transaction) => (
-                <TableRow key={transaction.id}>
-                  <TableCell>{formatDate(transaction.date)}</TableCell>
-                  <TableCell>{transaction.description}</TableCell>
-                  <TableCell>{transaction.category}</TableCell>
-                  <TableCell>{transaction.source}</TableCell>
-                  <TableCell className={`text-right font-medium ${transaction.type === 'income' ? 'income-text' : 'expense-text'}`}>
-                    {transaction.type === 'income' ? '+' : '-'} {formatCurrency(transaction.amount)}
+            </TableHeader>
+            <TableBody>
+              {filteredTransactions.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-6 text-gray-500">
+                    No hay transacciones que mostrar
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+              ) : (
+                filteredTransactions.map((transaction) => (
+                  <TableRow key={transaction.id}>
+                    <TableCell>{formatDate(transaction.date)}</TableCell>
+                    <TableCell>{transaction.description}</TableCell>
+                    <TableCell>{transaction.category}</TableCell>
+                    <TableCell>{transaction.source}</TableCell>
+                    <TableCell className={`text-right font-medium ${transaction.type === 'income' ? 'income-text' : 'expense-text'}`}>
+                      {transaction.type === 'income' ? '+' : '-'} {formatCurrency(transaction.amount)}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </>
   );
 };
 

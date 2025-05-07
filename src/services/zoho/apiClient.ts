@@ -1,10 +1,8 @@
+
 import { Transaction } from "../../types/financial";
 import { ensureValidDateFormat, handleApiError } from "./utils";
 import { getMockTransactions } from "./mockData";
 import { supabase } from "@/integrations/supabase/client";
-
-// The make.com webhook URL - kept as fallback if necessary
-const makeWebhookUrl = "https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihlmx22";
 
 // Format date in YYYY-MM-DD format without timezone shifts
 const formatDateYYYYMMDD = (date: Date): string => {
@@ -40,6 +38,41 @@ export const fetchTransactionsFromWebhook = async (
     
     console.log("ZohoService: Calling Supabase edge function with exact dates:", formattedStartDate, formattedEndDate);
     
+    // First try to get data from the cache directly unless forceRefresh is true
+    if (!forceRefresh) {
+      console.log("ZohoService: Checking for cached data first");
+      const { data: cachedData, error: cacheError } = await supabase
+        .from("cached_transactions")
+        .select("*")
+        .gte("date", formattedStartDate)
+        .lte("date", formattedEndDate);
+        
+      if (!cacheError && cachedData && cachedData.length > 0) {
+        console.log("ZohoService: Found cached data, returning", cachedData.length, "transactions");
+        
+        // Calculate cache age from most recent sync_date
+        const latestSync = new Date(Math.max(...cachedData.map(tx => new Date(tx.sync_date).getTime())));
+        const cacheAge = Date.now() - latestSync.getTime();
+        const cacheAgeHours = cacheAge / (1000 * 60 * 60);
+        
+        console.log(`ZohoService: Cache age: ${cacheAgeHours.toFixed(2)} hours`);
+        
+        // If cache is fresh (less than 1 hour old), return it directly
+        if (cacheAgeHours < 1) {
+          if (returnRawResponse) {
+            return { cached: true, data: cachedData };
+          }
+          return cachedData;
+        }
+        
+        console.log("ZohoService: Cache data is stale, fetching fresh data but will use cache if fetch fails");
+      } else {
+        console.log("ZohoService: No cached data found or cache error:", cacheError);
+      }
+    } else {
+      console.log("ZohoService: Force refresh requested, bypassing cache");
+    }
+    
     // Call the Supabase edge function instead of make.com webhook directly
     const { data, error } = await supabase.functions.invoke("zoho-transactions", {
       body: {
@@ -51,6 +84,27 @@ export const fetchTransactionsFromWebhook = async (
     
     if (error) {
       console.error("Failed to fetch data from Supabase function:", error);
+      
+      // If we get an error, check if we have cached data as fallback
+      if (!forceRefresh) {
+        const { data: fallbackCache } = await supabase
+          .from("cached_transactions")
+          .select("*")
+          .gte("date", formattedStartDate)
+          .lte("date", formattedEndDate);
+          
+        if (fallbackCache && fallbackCache.length > 0) {
+          console.log("ZohoService: Using cached data as fallback after API error");
+          if (returnRawResponse) {
+            return { 
+              cached: true, 
+              error: error.message,
+              data: fallbackCache 
+            };
+          }
+          return fallbackCache;
+        }
+      }
       
       const errorMessage = handleApiError({details: error.message}, 'Failed to fetch Zoho transactions from Supabase cache');
       console.warn('Falling back to mock data due to error');
@@ -122,9 +176,10 @@ const processRawTransactions = (data: any): Transaction[] => {
       // Parse the string to a number, handling comma as decimal separator
       const stripeAmount = parseFloat(String(data.stripe).replace(".", "").replace(",", "."));
       if (!isNaN(stripeAmount) && stripeAmount > 0) {
+        const today = new Date().toISOString().split('T')[0];
         result.push({
-          id: `stripe-income-${Date.now()}`,
-          date: new Date().toISOString().split('T')[0],
+          id: `stripe-income-${today}-${stripeAmount}`,
+          date: today,
           amount: stripeAmount,
           description: 'Ingresos de Stripe',
           category: 'Ingresos por plataforma',
@@ -147,7 +202,7 @@ const processRawTransactions = (data: any): Transaction[] => {
           const collaboratorDate = item.date || new Date().toISOString().split('T')[0];
           
           result.push({
-            id: `colaborador-${item.vendor_name.replace(/\s/g, '-')}-${Date.now()}-${index}`,
+            id: `colaborador-${item.vendor_name.replace(/\s/g, '-')}-${collaboratorDate}-${amount}`,
             date: collaboratorDate,
             amount,
             description: `Pago a colaborador: ${item.vendor_name}`,
@@ -168,14 +223,18 @@ const processRawTransactions = (data: any): Transaction[] => {
       if (item && typeof item.total !== 'undefined' && item.account_name !== "Impuestos") {
         const amount = Number(item.total);
         if (amount > 0) {
+          const expenseDate = item.date || new Date().toISOString().split('T')[0];
+          const vendorName = item.vendor_name || '';
+          const accountName = item.account_name || 'Gastos generales';
+          
           result.push({
-            id: `expense-${(item.vendor_name || item.account_name || '').replace(/\s/g, '-')}-${Date.now()}-${index}`,
-            date: item.date || new Date().toISOString().split('T')[0],
+            id: `expense-${(vendorName || accountName || '').replace(/\s/g, '-')}-${expenseDate}-${amount}`,
+            date: expenseDate,
             amount,
-            description: item.vendor_name 
-              ? `Pago a ${item.vendor_name}` 
-              : `${item.account_name || 'Gasto'}`,
-            category: item.account_name || 'Gastos generales',
+            description: vendorName 
+              ? `Pago a ${vendorName}` 
+              : `${accountName}`,
+            category: accountName,
             source: 'Zoho',
             type: 'expense'
           });
@@ -190,11 +249,15 @@ const processRawTransactions = (data: any): Transaction[] => {
       if (item && typeof item.amount !== 'undefined' && item.customer_name) {
         const amount = Number(item.amount);
         if (amount > 0) {
+          const paymentDate = item.date || new Date().toISOString().split('T')[0];
+          const customerName = item.customer_name;
+          const invoiceId = item.invoice_id || '';
+          
           result.push({
-            id: `income-${item.customer_name.replace(/\s/g, '-')}-${Date.now()}-${index}`,
-            date: item.date || new Date().toISOString().split('T')[0],
+            id: `income-${customerName.replace(/\s/g, '-')}-${paymentDate}-${invoiceId || index}`,
+            date: paymentDate,
             amount,
-            description: `Ingreso de ${item.customer_name}`,
+            description: `Ingreso de ${customerName}`,
             category: 'Ingresos',
             source: 'Zoho',
             type: 'income'
