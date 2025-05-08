@@ -56,7 +56,7 @@ const CacheAnalysis: React.FC<CacheAnalysisProps> = ({ onUpdate }) => {
     try {
       // Get all unique month-years
       const { data: monthsData, error: monthsError } = await supabase
-        .rpc<MonthYearResult[]>('get_unique_months_with_transactions');
+        .rpc<MonthYearResult[], never>('get_unique_months_with_transactions');
       
       if (monthsError) {
         throw new Error(`Error getting unique months: ${monthsError.message}`);
@@ -78,7 +78,7 @@ const CacheAnalysis: React.FC<CacheAnalysisProps> = ({ onUpdate }) => {
         
         // Get first and last date for this month
         const { data: dateRangeData, error: dateRangeError } = await supabase
-          .rpc<DateRangeResult[]>('get_month_transaction_range', { month_year_param: monthYear });
+          .rpc<DateRangeResult[], { month_year_param: string }>('get_month_transaction_range', { month_year_param: monthYear });
           
         if (dateRangeError) {
           console.error(`Error getting date range for ${monthYear}:`, dateRangeError);
