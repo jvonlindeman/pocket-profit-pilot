@@ -17,11 +17,11 @@ export const useStripeIncome = () => {
     isDateInRange: (date: string) => boolean
   ): Promise<StripeIncomeData> => {
     try {
-      console.log('Loading Stripe income data for range:', dateRange);
+      console.log('🔄 Loading Stripe income data for range:', dateRange);
       
       // Format month string for database query (YYYY-MM)
       const monthString = formatISO(dateRange.startDate, { representation: 'date' }).substring(0, 7);
-      console.log('Using month string for query:', monthString);
+      console.log('📅 Using month string for query:', monthString);
       
       // Load monthly balance data to check for override
       const { data: balanceData, error: balanceError } = await supabase
@@ -32,9 +32,9 @@ export const useStripeIncome = () => {
 
       if (balanceError) {
         if (balanceError.code !== 'PGRST116') { // Not found error
-          console.error("Error loading monthly balance:", balanceError);
+          console.error("❌ Error loading monthly balance:", balanceError);
         } else {
-          console.log("No monthly balance found for month:", monthString);
+          console.log("⚠️ No monthly balance found for month:", monthString);
         }
       }
 
@@ -45,7 +45,7 @@ export const useStripeIncome = () => {
         setStripeOverride(overrideValue);
         setStripeIncome(overrideValue);
         
-        console.log("Using Stripe override value:", overrideValue);
+        console.log("💰 Using Stripe override value:", overrideValue);
         
         return {
           amount: overrideValue,
@@ -55,7 +55,7 @@ export const useStripeIncome = () => {
       } else {
         // Reset the override value
         setStripeOverride(null);
-        console.log("No Stripe override found, will calculate from transactions");
+        console.log("ℹ️ No Stripe override found, will calculate from transactions");
       }
 
       // If no override, calculate from transactions
@@ -66,16 +66,21 @@ export const useStripeIncome = () => {
         .eq('type', 'income');
 
       if (stripeError) {
-        console.error("Error loading Stripe transactions:", stripeError);
+        console.error("❌ Error loading Stripe transactions:", stripeError);
+        toast({
+          variant: "destructive",
+          title: "Error al cargar datos de Stripe",
+          description: stripeError.message,
+        });
         return { amount: 0, isOverridden: false, override: null };
       }
 
       if (stripeTransactions && stripeTransactions.length > 0) {
-        console.log(`Found ${stripeTransactions.length} Stripe transactions before filtering by date range`);
+        console.log(`✅ Found ${stripeTransactions.length} Stripe transactions before filtering by date range`);
         
         // Filter transactions within date range
         const filteredTransactions = stripeTransactions.filter(tx => isDateInRange(tx.date));
-        console.log(`${filteredTransactions.length} Stripe transactions are within date range`);
+        console.log(`📊 ${filteredTransactions.length} Stripe transactions are within date range`);
         
         // Calculate total from transactions
         const total = filteredTransactions.reduce((sum, tx) => {
@@ -84,7 +89,7 @@ export const useStripeIncome = () => {
         }, 0);
         
         setStripeIncome(total);
-        console.log("Calculated Stripe income from transactions:", total);
+        console.log("💰 Calculated Stripe income from transactions:", total);
         
         return {
           amount: total,
@@ -92,12 +97,12 @@ export const useStripeIncome = () => {
           override: null
         };
       } else {
-        console.log("No Stripe transactions found");
+        console.log("ℹ️ No Stripe transactions found");
         setStripeIncome(0);
         return { amount: 0, isOverridden: false, override: null };
       }
     } catch (err) {
-      console.error("Error in loadStripeIncomeData:", err);
+      console.error("❌ Error in loadStripeIncomeData:", err);
       toast({
         variant: "destructive",
         title: "Error cargando datos de Stripe",

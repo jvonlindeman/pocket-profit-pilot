@@ -32,6 +32,11 @@ export const DEFAULT_FINANCIAL_DATA: FinancialData = {
   }
 };
 
+// Create a timeout promise for API calls
+const timeoutPromise = (ms: number) => new Promise((_, reject) => {
+  setTimeout(() => reject(new Error(`Request timed out after ${ms}ms`)), ms);
+});
+
 export const useFinanceDataFetcher = () => {
   const [financialData, setFinancialData] = useState<FinancialData>(DEFAULT_FINANCIAL_DATA);
   const [loading, setLoading] = useState<boolean>(false);
@@ -55,7 +60,7 @@ export const useFinanceDataFetcher = () => {
     forceRefresh: boolean = false,
     stripeIncomeData: { amount: number, isOverridden: boolean }
   ) => {
-    console.log(`Fetching financial data with forceRefresh=${forceRefresh}`);
+    console.log(`📊 Fetching financial data with forceRefresh=${forceRefresh}`);
     setLoading(true);
     setError(null);
     setCacheStatus({
@@ -73,7 +78,7 @@ export const useFinanceDataFetcher = () => {
       const formattedStartDate = formatDateForAPI(startDate);
       const formattedEndDate = formatDateForAPI(endDate);
       
-      console.log('Formatted dates for API call:', formattedStartDate, formattedEndDate);
+      console.log('📆 Formatted dates for API call:', formattedStartDate, formattedEndDate);
       
       // Prepare params for API call
       const params = new URLSearchParams({
@@ -82,25 +87,32 @@ export const useFinanceDataFetcher = () => {
         force_refresh: forceRefresh ? 'true' : 'false'
       });
       
-      // Fetch data from API
+      // Fetch data from API with timeout
       let data;
       let apiError = null;
       
       try {
-        // Try using Supabase function invoke
-        console.log(`Invoking zoho-transactions function with params:`, {
+        // Try using Supabase function invoke with timeout
+        console.log(`🔄 Invoking zoho-transactions function with params:`, {
           startDate: formattedStartDate,
           endDate: formattedEndDate,
           forceRefresh: forceRefresh
         });
         
-        const result = await supabase.functions.invoke("zoho-transactions", {
+        // Create a promise that will race against a timeout
+        const invokePromise = supabase.functions.invoke("zoho-transactions", {
           body: {
             startDate: formattedStartDate,
             endDate: formattedEndDate,
             forceRefresh: forceRefresh
           }
         });
+        
+        // Race the invoke promise with a timeout
+        const result = await Promise.race([
+          invokePromise,
+          timeoutPromise(15000) // 15 seconds timeout
+        ]) as any;
         
         if (result.error) {
           throw new Error(`Error al invocar la función zoho-transactions: ${result.error.message || JSON.stringify(result.error)}`);
@@ -112,15 +124,21 @@ export const useFinanceDataFetcher = () => {
           throw new Error("No se recibieron datos de la función zoho-transactions");
         }
         
-        console.log("Data received from zoho-transactions function:", data);
+        console.log("✅ Data received from zoho-transactions function:", data);
       } catch (invokeError: any) {
-        console.error("Error calling zoho-transactions function:", invokeError);
+        console.error("❌ Error calling zoho-transactions function:", invokeError);
         apiError = invokeError;
         
         // Fallback to direct fetch
         try {
-          console.log("Falling back to direct fetch method");
-          const response = await fetch(`/functions/v1/zoho-transactions?${params.toString()}`);
+          console.log("⚠️ Falling back to direct fetch method");
+          const fetchPromise = fetch(`/functions/v1/zoho-transactions?${params.toString()}`);
+          
+          // Race the fetch promise with a timeout
+          const response = await Promise.race([
+            fetchPromise,
+            timeoutPromise(15000) // 15 seconds timeout
+          ]) as Response;
           
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -130,14 +148,14 @@ export const useFinanceDataFetcher = () => {
           const contentType = response.headers.get('content-type');
           if (!contentType || !contentType.includes('application/json')) {
             const textResponse = await response.text();
-            console.error("Received non-JSON response:", textResponse.substring(0, 200) + "...");
+            console.error("⚠️ Received non-JSON response:", textResponse.substring(0, 200) + "...");
             throw new Error(`Respuesta no JSON recibida del servidor: ${response.status} ${response.statusText}`);
           }
           
           data = await response.json();
-          console.log("Data received from direct API call:", data);
+          console.log("✅ Data received from direct API call:", data);
         } catch (fetchError) {
-          console.error("Error with direct fetch call:", fetchError);
+          console.error("❌ Error with direct fetch call:", fetchError);
           throw apiError || new Error("Error al obtener datos financieros");
         }
       }
@@ -164,16 +182,20 @@ export const useFinanceDataFetcher = () => {
         // Store regular income from Zoho
         const regularIncomeValue = safeParseNumber(data.financial_data.summary.totalIncome || 0);
         setRegularIncome(regularIncomeValue);
-        console.log('Regular income from Zoho:', regularIncomeValue);
+        console.log('💰 Regular income from Zoho:', regularIncomeValue);
         
         // Calculate total income including Stripe
         const stripeAmount = safeParseNumber(stripeIncomeData.amount || 0);
+        console.log('💳 Stripe amount:', stripeAmount);
+        
         const totalIncome = regularIncomeValue + stripeAmount;
+        console.log('💵 Total income (Zoho + Stripe):', totalIncome);
+        
         const totalExpense = safeParseNumber(data.financial_data.summary.totalExpense || 0);
         const profit = totalIncome - totalExpense;
         const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0;
         
-        console.log("Financial summary calculation:", {
+        console.log("📊 Financial summary calculation:", {
           regularIncome: regularIncomeValue,
           stripeIncome: stripeAmount,
           totalIncome,
@@ -199,7 +221,7 @@ export const useFinanceDataFetcher = () => {
         // Extract collaborator expenses if available
         if (data.collaborator_expenses && Array.isArray(data.collaborator_expenses)) {
           setCollaboratorExpenses(data.collaborator_expenses);
-          console.log('Collaborator expenses:', data.collaborator_expenses);
+          console.log('👥 Collaborator expenses:', data.collaborator_expenses);
         }
 
         toast({
@@ -211,11 +233,11 @@ export const useFinanceDataFetcher = () => {
         setDataInitialized(true);
         return updatedData;
       } else {
-        console.warn('No financial_data found in the response:', data);
+        console.warn('⚠️ No financial_data found in the response:', data);
         return DEFAULT_FINANCIAL_DATA;
       }
     } catch (err: any) {
-      console.error("Error fetching financial data:", err);
+      console.error("❌ Error fetching financial data:", err);
       setError(err instanceof Error ? err.message : "Error desconocido al obtener datos");
       toast({
         variant: "destructive",
@@ -235,6 +257,7 @@ export const useFinanceDataFetcher = () => {
     
     try {
       // Clear the cache for the current date range
+      console.log('🗑️ Clearing cache for date range:', dateRange);
       const success = await ZohoService.clearCacheForDateRange(dateRange.startDate, dateRange.endDate);
       
       if (success) {
@@ -242,13 +265,14 @@ export const useFinanceDataFetcher = () => {
           title: "Caché limpiado con éxito",
           description: "Se va a obtener datos frescos de la API",
         });
+        console.log('✅ Cache cleared successfully');
       } else {
         throw new Error("No se pudo limpiar el caché");
       }
       
       return true;
     } catch (err: any) {
-      console.error("Error clearing cache:", err);
+      console.error("❌ Error clearing cache:", err);
       setError(err instanceof Error ? err.message : "Error desconocido al limpiar el caché");
       toast({
         variant: "destructive",
