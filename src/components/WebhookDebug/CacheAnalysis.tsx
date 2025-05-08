@@ -1,212 +1,167 @@
+
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, RefreshCw, CalendarIcon, DatabaseIcon } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import ZohoService from '@/services/zohoService';
+import { Loader2, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { format as formatDate } from 'date-fns';
 
-interface CacheAnalysisProps {
-  onUpdate?: () => void;
-}
+export default function CacheAnalysis() {
+  const [cachingStats, setCachingStats] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
-interface MonthStats {
-  monthYear: string;
-  firstDate: string | null;
-  lastDate: string | null;
-  count: number;
-  formattedMonth: string;
-}
-
-// Response types for the Supabase RPC functions
-interface MonthYearResult {
-  month_year: string;
-}
-
-interface DateRangeResult {
-  min_date: string | null;
-  max_date: string | null;
-}
-
-// Format month-year string for display
-const formatMonthYear = (monthYear: string): string => {
-  const [year, month] = monthYear.split('-');
-  const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-  
-  return date.toLocaleDateString('es-ES', {
-    month: 'long',
-    year: 'numeric'
-  });
-};
-
-const CacheAnalysis: React.FC<CacheAnalysisProps> = ({ onUpdate }) => {
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [months, setMonths] = useState<MonthStats[]>([]);
-  const [totalTransactions, setTotalTransactions] = useState<number>(0);
-
-  // Load cache statistics when component mounts
+  // Load initial cache stats
   useEffect(() => {
-    analyzeCache();
+    const stats = ZohoService.getCacheStats();
+    setCachingStats(stats);
   }, []);
 
-  // Function to analyze cache by month
-  const analyzeCache = async () => {
+  // Function to refresh cache stats
+  const refreshStats = () => {
     setLoading(true);
-    setError(null);
-    
-    try {
-      // Get all unique month-years with type assertion
-      const { data: monthsData, error: monthsError } = await supabase
-        .rpc('get_unique_months_with_transactions') as { 
-          data: MonthYearResult[] | null; 
-          error: any;
-        };
-      
-      if (monthsError) {
-        throw new Error(`Error getting unique months: ${monthsError.message}`);
-      }
-      
-      if (!monthsData || !Array.isArray(monthsData) || monthsData.length === 0) {
-        setMonths([]);
-        setTotalTransactions(0);
-        setLoading(false);
-        return;
-      }
-      
-      // For each month, get stats
-      const monthsWithStats: MonthStats[] = [];
-      let totalCount = 0;
-      
-      for (const monthObj of monthsData) {
-        const monthYear = monthObj.month_year;
-        
-        // Get first and last date for this month with type assertion
-        const { data: dateRangeData, error: dateRangeError } = await supabase
-          .rpc('get_month_transaction_range', { 
-            month_year_param: monthYear 
-          }) as {
-            data: DateRangeResult[] | null;
-            error: any;
-          };
-          
-        if (dateRangeError) {
-          console.error(`Error getting date range for ${monthYear}:`, dateRangeError);
-          continue;
-        }
-        
-        // Get count for this month
-        const { count, error: countError } = await supabase
-          .from('cached_transactions')
-          .select('*', { count: 'exact', head: true })
-          .ilike('date', `${monthYear}-%`);
-          
-        if (countError) {
-          console.error(`Error getting count for ${monthYear}:`, countError);
-          continue;
-        }
-        
-        const monthCount = count || 0;
-        totalCount += monthCount;
-        
-        if (dateRangeData && Array.isArray(dateRangeData) && dateRangeData.length > 0) {
-          const stats = dateRangeData[0] as DateRangeResult;
-          
-          monthsWithStats.push({
-            monthYear,
-            firstDate: stats.min_date,
-            lastDate: stats.max_date,
-            count: monthCount,
-            formattedMonth: formatMonthYear(monthYear)
-          });
-        }
-      }
-      
-      // Sort by most recent first
-      monthsWithStats.sort((a, b) => b.monthYear.localeCompare(a.monthYear));
-      
-      setMonths(monthsWithStats);
-      setTotalTransactions(totalCount);
-      
-    } catch (err) {
-      console.error('Error analyzing cache:', err);
-      setError(err instanceof Error ? err.message : 'Unknown error analyzing cache');
-    } finally {
+    setTimeout(() => {
+      const stats = ZohoService.getCacheStats();
+      setCachingStats(stats);
       setLoading(false);
+    }, 100);
+  };
+
+  // Format date for display
+  const formatCachedDate = (date: Date | string) => {
+    if (!date) return 'N/A';
+    try {
+      const dateObj = typeof date === 'string' ? new Date(date) : date;
+      return formatDate(dateObj, 'yyyy-MM-dd HH:mm:ss');
+    } catch (e) {
+      return String(date);
     }
   };
 
+  // Calculate how long ago the cache was refreshed
+  const getTimeAgo = (date: Date | string) => {
+    if (!date) return 'N/A';
+    try {
+      const dateObj = typeof date === 'string' ? new Date(date) : date;
+      const seconds = Math.floor((Date.now() - dateObj.getTime()) / 1000);
+      
+      if (seconds < 60) return `${seconds} seconds ago`;
+      if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
+      if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+      return `${Math.floor(seconds / 86400)} days ago`;
+    } catch (e) {
+      return 'Unknown';
+    }
+  };
+
+  // Get list of cached date ranges
+  const getCachedRanges = () => {
+    if (!cachingStats?.cachedRanges) return [];
+    
+    return Object.entries(cachingStats.cachedRanges).map(([rangeKey, timestamp]) => {
+      const [startDate, endDate] = rangeKey.split('_');
+      return {
+        startDate,
+        endDate,
+        timestamp: formatCachedDate(timestamp as Date | string),
+        timeAgo: getTimeAgo(timestamp as Date | string)
+      };
+    });
+  };
+
+  const cachedRanges = getCachedRanges();
+
   return (
-    <Card className="mt-2">
-      <CardContent className="p-4">
-        <div className="flex justify-between items-center mb-2">
-          <div className="font-medium flex items-center">
-            <DatabaseIcon className="h-4 w-4 mr-2 text-blue-500" />
-            Análisis de Caché por Mes
-          </div>
-          <button 
-            onClick={analyzeCache} 
-            className="text-xs text-gray-500 hover:text-gray-700 flex items-center"
-            disabled={loading}
-          >
-            {loading ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <RefreshCw className="h-3 w-3 mr-1" />}
-            Actualizar
-          </button>
-        </div>
-
-        {loading && (
-          <div className="flex justify-center items-center py-4">
-            <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-          </div>
-        )}
-
-        {error && (
-          <div className="bg-red-50 text-red-800 p-2 rounded-md text-xs">
-            Error: {error}
-          </div>
-        )}
-
-        {!loading && !error && months.length === 0 && (
-          <div className="text-center text-gray-500 py-4 text-sm">
-            No hay datos en caché
-          </div>
-        )}
-
-        {!loading && !error && months.length > 0 && (
-          <>
-            <div className="text-xs text-gray-500 mb-2">
-              <span className="font-medium">{totalTransactions}</span> transacciones en caché en total
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-medium">Cache Analysis</h3>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={refreshStats}
+          disabled={loading}
+        >
+          {loading ? (
+            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4 mr-1" />
+          )}
+          Refresh Stats
+        </Button>
+      </div>
+      
+      {cachingStats && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Cache Performance</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="font-semibold">Hit Rate:</div>
+              <div>{cachingStats.hitRate || '0%'}</div>
+              
+              <div className="font-semibold">Cache Hits:</div>
+              <div>{cachingStats.hits || 0}</div>
+              
+              <div className="font-semibold">Cache Misses:</div>
+              <div>{cachingStats.misses || 0}</div>
+              
+              <div className="font-semibold">Errors:</div>
+              <div>{cachingStats.errors || 0}</div>
+              
+              <div className="font-semibold">Last Refresh:</div>
+              <div>{formatCachedDate(cachingStats.lastRefresh)}</div>
+              
+              <div className="font-semibold">Time Since Refresh:</div>
+              <div>{getTimeAgo(cachingStats.lastRefresh)}</div>
             </div>
-            
-            <div className="max-h-48 overflow-y-auto">
-              <table className="w-full text-xs border-collapse">
-                <thead className="bg-gray-50">
+          </CardContent>
+        </Card>
+      )}
+      
+      {cachedRanges.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Cached Date Ranges</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm p-0">
+            <div className="max-h-[200px] overflow-y-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 sticky top-0">
                   <tr>
-                    <th className="text-left p-2">Mes</th>
-                    <th className="text-left p-2">Rango de Fechas</th>
-                    <th className="text-right p-2">Transacciones</th>
+                    <th className="px-4 py-2 text-left">Start Date</th>
+                    <th className="px-4 py-2 text-left">End Date</th>
+                    <th className="px-4 py-2 text-left">Last Updated</th>
+                    <th className="px-4 py-2 text-left">Age</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {months.map(month => (
-                    <tr key={month.monthYear} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="p-2">{month.formattedMonth}</td>
-                      <td className="p-2 text-gray-600">
-                        {month.firstDate && month.lastDate ? (
-                          <span className="flex items-center">
-                            <CalendarIcon className="h-3 w-3 mr-1 text-gray-400" />
-                            {new Date(month.firstDate).toLocaleDateString()} - {new Date(month.lastDate).toLocaleDateString()}
-                          </span>
-                        ) : 'N/A'}
-                      </td>
-                      <td className="p-2 text-right font-medium">{month.count}</td>
+                  {cachedRanges.map((range, idx) => (
+                    <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="px-4 py-2">{range.startDate}</td>
+                      <td className="px-4 py-2">{range.endDate}</td>
+                      <td className="px-4 py-2">{range.timestamp}</td>
+                      <td className="px-4 py-2">{range.timeAgo}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
+          </CardContent>
+        </Card>
+      )}
+      
+      {(!cachingStats || cachedRanges.length === 0) && !loading && (
+        <div className="text-center py-8 text-gray-500">
+          No cache statistics available
+        </div>
+      )}
+      
+      {loading && (
+        <div className="flex justify-center items-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+          <span className="ml-2 text-gray-500">Loading cache statistics...</span>
+        </div>
+      )}
+    </div>
   );
-};
-
-export default CacheAnalysis;
+}

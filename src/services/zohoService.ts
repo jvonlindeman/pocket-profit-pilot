@@ -1,4 +1,3 @@
-
 import { Transaction } from "../types/financial";
 import { fetchTransactionsFromWebhook } from "./zoho/apiClient";
 import { getMockTransactions } from "./zoho/mockData";
@@ -216,6 +215,32 @@ const ZohoService = {
       // If this was successful, record the date range as cached
       if (response && !response.error) {
         cacheStats.cachedRanges[rangeKey] = new Date();
+      }
+      
+      // Check if we got a partial refresh response
+      if (response && response.partialRefresh) {
+        console.log("ZohoService: Received partial refresh response");
+        lastRawResponse = {
+          ...response,
+          partialRefresh: true
+        };
+        
+        // Process the response based on its format
+        if (response.data && Array.isArray(response.data)) {
+          console.log(`ZohoService: Using ${response.data.length} transactions from partial refresh response`);
+          
+          const normalizedTransactions: Transaction[] = response.data.map(tx => ({
+            id: tx.id,
+            date: tx.date,
+            amount: Number(tx.amount),
+            description: tx.description || '',
+            category: tx.category,
+            source: normalizeSource(tx.source),
+            type: normalizeType(tx.type)
+          }));
+          
+          return normalizedTransactions;
+        }
       }
       
       // Process the response based on its format
