@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
@@ -12,7 +11,7 @@ import InitialBalanceDialog from '@/components/Dashboard/InitialBalanceDialog';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Settings, Bug, Play, RotateCw, Database } from 'lucide-react';
+import { RefreshCw, Settings, Bug, Play, RotateCw, Database, DollarSign } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import WebhookDebug from '@/components/WebhookDebug';
@@ -142,7 +141,7 @@ const Index = () => {
                 </Button>
                 <Button variant="outline" size="sm" asChild>
                   <Link to="/stripe-management">
-                    <BadgeDollarSign className="h-4 w-4 mr-2" />
+                    <DollarSign className="h-4 w-4 mr-2" />
                     Gestión Stripe
                   </Link>
                 </Button>
