@@ -111,8 +111,11 @@ export const useFinanceData = () => {
           let overrideValue = balanceData.stripe_override;
           
           // Si es string y tiene coma como separador decimal, convertirlo
-          if (typeof overrideValue === 'string' && overrideValue.toString().includes(',')) {
-            overrideValue = parseFloat(overrideValue.toString().replace('.', '').replace(',', '.'));
+          if (typeof overrideValue === 'string') {
+            const strValue = String(overrideValue);
+            if (strValue.includes(',')) {
+              overrideValue = parseFloat(strValue.replace('.', '').replace(',', '.'));
+            }
           }
           
           setStripeOverride(overrideValue);
@@ -268,9 +271,14 @@ export const useFinanceData = () => {
         
         // Si hay un valor de Stripe override, asegurarse de que sea numérico
         if (stripeOverride !== null) {
-          // Si es string (puede venir como "4.284,51"), convertirlo a numero
+          // Si es string, convertirlo a numero
           if (typeof stripeOverride === 'string') {
-            stripeIncomeValue = parseFloat(String(stripeOverride).replace('.', '').replace(',', '.'));
+            const strValue = String(stripeOverride);
+            if (strValue.includes(',')) {
+              stripeIncomeValue = parseFloat(strValue.replace('.', '').replace(',', '.'));
+            } else {
+              stripeIncomeValue = Number(stripeOverride);
+            }
           } else {
             stripeIncomeValue = Number(stripeOverride);
           }
