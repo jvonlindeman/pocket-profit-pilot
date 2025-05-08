@@ -133,12 +133,20 @@ const Index = () => {
               <p className="mt-1 text-sm text-gray-500">Análisis de ingresos y gastos para tu agencia</p>
             </div>
             <div className="mt-4 md:mt-0 flex items-center space-x-3">
-              <Button variant="outline" size="sm" asChild>
-                <Link to="/settings">
-                  <Settings className="h-4 w-4 mr-2" />
-                  Configuración
-                </Link>
-              </Button>
+              <div className="flex space-x-2">
+                <Button variant="outline" size="sm" asChild>
+                  <Link to="/settings">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Configuración
+                  </Link>
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <Link to="/stripe-management">
+                    <BadgeDollarSign className="h-4 w-4 mr-2" />
+                    Gestión Stripe
+                  </Link>
+                </Button>
+              </div>
               <div className="w-full md:w-64">
                 <DateRangePicker
                   dateRange={dateRange}

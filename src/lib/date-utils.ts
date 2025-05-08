@@ -41,3 +41,31 @@ export function formatCurrency(amount: number, currency: string = 'USD', locale:
     currency
   }).format(amount);
 }
+
+/**
+ * Generates an ISO string date for the current day
+ * 
+ * @returns ISO string for the current date (YYYY-MM-DD)
+ */
+export function getCurrentISODate(): string {
+  const today = new Date();
+  return format(today, 'yyyy-MM-dd');
+}
+
+/**
+ * Validates and formats a date string to ISO format
+ * 
+ * @param dateString The date string to validate and format
+ * @returns A properly formatted ISO date string (YYYY-MM-DD)
+ */
+export function validateAndFormatDate(dateString: string): string {
+  try {
+    const date = parseISO(dateString);
+    if (isNaN(date.getTime())) {
+      return getCurrentISODate();
+    }
+    return format(date, 'yyyy-MM-dd');
+  } catch (e) {
+    return getCurrentISODate();
+  }
+}
