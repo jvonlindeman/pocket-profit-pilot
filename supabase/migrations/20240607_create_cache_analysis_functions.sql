@@ -1,4 +1,5 @@
 
+
 -- Function to get unique month-years that have transactions
 CREATE OR REPLACE FUNCTION public.get_unique_months_with_transactions()
 RETURNS TABLE (month_year text) 
@@ -22,3 +23,4 @@ AS $$
   FROM cached_transactions
   WHERE date::text LIKE (month_year_param || '-%');
 $$;
+
