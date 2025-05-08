@@ -18,6 +18,13 @@ const StripeTransactionManager: React.FC<StripeTransactionManagerProps> = ({
   currentDate,
   stripeOverride
 }) => {
+  const handleTransactionChange = () => {
+    console.log("Transaction change detected in StripeTransactionManager, refreshing...");
+    if (onTransactionAdded) {
+      onTransactionAdded();
+    }
+  };
+
   return (
     <Card className="mb-6">
       <CardHeader>
@@ -27,6 +34,11 @@ const StripeTransactionManager: React.FC<StripeTransactionManagerProps> = ({
         </CardTitle>
         <CardDescription>
           Añade transacciones de Stripe manualmente o configura un valor fijo mensual
+          {stripeOverride !== null && stripeOverride !== undefined && (
+            <span className="ml-2 text-amber-600 font-medium">
+              (Valor fijo actual: ${stripeOverride.toFixed(2)})
+            </span>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -41,14 +53,14 @@ const StripeTransactionManager: React.FC<StripeTransactionManagerProps> = ({
           </TabsList>
           
           <TabsContent value="manual">
-            <ManualStripeForm onTransactionAdded={onTransactionAdded} />
+            <ManualStripeForm onTransactionAdded={handleTransactionChange} />
           </TabsContent>
           
           <TabsContent value="override">
             <StripeOverrideForm 
               currentDate={currentDate} 
               currentOverride={stripeOverride}
-              onOverrideUpdated={onTransactionAdded} 
+              onOverrideUpdated={handleTransactionChange} 
             />
           </TabsContent>
         </Tabs>

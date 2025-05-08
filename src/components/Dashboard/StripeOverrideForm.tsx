@@ -118,8 +118,12 @@ const StripeOverrideForm: React.FC<StripeOverrideFormProps> = ({
         description: `Se ha ${action} el valor mensual fijo de Stripe a ${valueDisplay}.`,
       });
       
-      // Trigger refresh if callback is provided
+      // Force immediate refresh of UI by updating the form's default value
+      form.reset({ amount: values.amount });
+      
+      // Trigger refresh if callback is provided - ensure this is called to update parent components
       if (onOverrideUpdated) {
+        console.log("Calling onOverrideUpdated callback to refresh data");
         onOverrideUpdated();
       }
       

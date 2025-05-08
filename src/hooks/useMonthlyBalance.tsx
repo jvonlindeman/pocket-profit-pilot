@@ -19,7 +19,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
   // Format the current month-year
   const currentMonthYear = formatDate(currentDate, 'yyyy-MM');
 
-  // Function to check if a balance exists for the current month
+  // Function to check if a balance exists for the current month and load data
   const checkBalanceExists = useCallback(async (): Promise<boolean> => {
     try {
       setLoading(true);
@@ -42,6 +42,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
         setNotes(data.notes);
         setStripeOverride(data.stripe_override);
         setMonthlyBalance(data as MonthlyBalance);
+        console.log("Loaded monthly balance data:", data);
         return true;
       }
       
@@ -113,8 +114,11 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       
       // Update local state
       setBalance(value);
-      setNotes(noteText || null);
-      setStripeOverride(stripeOverrideValue);
+      if (noteText !== undefined) setNotes(noteText);
+      if (stripeOverrideValue !== undefined) {
+        console.log("Updating stripe override value:", stripeOverrideValue);
+        setStripeOverride(stripeOverrideValue);
+      }
       
       // Fetch the updated data to update the monthlyBalance state
       const { data: updatedData } = await supabase

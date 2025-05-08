@@ -1,9 +1,10 @@
 
 import React from 'react';
-import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, BadgeDollarSign, Users, Scale } from 'lucide-react';
+import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, Users, Scale } from 'lucide-react';
 import { FinancialSummary, CategorySummary } from '@/types/financial';
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { DollarSign } from 'lucide-react'; // Use DollarSign icon from lucide-react
 
 interface FinanceSummaryProps {
   summary: FinancialSummary;
@@ -72,12 +73,12 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className="p-2 bg-green-50 rounded-full">
-                    <BadgeDollarSign className="h-4 w-4 text-green-500" />
+                    <DollarSign className="h-4 w-4 text-green-500" />
                   </div>
                 </TooltipTrigger>
                 {isStripeOverridden && (
                   <TooltipContent>
-                    <p>Valor anulado manualmente</p>
+                    <p>Valor anulado manualmente a {formatCurrency(stripeOverride || 0)}</p>
                   </TooltipContent>
                 )}
               </Tooltip>
