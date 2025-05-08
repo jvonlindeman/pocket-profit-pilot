@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, RefreshCw, CalendarIcon, DatabaseIcon } from 'lucide-react';
@@ -54,15 +53,15 @@ const CacheAnalysis: React.FC<CacheAnalysisProps> = ({ onUpdate }) => {
     setError(null);
     
     try {
-      // Get all unique month-years
+      // Get all unique month-years - using proper type parameters for RPC
       const { data: monthsData, error: monthsError } = await supabase
-        .rpc<MonthYearResult[], never>('get_unique_months_with_transactions');
+        .rpc('get_unique_months_with_transactions');
       
       if (monthsError) {
         throw new Error(`Error getting unique months: ${monthsError.message}`);
       }
       
-      if (!monthsData || monthsData.length === 0) {
+      if (!monthsData || !Array.isArray(monthsData) || monthsData.length === 0) {
         setMonths([]);
         setTotalTransactions(0);
         setLoading(false);
@@ -73,12 +72,12 @@ const CacheAnalysis: React.FC<CacheAnalysisProps> = ({ onUpdate }) => {
       const monthsWithStats: MonthStats[] = [];
       let totalCount = 0;
       
-      for (const monthObj of monthsData) {
+      for (const monthObj of monthsData as MonthYearResult[]) {
         const monthYear = monthObj.month_year;
         
-        // Get first and last date for this month
+        // Get first and last date for this month - using proper type parameters
         const { data: dateRangeData, error: dateRangeError } = await supabase
-          .rpc<DateRangeResult[], { month_year_param: string }>('get_month_transaction_range', { month_year_param: monthYear });
+          .rpc('get_month_transaction_range', { month_year_param: monthYear });
           
         if (dateRangeError) {
           console.error(`Error getting date range for ${monthYear}:`, dateRangeError);
@@ -99,8 +98,8 @@ const CacheAnalysis: React.FC<CacheAnalysisProps> = ({ onUpdate }) => {
         const monthCount = count || 0;
         totalCount += monthCount;
         
-        if (dateRangeData && dateRangeData.length > 0) {
-          const stats = dateRangeData[0];
+        if (dateRangeData && Array.isArray(dateRangeData) && dateRangeData.length > 0) {
+          const stats = dateRangeData[0] as DateRangeResult;
           
           monthsWithStats.push({
             monthYear,
