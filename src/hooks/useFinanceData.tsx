@@ -238,7 +238,7 @@ export const useFinanceData = () => {
     } finally {
       setLoading(false);
     }
-  }, [dateRange, loadStripeAndBalanceData, toast]);
+  }, [dateRange, loadStripeAndBalanceData, stripeIncome, toast]);
 
   // Efecto para actualizar datos cuando cambia el rango de fechas
   useEffect(() => {
