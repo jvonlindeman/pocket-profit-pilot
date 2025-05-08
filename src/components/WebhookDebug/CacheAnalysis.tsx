@@ -56,13 +56,13 @@ const CacheAnalysis: React.FC<CacheAnalysisProps> = ({ onUpdate }) => {
     try {
       // Get all unique month-years
       const { data: monthsData, error: monthsError } = await supabase
-        .rpc('get_unique_months_with_transactions');
+        .rpc<MonthYearResult[]>('get_unique_months_with_transactions');
       
       if (monthsError) {
         throw new Error(`Error getting unique months: ${monthsError.message}`);
       }
       
-      if (!monthsData || !Array.isArray(monthsData) || monthsData.length === 0) {
+      if (!monthsData || monthsData.length === 0) {
         setMonths([]);
         setTotalTransactions(0);
         setLoading(false);
@@ -78,7 +78,7 @@ const CacheAnalysis: React.FC<CacheAnalysisProps> = ({ onUpdate }) => {
         
         // Get first and last date for this month
         const { data: dateRangeData, error: dateRangeError } = await supabase
-          .rpc('get_month_transaction_range', { month_year_param: monthYear });
+          .rpc<DateRangeResult[]>('get_month_transaction_range', { month_year_param: monthYear });
           
         if (dateRangeError) {
           console.error(`Error getting date range for ${monthYear}:`, dateRangeError);
@@ -99,7 +99,7 @@ const CacheAnalysis: React.FC<CacheAnalysisProps> = ({ onUpdate }) => {
         const monthCount = count || 0;
         totalCount += monthCount;
         
-        if (dateRangeData && Array.isArray(dateRangeData) && dateRangeData.length > 0) {
+        if (dateRangeData && dateRangeData.length > 0) {
           const stats = dateRangeData[0];
           
           monthsWithStats.push({
