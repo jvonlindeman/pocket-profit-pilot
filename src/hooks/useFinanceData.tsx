@@ -1,10 +1,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { FinancialData, DateRange } from '@/types/financial';
+import { DateRange } from '@/types/financial';
 import { useDateRange } from '@/hooks/useDateRange';
 import { useStripeIncome } from '@/hooks/useStripeIncome';
-import { useFinanceDataFetcher, DEFAULT_FINANCIAL_DATA } from '@/hooks/useFinanceDataFetcher';
+import { useFinanceDataFetcher } from '@/hooks/useFinanceDataFetcher';
 
 export const useFinanceData = () => {
   // Use our custom hooks for specific functionality
