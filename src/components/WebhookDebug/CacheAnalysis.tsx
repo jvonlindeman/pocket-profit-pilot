@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, RefreshCw, CalendarIcon, DatabaseIcon } from 'lucide-react';
@@ -56,7 +55,10 @@ const CacheAnalysis: React.FC<CacheAnalysisProps> = ({ onUpdate }) => {
     try {
       // Get all unique month-years with type assertion
       const { data: monthsData, error: monthsError } = await supabase
-        .rpc('get_unique_months_with_transactions') as any;
+        .rpc('get_unique_months_with_transactions') as { 
+          data: MonthYearResult[] | null; 
+          error: any;
+        };
       
       if (monthsError) {
         throw new Error(`Error getting unique months: ${monthsError.message}`);
@@ -80,7 +82,10 @@ const CacheAnalysis: React.FC<CacheAnalysisProps> = ({ onUpdate }) => {
         const { data: dateRangeData, error: dateRangeError } = await supabase
           .rpc('get_month_transaction_range', { 
             month_year_param: monthYear 
-          }) as any;
+          }) as {
+            data: DateRangeResult[] | null;
+            error: any;
+          };
           
         if (dateRangeError) {
           console.error(`Error getting date range for ${monthYear}:`, dateRangeError);
@@ -91,7 +96,7 @@ const CacheAnalysis: React.FC<CacheAnalysisProps> = ({ onUpdate }) => {
         const { count, error: countError } = await supabase
           .from('cached_transactions')
           .select('*', { count: 'exact', head: true })
-          .like('date', `${monthYear}-%`);
+          .ilike('date', `${monthYear}-%`);
           
         if (countError) {
           console.error(`Error getting count for ${monthYear}:`, countError);
