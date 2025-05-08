@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { DateRange, MonthlyBalance, StripeIncomeData } from '@/types/financial';
@@ -17,8 +17,11 @@ export const useStripeIncome = () => {
     isDateInRange: (date: string) => boolean
   ): Promise<StripeIncomeData> => {
     try {
-      // Format month string for database query
+      console.log('Loading Stripe income data for range:', dateRange);
+      
+      // Format month string for database query (YYYY-MM)
       const monthString = formatISO(dateRange.startDate, { representation: 'date' }).substring(0, 7);
+      console.log('Using month string for query:', monthString);
       
       // Load monthly balance data to check for override
       const { data: balanceData, error: balanceError } = await supabase
@@ -27,8 +30,12 @@ export const useStripeIncome = () => {
         .eq('month_year', monthString)
         .single();
 
-      if (balanceError && balanceError.code !== 'PGRST116') {
-        console.error("Error loading monthly balance:", balanceError);
+      if (balanceError) {
+        if (balanceError.code !== 'PGRST116') { // Not found error
+          console.error("Error loading monthly balance:", balanceError);
+        } else {
+          console.log("No monthly balance found for month:", monthString);
+        }
       }
 
       // Check if there's a stripe override value
@@ -48,6 +55,7 @@ export const useStripeIncome = () => {
       } else {
         // Reset the override value
         setStripeOverride(null);
+        console.log("No Stripe override found, will calculate from transactions");
       }
 
       // If no override, calculate from transactions
@@ -62,9 +70,12 @@ export const useStripeIncome = () => {
         return { amount: 0, isOverridden: false, override: null };
       }
 
-      if (stripeTransactions) {
+      if (stripeTransactions && stripeTransactions.length > 0) {
+        console.log(`Found ${stripeTransactions.length} Stripe transactions before filtering by date range`);
+        
         // Filter transactions within date range
         const filteredTransactions = stripeTransactions.filter(tx => isDateInRange(tx.date));
+        console.log(`${filteredTransactions.length} Stripe transactions are within date range`);
         
         // Calculate total from transactions
         const total = filteredTransactions.reduce((sum, tx) => {
@@ -80,9 +91,11 @@ export const useStripeIncome = () => {
           isOverridden: false,
           override: null
         };
+      } else {
+        console.log("No Stripe transactions found");
+        setStripeIncome(0);
+        return { amount: 0, isOverridden: false, override: null };
       }
-
-      return { amount: 0, isOverridden: false, override: null };
     } catch (err) {
       console.error("Error in loadStripeIncomeData:", err);
       toast({

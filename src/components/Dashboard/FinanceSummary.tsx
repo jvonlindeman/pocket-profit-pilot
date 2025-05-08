@@ -1,10 +1,11 @@
+
 import React from 'react';
 import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, Users, Scale } from 'lucide-react';
 import { FinancialSummary, CategorySummary } from '@/types/financial';
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DollarSign } from 'lucide-react';
-import { formatCurrency, formatPercentage } from '@/utils/financialUtils';
+import { formatCurrency, formatPercentage, safeParseNumber } from '@/utils/financialUtils';
 
 interface FinanceSummaryProps {
   summary: FinancialSummary;
@@ -21,8 +22,34 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
   regularIncome = 0,
   stripeOverride = null
 }) => {
+  // Ensure all values are numbers
+  const totalIncome = safeParseNumber(summary.totalIncome);
+  const totalExpense = safeParseNumber(summary.totalExpense);
+  const collaboratorExpense = safeParseNumber(summary.collaboratorExpense || 0);
+  const otherExpense = safeParseNumber(summary.otherExpense || 0);
+  const profit = safeParseNumber(summary.profit);
+  const profitMargin = safeParseNumber(summary.profitMargin);
+  const startingBalance = summary.startingBalance !== undefined ? safeParseNumber(summary.startingBalance) : undefined;
+
   // Check if stripe income is using an override
   const isStripeOverridden = stripeOverride !== null;
+  
+  // Ensure all displayed values are numbers
+  const safeStripeIncome = safeParseNumber(stripeIncome);
+  const safeRegularIncome = safeParseNumber(regularIncome);
+
+  console.log('FinanceSummary rendering with values:', {
+    summary,
+    totalIncome, 
+    totalExpense,
+    collaboratorExpense,
+    otherExpense,
+    profit,
+    profitMargin,
+    stripeIncome: safeStripeIncome,
+    regularIncome: safeRegularIncome,
+    stripeOverride
+  });
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in">
@@ -36,7 +63,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
             </div>
           </div>
           <div className="text-2xl font-bold text-blue-500 animate-value">
-            {summary.startingBalance !== undefined ? formatCurrency(summary.startingBalance) : "No establecido"}
+            {startingBalance !== undefined ? formatCurrency(startingBalance) : "No establecido"}
           </div>
         </CardContent>
       </Card>
@@ -68,7 +95,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
               </Tooltip>
             </div>
             <div className="text-2xl font-bold text-green-500 animate-value">
-              {formatCurrency(stripeIncome)}
+              {formatCurrency(safeStripeIncome)}
             </div>
           </CardContent>
         </Card>
@@ -84,7 +111,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
             </div>
           </div>
           <div className="text-2xl font-bold text-green-500 animate-value">
-            {formatCurrency(regularIncome)}
+            {formatCurrency(safeRegularIncome)}
           </div>
         </CardContent>
       </Card>
@@ -99,7 +126,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
             </div>
           </div>
           <div className="text-2xl font-bold text-green-500 animate-value">
-            {formatCurrency(summary.totalIncome)}
+            {formatCurrency(totalIncome)}
           </div>
         </CardContent>
       </Card>
@@ -114,7 +141,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
             </div>
           </div>
           <div className="text-2xl font-bold text-amber-500 animate-value">
-            {formatCurrency(summary.collaboratorExpense || 0)}
+            {formatCurrency(collaboratorExpense)}
           </div>
         </CardContent>
       </Card>
@@ -129,7 +156,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
             </div>
           </div>
           <div className="text-2xl font-bold text-red-500 animate-value">
-            {formatCurrency(summary.otherExpense || 0)}
+            {formatCurrency(otherExpense)}
           </div>
         </CardContent>
       </Card>
@@ -144,7 +171,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
             </div>
           </div>
           <div className="text-2xl font-bold text-red-500 animate-value">
-            {formatCurrency(summary.totalExpense)}
+            {formatCurrency(totalExpense)}
           </div>
         </CardContent>
       </Card>
@@ -160,10 +187,10 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
           </div>
           <div className="flex items-end justify-between">
             <div className="text-2xl font-bold text-blue-500 animate-value">
-              {formatCurrency(summary.profit)}
+              {formatCurrency(profit)}
             </div>
-            <div className={`text-sm font-medium ml-2 ${summary.profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              Margen: {formatPercentage(summary.profitMargin)}
+            <div className={`text-sm font-medium ml-2 ${profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              Margen: {formatPercentage(profitMargin)}
             </div>
           </div>
         </CardContent>

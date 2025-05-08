@@ -1,13 +1,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { FinancialData, Transaction, MonthlyBalance, DateRange } from '@/types/financial';
-import { CacheStats } from '@/types/cache';
+import { FinancialData, DateRange } from '@/types/financial';
 import { useDateRange } from '@/hooks/useDateRange';
 import { useStripeIncome } from '@/hooks/useStripeIncome';
 import { useFinanceDataFetcher, DEFAULT_FINANCIAL_DATA } from '@/hooks/useFinanceDataFetcher';
-import { safeParseNumber } from '@/utils/financialUtils';
-import ZohoService from '@/services/zohoService';
 
 export const useFinanceData = () => {
   // Use our custom hooks for specific functionality
@@ -35,8 +32,11 @@ export const useFinanceData = () => {
   // Main function to fetch and process financial data
   const refreshData = useCallback(async (forceRefresh: boolean = false) => {
     try {
+      console.log('Refreshing financial data with forceRefresh =', forceRefresh);
+      
       // First load Stripe income data
       const stripeData = await loadStripeIncomeData(dateRange, isDateInRange);
+      console.log('Loaded Stripe income data:', stripeData);
       
       // Then fetch the main financial data including Stripe
       await fetchFinancialData(dateRange, forceRefresh, {
@@ -61,9 +61,14 @@ export const useFinanceData = () => {
   // Update data when date range changes
   useEffect(() => {
     if (dataInitialized) {
+      console.log('Date range changed, refreshing data');
       refreshData(false);
     }
   }, [dateRange, dataInitialized, refreshData]);
+
+  useEffect(() => {
+    console.log('Finance data component mounted or data initialized changed', { dataInitialized });
+  }, [dataInitialized]);
 
   return {
     // Date range management

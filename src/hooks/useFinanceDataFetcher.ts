@@ -1,10 +1,12 @@
 
 import { useState, useCallback } from 'react';
-import { DateRange, FinancialData } from '@/types/financial';
+import { DateRange, FinancialData, CacheStats } from '@/types/financial';
 import { CacheStatus } from '@/types/cache';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import ZohoService from '@/services/zohoService';
+import { safeParseNumber } from '@/utils/financialUtils';
+import { formatDateForAPI } from '@/lib/date-utils';
 
 // Default financial data structure
 export const DEFAULT_FINANCIAL_DATA: FinancialData = {
@@ -68,10 +70,15 @@ export const useFinanceDataFetcher = () => {
       const startDate = dateRange.startDate;
       const endDate = dateRange.endDate;
       
+      const formattedStartDate = formatDateForAPI(startDate);
+      const formattedEndDate = formatDateForAPI(endDate);
+      
+      console.log('Formatted dates for API call:', formattedStartDate, formattedEndDate);
+      
       // Prepare params for API call
       const params = new URLSearchParams({
-        start_date: formatDateForAPI(startDate),
-        end_date: formatDateForAPI(endDate),
+        start_date: formattedStartDate,
+        end_date: formattedEndDate,
         force_refresh: forceRefresh ? 'true' : 'false'
       });
       
@@ -81,17 +88,22 @@ export const useFinanceDataFetcher = () => {
       
       try {
         // Try using Supabase function invoke
-        console.log(`Invoking zoho-transactions function with params: ${params.toString()}`);
+        console.log(`Invoking zoho-transactions function with params:`, {
+          startDate: formattedStartDate,
+          endDate: formattedEndDate,
+          forceRefresh: forceRefresh
+        });
+        
         const result = await supabase.functions.invoke("zoho-transactions", {
           body: {
-            startDate: formatDateForAPI(startDate),
-            endDate: formatDateForAPI(endDate),
+            startDate: formattedStartDate,
+            endDate: formattedEndDate,
             forceRefresh: forceRefresh
           }
         });
         
         if (result.error) {
-          throw new Error(`Error al invocar la función zoho-transactions: ${result.error.message || result.error}`);
+          throw new Error(`Error al invocar la función zoho-transactions: ${result.error.message || JSON.stringify(result.error)}`);
         }
         
         data = result.data;
@@ -101,7 +113,7 @@ export const useFinanceDataFetcher = () => {
         }
         
         console.log("Data received from zoho-transactions function:", data);
-      } catch (invokeError) {
+      } catch (invokeError: any) {
         console.error("Error calling zoho-transactions function:", invokeError);
         apiError = invokeError;
         
@@ -150,18 +162,20 @@ export const useFinanceDataFetcher = () => {
       // Process the financial data
       if (data.financial_data) {
         // Store regular income from Zoho
-        const regularIncomeValue = data.financial_data.summary.totalIncome;
+        const regularIncomeValue = safeParseNumber(data.financial_data.summary.totalIncome || 0);
         setRegularIncome(regularIncomeValue);
+        console.log('Regular income from Zoho:', regularIncomeValue);
         
         // Calculate total income including Stripe
-        const totalIncome = regularIncomeValue + stripeIncomeData.amount;
-        const totalExpense = data.financial_data.summary.totalExpense;
+        const stripeAmount = safeParseNumber(stripeIncomeData.amount || 0);
+        const totalIncome = regularIncomeValue + stripeAmount;
+        const totalExpense = safeParseNumber(data.financial_data.summary.totalExpense || 0);
         const profit = totalIncome - totalExpense;
         const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0;
         
         console.log("Financial summary calculation:", {
           regularIncome: regularIncomeValue,
-          stripeIncome: stripeIncomeData.amount,
+          stripeIncome: stripeAmount,
           totalIncome,
           totalExpense,
           profit,
@@ -169,28 +183,38 @@ export const useFinanceDataFetcher = () => {
         });
         
         // Update summary with calculated values
-        data.financial_data.summary.totalIncome = totalIncome;
-        data.financial_data.summary.profit = profit;
-        data.financial_data.summary.profitMargin = profitMargin;
+        const updatedData = {
+          ...data.financial_data,
+          summary: {
+            ...data.financial_data.summary,
+            totalIncome: totalIncome,
+            profit: profit,
+            profitMargin: profitMargin,
+          }
+        };
         
         // Update state with processed data
-        setFinancialData(data.financial_data);
+        setFinancialData(updatedData);
         
         // Extract collaborator expenses if available
-        if (data.collaborator_expenses) {
+        if (data.collaborator_expenses && Array.isArray(data.collaborator_expenses)) {
           setCollaboratorExpenses(data.collaborator_expenses);
+          console.log('Collaborator expenses:', data.collaborator_expenses);
         }
 
         toast({
           title: "Datos financieros actualizados",
           description: `Ingresos: $${totalIncome.toFixed(2)}, Gastos: $${totalExpense.toFixed(2)}`,
         });
+        
+        // Mark data as initialized
+        setDataInitialized(true);
+        return updatedData;
+      } else {
+        console.warn('No financial_data found in the response:', data);
+        return DEFAULT_FINANCIAL_DATA;
       }
-      
-      // Mark data as initialized
-      setDataInitialized(true);
-      return data.financial_data || DEFAULT_FINANCIAL_DATA;
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching financial data:", err);
       setError(err instanceof Error ? err.message : "Error desconocido al obtener datos");
       toast({
@@ -203,11 +227,6 @@ export const useFinanceDataFetcher = () => {
       setLoading(false);
     }
   }, [toast]);
-
-  // Helper function to format date for API
-  const formatDateForAPI = (date: Date): string => {
-    return date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
-  };
 
   // Clear cache and force refresh data
   const clearCacheAndRefresh = useCallback(async (dateRange: DateRange) => {
@@ -228,7 +247,7 @@ export const useFinanceDataFetcher = () => {
       }
       
       return true;
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error clearing cache:", err);
       setError(err instanceof Error ? err.message : "Error desconocido al limpiar el caché");
       toast({

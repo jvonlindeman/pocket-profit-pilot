@@ -72,3 +72,46 @@ export const formatPercentage = (value: number, digits: number = 1): string => {
 export const isValidNumber = (value: unknown): value is number => {
   return typeof value === 'number' && !isNaN(value) && isFinite(value);
 };
+
+/**
+ * Calculate percentage safely
+ * @param part The part value
+ * @param total The total value
+ * @returns The percentage as a number between 0-100
+ */
+export const calculatePercentage = (part: number, total: number): number => {
+  if (!total) return 0;
+  return (part / total) * 100;
+};
+
+/**
+ * Process raw financial data from API into standardized format
+ * @param rawData Raw financial data from API
+ * @returns Processed financial data
+ */
+export const processFinancialData = (rawData: any): any => {
+  if (!rawData) return null;
+  
+  console.log('Processing financial data:', rawData);
+  
+  // Extract and normalize transactions
+  let transactions = [];
+  if (rawData.cached_transactions && Array.isArray(rawData.cached_transactions)) {
+    transactions = rawData.cached_transactions.map((tx: any) => ({
+      id: tx.id || '',
+      date: tx.date || '',
+      amount: safeParseNumber(tx.amount),
+      description: tx.description || '',
+      category: tx.category || '',
+      source: tx.source === 'Stripe' ? 'Stripe' : 'Zoho',
+      type: tx.type === 'income' ? 'income' : 'expense'
+    }));
+  }
+  
+  console.log(`Processed ${transactions.length} transactions`);
+  
+  return {
+    transactions,
+    // Additional processing as needed
+  };
+};

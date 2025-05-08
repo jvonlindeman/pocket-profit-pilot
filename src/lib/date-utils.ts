@@ -32,3 +32,29 @@ export const formatCurrency = formatCurrencyUtil;
 export const getYearMonth = (date: Date): string => {
   return format(date, 'yyyy-MM');
 };
+
+/**
+ * Format a date for API requests (YYYY-MM-DD)
+ * @param date Date object
+ * @returns Formatted date string
+ */
+export const formatDateForAPI = (date: Date): string => {
+  return format(date, 'yyyy-MM-dd');
+};
+
+/**
+ * Check if a date string is within a date range
+ * @param dateStr Date string to check
+ * @param startDate Range start date
+ * @param endDate Range end date
+ * @returns Boolean indicating if date is in range
+ */
+export const isDateInRange = (dateStr: string, startDate: Date, endDate: Date): boolean => {
+  try {
+    const date = parseISO(dateStr);
+    return date >= startDate && date <= endDate;
+  } catch (error) {
+    console.error('Error checking date range:', error);
+    return false;
+  }
+};
