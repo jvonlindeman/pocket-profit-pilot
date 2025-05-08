@@ -147,7 +147,7 @@ export const useFinanceData = () => {
           const total = filteredTransactions.reduce((sum, tx) => {
             // Si es string, asegurar formato adecuado
             const amount = typeof tx.amount === 'string' 
-              ? parseFloat(tx.amount.replace(',', '.'))
+              ? parseFloat(String(tx.amount).replace(',', '.'))
               : Number(tx.amount);
             return sum + amount;
           }, 0);
