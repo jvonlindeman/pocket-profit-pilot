@@ -4,6 +4,7 @@ import { formatISO, subMonths, startOfMonth, endOfMonth, isAfter, isBefore, pars
 import { useToast } from '@/hooks/use-toast';
 import { DateRange, FinancialData, Transaction, MonthlyBalance } from '@/types/financial';
 import { supabase } from '@/integrations/supabase/client';
+import ZohoService from '@/services/zohoService';
 
 // Definir estructura de datos para estadísticas de caché
 interface CacheStats {
