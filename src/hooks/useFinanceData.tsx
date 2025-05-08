@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import ZohoService from '@/services/zohoService';
 import StripeService from '@/services/stripeService';
@@ -47,6 +46,7 @@ export const useFinanceData = () => {
   const [usingCachedData, setUsingCachedData] = useState<boolean>(false);
   const [partialRefresh, setPartialRefresh] = useState<boolean>(false);
   const [cacheStats, setCacheStats] = useState<any>(null);
+  const [stripeOverride, setStripeOverride] = useState<number | null>(null);
   
   // Estado del rango de fechas - configurado para mostrar desde el último día del mes anterior hasta el último día del mes actual
   const [dateRange, setDateRange] = useState(() => {
@@ -139,9 +139,11 @@ export const useFinanceData = () => {
       if (data) {
         console.log("Fetched monthly balance:", data);
         setStartingBalance(data.balance);
+        setStripeOverride(data.stripe_override);
       } else {
         console.log("No monthly balance found for:", monthYear);
         setStartingBalance(undefined);
+        setStripeOverride(null);
       }
     } catch (err) {
       console.error("Error in fetchMonthlyBalance:", err);
@@ -203,11 +205,17 @@ export const useFinanceData = () => {
       }
     });
     
-    setStripeIncome(stripeAmount);
+    // If there's a stripe override for the current month, use it instead
+    const effectiveStripeAmount = stripeOverride !== null ? stripeOverride : stripeAmount;
+    
+    setStripeIncome(effectiveStripeAmount);
     setRegularIncome(regularAmount);
     
-    return { stripeAmount, regularAmount };
-  }, []);
+    return { 
+      stripeAmount: effectiveStripeAmount, 
+      regularAmount 
+    };
+  }, [stripeOverride]);
 
   // Función para procesar datos de colaboradores
   const processCollaboratorData = useCallback((rawResponse: any) => {
@@ -412,6 +420,7 @@ export const useFinanceData = () => {
     updateStartingBalance,
     usingCachedData,
     partialRefresh,
-    cacheStats
+    cacheStats,
+    stripeOverride
   };
 };

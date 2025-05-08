@@ -3,19 +3,22 @@ import React from 'react';
 import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, BadgeDollarSign, Users, Scale } from 'lucide-react';
 import { FinancialSummary, CategorySummary } from '@/types/financial';
 import { Card, CardContent } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface FinanceSummaryProps {
   summary: FinancialSummary;
   expenseCategories?: CategorySummary[];
   stripeIncome?: number; // Nuevo parámetro para ingresos de Stripe
   regularIncome?: number; // Nuevo parámetro para ingresos regulares de Zoho
+  stripeOverride?: number | null; // Nuevo parámetro para indicar si se está usando un override
 }
 
 const FinanceSummary: React.FC<FinanceSummaryProps> = ({ 
   summary, 
   expenseCategories = [],
   stripeIncome = 0,
-  regularIncome = 0
+  regularIncome = 0,
+  stripeOverride = null
 }) => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -32,6 +35,9 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
       maximumFractionDigits: 1
     }).format(percentage / 100);
   };
+
+  // Check if stripe income is using an override
+  const isStripeOverridden = stripeOverride !== null;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in">
@@ -51,19 +57,37 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
       </Card>
 
       {/* Ingresos Stripe */}
-      <Card className="finance-card">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Ingresos Stripe</h3>
-            <div className="p-2 bg-green-50 rounded-full">
-              <BadgeDollarSign className="h-4 w-4 text-green-500" />
+      <TooltipProvider>
+        <Card className={`finance-card ${isStripeOverridden ? 'border-amber-300 shadow-amber-100' : ''}`}>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-500">
+                Ingresos Stripe
+                {isStripeOverridden && (
+                  <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-600">
+                    Anulado
+                  </span>
+                )}
+              </h3>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="p-2 bg-green-50 rounded-full">
+                    <BadgeDollarSign className="h-4 w-4 text-green-500" />
+                  </div>
+                </TooltipTrigger>
+                {isStripeOverridden && (
+                  <TooltipContent>
+                    <p>Valor anulado manualmente</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
             </div>
-          </div>
-          <div className="text-2xl font-bold text-green-500 animate-value">
-            {formatCurrency(stripeIncome)}
-          </div>
-        </CardContent>
-      </Card>
+            <div className="text-2xl font-bold text-green-500 animate-value">
+              {formatCurrency(stripeIncome)}
+            </div>
+          </CardContent>
+        </Card>
+      </TooltipProvider>
 
       {/* Ingresos Zoho */}
       <Card className="finance-card">

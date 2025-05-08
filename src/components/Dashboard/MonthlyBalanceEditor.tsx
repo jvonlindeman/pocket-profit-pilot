@@ -21,6 +21,10 @@ interface MonthlyBalanceEditorProps {
 const formSchema = z.object({
   balance: z.coerce.number().min(0, "El saldo debe ser mayor o igual a 0"),
   notes: z.string().optional(),
+  stripeOverride: z.preprocess(
+    (val) => (val === "" ? null : Number(val)),
+    z.number().min(0, "El valor debe ser mayor o igual a 0").nullable()
+  )
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -35,6 +39,7 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
     defaultValues: {
       balance: 0,
       notes: '',
+      stripeOverride: null
     },
   });
 
@@ -44,6 +49,7 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
     error,
     balance,
     notes,
+    stripeOverride,
     saveBalance,
     monthlyBalance,
   } = useMonthlyBalance({ currentDate });
@@ -54,6 +60,7 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
       form.reset({
         balance: balance,
         notes: notes || '',
+        stripeOverride: stripeOverride
       });
       
       // Notify parent component if needed
@@ -61,7 +68,7 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
         onBalanceChange(balance);
       }
     }
-  }, [balance, notes, form, onBalanceChange]);
+  }, [balance, notes, stripeOverride, form, onBalanceChange]);
 
   // Format month name in Spanish
   const formattedMonth = format(currentDate, 'MMMM yyyy', { locale: es });
@@ -69,7 +76,7 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
 
   // Handle form submission
   const onSubmit = (data: FormValues) => {
-    saveBalance(data.balance, data.notes);
+    saveBalance(data.balance, data.notes, data.stripeOverride);
     
     // Notify parent component if needed
     if (onBalanceChange) {
@@ -102,6 +109,33 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
                   </FormControl>
                   <FormDescription>
                     Saldo al inicio del mes antes de cualquier transacción
+                  </FormDescription>
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="stripeOverride"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Anular Ingreso de Stripe ($)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      step="0.01" 
+                      placeholder="Dejar en blanco para usar datos automáticos" 
+                      {...field}
+                      value={field.value === null ? '' : field.value}
+                      onChange={(e) => {
+                        const value = e.target.value === '' ? null : parseFloat(e.target.value);
+                        field.onChange(value);
+                      }}
+                      disabled={loading}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Opcional: Anula el valor automático de Stripe para este mes
                   </FormDescription>
                 </FormItem>
               )}

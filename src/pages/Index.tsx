@@ -36,7 +36,8 @@ const Index = () => {
     collaboratorExpenses,
     usingCachedData,
     partialRefresh,
-    cacheStats
+    cacheStats,
+    stripeOverride
   } = useFinanceData();
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
@@ -259,6 +260,7 @@ const Index = () => {
               expenseCategories={financialData.expenseByCategory}
               stripeIncome={stripeIncome}
               regularIncome={regularIncome}
+              stripeOverride={stripeOverride}
             />
 
             {/* Gráficos */}

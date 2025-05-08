@@ -13,6 +13,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
   const [error, setError] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   const [notes, setNotes] = useState<string | null>(null);
+  const [stripeOverride, setStripeOverride] = useState<number | null>(null);
   const [monthlyBalance, setMonthlyBalance] = useState<MonthlyBalance | null>(null);
   
   // Format the current month-year
@@ -39,6 +40,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       if (data) {
         setBalance(data.balance);
         setNotes(data.notes);
+        setStripeOverride(data.stripe_override);
         setMonthlyBalance(data as MonthlyBalance);
         return true;
       }
@@ -52,8 +54,12 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     }
   }, [currentDate]);
 
-  // Function to save or update the balance
-  const saveBalance = useCallback(async (value: number, noteText?: string): Promise<boolean> => {
+  // Function to save or update the balance and stripe override
+  const saveBalance = useCallback(async (
+    value: number, 
+    noteText?: string,
+    stripeOverrideValue?: number | null
+  ): Promise<boolean> => {
     try {
       setLoading(true);
       setError(null);
@@ -73,6 +79,13 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
         return false;
       }
       
+      // Prepare update data with potential stripe override
+      const updateData = {
+        balance: value,
+        notes: noteText ?? existingData?.notes ?? null,
+        stripe_override: typeof stripeOverrideValue !== 'undefined' ? stripeOverrideValue : existingData?.stripe_override
+      };
+      
       // Perform update or insert
       let result;
       
@@ -80,10 +93,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
         // Update existing record
         result = await supabase
           .from('monthly_balances')
-          .update({
-            balance: value,
-            notes: noteText ?? existingData.notes,
-          })
+          .update(updateData)
           .eq('month_year', monthYear);
       } else {
         // Create new record
@@ -91,8 +101,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
           .from('monthly_balances')
           .insert({
             month_year: monthYear,
-            balance: value,
-            notes: noteText || null,
+            ...updateData
           });
       }
       
@@ -105,6 +114,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       // Update local state
       setBalance(value);
       setNotes(noteText || null);
+      setStripeOverride(stripeOverrideValue);
       
       // Fetch the updated data to update the monthlyBalance state
       const { data: updatedData } = await supabase
@@ -140,6 +150,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     error,
     balance,
     notes,
+    stripeOverride,
     checkBalanceExists,
     saveBalance,
     updateMonthlyBalance, // Alias for saveBalance for backward compatibility
