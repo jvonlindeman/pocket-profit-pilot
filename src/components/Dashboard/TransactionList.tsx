@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Transaction } from '@/types/financial';
 import {
@@ -14,6 +13,7 @@ import ExpenseTransactions from './Transactions/ExpenseTransactions';
 import CollaboratorTransactions from './Transactions/CollaboratorTransactions';
 import CacheStats from './CacheStats';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatCurrency } from '@/lib/date-utils';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -131,14 +131,6 @@ const TransactionList: React.FC<TransactionListProps> = ({
       </Card>
     </>
   );
-};
-
-// Format currency helper function
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD'
-  }).format(amount);
 };
 
 export default TransactionList;

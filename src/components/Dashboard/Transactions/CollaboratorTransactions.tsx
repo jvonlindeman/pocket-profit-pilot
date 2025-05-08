@@ -11,38 +11,13 @@ import {
 } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { formatDate, formatCurrency } from '@/lib/date-utils';
 
 interface CollaboratorTransactionsProps {
   transactions: Transaction[];
 }
 
 const CollaboratorTransactions: React.FC<CollaboratorTransactionsProps> = ({ transactions }) => {
-  // Format date
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      
-      // Check if the date is valid
-      if (isNaN(date.getTime())) {
-        console.error(`Invalid date string: ${dateString}`);
-        return 'Invalid date';
-      }
-      
-      return new Intl.DateTimeFormat('es-ES').format(date);
-    } catch (error) {
-      console.error(`Error formatting date: ${dateString}`, error);
-      return 'Invalid date';
-    }
-  };
-
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
-  };
-  
   // Extract collaborator name from description
   const getCollaboratorName = (description: string): string => {
     const match = description.match(/: (.+)$/);

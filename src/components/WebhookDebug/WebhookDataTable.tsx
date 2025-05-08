@@ -1,5 +1,5 @@
-
 import React from 'react';
+import { formatCurrency } from '@/lib/date-utils';
 
 interface WebhookDataTableProps {
   rawData: any;
@@ -76,18 +76,6 @@ const WebhookDataTable: React.FC<WebhookDataTableProps> = ({ rawData }) => {
     ) || 'default';
     
     return colors[key];
-  };
-
-  // Función para formatear moneda
-  const formatCurrency = (amount: number | string) => {
-    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-    if (isNaN(numAmount)) return amount;
-    
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2
-    }).format(numAmount);
   };
 
   if (!rawData) return null;

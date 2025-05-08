@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { formatDate, formatCurrency } from '@/lib/date-utils';
 
 interface ExpenseTransactionsProps {
   transactions: Transaction[];
@@ -33,32 +34,6 @@ const ExpenseTransactions: React.FC<ExpenseTransactionsProps> = ({ transactions 
     ? transactions 
     : transactions.filter(tx => tx.category === categoryFilter);
   
-  // Format date
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      
-      // Check if the date is valid
-      if (isNaN(date.getTime())) {
-        console.error(`Invalid date string: ${dateString}`);
-        return 'Invalid date';
-      }
-      
-      return new Intl.DateTimeFormat('es-ES').format(date);
-    } catch (error) {
-      console.error(`Error formatting date: ${dateString}`, error);
-      return 'Invalid date';
-    }
-  };
-
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
-  };
-
   // Calculate total expenses
   const totalExpenses = filteredTransactions.reduce((sum, tx) => sum + tx.amount, 0);
 
