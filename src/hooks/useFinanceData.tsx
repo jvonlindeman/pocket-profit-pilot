@@ -133,7 +133,7 @@ export const useFinanceData = () => {
           // Filtrar las transacciones que están en el rango de fechas actual
           const filteredTransactions = stripeTransactions.filter(tx => isDateInRange(tx.date));
           // Calcular la suma de los importes
-          const total = filteredTransactions.reduce((sum, tx) => sum + parseFloat(tx.amount), 0);
+          const total = filteredTransactions.reduce((sum, tx) => sum + parseFloat(tx.amount.toString()), 0);
           setStripeIncome(total);
           console.log("Calculated Stripe income from transactions:", total);
         }
