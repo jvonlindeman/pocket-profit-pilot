@@ -54,9 +54,9 @@ const CacheAnalysis: React.FC<CacheAnalysisProps> = ({ onUpdate }) => {
     setError(null);
     
     try {
-      // First get all unique month-years - properly specify the generic type parameter
+      // Get all unique month-years
       const { data: monthsData, error: monthsError } = await supabase
-        .rpc('get_unique_months_with_transactions');
+        .rpc<MonthYearResult>('get_unique_months_with_transactions');
       
       if (monthsError) {
         throw new Error(`Error getting unique months: ${monthsError.message}`);
@@ -76,9 +76,9 @@ const CacheAnalysis: React.FC<CacheAnalysisProps> = ({ onUpdate }) => {
       for (const monthObj of monthsData) {
         const monthYear = monthObj.month_year;
         
-        // Get first and last date for this month - properly specify the generic type parameter
+        // Get first and last date for this month
         const { data: dateRangeData, error: dateRangeError } = await supabase
-          .rpc('get_month_transaction_range', { month_year_param: monthYear });
+          .rpc<DateRangeResult>('get_month_transaction_range', { month_year_param: monthYear });
           
         if (dateRangeError) {
           console.error(`Error getting date range for ${monthYear}:`, dateRangeError);
