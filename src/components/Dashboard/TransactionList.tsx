@@ -13,7 +13,7 @@ import ExpenseTransactions from './Transactions/ExpenseTransactions';
 import CollaboratorTransactions from './Transactions/CollaboratorTransactions';
 import CacheStats from './CacheStats';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatCurrency } from '@/lib/date-utils';
+import { formatCurrency } from '@/utils/financialUtils';
 
 interface TransactionListProps {
   transactions: Transaction[];

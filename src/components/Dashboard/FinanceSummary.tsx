@@ -1,17 +1,17 @@
-
 import React from 'react';
 import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, Users, Scale } from 'lucide-react';
 import { FinancialSummary, CategorySummary } from '@/types/financial';
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { DollarSign } from 'lucide-react'; // Use DollarSign icon from lucide-react
+import { DollarSign } from 'lucide-react';
+import { formatCurrency, formatPercentage } from '@/utils/financialUtils';
 
 interface FinanceSummaryProps {
   summary: FinancialSummary;
   expenseCategories?: CategorySummary[];
-  stripeIncome?: number; // Nuevo parámetro para ingresos de Stripe
-  regularIncome?: number; // Nuevo parámetro para ingresos regulares de Zoho
-  stripeOverride?: number | null; // Nuevo parámetro para indicar si se está usando un override
+  stripeIncome?: number;
+  regularIncome?: number;
+  stripeOverride?: number | null;
 }
 
 const FinanceSummary: React.FC<FinanceSummaryProps> = ({ 
@@ -21,22 +21,6 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
   regularIncome = 0,
   stripeOverride = null
 }) => {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2
-    }).format(amount);
-  };
-
-  const formatPercentage = (percentage: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'percent',
-      minimumFractionDigits: 1,
-      maximumFractionDigits: 1
-    }).format(percentage / 100);
-  };
-
   // Check if stripe income is using an override
   const isStripeOverridden = stripeOverride !== null;
 

@@ -68,3 +68,29 @@ export interface MonthlyBalance {
   created_at: string;
   updated_at: string;
 }
+
+// New interfaces for financial data
+export interface StripeIncomeData {
+  amount: number;
+  isOverridden: boolean;
+  override: number | null;
+}
+
+export interface FinancialDataState {
+  data: FinancialData;
+  loading: boolean;
+  error: string | null;
+  initialized: boolean;
+  cacheStatus: {
+    usingCachedData: boolean;
+    partialRefresh: boolean;
+    stats: CacheStats | null;
+  };
+}
+
+// Interface for cache statistics
+export interface CacheStats {
+  cachedCount: number;
+  newCount: number;
+  totalCount: number;
+}

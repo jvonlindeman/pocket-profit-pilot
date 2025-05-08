@@ -1,0 +1,259 @@
+
+import { useState, useCallback } from 'react';
+import { DateRange, FinancialData } from '@/types/financial';
+import { CacheStatus } from '@/types/cache';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import ZohoService from '@/services/zohoService';
+
+// Default financial data structure
+export const DEFAULT_FINANCIAL_DATA: FinancialData = {
+  summary: {
+    totalIncome: 0,
+    totalExpense: 0,
+    collaboratorExpense: 0,
+    otherExpense: 0,
+    profit: 0,
+    profitMargin: 0,
+  },
+  transactions: [],
+  incomeBySource: [],
+  expenseByCategory: [],
+  dailyData: {
+    income: { labels: [], values: [] },
+    expense: { labels: [], values: [] }
+  },
+  monthlyData: {
+    income: { labels: [], values: [] },
+    expense: { labels: [], values: [] },
+    profit: { labels: [], values: [] }
+  }
+};
+
+export const useFinanceDataFetcher = () => {
+  const [financialData, setFinancialData] = useState<FinancialData>(DEFAULT_FINANCIAL_DATA);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [dataInitialized, setDataInitialized] = useState<boolean>(false);
+  const [rawResponse, setRawResponse] = useState<any>(null);
+  const [cacheStatus, setCacheStatus] = useState<CacheStatus>({
+    usingCachedData: false,
+    partialRefresh: false,
+    stats: null,
+    lastRefresh: null
+  });
+  const [regularIncome, setRegularIncome] = useState<number>(0);
+  const [collaboratorExpenses, setCollaboratorExpenses] = useState<any[]>([]);
+  
+  const { toast } = useToast();
+
+  // Fetch financial data from the API or cache
+  const fetchFinancialData = useCallback(async (
+    dateRange: DateRange, 
+    forceRefresh: boolean = false,
+    stripeIncomeData: { amount: number, isOverridden: boolean }
+  ) => {
+    console.log(`Fetching financial data with forceRefresh=${forceRefresh}`);
+    setLoading(true);
+    setError(null);
+    setCacheStatus({
+      usingCachedData: false,
+      partialRefresh: false,
+      stats: null,
+      lastRefresh: new Date()
+    });
+
+    try {
+      // Format dates for API call
+      const startDate = dateRange.startDate;
+      const endDate = dateRange.endDate;
+      
+      // Prepare params for API call
+      const params = new URLSearchParams({
+        start_date: formatDateForAPI(startDate),
+        end_date: formatDateForAPI(endDate),
+        force_refresh: forceRefresh ? 'true' : 'false'
+      });
+      
+      // Fetch data from API
+      let data;
+      let apiError = null;
+      
+      try {
+        // Try using Supabase function invoke
+        console.log(`Invoking zoho-transactions function with params: ${params.toString()}`);
+        const result = await supabase.functions.invoke("zoho-transactions", {
+          body: {
+            startDate: formatDateForAPI(startDate),
+            endDate: formatDateForAPI(endDate),
+            forceRefresh: forceRefresh
+          }
+        });
+        
+        if (result.error) {
+          throw new Error(`Error al invocar la función zoho-transactions: ${result.error.message || result.error}`);
+        }
+        
+        data = result.data;
+        
+        if (!data) {
+          throw new Error("No se recibieron datos de la función zoho-transactions");
+        }
+        
+        console.log("Data received from zoho-transactions function:", data);
+      } catch (invokeError) {
+        console.error("Error calling zoho-transactions function:", invokeError);
+        apiError = invokeError;
+        
+        // Fallback to direct fetch
+        try {
+          console.log("Falling back to direct fetch method");
+          const response = await fetch(`/functions/v1/zoho-transactions?${params.toString()}`);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          // Check for JSON content type
+          const contentType = response.headers.get('content-type');
+          if (!contentType || !contentType.includes('application/json')) {
+            const textResponse = await response.text();
+            console.error("Received non-JSON response:", textResponse.substring(0, 200) + "...");
+            throw new Error(`Respuesta no JSON recibida del servidor: ${response.status} ${response.statusText}`);
+          }
+          
+          data = await response.json();
+          console.log("Data received from direct API call:", data);
+        } catch (fetchError) {
+          console.error("Error with direct fetch call:", fetchError);
+          throw apiError || new Error("Error al obtener datos financieros");
+        }
+      }
+      
+      // Store raw response for debugging
+      setRawResponse(data);
+      
+      // Update cache status information
+      if (data.cache_status) {
+        setCacheStatus({
+          usingCachedData: data.cache_status.using_cached_data || false,
+          partialRefresh: data.cache_status.partial_refresh || false,
+          stats: data.cache_status.stats ? {
+            cachedCount: data.cache_status.stats.cached_count || 0,
+            newCount: data.cache_status.stats.new_count || 0,
+            totalCount: data.cache_status.stats.total_count || 0
+          } : null,
+          lastRefresh: new Date()
+        });
+      }
+      
+      // Process the financial data
+      if (data.financial_data) {
+        // Store regular income from Zoho
+        const regularIncomeValue = data.financial_data.summary.totalIncome;
+        setRegularIncome(regularIncomeValue);
+        
+        // Calculate total income including Stripe
+        const totalIncome = regularIncomeValue + stripeIncomeData.amount;
+        const totalExpense = data.financial_data.summary.totalExpense;
+        const profit = totalIncome - totalExpense;
+        const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0;
+        
+        console.log("Financial summary calculation:", {
+          regularIncome: regularIncomeValue,
+          stripeIncome: stripeIncomeData.amount,
+          totalIncome,
+          totalExpense,
+          profit,
+          profitMargin
+        });
+        
+        // Update summary with calculated values
+        data.financial_data.summary.totalIncome = totalIncome;
+        data.financial_data.summary.profit = profit;
+        data.financial_data.summary.profitMargin = profitMargin;
+        
+        // Update state with processed data
+        setFinancialData(data.financial_data);
+        
+        // Extract collaborator expenses if available
+        if (data.collaborator_expenses) {
+          setCollaboratorExpenses(data.collaborator_expenses);
+        }
+
+        toast({
+          title: "Datos financieros actualizados",
+          description: `Ingresos: $${totalIncome.toFixed(2)}, Gastos: $${totalExpense.toFixed(2)}`,
+        });
+      }
+      
+      // Mark data as initialized
+      setDataInitialized(true);
+      return data.financial_data || DEFAULT_FINANCIAL_DATA;
+    } catch (err) {
+      console.error("Error fetching financial data:", err);
+      setError(err instanceof Error ? err.message : "Error desconocido al obtener datos");
+      toast({
+        variant: "destructive",
+        title: "Error al obtener datos",
+        description: err instanceof Error ? err.message : "Error desconocido al obtener datos",
+      });
+      return DEFAULT_FINANCIAL_DATA;
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  // Helper function to format date for API
+  const formatDateForAPI = (date: Date): string => {
+    return date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+  };
+
+  // Clear cache and force refresh data
+  const clearCacheAndRefresh = useCallback(async (dateRange: DateRange) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Clear the cache for the current date range
+      const success = await ZohoService.clearCacheForDateRange(dateRange.startDate, dateRange.endDate);
+      
+      if (success) {
+        toast({
+          title: "Caché limpiado con éxito",
+          description: "Se va a obtener datos frescos de la API",
+        });
+      } else {
+        throw new Error("No se pudo limpiar el caché");
+      }
+      
+      return true;
+    } catch (err) {
+      console.error("Error clearing cache:", err);
+      setError(err instanceof Error ? err.message : "Error desconocido al limpiar el caché");
+      toast({
+        variant: "destructive",
+        title: "Error al limpiar el caché",
+        description: err instanceof Error ? err.message : "Error desconocido al limpiar el caché",
+      });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  return {
+    financialData,
+    setFinancialData,
+    loading,
+    error,
+    dataInitialized,
+    setDataInitialized,
+    rawResponse,
+    regularIncome,
+    collaboratorExpenses,
+    cacheStatus,
+    fetchFinancialData,
+    clearCacheAndRefresh,
+  };
+};

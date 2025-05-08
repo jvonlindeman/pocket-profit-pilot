@@ -1,71 +1,34 @@
 
-import { format, parseISO } from 'date-fns';
+import { format, parse, parseISO } from 'date-fns';
+import { safeParseNumber, formatCurrency as formatCurrencyUtil } from '@/utils/financialUtils';
 
 /**
- * Formats a date string in the user's locale format, properly handling UTC dates
- * 
- * @param dateString A string representing a date in ISO format
- * @param locale Locale to use for formatting (defaults to 'es-ES')
+ * Format a date string to display format
+ * @param dateStr Date string in ISO format
+ * @param formatStr Format string for date-fns
  * @returns Formatted date string
  */
-export function formatDate(dateString: string, locale: string = 'es-ES'): string {
+export const formatDate = (dateStr: string, formatStr: string = 'PP'): string => {
   try {
-    // Parse the ISO string to a Date object
-    const date = parseISO(dateString);
-    
-    // Check if the date is valid
-    if (isNaN(date.getTime())) {
-      console.error(`Invalid date string: ${dateString}`);
-      return 'Invalid date';
-    }
-    
-    // Format the date using date-fns with the specified locale
-    return format(date, 'dd/MM/yyyy');
+    const date = parseISO(dateStr);
+    return format(date, formatStr);
   } catch (error) {
-    console.error(`Error formatting date: ${dateString}`, error);
-    return 'Invalid date';
+    console.error('Error formatting date:', error);
+    return dateStr;
   }
-}
+};
 
 /**
- * Formats a number as currency
- * 
- * @param amount Number to format as currency
- * @param currency Currency code (defaults to 'USD')
- * @param locale Locale to use for formatting (defaults to 'en-US')
- * @returns Formatted currency string
+ * Format a number as currency
+ * Wrapper for the financialUtils function for backward compatibility
  */
-export function formatCurrency(amount: number, currency: string = 'USD', locale: string = 'en-US'): string {
-  return new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency
-  }).format(amount);
-}
+export const formatCurrency = formatCurrencyUtil;
 
 /**
- * Generates an ISO string date for the current day
- * 
- * @returns ISO string for the current date (YYYY-MM-DD)
+ * Extract year and month from a date
+ * @param date Date object
+ * @returns String in "YYYY-MM" format
  */
-export function getCurrentISODate(): string {
-  const today = new Date();
-  return format(today, 'yyyy-MM-dd');
-}
-
-/**
- * Validates and formats a date string to ISO format
- * 
- * @param dateString The date string to validate and format
- * @returns A properly formatted ISO date string (YYYY-MM-DD)
- */
-export function validateAndFormatDate(dateString: string): string {
-  try {
-    const date = parseISO(dateString);
-    if (isNaN(date.getTime())) {
-      return getCurrentISODate();
-    }
-    return format(date, 'yyyy-MM-dd');
-  } catch (e) {
-    return getCurrentISODate();
-  }
-}
+export const getYearMonth = (date: Date): string => {
+  return format(date, 'yyyy-MM');
+};
