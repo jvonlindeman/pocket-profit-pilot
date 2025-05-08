@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { formatISO, subMonths, startOfMonth, endOfMonth, isAfter, isBefore, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -112,8 +111,8 @@ export const useFinanceData = () => {
           let overrideValue = balanceData.stripe_override;
           
           // Si es string y tiene coma como separador decimal, convertirlo
-          if (typeof overrideValue === 'string' && overrideValue.includes(',')) {
-            overrideValue = parseFloat(overrideValue.replace('.', '').replace(',', '.'));
+          if (typeof overrideValue === 'string' && overrideValue.toString().includes(',')) {
+            overrideValue = parseFloat(overrideValue.toString().replace('.', '').replace(',', '.'));
           }
           
           setStripeOverride(overrideValue);
