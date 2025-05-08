@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, RefreshCw, CalendarIcon, DatabaseIcon } from 'lucide-react';
@@ -53,9 +54,12 @@ const CacheAnalysis: React.FC<CacheAnalysisProps> = ({ onUpdate }) => {
     setError(null);
     
     try {
-      // Get all unique month-years - using proper type parameters for RPC
+      // Get all unique month-years with type assertion to bypass TypeScript constraints
       const { data: monthsData, error: monthsError } = await supabase
-        .rpc('get_unique_months_with_transactions');
+        .rpc('get_unique_months_with_transactions') as { 
+          data: MonthYearResult[] | null, 
+          error: any 
+        };
       
       if (monthsError) {
         throw new Error(`Error getting unique months: ${monthsError.message}`);
@@ -75,9 +79,14 @@ const CacheAnalysis: React.FC<CacheAnalysisProps> = ({ onUpdate }) => {
       for (const monthObj of monthsData as MonthYearResult[]) {
         const monthYear = monthObj.month_year;
         
-        // Get first and last date for this month - using proper type parameters
+        // Get first and last date for this month with type assertion
         const { data: dateRangeData, error: dateRangeError } = await supabase
-          .rpc('get_month_transaction_range', { month_year_param: monthYear });
+          .rpc('get_month_transaction_range', { 
+            month_year_param: monthYear 
+          }) as { 
+            data: DateRangeResult[] | null, 
+            error: any 
+          };
           
         if (dateRangeError) {
           console.error(`Error getting date range for ${monthYear}:`, dateRangeError);
