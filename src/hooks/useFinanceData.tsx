@@ -170,58 +170,123 @@ export const useFinanceData = () => {
         force_refresh: forceRefresh ? 'true' : 'false'
       });
       
-      // Hacemos la llamada a la API
-      const response = await fetch(`/functions/v1/zoho-transactions?${params.toString()}`);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Error al obtener datos financieros: ${errorText}`);
-      }
-      
-      const data = await response.json();
-      setRawResponse(data);
-      
-      // Determinar si estamos usando datos en caché
-      if (data.cache_status) {
-        setUsingCachedData(data.cache_status.using_cached_data || false);
-        setPartialRefresh(data.cache_status.partial_refresh || false);
+      try {
+        // Hacemos la llamada a la API usando la función invoke de Supabase en lugar de fetch
+        console.log(`Invoking zoho-transactions function with params: ${params.toString()}`);
+        const { data, error } = await supabase.functions.invoke("zoho-transactions", {
+          body: {
+            startDate: startDate,
+            endDate: endDate,
+            forceRefresh: forceRefresh
+          }
+        });
         
-        if (data.cache_status.stats) {
-          setCacheStats({
-            cachedCount: data.cache_status.stats.cached_count || 0,
-            newCount: data.cache_status.stats.new_count || 0,
-            totalCount: data.cache_status.stats.total_count || 0
-          });
+        if (error) {
+          throw new Error(`Error al invocar la función zoho-transactions: ${error.message}`);
         }
-      }
-      
-      // Actualizar el estado con los datos obtenidos
-      if (data.financial_data) {
-        // Agregamos el saldo inicial si está disponible
-        if (balanceData && typeof balanceData.balance === 'number') {
-          data.financial_data.summary.startingBalance = balanceData.balance;
+        
+        if (!data) {
+          throw new Error("No se recibieron datos de la función zoho-transactions");
         }
+        
+        setRawResponse(data);
+        console.log("Raw response from zoho-transactions:", data);
+        
+        // Determinar si estamos usando datos en caché
+        if (data.cache_status) {
+          setUsingCachedData(data.cache_status.using_cached_data || false);
+          setPartialRefresh(data.cache_status.partial_refresh || false);
+          
+          if (data.cache_status.stats) {
+            setCacheStats({
+              cachedCount: data.cache_status.stats.cached_count || 0,
+              newCount: data.cache_status.stats.new_count || 0,
+              totalCount: data.cache_status.stats.total_count || 0
+            });
+          }
+        }
+        
+        // Actualizar el estado con los datos obtenidos
+        if (data.financial_data) {
+          // Agregamos el saldo inicial si está disponible
+          if (balanceData && typeof balanceData.balance === 'number') {
+            data.financial_data.summary.startingBalance = balanceData.balance;
+          }
 
-        // Separamos los ingresos de Zoho (regulares) de los ingresos totales
-        // Si hay un valor de Stripe override, lo usamos directamente
-        const regularIncomeValue = data.financial_data.summary.totalIncome - stripeIncome;
-        setRegularIncome(regularIncomeValue);
+          // Separamos los ingresos de Zoho (regulares) de los ingresos totales
+          // Si hay un valor de Stripe override, lo usamos directamente
+          const regularIncomeValue = data.financial_data.summary.totalIncome - stripeIncome;
+          setRegularIncome(regularIncomeValue);
+          
+          // Actualizamos el resumen con el ingreso de Stripe (puede ser override o calculado)
+          // y recalculamos profit y profitMargin
+          const totalIncome = regularIncomeValue + stripeIncome;
+          const profit = totalIncome - data.financial_data.summary.totalExpense;
+          const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0;
+          
+          data.financial_data.summary.totalIncome = totalIncome;
+          data.financial_data.summary.profit = profit;
+          data.financial_data.summary.profitMargin = profitMargin;
+          
+          setFinancialData(data.financial_data);
+          
+          // Extraer los gastos de colaboradores si existen
+          if (data.collaborator_expenses) {
+            setCollaboratorExpenses(data.collaborator_expenses);
+          }
+        }
+      } catch (apiError) {
+        console.error("Error calling zoho-transactions function:", apiError);
         
-        // Actualizamos el resumen con el ingreso de Stripe (puede ser override o calculado)
-        // y recalculamos profit y profitMargin
-        const totalIncome = regularIncomeValue + stripeIncome;
-        const profit = totalIncome - data.financial_data.summary.totalExpense;
-        const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0;
-        
-        data.financial_data.summary.totalIncome = totalIncome;
-        data.financial_data.summary.profit = profit;
-        data.financial_data.summary.profitMargin = profitMargin;
-        
-        setFinancialData(data.financial_data);
-        
-        // Extraer los gastos de colaboradores si existen
-        if (data.collaborator_expenses) {
-          setCollaboratorExpenses(data.collaborator_expenses);
+        // Intentar con el método alternativo usando fetch
+        console.log("Falling back to direct fetch method");
+        try {
+          // Hacemos la llamada a la API usando fetch directamente
+          const response = await fetch(`/functions/v1/zoho-transactions?${params.toString()}`);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          // Verificar que la respuesta es JSON antes de intentar procesarla
+          const contentType = response.headers.get('content-type');
+          if (!contentType || !contentType.includes('application/json')) {
+            const textResponse = await response.text();
+            console.error("Received non-JSON response:", textResponse.substring(0, 200) + "...");
+            throw new Error(`Respuesta no JSON recibida del servidor: ${response.status} ${response.statusText}`);
+          }
+          
+          const data = await response.json();
+          setRawResponse(data);
+          
+          // Resto del procesamiento igual que antes...
+          if (data.financial_data) {
+            // Agregamos el saldo inicial si está disponible
+            if (balanceData && typeof balanceData.balance === 'number') {
+              data.financial_data.summary.startingBalance = balanceData.balance;
+            }
+
+            // Separamos los ingresos de Zoho (regulares) de los ingresos totales
+            const regularIncomeValue = data.financial_data.summary.totalIncome - stripeIncome;
+            setRegularIncome(regularIncomeValue);
+            
+            const totalIncome = regularIncomeValue + stripeIncome;
+            const profit = totalIncome - data.financial_data.summary.totalExpense;
+            const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0;
+            
+            data.financial_data.summary.totalIncome = totalIncome;
+            data.financial_data.summary.profit = profit;
+            data.financial_data.summary.profitMargin = profitMargin;
+            
+            setFinancialData(data.financial_data);
+            
+            if (data.collaborator_expenses) {
+              setCollaboratorExpenses(data.collaborator_expenses);
+            }
+          }
+        } catch (fetchError) {
+          console.error("Error with direct fetch call:", fetchError);
+          throw new Error(`Error al obtener datos financieros: ${fetchError instanceof Error ? fetchError.message : 'Error desconocido'}`);
         }
       }
       

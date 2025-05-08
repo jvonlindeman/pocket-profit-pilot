@@ -5,11 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, RefreshCw, Bug } from 'lucide-react';
 import ZohoService from '@/services/zohoService';
+import { useToast } from '@/hooks/use-toast';
 
 export default function ZohoDebug() {
   const [loading, setLoading] = useState(false);
   const [rawData, setRawData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   // Function to fetch raw data from the API
   const fetchDebugData = async () => {
@@ -27,8 +29,15 @@ export default function ZohoDebug() {
       setRawData(data);
       console.log("Debug data received:", data);
     } catch (err: any) {
-      setError(err.message || "Unknown error occurred");
+      const errorMessage = err.message || "Unknown error occurred";
+      setError(errorMessage);
       console.error("Failed to fetch debug data:", err);
+      
+      toast({
+        variant: "destructive",
+        title: "Error al obtener datos de depuración",
+        description: errorMessage,
+      });
     } finally {
       setLoading(false);
     }
