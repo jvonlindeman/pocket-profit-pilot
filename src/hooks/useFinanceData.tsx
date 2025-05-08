@@ -1,289 +1,154 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import ZohoService from '@/services/zohoService';
-import StripeService from '@/services/stripeService';
-import { Transaction } from '@/types/financial';
-import { processTransactionData } from '@/services/zoho/utils';
-import { endOfMonth, subMonths, format as formatDate } from 'date-fns';
+import { formatISO, subMonths, startOfMonth, endOfMonth, isAfter, isBefore, parseISO } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
+import { DateRange, FinancialData, Transaction, MonthlyBalance } from '@/types/financial';
 import { supabase } from '@/integrations/supabase/client';
 
-// Format date in YYYY-MM-DD format without timezone shifts
-const formatDateYYYYMMDD = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
+// Definir estructura de datos para estadísticas de caché
+interface CacheStats {
+  cachedCount: number;
+  newCount: number;
+  totalCount: number;
+}
 
-// Fix date to ensure it's in the correct year
-const fixDateYear = (date: Date): Date => {
-  const currentYear = new Date().getFullYear();
-  if (date.getFullYear() > currentYear) {
-    const correctedDate = new Date(date);
-    correctedDate.setFullYear(currentYear);
-    console.log(`useFinanceData: Corrected future date from ${date.toISOString()} to ${correctedDate.toISOString()}`);
-    return correctedDate;
+const DEFAULT_FINANCIAL_DATA: FinancialData = {
+  summary: {
+    totalIncome: 0,
+    totalExpense: 0,
+    collaboratorExpense: 0,
+    otherExpense: 0,
+    profit: 0,
+    profitMargin: 0,
+  },
+  transactions: [],
+  incomeBySource: [],
+  expenseByCategory: [],
+  dailyData: {
+    income: { labels: [], values: [] },
+    expense: { labels: [], values: [] }
+  },
+  monthlyData: {
+    income: { labels: [], values: [] },
+    expense: { labels: [], values: [] },
+    profit: { labels: [], values: [] }
   }
-  return date;
-};
-
-// Check if a date range is in the past (historical data)
-const isHistoricalDateRange = (startDate: Date, endDate: Date): boolean => {
-  const today = new Date();
-  return endDate < today;
 };
 
 export const useFinanceData = () => {
-  // States
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [dataInitialized, setDataInitialized] = useState<boolean>(false);
-  const [rawResponse, setRawResponse] = useState<any>(null);
-  const [stripeIncome, setStripeIncome] = useState<number>(0);
-  const [regularIncome, setRegularIncome] = useState<number>(0);
-  const [collaboratorExpenses, setCollaboratorExpenses] = useState<any[]>([]);
-  const [startingBalance, setStartingBalance] = useState<number | undefined>(undefined);
-  const [usingCachedData, setUsingCachedData] = useState<boolean>(false);
-  const [partialRefresh, setPartialRefresh] = useState<boolean>(false);
-  const [cacheStats, setCacheStats] = useState<any>(null);
-  const [stripeOverride, setStripeOverride] = useState<number | null>(null);
-  
-  // Date range state - configured to show from the last day of the previous month to the last day of the current month
-  const [dateRange, setDateRange] = useState(() => {
+  // Estados para manejar fechas y datos
+  const [dateRange, setDateRange] = useState<DateRange>(() => {
     const today = new Date();
-    const currentYear = today.getFullYear();
-    
-    // Last day of previous month
-    const startDate = endOfMonth(subMonths(today, 1));
-    if (startDate.getFullYear() > currentYear) {
-      startDate.setFullYear(currentYear);
-    }
-    
-    // Last day of current month
+    const startDate = startOfMonth(today);
     const endDate = endOfMonth(today);
-    if (endDate.getFullYear() > currentYear) {
-      endDate.setFullYear(currentYear);
-    }
-    
-    console.log("Initial date range:", startDate, "to", endDate);
     return { startDate, endDate };
   });
+  
+  // Estados para datos financieros y control
+  const [financialData, setFinancialData] = useState<FinancialData>(DEFAULT_FINANCIAL_DATA);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [dataInitialized, setDataInitialized] = useState<boolean>(false);
+  const [rawResponse, setRawResponse] = useState<any>(null);
+  const [usingCachedData, setUsingCachedData] = useState<boolean>(false);
+  const [partialRefresh, setPartialRefresh] = useState<boolean>(false);
+  const [cacheStats, setCacheStats] = useState<CacheStats | null>(null);
+  
+  // Estado para el valor de Stripe override
+  const [stripeOverride, setStripeOverride] = useState<number | null>(null);
+  
+  // Ingresos de Stripe y regulares
+  const [stripeIncome, setStripeIncome] = useState<number>(0);
+  const [regularIncome, setRegularIncome] = useState<number>(0);
+  
+  // Colaboradores
+  const [collaboratorExpenses, setCollaboratorExpenses] = useState<any[]>([]);
+  
+  const { toast } = useToast();
 
-  // Processed financial data
-  const financialData = processTransactionData(transactions, startingBalance);
-
-  // Get current month range
+  // Obtener rango del mes actual
   const getCurrentMonthRange = useCallback(() => {
     const today = new Date();
-    const currentYear = today.getFullYear(); // Get current year
-    
-    const startDate = new Date(currentYear, today.getMonth(), 1);
-    const endDate = endOfMonth(today);
-    
-    // Ensure both dates are in the current year
-    if (startDate.getFullYear() > currentYear) {
-      startDate.setFullYear(currentYear);
-    }
-    
-    if (endDate.getFullYear() > currentYear) {
-      endDate.setFullYear(currentYear);
-    }
-    
-    return { startDate, endDate };
+    return {
+      startDate: startOfMonth(today),
+      endDate: endOfMonth(today),
+    };
   }, []);
 
-  // Function to update date range
-  const updateDateRange = useCallback((newRange: { startDate: Date; endDate: Date }) => {
-    console.log("Date range updated:", newRange);
-    
-    // Fix any dates in the future year
-    const startDate = fixDateYear(new Date(newRange.startDate));
-    const endDate = fixDateYear(new Date(newRange.endDate));
-    
-    console.log("Corrected date values:", {
-      startDate: startDate,
-      endDate: endDate,
-      startDateFormatted: formatDateYYYYMMDD(startDate),
-      endDateFormatted: formatDateYYYYMMDD(endDate)
-    });
-    
-    setDateRange({
-      startDate,
-      endDate
-    });
-
-    // Fetch monthly balance when date range changes
-    fetchMonthlyBalance(startDate);
-    
-    // Check if we need to refresh the cache
-    ZohoService.checkAndRefreshCache(startDate, endDate);
+  // Función para actualizar el rango de fechas
+  const updateDateRange = useCallback((newRange: DateRange) => {
+    setDateRange(newRange);
   }, []);
 
-  // Fetch monthly balance for the selected month
-  const fetchMonthlyBalance = useCallback(async (date: Date) => {
+  // Comprobar si una fecha está dentro del rango actual
+  const isDateInRange = useCallback((date: string) => {
+    const parsedDate = new Date(date);
+    return (
+      !isBefore(parsedDate, dateRange.startDate) && 
+      !isAfter(parsedDate, dateRange.endDate)
+    );
+  }, [dateRange]);
+
+  // Función para cargar los datos de Stripe y el balance mensual
+  const loadStripeAndBalanceData = useCallback(async () => {
     try {
-      // Ensure date is in current year
-      date = fixDateYear(date);
-      const monthYear = formatDate(date, 'yyyy-MM');
-      
-      const { data, error } = await supabase
+      // Cargar el balance mensual
+      const monthString = formatISO(dateRange.startDate, { representation: 'date' }).substring(0, 7);
+      const { data: balanceData, error: balanceError } = await supabase
         .from('monthly_balances')
         .select('*')
-        .eq('month_year', monthYear)
+        .eq('month_year', monthString)
         .single();
-      
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
-        console.error("Error fetching monthly balance:", error);
+
+      if (balanceError && balanceError.code !== 'PGRST116') {
+        console.error("Error loading monthly balance:", balanceError);
       }
 
-      if (data) {
-        console.log("Fetched monthly balance:", data);
-        setStartingBalance(data.balance);
-        setStripeOverride(data.stripe_override);
+      if (balanceData) {
+        // Si hay un valor de override de Stripe, establecerlo
+        if (balanceData.stripe_override !== null) {
+          setStripeOverride(balanceData.stripe_override);
+          setStripeIncome(balanceData.stripe_override);
+          console.log("Using Stripe override value:", balanceData.stripe_override);
+        }
       } else {
-        console.log("No monthly balance found for:", monthYear);
-        setStartingBalance(undefined);
+        // Si no hay datos de balance mensual, resetear el valor de Stripe override
         setStripeOverride(null);
       }
-    } catch (err) {
-      console.error("Error in fetchMonthlyBalance:", err);
-    }
-  }, []);
 
-  // Update the starting balance
-  const updateStartingBalance = useCallback(async (balance: number, notes?: string) => {
-    try {
-      // Ensure date is in current year
-      const correctedDate = fixDateYear(dateRange.startDate);
-      const monthYear = formatDate(correctedDate, 'yyyy-MM');
-      
-      // Check if a record already exists
-      const { data: existingData } = await supabase
-        .from('monthly_balances')
-        .select('*')
-        .eq('month_year', monthYear)
-        .single();
-      
-      if (existingData) {
-        // Update existing record
-        await supabase
-          .from('monthly_balances')
-          .update({
-            balance,
-            notes: notes || existingData.notes,
-          })
-          .eq('month_year', monthYear);
-      } else {
-        // Create new record
-        await supabase
-          .from('monthly_balances')
-          .insert({
-            month_year: monthYear,
-            balance,
-            notes: notes || null,
-          });
-      }
-      
-      setStartingBalance(balance);
-    } catch (err) {
-      console.error("Error updating starting balance:", err);
-    }
-  }, [dateRange.startDate]);
+      // Si no estamos usando un valor override, cargar las transacciones de Stripe
+      if (balanceData?.stripe_override === null || balanceData?.stripe_override === undefined) {
+        // Cargar transacciones de Stripe
+        const { data: stripeTransactions, error: stripeError } = await supabase
+          .from('cached_transactions')
+          .select('*')
+          .eq('source', 'Stripe')
+          .eq('type', 'income');
 
-  // Function to process and separate income types
-  const processIncomeTypes = useCallback((transactions: Transaction[]) => {
-    let stripeAmount = 0;
-    let regularAmount = 0;
-    
-    transactions.forEach(transaction => {
-      if (transaction.type === 'income') {
-        if (transaction.source === 'Stripe') {
-          stripeAmount += transaction.amount;
-        } else {
-          regularAmount += transaction.amount;
+        if (stripeError) {
+          console.error("Error loading Stripe transactions:", stripeError);
+        }
+
+        if (stripeTransactions) {
+          // Filtrar las transacciones que están en el rango de fechas actual
+          const filteredTransactions = stripeTransactions.filter(tx => isDateInRange(tx.date));
+          // Calcular la suma de los importes
+          const total = filteredTransactions.reduce((sum, tx) => sum + parseFloat(tx.amount), 0);
+          setStripeIncome(total);
+          console.log("Calculated Stripe income from transactions:", total);
         }
       }
-    });
-    
-    // If there's a stripe override for the current month, use it instead
-    const effectiveStripeAmount = stripeOverride !== null ? stripeOverride : stripeAmount;
-    
-    setStripeIncome(effectiveStripeAmount);
-    setRegularIncome(regularAmount);
-    
-    return { 
-      stripeAmount: effectiveStripeAmount, 
-      regularAmount 
-    };
-  }, [stripeOverride]);
 
-  // Function to process collaborator data
-  const processCollaboratorData = useCallback((rawResponse: any) => {
-    if (!rawResponse || !rawResponse.colaboradores || !Array.isArray(rawResponse.colaboradores)) {
-      setCollaboratorExpenses([]);
-      return [];
+      return balanceData as MonthlyBalance | null;
+    } catch (err) {
+      console.error("Error in loadStripeAndBalanceData:", err);
+      return null;
     }
-
-    // Filter collaborators with valid data
-    const validCollaborators = rawResponse.colaboradores
-      .filter((item: any) => item && typeof item.total !== 'undefined' && item.vendor_name)
-      .map((item: any) => ({
-        name: item.vendor_name,
-        amount: Number(item.total)
-      }))
-      .filter((item: any) => item.amount > 0);
-
-    // Calculate total
-    const totalAmount = validCollaborators.reduce((sum: number, item: any) => sum + item.amount, 0);
-    
-    // Calculate percentages and format for chart
-    const formattedData = validCollaborators.map((item: any) => ({
-      category: item.name,
-      amount: item.amount,
-      percentage: totalAmount > 0 ? (item.amount / totalAmount) * 100 : 0
-    })).sort((a: any, b: any) => b.amount - a.amount);
-    
-    setCollaboratorExpenses(formattedData);
-    return formattedData;
-  }, []);
-
-  // Check if a date range is historical (fully in the past)
-  const isHistorical = useCallback((startDate: Date, endDate: Date) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // normalize to start of day
-    
-    return endDate < today;
-  }, []);
-
-  // Parse cache statistics from API response
-  const parseCacheStats = useCallback((response: any) => {
-    if (!response) return null;
-    
-    let stats = null;
-    
-    // Check for different response formats that might contain cache stats
-    if (response.cacheStats) {
-      stats = response.cacheStats;
-    } else if (response.partialRefresh) {
-      stats = {
-        partialRefresh: true,
-        newCount: response.newTransactionsCount || 0,
-        cachedCount: response.data?.length || 0
-      };
-    }
-    
-    // If we found stats, save them
-    if (stats) {
-      setCacheStats(stats);
-    }
-    
-    return stats;
-  }, []);
+  }, [dateRange, isDateInRange]);
   
-  // Function to load data (not loaded automatically)
-  const fetchData = useCallback(async (forceRefresh = false) => {
-    console.log("Fetching financial data...");
+  // Función principal para obtener datos financieros
+  const fetchFinancialData = useCallback(async (forceRefresh: boolean = false) => {
+    console.log(`Fetching financial data with forceRefresh=${forceRefresh}`);
     setLoading(true);
     setError(null);
     setUsingCachedData(false);
@@ -291,118 +156,96 @@ export const useFinanceData = () => {
     setCacheStats(null);
 
     try {
-      // Fix any dates in the future year
-      const startDate = fixDateYear(new Date(dateRange.startDate));
-      const endDate = fixDateYear(new Date(dateRange.endDate));
+      // Primero, cargamos los datos de Stripe y el balance mensual
+      const balanceData = await loadStripeAndBalanceData();
       
-      // Also fetch the monthly balance for the selected date range
-      await fetchMonthlyBalance(startDate);
+      // Formateamos las fechas para la API
+      const startDate = formatISO(dateRange.startDate, { representation: 'date' });
+      const endDate = formatISO(dateRange.endDate, { representation: 'date' });
       
-      // Log exact date objects for debugging
-      console.log("Original dateRange from datepicker:", {
-        startDate: dateRange.startDate,
-        endDate: dateRange.endDate
+      // Construimos los parámetros para la llamada a la API
+      const params = new URLSearchParams({
+        start_date: startDate,
+        end_date: endDate,
+        force_refresh: forceRefresh ? 'true' : 'false'
       });
       
-      console.log("Corrected dates:", {
-        startDate,
-        endDate,
-        startDateFormatted: formatDateYYYYMMDD(startDate),
-        endDateFormatted: formatDateYYYYMMDD(endDate)
-      });
+      // Hacemos la llamada a la API
+      const response = await fetch(`/functions/v1/zoho-transactions?${params.toString()}`);
       
-      // Check if we're loading historical data (past months)
-      const loadingHistoricalData = isHistorical(startDate, endDate);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Error al obtener datos financieros: ${errorText}`);
+      }
       
-      // If we're looking at historical data and not forcing a refresh,
-      // prefer using cached data even more strongly (higher chance of returning cache)
-      const effectiveForceRefresh = loadingHistoricalData ? forceRefresh : forceRefresh;
+      const data = await response.json();
+      setRawResponse(data);
       
-      console.log(`Loading ${loadingHistoricalData ? 'historical' : 'current'} data, forceRefresh=${effectiveForceRefresh}`);
-      
-      // Before making any requests, clean up any future year dates if this is the first time loading
-      if (!dataInitialized) {
-        const cleanedCount = await ZohoService.cleanupFutureDates();
-        if (cleanedCount > 0) {
-          console.log(`useFinanceData: Cleaned up ${cleanedCount} transactions with future dates`);
+      // Determinar si estamos usando datos en caché
+      if (data.cache_status) {
+        setUsingCachedData(data.cache_status.using_cached_data || false);
+        setPartialRefresh(data.cache_status.partial_refresh || false);
+        
+        if (data.cache_status.stats) {
+          setCacheStats({
+            cachedCount: data.cache_status.stats.cached_count || 0,
+            newCount: data.cache_status.stats.new_count || 0,
+            totalCount: data.cache_status.stats.total_count || 0
+          });
         }
       }
       
-      // Get transactions from Zoho Books - using corrected dates
-      const zohoData = await ZohoService.getTransactions(
-        startDate, 
-        endDate,
-        effectiveForceRefresh // Use the adjusted forceRefresh value
-      );
+      // Actualizar el estado con los datos obtenidos
+      if (data.financial_data) {
+        // Agregamos el saldo inicial si está disponible
+        if (balanceData && typeof balanceData.balance === 'number') {
+          data.financial_data.summary.startingBalance = balanceData.balance;
+        }
 
-      // Get the current raw response for debugging immediately after
-      const rawData = ZohoService.getLastRawResponse();
-      setRawResponse(rawData);
-      console.log("Fetched raw response for debugging:", rawData);
-      
-      // Check for partial refresh
-      if (rawData && rawData.partialRefresh) {
-        console.log("Detected partial refresh in response");
-        setPartialRefresh(true);
+        // Separamos los ingresos de Zoho (regulares) de los ingresos totales
+        // Si hay un valor de Stripe override, lo usamos directamente
+        const regularIncomeValue = data.financial_data.summary.totalIncome - stripeIncome;
+        setRegularIncome(regularIncomeValue);
+        
+        // Actualizamos el resumen con el ingreso de Stripe (puede ser override o calculado)
+        // y recalculamos profit y profitMargin
+        const totalIncome = regularIncomeValue + stripeIncome;
+        const profit = totalIncome - data.financial_data.summary.totalExpense;
+        const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0;
+        
+        data.financial_data.summary.totalIncome = totalIncome;
+        data.financial_data.summary.profit = profit;
+        data.financial_data.summary.profitMargin = profitMargin;
+        
+        setFinancialData(data.financial_data);
+        
+        // Extraer los gastos de colaboradores si existen
+        if (data.collaborator_expenses) {
+          setCollaboratorExpenses(data.collaborator_expenses);
+        }
       }
       
-      // Parse cache stats if available
-      parseCacheStats(rawData);
-
-      // Detect if we're using cached data based on the response
-      if (rawData && (rawData.fromCache || rawData.cached)) {
-        console.log("Using cached data from previous response");
-        setUsingCachedData(true);
-      }
-
-      // Process collaborator data
-      processCollaboratorData(rawData);
-
-      // Get transactions from Stripe - using corrected dates
-      console.log("Fetching from Stripe:", startDate, endDate);
-      const stripeData = await StripeService.getTransactions(
-        startDate,
-        endDate
-      );
-
-      // Combine the data
-      const combinedData = [...zohoData, ...stripeData];
-      console.log("Combined transactions:", combinedData.length);
-      
-      // Process separate income types
-      processIncomeTypes(combinedData);
-      
-      // Update state
-      setTransactions(combinedData);
+      // Marcar los datos como inicializados
       setDataInitialized(true);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error fetching financial data:", err);
-      setError(err.message || "Error al cargar los datos financieros");
-      
-      // Make sure to get any raw response for debugging even in case of error
-      const rawData = ZohoService.getLastRawResponse();
-      if (rawData) {
-        setRawResponse(rawData);
-        console.log("Set raw response after error:", rawData);
-      }
+      setError(err instanceof Error ? err.message : "Error desconocido al obtener datos");
+      toast({
+        variant: "destructive",
+        title: "Error al obtener datos",
+        description: err instanceof Error ? err.message : "Error desconocido al obtener datos",
+      });
     } finally {
       setLoading(false);
     }
-  }, [
-    dateRange.startDate, 
-    dateRange.endDate, 
-    processIncomeTypes, 
-    processCollaboratorData, 
-    fetchMonthlyBalance,
-    dataInitialized,
-    isHistorical,
-    parseCacheStats
-  ]);
+  }, [dateRange, loadStripeAndBalanceData, toast]);
 
-  // Public function to refresh data (forcing or not)
-  const refreshData = useCallback((force = false) => {
-    fetchData(force);
-  }, [fetchData]);
+  // Efecto para actualizar datos cuando cambia el rango de fechas
+  useEffect(() => {
+    if (dataInitialized) {
+      fetchFinancialData(false);
+    }
+  }, [dateRange, dataInitialized, fetchFinancialData]);
 
   return {
     dateRange,
@@ -411,14 +254,12 @@ export const useFinanceData = () => {
     loading,
     error,
     getCurrentMonthRange,
-    refreshData,
+    refreshData: fetchFinancialData,
     dataInitialized,
     rawResponse,
     stripeIncome,
     regularIncome,
     collaboratorExpenses,
-    startingBalance,
-    updateStartingBalance,
     usingCachedData,
     partialRefresh,
     cacheStats,

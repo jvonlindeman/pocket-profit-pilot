@@ -1,6 +1,5 @@
 
-import React, { useState } from 'react';
-import { format } from 'date-fns';
+import React from 'react';
 import { ArrowLeftIcon, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -31,7 +30,7 @@ const StripeManagement = () => {
       title: "Actualizando datos",
       description: "Obteniendo las últimas transacciones de Stripe...",
     });
-    refreshData(true);
+    refreshData(true); // Force refresh to ensure we get the latest data
   };
   
   return (
