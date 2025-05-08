@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale'; // Import the Spanish locale as an ES module
 import { Card, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -137,7 +138,7 @@ const StripeOverrideForm: React.FC<StripeOverrideFormProps> = ({
     form.handleSubmit(onSubmit)();
   };
 
-  const monthName = format(currentDate, 'MMMM yyyy', { locale: require('date-fns/locale/es') });
+  const monthName = format(currentDate, 'MMMM yyyy', { locale: es }); // Use the imported ES locale
 
   return (
     <Card className="bg-white">
