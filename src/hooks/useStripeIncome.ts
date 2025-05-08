@@ -31,8 +31,14 @@ export const useStripeIncome = () => {
         .single();
 
       if (balanceError) {
+        console.error("❌ Error loading monthly balance:", balanceError);
         if (balanceError.code !== 'PGRST116') { // Not found error
           console.error("❌ Error loading monthly balance:", balanceError);
+          toast({
+            variant: "destructive",
+            title: "Error al cargar balance mensual",
+            description: `No se pudo cargar el balance para ${monthString}: ${balanceError.message}`,
+          });
         } else {
           console.log("⚠️ No monthly balance found for month:", monthString);
         }

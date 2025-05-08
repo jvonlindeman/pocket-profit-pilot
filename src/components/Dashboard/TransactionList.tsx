@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useEffect } from 'react';
 import { Transaction } from '@/types/financial';
 import {
   Card,
@@ -30,6 +31,12 @@ const TransactionList: React.FC<TransactionListProps> = ({
   startDate,
   endDate
 }) => {
+  // Debug render information
+  useEffect(() => {
+    console.log('TransactionList rendered with', transactions.length, 'transactions', 
+      isLoading ? '(loading)' : '(not loading)');
+  }, [transactions, isLoading]);
+  
   // Filter transactions by type
   const incomeTransactions = transactions.filter(tx => tx.type === 'income');
   const expenseTransactions = transactions.filter(tx => 
@@ -58,6 +65,13 @@ const TransactionList: React.FC<TransactionListProps> = ({
   const incomeCount = incomeTransactions.length;
   const expenseCount = expenseTransactions.length;
   const collaboratorCount = collaboratorTransactions.length;
+  
+  console.log('Transaction counts:', {
+    total: transactions.length,
+    income: incomeCount,
+    expense: expenseCount,
+    collaborator: collaboratorCount
+  });
 
   return (
     <>

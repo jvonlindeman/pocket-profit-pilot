@@ -44,31 +44,34 @@ export const useFinanceData = () => {
       const stripeData = await loadStripeIncomeData(dateRange, isDateInRange);
       console.log('💰 Loaded Stripe income data:', stripeData);
       
+      // Set the Stripe income value after loading to ensure it's available
       if (stripeData) {
         setStripeIncome(stripeData.amount || 0);
       }
       
       // Then fetch the main financial data including Stripe
-      console.log('📈 Fetching financial data...');
+      console.log('📈 Fetching financial data with stripe data:', stripeData);
       const result = await fetchFinancialData(dateRange, forceRefresh, {
         amount: stripeData?.amount || 0,
         isOverridden: stripeData?.isOverridden || false
       });
       
       if (result) {
-        console.log('✅ Financial data loaded successfully');
+        console.log('✅ Financial data loaded successfully:', result);
         setDataInitialized(true);
         toast({
           title: "Datos cargados",
           description: "Datos financieros actualizados correctamente",
         });
+        return true;
       } else {
-        console.error("❌ Failed to load financial data");
+        console.error("❌ Failed to load financial data - result was null/undefined");
         toast({
           variant: "destructive",
           title: "Error de carga",
           description: "No se pudieron cargar los datos financieros",
         });
+        return false;
       }
     } catch (err) {
       console.error("🚨 Error in refreshData:", err);
@@ -77,6 +80,7 @@ export const useFinanceData = () => {
         title: "Error de carga",
         description: err instanceof Error ? err.message : "Error desconocido al cargar datos",
       });
+      return false;
     }
   }, [dateRange, isDateInRange, loadStripeIncomeData, fetchFinancialData, setDataInitialized, toast, setStripeIncome]);
 
@@ -93,7 +97,7 @@ export const useFinanceData = () => {
       if (success) {
         console.log('✅ Cache cleared successfully');
         // Force refresh the data after clearing cache
-        await refreshData(true);
+        return await refreshData(true);
       } else {
         console.error('❌ Failed to clear cache');
         toast({
@@ -101,6 +105,7 @@ export const useFinanceData = () => {
           title: "Error",
           description: "No se pudo limpiar el caché",
         });
+        return false;
       }
     } catch (err) {
       console.error('🚨 Error clearing cache:', err);
@@ -109,6 +114,7 @@ export const useFinanceData = () => {
         title: "Error",
         description: err instanceof Error ? err.message : "Error desconocido al limpiar caché",
       });
+      return false;
     }
   }, [dateRange, clearCacheAndRefresh, refreshData, toast]);
 

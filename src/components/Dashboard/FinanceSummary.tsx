@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, Users, Scale } from 'lucide-react';
 import { FinancialSummary, CategorySummary } from '@/types/financial';
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,6 +22,16 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
   regularIncome = 0,
   stripeOverride = null
 }) => {
+  // Debug logging for component render
+  useEffect(() => {
+    console.log('🧩 FinanceSummary rendered with props:', { 
+      summary, 
+      stripeIncome, 
+      regularIncome, 
+      stripeOverride 
+    });
+  }, [summary, stripeIncome, regularIncome, stripeOverride]);
+
   // Ensure all values are numbers
   const totalIncome = safeParseNumber(summary.totalIncome);
   const totalExpense = safeParseNumber(summary.totalExpense);
@@ -38,16 +48,15 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
   const safeStripeIncome = safeParseNumber(stripeIncome);
   const safeRegularIncome = safeParseNumber(regularIncome);
 
-  console.log('FinanceSummary rendering with values:', {
-    summary,
+  console.log('FinanceSummary calculated values:', {
     totalIncome, 
     totalExpense,
     collaboratorExpense,
     otherExpense,
     profit,
     profitMargin,
-    stripeIncome: safeStripeIncome,
-    regularIncome: safeRegularIncome,
+    safeStripeIncome,
+    safeRegularIncome,
     stripeOverride
   });
 

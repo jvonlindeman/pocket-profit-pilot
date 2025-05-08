@@ -111,16 +111,18 @@ export const useFinanceDataFetcher = () => {
         // Race the invoke promise with a timeout
         const result = await Promise.race([
           invokePromise,
-          timeoutPromise(15000) // 15 seconds timeout
+          timeoutPromise(30000) // 30 seconds timeout (increased from 15)
         ]) as any;
         
         if (result.error) {
+          console.error("❌ Supabase function returned an error:", result.error);
           throw new Error(`Error al invocar la función zoho-transactions: ${result.error.message || JSON.stringify(result.error)}`);
         }
         
         data = result.data;
         
         if (!data) {
+          console.error("❌ No data received from zoho-transactions function");
           throw new Error("No se recibieron datos de la función zoho-transactions");
         }
         
@@ -131,16 +133,17 @@ export const useFinanceDataFetcher = () => {
         
         // Fallback to direct fetch
         try {
-          console.log("⚠️ Falling back to direct fetch method");
+          console.log("⚠️ Falling back to direct fetch method with URL:", `/functions/v1/zoho-transactions?${params.toString()}`);
           const fetchPromise = fetch(`/functions/v1/zoho-transactions?${params.toString()}`);
           
           // Race the fetch promise with a timeout
           const response = await Promise.race([
             fetchPromise,
-            timeoutPromise(15000) // 15 seconds timeout
+            timeoutPromise(30000) // 30 seconds timeout (increased from 15)
           ]) as Response;
           
           if (!response.ok) {
+            console.error("❌ HTTP error response:", response.status, response.statusText);
             throw new Error(`HTTP error! status: ${response.status}`);
           }
           
@@ -154,13 +157,14 @@ export const useFinanceDataFetcher = () => {
           
           data = await response.json();
           console.log("✅ Data received from direct API call:", data);
-        } catch (fetchError) {
+        } catch (fetchError: any) {
           console.error("❌ Error with direct fetch call:", fetchError);
-          throw apiError || new Error("Error al obtener datos financieros");
+          throw apiError || fetchError || new Error("Error al obtener datos financieros");
         }
       }
       
       // Store raw response for debugging
+      console.log("📑 Setting raw response data:", data);
       setRawResponse(data);
       
       // Update cache status information
@@ -174,6 +178,12 @@ export const useFinanceDataFetcher = () => {
             totalCount: data.cache_status.stats.total_count || 0
           } : null,
           lastRefresh: new Date()
+        });
+        
+        console.log("🔄 Cache status updated:", {
+          usingCachedData: data.cache_status.using_cached_data || false,
+          partialRefresh: data.cache_status.partial_refresh || false,
+          stats: data.cache_status.stats
         });
       }
       
@@ -216,6 +226,7 @@ export const useFinanceDataFetcher = () => {
         };
         
         // Update state with processed data
+        console.log("🔄 Setting financial data:", updatedData);
         setFinancialData(updatedData);
         
         // Extract collaborator expenses if available
@@ -234,6 +245,11 @@ export const useFinanceDataFetcher = () => {
         return updatedData;
       } else {
         console.warn('⚠️ No financial_data found in the response:', data);
+        toast({
+          variant: "destructive",
+          title: "Error en formato de datos",
+          description: "La respuesta del servidor no contiene datos financieros en el formato esperado",
+        });
         return DEFAULT_FINANCIAL_DATA;
       }
     } catch (err: any) {
