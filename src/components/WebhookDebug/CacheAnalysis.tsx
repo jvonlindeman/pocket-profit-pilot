@@ -54,12 +54,9 @@ const CacheAnalysis: React.FC<CacheAnalysisProps> = ({ onUpdate }) => {
     setError(null);
     
     try {
-      // Get all unique month-years with type assertion to bypass TypeScript constraints
+      // Get all unique month-years with type assertion
       const { data: monthsData, error: monthsError } = await supabase
-        .rpc('get_unique_months_with_transactions') as { 
-          data: MonthYearResult[] | null, 
-          error: any 
-        };
+        .rpc('get_unique_months_with_transactions') as any;
       
       if (monthsError) {
         throw new Error(`Error getting unique months: ${monthsError.message}`);
@@ -76,17 +73,14 @@ const CacheAnalysis: React.FC<CacheAnalysisProps> = ({ onUpdate }) => {
       const monthsWithStats: MonthStats[] = [];
       let totalCount = 0;
       
-      for (const monthObj of monthsData as MonthYearResult[]) {
+      for (const monthObj of monthsData) {
         const monthYear = monthObj.month_year;
         
         // Get first and last date for this month with type assertion
         const { data: dateRangeData, error: dateRangeError } = await supabase
           .rpc('get_month_transaction_range', { 
             month_year_param: monthYear 
-          }) as { 
-            data: DateRangeResult[] | null, 
-            error: any 
-          };
+          }) as any;
           
         if (dateRangeError) {
           console.error(`Error getting date range for ${monthYear}:`, dateRangeError);
