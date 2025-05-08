@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
-import FinanceSummary from '@/components/Dashboard/FinanceSummary';
+import FinanceSummary from '@/components/Dashboard/FinanceSummary/index';
 import RevenueChart from '@/components/Dashboard/RevenueChart';
 import ExpenseChart from '@/components/Dashboard/ExpenseChart';
 import CollaboratorChart from '@/components/Dashboard/CollaboratorChart';
