@@ -28,26 +28,28 @@ const RevenueChart: React.FC<RevenueChartProps> = ({ incomeData, expenseData, st
     );
   }
 
-  // Safely prepare chart data
+  // Safely prepare chart data with strong type checks and fallbacks
   const chartData = incomeData.labels.map((label, index) => {
+    // Make sure all values exist and are valid numbers
     const stripeValue = stripeData && 
                         stripeData.values && 
                         Array.isArray(stripeData.values) && 
-                        stripeData.values.length > index ? 
-                          stripeData.values[index] || 0 : 0;
+                        index < stripeData.values.length ? 
+                          Number(stripeData.values[index] || 0) : 0;
                           
     const regularIncome = incomeData.values && 
                           Array.isArray(incomeData.values) && 
                           index < incomeData.values.length ? 
-                            incomeData.values[index] : 0;
+                            Number(incomeData.values[index] || 0) : 0;
                             
-    const expense = expenseData.values && 
+    const expense = expenseData && 
+                    expenseData.values && 
                     Array.isArray(expenseData.values) && 
                     index < expenseData.values.length ? 
-                      expenseData.values[index] : 0;
+                      Number(expenseData.values[index] || 0) : 0;
     
     return {
-      name: label,
+      name: label || `Day ${index + 1}`,
       ingresos_regulares: regularIncome,
       stripe: stripeValue,
       ingresos_totales: regularIncome + stripeValue,

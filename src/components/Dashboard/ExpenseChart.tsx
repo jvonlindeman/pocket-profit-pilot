@@ -23,8 +23,15 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenseData }) => {
     );
   }
 
+  // Make a defensive copy of the data and ensure all required properties exist
+  const safeExpenseData = expenseData.map(item => ({
+    category: item.category || 'Sin categoría',
+    amount: typeof item.amount === 'number' ? item.amount : 0,
+    percentage: typeof item.percentage === 'number' ? item.percentage : 0
+  }));
+
   // Filtramos los pagos a colaboradores de los datos
-  const filteredExpenseData = expenseData.filter(item => 
+  const filteredExpenseData = safeExpenseData.filter(item => 
     item.category.toLowerCase() !== 'pagos a colaboradores'
   );
 
@@ -51,7 +58,7 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenseData }) => {
       'default': '#95a5a6'
     };
 
-    return colors[category.toLowerCase()] || colors.default;
+    return colors[(category || '').toLowerCase()] || colors.default;
   };
 
   // Preparamos datos para el gráfico with safety checks for percentage
@@ -73,12 +80,12 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenseData }) => {
 
   // Renderizado personalizado para el tooltip
   const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
+    if (active && payload && payload.length && payload[0]) {
       return (
         <div className="bg-white p-3 shadow-md rounded-md border border-gray-100">
           <p className="text-sm font-medium">{payload[0].name}</p>
           <p className="text-sm">{formatCurrency(payload[0].value)}</p>
-          <p className="text-sm text-gray-500">{payload[0].payload.percentage}</p>
+          <p className="text-sm text-gray-500">{payload[0].payload?.percentage || '0.0%'}</p>
         </div>
       );
     }
@@ -114,7 +121,7 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenseData }) => {
                 align="right"
                 formatter={(value, entry, index) => {
                   const item = chartData[index];
-                  return <span className="text-sm">{value} ({item.percentage})</span>;
+                  return <span className="text-sm">{value} ({item?.percentage || '0.0%'})</span>;
                 }}
               />
             </PieChart>

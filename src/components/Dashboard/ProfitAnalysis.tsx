@@ -33,12 +33,29 @@ const ProfitAnalysis: React.FC<ProfitAnalysisProps> = ({ monthlyData }) => {
   }
 
   // Now we can safely prepare chart data
-  const chartData = monthlyData.income.labels.map((label, index) => ({
-    name: label,
-    ingresos: monthlyData.income.values[index] || 0,
-    gastos: monthlyData.expense.values && monthlyData.expense.values[index] ? monthlyData.expense.values[index] : 0,
-    beneficio: monthlyData.profit.values && monthlyData.profit.values[index] ? monthlyData.profit.values[index] : 0
-  }));
+  const chartData = monthlyData.income.labels.map((label, index) => {
+    // Make sure all values are numbers with fallbacks to 0
+    const incomeValue = monthlyData.income.values && Array.isArray(monthlyData.income.values) && 
+                        index < monthlyData.income.values.length ? 
+                        Number(monthlyData.income.values[index] || 0) : 0;
+    
+    const expenseValue = monthlyData.expense && monthlyData.expense.values && 
+                         Array.isArray(monthlyData.expense.values) && 
+                         index < monthlyData.expense.values.length ? 
+                         Number(monthlyData.expense.values[index] || 0) : 0;
+    
+    const profitValue = monthlyData.profit && monthlyData.profit.values && 
+                        Array.isArray(monthlyData.profit.values) && 
+                        index < monthlyData.profit.values.length ? 
+                        Number(monthlyData.profit.values[index] || 0) : 0;
+    
+    return {
+      name: label || `Month ${index + 1}`,
+      ingresos: incomeValue,
+      gastos: expenseValue,
+      beneficio: profitValue
+    };
+  });
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
