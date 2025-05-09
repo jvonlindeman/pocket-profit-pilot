@@ -58,7 +58,7 @@ const DashboardContent: React.FC = () => {
             usingCachedData={usingCachedData}
             partialRefresh={partialRefresh}
             cacheStats={cacheStats}
-            lastRefresh={cacheStats?.lastRefresh || null}
+            lastRefresh={cacheStats?.lastRefresh ? new Date(cacheStats.lastRefresh) : null}
             onRefreshClick={forceManualRefresh}
             isRefreshing={isRefreshing}
             refreshCount={refreshCount}

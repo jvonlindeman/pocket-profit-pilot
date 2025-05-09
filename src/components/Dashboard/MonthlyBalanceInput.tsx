@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { formatISO } from 'date-fns';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 import { formatCurrency } from '@/utils/financialUtils';
 
@@ -12,7 +11,7 @@ interface MonthlyBalanceInputProps {
 }
 
 const MonthlyBalanceInput: React.FC<MonthlyBalanceInputProps> = ({ currentDate }) => {
-  const { balance, setBalance, saveBalance, isLoading } = useMonthlyBalance({ currentDate });
+  const { balance, saveBalance, loading } = useMonthlyBalance({ currentDate });
   const [inputValue, setInputValue] = useState<string>('');
   
   // Update input when balance changes
@@ -56,8 +55,8 @@ const MonthlyBalanceInput: React.FC<MonthlyBalanceInputProps> = ({ currentDate }
             className="flex-1"
             step="0.01"
           />
-          <Button onClick={handleSave} disabled={isLoading}>
-            {isLoading ? 'Guardando...' : 'Guardar'}
+          <Button onClick={handleSave} disabled={loading}>
+            {loading ? 'Guardando...' : 'Guardar'}
           </Button>
         </div>
         {balance !== undefined && balance !== null && (

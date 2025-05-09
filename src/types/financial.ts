@@ -91,4 +91,5 @@ export interface CacheStats {
   cachedCount: number;
   newCount: number;
   totalCount: number;
+  lastRefresh?: string | null;
 }
