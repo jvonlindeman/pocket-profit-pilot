@@ -1,5 +1,9 @@
+
 import { Transaction, FinancialSummary, FinancialData, CategorySummary, CacheStats } from '@/types/financial';
 import { calculateDailyAndMonthlyData, calculateExpensesByCategory, calculateIncomeBySource } from './financeDataProcessor';
+import { safeParseNumber } from './financialUtils';
+import { DEFAULT_FINANCIAL_DATA } from '@/constants/financialDefaults';
+import { CacheStatus as CacheStatusType } from '@/types/cache'; 
 
 /**
  * Interface for cache status information
@@ -11,6 +15,81 @@ interface CacheStatus {
 }
 
 /**
+ * Process raw transaction data into the standard financial data format
+ * @param transactions Transaction list
+ * @param stripeAmount Stripe income amount
+ * @param startingBalance Optional starting balance
+ * @returns Processed financial data
+ */
+export const processTransactionsIntoFinancialData = (
+  transactions: Transaction[],
+  stripeAmount: number,
+  startingBalance: number | null
+): FinancialData => {
+  // Filter income and expense transactions
+  const incomeTransactions = transactions.filter(tx => tx.type === 'income');
+  const expenseTransactions = transactions.filter(tx => tx.type === 'expense');
+  
+  // Calculate regular income (excluding stripe)
+  const regularIncome = incomeTransactions
+    .filter(tx => tx.source !== 'Stripe')
+    .reduce((sum, tx) => sum + tx.amount, 0);
+  
+  // Calculate total income including Stripe
+  const totalIncome = regularIncome + stripeAmount;
+  
+  // Calculate total expenses
+  const totalExpense = expenseTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+  
+  // Calculate profit and profit margin
+  const profit = totalIncome - totalExpense;
+  const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0;
+  
+  // Calculate collaborator expenses
+  const collaboratorExpense = expenseTransactions
+    .filter(tx => tx.category === 'Colaboradores' || tx.category === 'Collaborators')
+    .reduce((sum, tx) => sum + tx.amount, 0);
+  
+  // Calculate other expenses
+  const otherExpense = totalExpense - collaboratorExpense;
+  
+  // Process chart data
+  const chartData = calculateDailyAndMonthlyData(transactions);
+  
+  // Process income by source and expenses by category
+  const incomeBySource = calculateIncomeBySource(transactions);
+  const expenseByCategory = calculateExpensesByCategory(transactions);
+  
+  // Combine all data into the final structure
+  return {
+    summary: {
+      totalIncome,
+      totalExpense,
+      collaboratorExpense,
+      otherExpense,
+      profit,
+      profitMargin,
+      startingBalance: startingBalance || 0
+    },
+    transactions,
+    incomeBySource,
+    expenseByCategory,
+    dailyData: chartData.income && chartData.expense ? {
+      income: chartData.income,
+      expense: chartData.expense
+    } : {
+      income: { labels: [], values: [] },
+      expense: { labels: [], values: [] }
+    },
+    monthlyData: chartData.monthlyData ? chartData.monthlyData : {
+      income: { labels: [], values: [] },
+      expense: { labels: [], values: [] },
+      profit: { labels: [], values: [] }
+    }
+  };
+};
+
+/**
  * Transform financial data from API response to application format
  * @param data Raw data from API
  * @param stripeIncomeData Stripe income data
@@ -20,7 +99,7 @@ interface CacheStatus {
 export const transformFinancialData = (
   data: any, 
   stripeIncomeData: { amount: number, isOverridden: boolean },
-  updateCacheStatus: (status: CacheStatus) => void
+  updateCacheStatus: (status: CacheStatusType) => void
 ): FinancialData => {
   // Check if we have the expected data format or if we need to transform it
   if (!data.financial_data && data.cached_transactions) {
@@ -115,7 +194,7 @@ export const transformFinancialData = (
 /**
  * Extract and update cache status from API response
  */
-const updateCacheStatusFromResponse = (data: any, updateCacheStatus: (status: CacheStatus) => void): void => {
+const updateCacheStatusFromResponse = (data: any, updateCacheStatus: (status: CacheStatusType) => void): void => {
   if (data.fromCache || data.cached || data.partialRefresh) {
     updateCacheStatus({
       usingCachedData: Boolean(data.fromCache || data.cached),
@@ -124,9 +203,11 @@ const updateCacheStatusFromResponse = (data: any, updateCacheStatus: (status: Ca
         ? { 
             cachedCount: data.cacheStats?.cachedCount || 0,
             newCount: data.newTransactionsCount || 0,
-            isFresh: data.cacheStats?.isFresh || false
+            totalCount: data.cacheStats?.totalCount || 0
           } 
-        : null
+        : null,
+      lastRefresh: new Date()
     });
   }
 };
+

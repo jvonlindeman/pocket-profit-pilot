@@ -6,7 +6,8 @@
 export interface CacheStats {
   cachedCount: number;
   newCount: number;
-  totalCount: number;
+  totalCount?: number;
+  isFresh?: boolean;
 }
 
 export interface CacheStatus {
