@@ -9,10 +9,38 @@ interface ExpenseChartProps {
 }
 
 const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenseData }) => {
+  // Safety check for the entire expense data array
+  if (!expenseData || !Array.isArray(expenseData) || expenseData.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Distribución de Gastos (USD)</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center h-[250px] bg-gray-50">
+          <p className="text-gray-500">No hay datos suficientes para mostrar el gráfico</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   // Filtramos los pagos a colaboradores de los datos
   const filteredExpenseData = expenseData.filter(item => 
     item.category.toLowerCase() !== 'pagos a colaboradores'
   );
+
+  // Safety check for filtered data
+  if (filteredExpenseData.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Distribución de Gastos (USD)</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center h-[250px] bg-gray-50">
+          <p className="text-gray-500">No hay gastos distintos a pagos a colaboradores para mostrar</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   // Colores personalizados según categorías
   const getCategoryColor = (category: string) => {
@@ -26,11 +54,13 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenseData }) => {
     return colors[category.toLowerCase()] || colors.default;
   };
 
-  // Preparamos datos para el gráfico
+  // Preparamos datos para el gráfico with safety checks for percentage
   const chartData = filteredExpenseData.map((item) => ({
     name: item.category,
     value: item.amount,
-    percentage: item.percentage.toFixed(1) + '%'
+    percentage: item.percentage !== undefined && !isNaN(item.percentage) 
+      ? item.percentage.toFixed(1) + '%' 
+      : '0.0%'
   }));
 
   // Formateo de moneda (ahora en USD)
