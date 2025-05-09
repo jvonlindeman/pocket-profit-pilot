@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { DateRange } from '@/types/financial';
 import { useDateRange } from '@/hooks/useDateRange';
@@ -34,6 +34,9 @@ export const useFinanceData = () => {
     fetchFinancialData,
     clearCacheAndRefresh
   } = dataFetcher;
+  
+  // Add a ref to track if the balance has been synced to avoid infinite loops
+  const balanceSyncedRef = useRef<number | null>(null);
 
   // Main function to fetch and process financial data
   const refreshData = useCallback(async (forceRefresh: boolean = false) => {
@@ -154,19 +157,33 @@ export const useFinanceData = () => {
   }, [dataInitialized]);
 
   // If the financialData doesn't have the starting balance but we have one from the monthly balance,
-  // update the financial data summary
+  // update the financial data summary, but with protections against infinite loops
   useEffect(() => {
-    if (financialData && startingBalance !== undefined && 
-        (financialData.summary.startingBalance === undefined || 
-         financialData.summary.startingBalance !== startingBalance)) {
-      console.log('📊 Updating financial data with starting balance:', startingBalance);
-      dataFetcher.setFinancialData({
-        ...financialData,
-        summary: {
-          ...financialData.summary,
-          startingBalance: startingBalance
-        }
-      });
+    // Only proceed if we have both financialData and a valid startingBalance
+    if (financialData && startingBalance !== undefined && startingBalance !== null) {
+      // Check if the balance is different from what's in financialData OR from our last synced value
+      const currentFinancialDataBalance = financialData.summary.startingBalance;
+      const needsUpdate = currentFinancialDataBalance === undefined || 
+                           currentFinancialDataBalance !== startingBalance;
+      
+      // Ensure we're not in an update loop by checking if this balance is the same as the last one we synced
+      const alreadySynced = balanceSyncedRef.current === startingBalance;
+      
+      if (needsUpdate && !alreadySynced) {
+        console.log('📊 Updating financial data with starting balance:', startingBalance);
+        
+        // Update our ref to indicate we've synced this specific balance value
+        balanceSyncedRef.current = startingBalance;
+        
+        // Update the financial data with the new balance
+        dataFetcher.setFinancialData({
+          ...financialData,
+          summary: {
+            ...financialData.summary,
+            startingBalance: startingBalance
+          }
+        });
+      }
     }
   }, [financialData, startingBalance, dataFetcher]);
 
