@@ -37,7 +37,7 @@ export const useFinanceData = () => {
     collaboratorExpenses,
     cacheStatus,
     fetchFinancialData,
-    clearCacheAndRefresh,
+    clearCacheAndRefresh: clearCacheFromDataFetcher,
     setFinancialData
   } = dataFetcher;
   
@@ -177,7 +177,7 @@ export const useFinanceData = () => {
     });
     
     try {
-      const success = await clearCacheForDateRange(dateRange);
+      const success = await clearCacheFromDataFetcher(dateRange);
       if (success) {
         console.log('✅ Cache cleared successfully');
         // Force refresh the data after clearing cache
@@ -200,7 +200,7 @@ export const useFinanceData = () => {
       });
       return false;
     }
-  }, [dateRange, clearCacheForDateRange, refreshData, toast]);
+  }, [dateRange, clearCacheFromDataFetcher, refreshData, toast]);
 
   // Update data when date range changes - REMOVED startingBalance from dependencies!
   useEffect(() => {
@@ -297,3 +297,4 @@ export const useFinanceData = () => {
     clearCacheAndRefresh: handleClearCacheAndRefresh,
   };
 };
+
