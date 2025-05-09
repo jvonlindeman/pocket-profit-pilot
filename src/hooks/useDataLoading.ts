@@ -3,7 +3,7 @@ import { useCallback } from 'react';
 import { DateRange } from '@/types/financial';
 
 /**
- * Hook to manage data loading operations
+ * Hook to manage data loading operations without circuit breaker functionality
  */
 export const useDataLoading = () => {
   // Main function to fetch and process financial data

@@ -6,7 +6,7 @@ import { useDateRange } from '@/hooks/useDateRange';
 import { useStripeIncome } from '@/hooks/useStripeIncome';
 import { useFinanceDataFetcher } from '@/hooks/useFinanceDataFetcher';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
-import { useDataRefresh } from '@/hooks/useDataRefresh';
+import { useSimpleDataRefresh } from '@/hooks/useSimpleDataRefresh';
 import { useDataLoading } from '@/hooks/useDataLoading';
 import { useBalanceSync } from '@/hooks/useBalanceSync';
 
@@ -36,14 +36,15 @@ export const useFinanceData = () => {
     cacheStatus,
     fetchFinancialData,
     clearCacheAndRefresh: clearCacheFromDataFetcher,
-    resetCircuitBreakerState,
+    resetErrorState,
     setFinancialData
   } = dataFetcher;
   
-  const dataRefresh = useDataRefresh();
+  // Use our simplified data refresh hook
+  const dataRefresh = useSimpleDataRefresh();
   const { 
     isRefreshing, 
-    refreshCount, 
+    resetRefreshState,
     withRefreshProtection, 
     forceManualRefresh: forceManualRefreshAction,
     handleClearCacheAndRefresh,
@@ -65,16 +66,16 @@ export const useFinanceData = () => {
 
   // Reset refresh count when component mounts or date range changes
   useEffect(() => {
-    // Only reset counters if the date range has actually changed
+    // Only reset refresh state if the date range has actually changed
     if (!currentDateRangeRef.current || 
         currentDateRangeRef.current.startDate !== dateRange.startDate || 
         currentDateRangeRef.current.endDate !== dateRange.endDate) {
-      console.log('🔄 Date range changed, resetting refresh count');
-      dataRefresh.resetCircuitBreaker();
+      console.log('🔄 Date range changed, resetting refresh state');
+      resetRefreshState();
       // Update current date range ref
       currentDateRangeRef.current = { ...dateRange };
     }
-  }, [dateRange, dataRefresh]);
+  }, [dateRange, resetRefreshState]);
   
   // Main function to fetch and process financial data
   const refreshData = useCallback(async (forceRefresh: boolean = false) => {
@@ -112,17 +113,17 @@ export const useFinanceData = () => {
     );
   }, [dateRange, clearCacheFromDataFetcher, refreshData, handleClearCacheAndRefresh]);
 
-  // Manual refresh function that resets circuit breaker and forces refresh
+  // Manual refresh function that resets refresh state and forces refresh
   const forceManualRefresh = useCallback(async () => {
     return await forceManualRefreshAction(refreshData);
   }, [refreshData, forceManualRefreshAction]);
 
   // Handle emergency recovery - reset all states
   const emergencyRecovery = useCallback(() => {
-    return handleEmergencyRecovery(resetCircuitBreakerState);
-  }, [handleEmergencyRecovery, resetCircuitBreakerState]);
+    return handleEmergencyRecovery(resetErrorState);
+  }, [handleEmergencyRecovery, resetErrorState]);
 
-  // Update data when date range changes - removed startingBalance from dependencies!
+  // Update data when date range changes
   useEffect(() => {
     if (dataInitialized) {
       console.log('📅 Date range changed, refreshing data:', { dateRange });
@@ -141,7 +142,7 @@ export const useFinanceData = () => {
     }
   }, [dataInitialized]);
 
-  // Completely separate effect for handling startingBalance changes
+  // Effect for handling startingBalance changes
   useEffect(() => {
     syncBalance(startingBalance, financialData, setFinancialData, dataInitialized);
   }, [startingBalance, financialData, setFinancialData, dataInitialized, syncBalance]);
@@ -186,7 +187,6 @@ export const useFinanceData = () => {
     
     // Status information
     isRefreshing,
-    refreshCount,
     
     // Error information
     lastError,

@@ -6,7 +6,6 @@ import { DEFAULT_FINANCIAL_DATA } from '@/constants/financialDefaults';
 import { useFinanceAPI } from '@/hooks/useFinanceAPI';
 import { useCacheManagement } from '@/hooks/useCacheManagement';
 import { transformFinancialData } from '@/utils/financeDataTransformer';
-import { getCircuitBreaker } from '@/utils/circuitBreaker';
 import { retryWithBackoff } from '@/utils/apiUtils';
 import { useFinanceDataState } from '@/hooks/useFinanceDataState';
 import { useFinanceErrorHandler } from '@/hooks/useFinanceErrorHandler';
@@ -15,9 +14,6 @@ export const useFinanceDataFetcher = () => {
   const { toast } = useToast();
   const { fetchFinanceDataFromAPI } = useFinanceAPI();
   const { cacheStatus, updateCacheStatus, clearCacheForDateRange } = useCacheManagement();
-  
-  // Get circuit breaker instance
-  const circuitBreaker = getCircuitBreaker();
 
   // Use our new hooks for state management and error handling
   const {
@@ -38,24 +34,24 @@ export const useFinanceDataFetcher = () => {
   const {
     error,
     setError,
-    resetCircuitBreakerState,
+    resetErrorState,
     localRefreshingRef
   } = useFinanceErrorHandler();
 
-  // Fetch financial data from the API or cache - updated to match parameter order from types
+  // Fetch financial data from the API or cache
   const fetchFinancialData = useCallback(async (
     dateRange: DateRange, 
     stripeIncomeData: { amount: number, isOverridden: boolean },
     startingBalanceData?: { starting_balance: number },
     forceRefresh: boolean = false
   ) => {
-    // Check if we're already refreshing - first check global state, then local ref
-    if (circuitBreaker.getState().isRefreshing || localRefreshingRef.current) {
+    // Check if we're already refreshing using the local ref
+    if (localRefreshingRef.current && !forceRefresh) {
       console.warn("⚠️ Fetch operation already in progress, skipping duplicate request");
       return null;
     }
     
-    // Set both global and local refresh flags
+    // Set local refresh flags
     localRefreshingRef.current = true;
     
     console.log(`📊 Fetching financial data with forceRefresh=${forceRefresh}, startingBalance=${startingBalanceData?.starting_balance}`);
@@ -143,8 +139,8 @@ export const useFinanceDataFetcher = () => {
 
   // Clear cache and force refresh data
   const clearCacheAndRefresh = useCallback(async (dateRange: DateRange) => {
-    // Use circuit breaker here as well
-    if (circuitBreaker.getState().isRefreshing || localRefreshingRef.current) {
+    // Use local refreshing ref
+    if (localRefreshingRef.current) {
       console.warn("⚠️ Cache clear operation already in progress, skipping duplicate request");
       return false;
     }
@@ -180,8 +176,7 @@ export const useFinanceDataFetcher = () => {
     cacheStatus,
     fetchFinancialData,
     clearCacheAndRefresh,
-    resetCircuitBreakerState,
-    isRefreshing: circuitBreaker.getState().isRefreshing || localRefreshingRef.current,
-    refreshCount: circuitBreaker.getState().refreshCount
+    resetErrorState,
+    isRefreshing: localRefreshingRef.current,
   };
 };

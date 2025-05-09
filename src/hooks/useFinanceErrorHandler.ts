@@ -1,9 +1,8 @@
 
 import { useState, useRef, useCallback } from 'react';
-import { getCircuitBreaker } from '@/utils/circuitBreaker';
 
 /**
- * Hook to manage errors and circuit breaker state for financial data
+ * Hook to manage errors for financial data without circuit breaker
  */
 export const useFinanceErrorHandler = () => {
   // Error state
@@ -11,22 +10,18 @@ export const useFinanceErrorHandler = () => {
   
   // Create a local ref to track if a refresh is in progress
   const localRefreshingRef = useRef<boolean>(false);
-  
-  // Get circuit breaker instance
-  const circuitBreaker = getCircuitBreaker();
 
-  // Reset circuit breaker state
-  const resetCircuitBreakerState = useCallback(() => {
+  // Reset error state
+  const resetErrorState = useCallback(() => {
     localRefreshingRef.current = false;
-    circuitBreaker.reset();
     setError(null);
-    console.log('🔄 Circuit breaker state reset in data fetcher');
+    console.log('🔄 Error state reset in data fetcher');
   }, []);
 
   return {
     error,
     setError,
-    resetCircuitBreakerState,
+    resetErrorState,
     localRefreshingRef
   };
 };
