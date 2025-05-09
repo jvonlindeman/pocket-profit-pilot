@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -21,7 +20,8 @@ interface WebhookDebugProps {
   rawResponse?: any;
 }
 
-export default function WebhookDebug({ dateRange, refreshDataFunction, rawResponse }: WebhookDebugProps) {
+// Renamed from WebhookDebug to WebhookDebugExtended to avoid naming conflicts
+export default function WebhookDebugExtended({ dateRange, refreshDataFunction, rawResponse }: WebhookDebugProps) {
   const [loading, setLoading] = useState(false);
   const [rawData, setRawData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
