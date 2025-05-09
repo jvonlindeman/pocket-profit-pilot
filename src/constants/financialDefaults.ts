@@ -10,7 +10,7 @@ export const DEFAULT_FINANCIAL_DATA: FinancialData = {
     otherExpense: 0,
     profit: 0,
     profitMargin: 0,
-    startingBalance: undefined
+    startingBalance: 0 // Set a default value for startingBalance
   },
   transactions: [],
   incomeBySource: [],

@@ -12,7 +12,10 @@ interface RevenueChartProps {
 
 const RevenueChart: React.FC<RevenueChartProps> = ({ incomeData, expenseData, stripeData }) => {
   // Add safety check before processing data
-  if (!incomeData || !incomeData.labels || !Array.isArray(incomeData.labels) || !incomeData.labels.length) {
+  if (!incomeData || 
+      !incomeData.labels || 
+      !Array.isArray(incomeData.labels) || 
+      incomeData.labels.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -27,9 +30,21 @@ const RevenueChart: React.FC<RevenueChartProps> = ({ incomeData, expenseData, st
 
   // Safely prepare chart data
   const chartData = incomeData.labels.map((label, index) => {
-    const stripeValue = stripeData && stripeData.values && stripeData.values.length > index ? stripeData.values[index] || 0 : 0;
-    const regularIncome = incomeData.values && incomeData.values[index] ? incomeData.values[index] : 0;
-    const expense = expenseData.values && expenseData.values[index] ? expenseData.values[index] : 0;
+    const stripeValue = stripeData && 
+                        stripeData.values && 
+                        Array.isArray(stripeData.values) && 
+                        stripeData.values.length > index ? 
+                          stripeData.values[index] || 0 : 0;
+                          
+    const regularIncome = incomeData.values && 
+                          Array.isArray(incomeData.values) && 
+                          index < incomeData.values.length ? 
+                            incomeData.values[index] : 0;
+                            
+    const expense = expenseData.values && 
+                    Array.isArray(expenseData.values) && 
+                    index < expenseData.values.length ? 
+                      expenseData.values[index] : 0;
     
     return {
       name: label,

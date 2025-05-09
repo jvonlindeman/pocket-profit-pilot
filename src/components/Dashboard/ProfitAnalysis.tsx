@@ -14,7 +14,11 @@ interface ProfitAnalysisProps {
 
 const ProfitAnalysis: React.FC<ProfitAnalysisProps> = ({ monthlyData }) => {
   // Ensure we have valid data before trying to map it
-  if (!monthlyData || !monthlyData.income || !monthlyData.income.labels || !Array.isArray(monthlyData.income.labels)) {
+  if (!monthlyData || 
+      !monthlyData.income || 
+      !monthlyData.income.labels || 
+      !Array.isArray(monthlyData.income.labels) || 
+      monthlyData.income.labels.length === 0) {
     // Return a placeholder when data is not available
     return (
       <Card>
@@ -32,8 +36,8 @@ const ProfitAnalysis: React.FC<ProfitAnalysisProps> = ({ monthlyData }) => {
   const chartData = monthlyData.income.labels.map((label, index) => ({
     name: label,
     ingresos: monthlyData.income.values[index] || 0,
-    gastos: monthlyData.expense.values[index] || 0,
-    beneficio: monthlyData.profit.values[index] || 0
+    gastos: monthlyData.expense.values && monthlyData.expense.values[index] ? monthlyData.expense.values[index] : 0,
+    beneficio: monthlyData.profit.values && monthlyData.profit.values[index] ? monthlyData.profit.values[index] : 0
   }));
 
   const formatCurrency = (value: number) => {

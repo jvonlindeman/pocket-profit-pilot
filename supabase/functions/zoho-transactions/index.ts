@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -50,7 +49,7 @@ const generateConsistentId = (transaction: Partial<Transaction>, index: number):
 const isCacheFresh = (cachedData: any[], maxHoursOld = 24, requestStartDate: string = ''): boolean => {
   if (!cachedData || cachedData.length === 0) return false;
   
-  const latestSync = new Date(Math.max(...cachedData.map(tx => new Date(tx.sync_date).getTime())));
+  const latestSync = new Date(Math.max(...cachedData.map(tx => new Date(tx.sync_date || new Date()).getTime())));
   const cacheAge = Date.now() - latestSync.getTime();
   const cacheAgeHours = cacheAge / (1000 * 60 * 60);
   
@@ -110,16 +109,16 @@ const cacheCoversDateRange = (cachedData: any[], startDate: string, endDate: str
   // If we have transactions that cover the entire month (especially for past months),
   // we should consider the cache valid
   const isHistoricalMonth = new Date() > new Date(endDate);
+  const isCurrentMonthRequest = endDate.substring(0, 7) === new Date().toISOString().substring(0, 7);
   
-  const hasGoodCoverage = (
-    // Either spans the date range or has significant number of transactions for historical data
-    (spansDateRange || (isHistoricalMonth && cachedData.length > 20)) && 
-    // Always require both income and expense transactions
-    hasIncomeTransactions && 
-    hasExpenseTransactions && 
-    // Always require Zoho data
-    hasZohoTransactions
-  );
+  // For historical months, be more lenient about coverage
+  // For current month, be more strict (require full coverage)
+  const hasGoodCoverage = isCurrentMonthRequest ? 
+    // For current month: strict requirements
+    (spansDateRange && hasIncomeTransactions && hasExpenseTransactions && hasZohoTransactions) : 
+    // For historical months: more lenient
+    ((spansDateRange || (isHistoricalMonth && cachedData.length > 10)) && 
+     hasIncomeTransactions && hasExpenseTransactions && hasZohoTransactions);
     
   return hasGoodCoverage;
 };
@@ -309,6 +308,10 @@ serve(async (req: Request) => {
           JSON.stringify({
             fromCache: true,
             cached: true,
+            cache_status: {
+              usingCachedData: true,
+              partialRefresh: false
+            },
             data: cachedTransactions,
             cacheStats: {
               isFresh,
