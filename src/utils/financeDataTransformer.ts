@@ -1,4 +1,3 @@
-
 import { Transaction, FinancialSummary, FinancialData, CategorySummary, CacheStats } from '@/types/financial';
 import { calculateDailyAndMonthlyData, calculateExpensesByCategory, calculateIncomeBySource } from './financeDataProcessor';
 import { safeParseNumber } from './financialUtils';
@@ -242,8 +241,7 @@ const updateCacheStatusFromResponse = (data: any, updateCacheStatus: (status: Ca
             totalCount: data.cacheStats?.totalCount || 0,
             lastRefresh: data.cacheStats?.lastRefresh || new Date().toISOString()
           } 
-        : null,
-      lastRefresh: new Date()
+        : null
     });
   }
 };
