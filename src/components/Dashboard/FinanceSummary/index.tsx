@@ -46,7 +46,8 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
   const otherExpense = safeParseNumber(summary.otherExpense || 0);
   const profit = safeParseNumber(summary.profit);
   const profitMargin = safeParseNumber(summary.profitMargin);
-  const startingBalance = summary.startingBalance !== undefined ? safeParseNumber(summary.startingBalance) : undefined;
+  // Handle potentially undefined or null starting balance
+  const startingBalance = summary.startingBalance !== undefined ? safeParseNumber(summary.startingBalance) : null;
 
   // Check if stripe income is using an override
   const isStripeOverridden = stripeOverride !== null;

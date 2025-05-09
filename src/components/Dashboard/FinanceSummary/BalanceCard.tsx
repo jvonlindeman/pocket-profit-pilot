@@ -5,12 +5,14 @@ import FinanceSummaryCard from './FinanceSummaryCard';
 import { formatCurrency } from '@/utils/financialUtils';
 
 interface BalanceCardProps {
-  startingBalance?: number;
+  startingBalance?: number | null;
 }
 
 const BalanceCard: React.FC<BalanceCardProps> = ({ startingBalance }) => {
-  // Convert undefined to null to avoid display issues
-  const balanceValue = startingBalance !== undefined ? startingBalance : null;
+  // Convert undefined or null to null for consistent handling
+  const balanceValue = startingBalance !== undefined && startingBalance !== null 
+    ? startingBalance 
+    : null;
   
   // Format the balance for display or show "No establecido"
   const displayValue = balanceValue !== null 

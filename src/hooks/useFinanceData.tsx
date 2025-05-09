@@ -54,12 +54,14 @@ export const useFinanceData = () => {
         setStripeIncome(stripeData.amount || 0);
       }
       
-      // Pass starting balance if available
-      const startingBalanceData = startingBalance !== undefined && startingBalance !== null 
-        ? { starting_balance: startingBalance } 
-        : {};
-        
-      console.log('💰 Passing starting balance to API:', startingBalanceData);
+      // Prepare starting balance data, only if we have a valid value
+      let startingBalanceData = undefined;
+      if (startingBalance !== undefined && startingBalance !== null) {
+        startingBalanceData = { starting_balance: startingBalance };
+        console.log('💰 Passing starting balance to API:', startingBalanceData);
+      } else {
+        console.log('💰 No starting balance to pass to API');
+      }
       
       // Then fetch the main financial data including Stripe
       console.log('📈 Fetching financial data with stripe data and starting balance:', {
