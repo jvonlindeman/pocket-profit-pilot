@@ -42,12 +42,12 @@ export const useFinanceDataFetcher = () => {
     localRefreshingRef
   } = useFinanceErrorHandler();
 
-  // Fetch financial data from the API or cache
+  // Fetch financial data from the API or cache - updated to match parameter order from types
   const fetchFinancialData = useCallback(async (
     dateRange: DateRange, 
-    forceRefresh: boolean = false,
     stripeIncomeData: { amount: number, isOverridden: boolean },
-    startingBalanceData?: { starting_balance: number }
+    startingBalanceData?: { starting_balance: number },
+    forceRefresh: boolean = false
   ) => {
     // Check if we're already refreshing - first check global state, then local ref
     if (circuitBreaker.getState().isRefreshing || localRefreshingRef.current) {

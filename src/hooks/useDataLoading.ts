@@ -14,9 +14,9 @@ export const useDataLoading = () => {
     setStripeIncome: (value: number) => void,
     fetchFinancialData: (
       dateRange: DateRange, 
-      forceRefresh: boolean, 
       stripeIncomeData: { amount: number, isOverridden: boolean },
-      startingBalanceData?: { starting_balance: number }
+      startingBalanceData?: { starting_balance: number },
+      forceRefresh?: boolean
     ) => Promise<any>,
     startingBalance: number | null | undefined,
     withRefreshProtection: (operation: () => Promise<any>, forceRefresh?: boolean) => Promise<any>,
@@ -59,12 +59,12 @@ export const useDataLoading = () => {
       try {
         const result = await fetchFinancialData(
           dateRange, 
-          forceRefresh, 
           {
             amount: stripeData?.amount || 0,
             isOverridden: stripeData?.isOverridden || false
           },
-          startingBalanceData
+          startingBalanceData,
+          forceRefresh
         );
         
         if (result) {
