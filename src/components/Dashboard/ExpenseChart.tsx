@@ -9,6 +9,9 @@ interface ExpenseChartProps {
 }
 
 const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenseData }) => {
+  // Debug logging to verify data
+  console.log('💸 ExpenseChart received data:', expenseData);
+  
   // Safety check for the entire expense data array
   if (!expenseData || !Array.isArray(expenseData) || expenseData.length === 0) {
     return (
@@ -30,10 +33,17 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenseData }) => {
     percentage: typeof item.percentage === 'number' ? item.percentage : 0
   }));
 
-  // Filtramos los pagos a colaboradores de los datos
-  const filteredExpenseData = safeExpenseData.filter(item => 
-    item.category.toLowerCase() !== 'pagos a colaboradores'
-  );
+  // Filtramos los pagos a colaboradores de los datos - updated to catch all variations
+  const filteredExpenseData = safeExpenseData.filter(item => {
+    const category = (item.category || '').toLowerCase();
+    return !(
+      category === 'pagos a colaboradores' || 
+      category === 'colaboradores' || 
+      category === 'collaborators' ||
+      category.includes('colaborador') ||
+      category.includes('collaborator')
+    );
+  });
 
   // Safety check for filtered data
   if (filteredExpenseData.length === 0) {

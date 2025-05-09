@@ -45,10 +45,22 @@ export const processTransactionsIntoFinancialData = (
   const profit = totalIncome - totalExpense;
   const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0;
   
-  // Calculate collaborator expenses
+  // Calculate collaborator expenses - updated to check for all variations of collaborator categories
   const collaboratorExpense = expenseTransactions
-    .filter(tx => tx.category === 'Colaboradores' || tx.category === 'Collaborators')
+    .filter(tx => {
+      const category = tx.category.toLowerCase();
+      return category === 'colaboradores' || 
+             category === 'collaborators' || 
+             category === 'pagos a colaboradores' ||
+             category.includes('colaborador') ||
+             category.includes('collaborator');
+    })
     .reduce((sum, tx) => sum + tx.amount, 0);
+  
+  console.log('👥 Calculating collaborator expenses:', { 
+    totalCollaborators: collaboratorExpense,
+    categories: expenseTransactions.map(tx => tx.category)
+  });
   
   // Calculate other expenses
   const otherExpense = totalExpense - collaboratorExpense;
@@ -148,6 +160,26 @@ export const transformFinancialData = (
   console.log('💵 Total income (Zoho + Stripe):', totalIncome);
   
   const totalExpense = safeParseNumber(data.financial_data.summary.totalExpense || 0);
+  
+  // Re-calculate collaborator expenses to ensure all variations are caught
+  const collaboratorExpense = Array.isArray(data.financial_data.transactions) 
+    ? data.financial_data.transactions
+        .filter((tx: any) => {
+          if (tx.type !== 'expense') return false;
+          const category = String(tx.category || '').toLowerCase();
+          return category === 'colaboradores' || 
+                 category === 'collaborators' || 
+                 category === 'pagos a colaboradores' ||
+                 category.includes('colaborador') ||
+                 category.includes('collaborator');
+        })
+        .reduce((sum: number, tx: any) => sum + safeParseNumber(tx.amount || 0), 0)
+    : safeParseNumber(data.financial_data.summary.collaboratorExpense || 0);
+  
+  // Calculate other expenses
+  const otherExpense = totalExpense - collaboratorExpense;
+  
+  // Calculate profit and profit margin
   const profit = totalIncome - totalExpense;
   const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0;
   
@@ -156,6 +188,8 @@ export const transformFinancialData = (
     stripeIncome: stripeAmount,
     totalIncome,
     totalExpense,
+    collaboratorExpense,
+    otherExpense,
     profit,
     profitMargin
   });
@@ -166,6 +200,8 @@ export const transformFinancialData = (
     summary: {
       ...data.financial_data.summary,
       totalIncome: totalIncome,
+      collaboratorExpense: collaboratorExpense,
+      otherExpense: otherExpense,
       profit: profit,
       profitMargin: profitMargin,
       // Make sure starting balance is preserved
@@ -203,11 +239,11 @@ const updateCacheStatusFromResponse = (data: any, updateCacheStatus: (status: Ca
         ? { 
             cachedCount: data.cacheStats?.cachedCount || 0,
             newCount: data.newTransactionsCount || 0,
-            totalCount: data.cacheStats?.totalCount || 0
+            totalCount: data.cacheStats?.totalCount || 0,
+            lastRefresh: data.cacheStats?.lastRefresh || new Date().toISOString()
           } 
         : null,
       lastRefresh: new Date()
     });
   }
 };
-

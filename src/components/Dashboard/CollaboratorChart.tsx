@@ -9,6 +9,9 @@ interface CollaboratorChartProps {
 }
 
 const CollaboratorChart: React.FC<CollaboratorChartProps> = ({ collaboratorData }) => {
+  // Debug logging to verify data
+  console.log('💼 CollaboratorChart received data:', collaboratorData);
+  
   // Colores personalizados para el gráfico de colaboradores
   const getCollaboratorColor = (index: number) => {
     const colors = [
@@ -19,9 +22,21 @@ const CollaboratorChart: React.FC<CollaboratorChartProps> = ({ collaboratorData 
   };
 
   // Filtrar colaboradores excluyendo a los dueños de la empresa
-  const filteredData = collaboratorData.filter((item) => 
-    item.category !== 'Johan von Lindeman' && item.category !== 'Daniel Chen'
-  );
+  // Updated to include variations of collaborator categories
+  const filteredData = collaboratorData.filter((item) => {
+    const category = item.category.toLowerCase();
+    // First check if it's a collaborator category
+    const isCollaborator = category === 'colaboradores' || 
+                           category === 'collaborators' || 
+                           category === 'pagos a colaboradores' ||
+                           category.includes('colaborador') ||
+                           category.includes('collaborator');
+                           
+    // Then exclude specific owners
+    return isCollaborator && 
+           category !== 'johan von lindeman' && 
+           category !== 'daniel chen';
+  });
 
   // Recalcular porcentajes basados en el nuevo total (después de filtrar)
   const totalAmount = filteredData.reduce((sum, item) => sum + item.amount, 0);
