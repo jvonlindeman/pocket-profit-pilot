@@ -22,7 +22,7 @@ export interface FinanceDataState {
 export interface FinanceErrorHandler {
   error: string | null;
   setError: (error: string | null) => void;
-  resetCircuitBreakerState: () => void;
+  resetErrorState: () => void;
   localRefreshingRef: React.MutableRefObject<boolean>;
 }
 
@@ -45,7 +45,6 @@ export interface FinanceDataFetcher {
     forceRefresh?: boolean
   ) => Promise<FinancialData | null>;
   clearCacheAndRefresh: (dateRange: DateRange) => Promise<boolean>;
-  resetCircuitBreakerState: () => void;
+  resetErrorState: () => void;
   isRefreshing: boolean;
-  refreshCount: number;
 }

@@ -2,7 +2,6 @@
 import { useCallback } from 'react';
 import { useRefreshStatus } from '@/hooks/useRefreshStatus';
 import { useToast } from '@/hooks/use-toast';
-import { DateRange } from '@/types/financial';
 
 /**
  * Simplified hook to manage data refresh operations without circuit breaker

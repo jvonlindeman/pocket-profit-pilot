@@ -27,7 +27,6 @@ const DashboardContent: React.FC = () => {
     partialRefresh,
     cacheStats,
     isRefreshing,
-    refreshCount,
     lastError,
     hasErrors,
     errorCount,
@@ -77,7 +76,6 @@ const DashboardContent: React.FC = () => {
             lastRefresh={cacheStats?.lastRefresh ? new Date(cacheStats.lastRefresh) : null}
             onRefreshClick={forceManualRefresh}
             isRefreshing={isRefreshing}
-            refreshCount={refreshCount}
           />
         </div>
       </div>
