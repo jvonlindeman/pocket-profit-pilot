@@ -1,3 +1,4 @@
+
 import { FinancialData } from '@/types/financial';
 
 // Default financial data structure
@@ -19,7 +20,6 @@ export const DEFAULT_FINANCIAL_DATA: FinancialData = {
     expense: { labels: [], values: [] }
   },
   monthlyData: {
-    labels: [],
     income: { labels: [], values: [] },
     expense: { labels: [], values: [] },
     profit: { labels: [], values: [] }
