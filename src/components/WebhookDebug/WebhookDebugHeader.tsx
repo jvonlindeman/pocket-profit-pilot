@@ -15,7 +15,7 @@ const WebhookDebugHeader: React.FC<WebhookDebugHeaderProps> = ({ loading, onFetc
         Esta herramienta te permite ver la respuesta sin procesar del webhook de make.com
       </p>
       <Button 
-        onClick={() => onFetchData()} 
+        onClick={onFetchData} 
         variant="outline" 
         disabled={loading}
       >

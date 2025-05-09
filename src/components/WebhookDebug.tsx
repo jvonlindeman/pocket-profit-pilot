@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, RefreshCw, Bug } from 'lucide-react';
+import { Loader2, Bug } from 'lucide-react';
 import ZohoService from '@/services/zohoService';
+import WebhookDebugHeader from './WebhookDebug/WebhookDebugHeader';
 
 interface WebhookDebugProps {
   dateRange: {
@@ -89,22 +88,7 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex justify-between items-center mb-4">
-          <p className="text-sm text-muted-foreground">
-            Esta herramienta te permite ver la respuesta sin procesar del webhook de make.com
-          </p>
-          <Button 
-            onClick={fetchDebugData} 
-            variant="outline" 
-            disabled={loading}
-          >
-            {loading ? (
-              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Cargando...</>
-            ) : (
-              <><RefreshCw className="h-4 w-4 mr-2" /> Cargar Datos</>
-            )}
-          </Button>
-        </div>
+        <WebhookDebugHeader loading={loading} onFetchData={fetchDebugData} />
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-4 mb-4">
