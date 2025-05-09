@@ -1,7 +1,5 @@
-import { DEFAULT_FINANCIAL_DATA } from '@/constants/financialDefaults';
-import { FinancialData } from '@/types/financial';
-import { safeParseNumber } from '@/utils/financialUtils';
-import { processTransactionsIntoFinancialData } from './financeDataProcessor';
+import { Transaction, FinancialSummary, FinancialData, CategorySummary, CacheStats } from '@/types/financial';
+import { calculateDailyAndMonthlyData, calculateExpensesByCategory, calculateIncomeBySource } from './financeDataProcessor';
 
 /**
  * Interface for cache status information
@@ -9,11 +7,7 @@ import { processTransactionsIntoFinancialData } from './financeDataProcessor';
 interface CacheStatus {
   usingCachedData: boolean;
   partialRefresh: boolean;
-  stats: {
-    cachedCount: number;
-    newCount: number;
-    isFresh: boolean;
-  } | null;
+  stats: CacheStats | null;
 }
 
 /**
@@ -26,7 +20,7 @@ interface CacheStatus {
 export const transformFinancialData = (
   data: any, 
   stripeIncomeData: { amount: number, isOverridden: boolean },
-  updateCacheStatus: (status: Partial<CacheStatus>) => void
+  updateCacheStatus: (status: CacheStatus) => void
 ): FinancialData => {
   // Check if we have the expected data format or if we need to transform it
   if (!data.financial_data && data.cached_transactions) {
@@ -121,7 +115,7 @@ export const transformFinancialData = (
 /**
  * Extract and update cache status from API response
  */
-const updateCacheStatusFromResponse = (data: any, updateCacheStatus: (status: Partial<CacheStatus>) => void): void => {
+const updateCacheStatusFromResponse = (data: any, updateCacheStatus: (status: CacheStatus) => void): void => {
   if (data.fromCache || data.cached || data.partialRefresh) {
     updateCacheStatus({
       usingCachedData: Boolean(data.fromCache || data.cached),
