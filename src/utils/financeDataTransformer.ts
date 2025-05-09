@@ -1,8 +1,20 @@
-
 import { DEFAULT_FINANCIAL_DATA } from '@/constants/financialDefaults';
-import { CacheStatus, FinancialData } from '@/types/financial';
+import { FinancialData } from '@/types/financial';
 import { safeParseNumber } from '@/utils/financialUtils';
 import { processTransactionsIntoFinancialData } from './financeDataProcessor';
+
+/**
+ * Interface for cache status information
+ */
+interface CacheStatus {
+  usingCachedData: boolean;
+  partialRefresh: boolean;
+  stats: {
+    cachedCount: number;
+    newCount: number;
+    isFresh: boolean;
+  } | null;
+}
 
 /**
  * Transform financial data from API response to application format

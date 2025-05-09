@@ -164,6 +164,7 @@ const processTransactionsByMonth = (transactions: any[], financialData: Financia
  */
 const processExpensesByCategory = (expenseTransactions: any[], financialData: FinancialData): void => {
   const expensesByCategory = new Map();
+  const totalExpense = financialData.summary.totalExpense;
   
   expenseTransactions.forEach((tx: any) => {
     const category = tx.category || 'Sin categoría';
@@ -174,9 +175,13 @@ const processExpensesByCategory = (expenseTransactions: any[], financialData: Fi
   });
   
   financialData.expenseByCategory = Array.from(expensesByCategory.entries())
-    .map(([category, amount]) => ({ 
-      category, 
-      amount: safeParseNumber(amount) 
-    }))
+    .map(([category, amount]) => {
+      const amountValue = safeParseNumber(amount);
+      return { 
+        category, 
+        amount: amountValue,
+        percentage: totalExpense > 0 ? (amountValue / totalExpense) * 100 : 0
+      };
+    })
     .sort((a, b) => b.amount - a.amount);
 };
