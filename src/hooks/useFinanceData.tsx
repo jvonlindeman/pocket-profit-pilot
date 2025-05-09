@@ -36,8 +36,8 @@ export const useFinanceData = () => {
     cacheStatus,
     fetchFinancialData,
     clearCacheAndRefresh: clearCacheFromDataFetcher,
-    setFinancialData,
-    resetCircuitBreakerState
+    resetCircuitBreakerState,
+    setFinancialData
   } = dataFetcher;
   
   const dataRefresh = useDataRefresh();

@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Bug } from 'lucide-react';
 import ZohoService from '@/services/zohoService';
 import WebhookDebugHeader from './WebhookDebug/WebhookDebugHeader';
+import WebhookErrorDisplay from './WebhookDebug/WebhookErrorDisplay';
 
 interface WebhookDebugProps {
   dateRange: {
@@ -29,39 +31,52 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
 
   // Función para obtener los datos crudos del API
   const fetchDebugData = async () => {
+    console.log("WebhookDebug: fetchDebugData called");
     setLoading(true);
     setError(null);
     
     try {
-      // Primero actualizamos los datos usando la función de actualización global
-      // Esto asegura que ambos botones hagan el mismo proceso
+      // First check if there's a global refresh function
       if (refreshDataFunction) {
-        console.log("Usando la función de actualización global para cargar datos");
-        refreshDataFunction(true);
+        console.log("WebhookDebug: Using global refresh function with forceRefresh=true");
         
-        // Como refreshDataFunction ya actualiza rawResponse a través de useFinanceData,
-        // no necesitamos hacer una llamada adicional a ZohoService.getRawResponse
-        // La actualización sucederá a través del useEffect cuando se actualice el prop rawResponse
-        
-        // Esperamos un breve momento para que se complete la actualización
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Verificamos si ya tenemos datos a través del prop rawResponse
-        if (rawResponse) {
-          setRawData(rawResponse);
-          setLoading(false);
-          return;
+        try {
+          // Always force refresh when button is clicked directly
+          await refreshDataFunction(true);
+          console.log("WebhookDebug: Global refresh function completed successfully");
+          
+          // The useEffect above will handle setting rawData from rawResponse
+          // Wait a brief moment to ensure the parent component has time to update rawResponse
+          await new Promise(resolve => setTimeout(resolve, 250));
+          
+          // Check if we already have data through rawResponse
+          if (rawResponse) {
+            console.log("WebhookDebug: Using rawResponse from parent");
+            setRawData(rawResponse);
+            setLoading(false);
+            return;
+          }
+        } catch (refreshErr: any) {
+          console.error("WebhookDebug: Error in global refresh function:", refreshErr);
+          // Continue to direct fetch since global refresh failed
+          setError(`Error en función de actualización global: ${refreshErr.message || "Error desconocido"}`);
         }
       }
       
-      // Luego obtenemos los datos crudos para mostrarlos en la UI de depuración
-      // Solo si no se actualizaron a través del prop rawResponse
-      const data = await ZohoService.getRawResponse(dateRange.startDate, dateRange.endDate);
-      setRawData(data);
-      console.log("Debug data received:", data);
+      console.log("WebhookDebug: Falling back to direct ZohoService.getRawResponse");
+      // Fall back to direct fetch
+      try {
+        const data = await ZohoService.getRawResponse(dateRange.startDate, dateRange.endDate);
+        console.log("WebhookDebug: Direct fetch successful:", data);
+        setRawData(data);
+      } catch (directErr: any) {
+        console.error("WebhookDebug: Error in direct fetch:", directErr);
+        throw directErr; // Re-throw to be caught by outer try/catch
+      }
     } catch (err: any) {
-      setError(err.message || "Error desconocido");
-      console.error("Failed to fetch debug data:", err);
+      const errorMsg = err.message || "Error desconocido al obtener datos";
+      console.error("WebhookDebug: Failed to fetch debug data:", err);
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -89,13 +104,7 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
       </CardHeader>
       <CardContent>
         <WebhookDebugHeader loading={loading} onFetchData={fetchDebugData} />
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-4 mb-4">
-            <p className="font-medium">Error</p>
-            <p className="text-sm">{error}</p>
-          </div>
-        )}
+        <WebhookErrorDisplay error={error} />
 
         {loading && (
           <div className="flex justify-center items-center py-8">

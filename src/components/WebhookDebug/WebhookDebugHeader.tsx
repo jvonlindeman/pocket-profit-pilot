@@ -9,13 +9,19 @@ interface WebhookDebugHeaderProps {
 }
 
 const WebhookDebugHeader: React.FC<WebhookDebugHeaderProps> = ({ loading, onFetchData }) => {
+  // Use a direct function call without wrapping it in another function
+  const handleClick = () => {
+    console.log("WebhookDebugHeader: Fetch data button clicked");
+    onFetchData();
+  };
+
   return (
     <div className="flex justify-between items-center mb-4">
       <p className="text-sm text-muted-foreground">
         Esta herramienta te permite ver la respuesta sin procesar del webhook de make.com
       </p>
       <Button 
-        onClick={onFetchData} 
+        onClick={handleClick} 
         variant="outline" 
         disabled={loading}
       >
