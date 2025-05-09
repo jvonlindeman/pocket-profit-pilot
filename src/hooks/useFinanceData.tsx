@@ -32,14 +32,23 @@ export const useFinanceData = () => {
     collaboratorExpenses,
     cacheStatus,
     fetchFinancialData,
-    clearCacheAndRefresh
+    clearCacheAndRefresh,
+    setFinancialData
   } = dataFetcher;
   
   // Add a ref to track if the balance has been synced to avoid infinite loops
   const balanceSyncedRef = useRef<number | null>(null);
+  // Add a ref to track if we're in a refresh operation to prevent cascading updates
+  const isRefreshingRef = useRef<boolean>(false);
 
   // Main function to fetch and process financial data
   const refreshData = useCallback(async (forceRefresh: boolean = false) => {
+    if (isRefreshingRef.current) {
+      console.log('🔄 Already refreshing data, skipping duplicate refresh');
+      return false;
+    }
+    
+    isRefreshingRef.current = true;
     try {
       console.log('🔄 Starting data refresh with forceRefresh =', forceRefresh);
       toast({
@@ -85,6 +94,12 @@ export const useFinanceData = () => {
       if (result) {
         console.log('✅ Financial data loaded successfully:', result);
         setDataInitialized(true);
+        
+        // When data loads successfully, update our balance sync ref to prevent unnecessary updates
+        if (startingBalance !== undefined && startingBalance !== null) {
+          balanceSyncedRef.current = startingBalance;
+        }
+        
         toast({
           title: "Datos cargados",
           description: "Datos financieros actualizados correctamente",
@@ -107,6 +122,8 @@ export const useFinanceData = () => {
         description: err instanceof Error ? err.message : "Error desconocido al cargar datos",
       });
       return false;
+    } finally {
+      isRefreshingRef.current = false;
     }
   }, [dateRange, isDateInRange, loadStripeIncomeData, fetchFinancialData, setDataInitialized, toast, setStripeIncome, startingBalance]);
 
@@ -144,48 +161,49 @@ export const useFinanceData = () => {
     }
   }, [dateRange, clearCacheAndRefresh, refreshData, toast]);
 
-  // Update data when date range changes or when starting balance changes
+  // Update data when date range changes - REMOVED startingBalance from dependencies
   useEffect(() => {
     if (dataInitialized) {
-      console.log('📅 Date range or starting balance changed, refreshing data:', { dateRange, startingBalance });
+      console.log('📅 Date range changed, refreshing data:', { dateRange });
       refreshData(false);
     }
-  }, [dateRange, startingBalance, dataInitialized, refreshData]);
+  }, [dateRange, dataInitialized, refreshData]);
 
+  // Separate effect for debugging initialization state
   useEffect(() => {
     console.log('🔍 Finance data component mounted or data initialized state changed:', { dataInitialized });
   }, [dataInitialized]);
 
-  // If the financialData doesn't have the starting balance but we have one from the monthly balance,
-  // update the financial data summary, but with protections against infinite loops
+  // Separate effect for handling startingBalance changes to avoid cascading updates
   useEffect(() => {
     // Only proceed if we have both financialData and a valid startingBalance
     if (financialData && startingBalance !== undefined && startingBalance !== null) {
       // Check if the balance is different from what's in financialData OR from our last synced value
       const currentFinancialDataBalance = financialData.summary.startingBalance;
-      const needsUpdate = currentFinancialDataBalance === undefined || 
-                           currentFinancialDataBalance !== startingBalance;
+      const needsUpdate = (currentFinancialDataBalance === undefined || 
+                          currentFinancialDataBalance !== startingBalance) &&
+                          balanceSyncedRef.current !== startingBalance;
       
-      // Ensure we're not in an update loop by checking if this balance is the same as the last one we synced
-      const alreadySynced = balanceSyncedRef.current === startingBalance;
-      
-      if (needsUpdate && !alreadySynced) {
-        console.log('📊 Updating financial data with starting balance:', startingBalance);
+      if (needsUpdate) {
+        console.log('📊 Updating financial data with starting balance:', startingBalance, 
+                   'previous sync value was:', balanceSyncedRef.current);
         
         // Update our ref to indicate we've synced this specific balance value
         balanceSyncedRef.current = startingBalance;
         
-        // Update the financial data with the new balance
-        dataFetcher.setFinancialData({
+        // Update the financial data with the new balance without triggering a full refresh
+        setFinancialData({
           ...financialData,
           summary: {
             ...financialData.summary,
             startingBalance: startingBalance
           }
         });
+      } else {
+        console.log('📊 No need to update financial data with starting balance - already synced or unchanged');
       }
     }
-  }, [financialData, startingBalance, dataFetcher]);
+  }, [financialData, startingBalance, setFinancialData]);
 
   return {
     // Date range management
