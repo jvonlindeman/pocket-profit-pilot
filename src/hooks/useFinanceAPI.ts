@@ -14,10 +14,12 @@ export const useFinanceAPI = () => {
    * Fetch financial data from Supabase Edge Function
    * @param dateRange Date range for which to fetch data
    * @param forceRefresh Force refresh from API instead of using cache
+   * @param startingBalanceData Optional starting balance data
    */
   const fetchFinanceDataFromAPI = useCallback(async (
     dateRange: DateRange,
-    forceRefresh: boolean = false
+    forceRefresh: boolean = false,
+    startingBalanceData?: { starting_balance: number }
   ) => {
     try {
       // Format dates for API call
@@ -30,7 +32,8 @@ export const useFinanceAPI = () => {
       const params = {
         startDate: formattedStartDate,
         endDate: formattedEndDate,
-        forceRefresh: forceRefresh
+        forceRefresh: forceRefresh,
+        ...(startingBalanceData && { starting_balance: startingBalanceData.starting_balance })
       };
       
       console.log(`🔄 Invoking zoho-transactions function with params:`, params);
@@ -66,6 +69,11 @@ export const useFinanceAPI = () => {
           end_date: formattedEndDate,
           force_refresh: forceRefresh ? 'true' : 'false'
         });
+        
+        // Add starting_balance to query params if available
+        if (startingBalanceData?.starting_balance !== undefined) {
+          queryParams.append('starting_balance', startingBalanceData.starting_balance.toString());
+        }
         
         try {
           console.log("⚠️ Attempting direct fetch with URL:", `/functions/v1/zoho-transactions?${queryParams.toString()}`);
