@@ -34,7 +34,8 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
       summary, 
       stripeIncome, 
       regularIncome, 
-      stripeOverride 
+      stripeOverride,
+      startingBalance: summary.startingBalance
     });
   }, [summary, stripeIncome, regularIncome, stripeOverride]);
 
@@ -61,6 +62,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
     otherExpense,
     profit,
     profitMargin,
+    startingBalance,
     safeStripeIncome,
     safeRegularIncome,
     stripeOverride

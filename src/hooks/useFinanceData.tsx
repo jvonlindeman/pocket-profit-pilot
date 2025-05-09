@@ -5,6 +5,7 @@ import { DateRange } from '@/types/financial';
 import { useDateRange } from '@/hooks/useDateRange';
 import { useStripeIncome } from '@/hooks/useStripeIncome';
 import { useFinanceDataFetcher } from '@/hooks/useFinanceDataFetcher';
+import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 
 export const useFinanceData = () => {
   // Use our custom hooks for specific functionality
@@ -12,8 +13,12 @@ export const useFinanceData = () => {
   const { dateRange, updateDateRange, getCurrentMonthRange, isDateInRange } = dateRangeHook;
   
   const { toast } = useToast();
+  
   const stripeHook = useStripeIncome();
   const { stripeIncome, stripeOverride, loadStripeIncomeData, setStripeIncome } = stripeHook;
+  
+  const monthlyBalanceHook = useMonthlyBalance({ currentDate: dateRange.startDate });
+  const { balance: startingBalance } = monthlyBalanceHook;
   
   const dataFetcher = useFinanceDataFetcher();
   const {
@@ -49,12 +54,28 @@ export const useFinanceData = () => {
         setStripeIncome(stripeData.amount || 0);
       }
       
+      // Pass starting balance if available
+      const startingBalanceData = startingBalance !== undefined && startingBalance !== null 
+        ? { starting_balance: startingBalance } 
+        : {};
+        
+      console.log('💰 Passing starting balance to API:', startingBalanceData);
+      
       // Then fetch the main financial data including Stripe
-      console.log('📈 Fetching financial data with stripe data:', stripeData);
-      const result = await fetchFinancialData(dateRange, forceRefresh, {
-        amount: stripeData?.amount || 0,
-        isOverridden: stripeData?.isOverridden || false
+      console.log('📈 Fetching financial data with stripe data and starting balance:', {
+        stripeData,
+        startingBalanceData
       });
+      
+      const result = await fetchFinancialData(
+        dateRange, 
+        forceRefresh, 
+        {
+          amount: stripeData?.amount || 0,
+          isOverridden: stripeData?.isOverridden || false
+        },
+        startingBalanceData
+      );
       
       if (result) {
         console.log('✅ Financial data loaded successfully:', result);
@@ -82,7 +103,7 @@ export const useFinanceData = () => {
       });
       return false;
     }
-  }, [dateRange, isDateInRange, loadStripeIncomeData, fetchFinancialData, setDataInitialized, toast, setStripeIncome]);
+  }, [dateRange, isDateInRange, loadStripeIncomeData, fetchFinancialData, setDataInitialized, toast, setStripeIncome, startingBalance]);
 
   // Clear cache and refresh data
   const handleClearCacheAndRefresh = useCallback(async () => {
@@ -118,17 +139,34 @@ export const useFinanceData = () => {
     }
   }, [dateRange, clearCacheAndRefresh, refreshData, toast]);
 
-  // Update data when date range changes
+  // Update data when date range changes or when starting balance changes
   useEffect(() => {
     if (dataInitialized) {
-      console.log('📅 Date range changed, refreshing data');
+      console.log('📅 Date range or starting balance changed, refreshing data:', { dateRange, startingBalance });
       refreshData(false);
     }
-  }, [dateRange, dataInitialized, refreshData]);
+  }, [dateRange, startingBalance, dataInitialized, refreshData]);
 
   useEffect(() => {
     console.log('🔍 Finance data component mounted or data initialized state changed:', { dataInitialized });
   }, [dataInitialized]);
+
+  // If the financialData doesn't have the starting balance but we have one from the monthly balance,
+  // update the financial data summary
+  useEffect(() => {
+    if (financialData && startingBalance !== undefined && 
+        (financialData.summary.startingBalance === undefined || 
+         financialData.summary.startingBalance !== startingBalance)) {
+      console.log('📊 Updating financial data with starting balance:', startingBalance);
+      dataFetcher.setFinancialData({
+        ...financialData,
+        summary: {
+          ...financialData.summary,
+          startingBalance: startingBalance
+        }
+      });
+    }
+  }, [financialData, startingBalance, dataFetcher]);
 
   return {
     // Date range management
@@ -147,6 +185,9 @@ export const useFinanceData = () => {
     stripeIncome,
     regularIncome,
     stripeOverride,
+    
+    // Balance data
+    startingBalance,
     
     // Expenses data
     collaboratorExpenses,

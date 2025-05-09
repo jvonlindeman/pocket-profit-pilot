@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { DateRange, FinancialData } from '@/types/financial';
 import { useToast } from '@/hooks/use-toast';
@@ -285,27 +284,33 @@ export const useFinanceDataFetcher = () => {
   const fetchFinancialData = useCallback(async (
     dateRange: DateRange, 
     forceRefresh: boolean = false,
-    stripeIncomeData: { amount: number, isOverridden: boolean }
+    stripeIncomeData: { amount: number, isOverridden: boolean },
+    startingBalanceData?: { starting_balance: number }
   ) => {
-    console.log(`📊 Fetching financial data with forceRefresh=${forceRefresh}`);
+    console.log(`📊 Fetching financial data with forceRefresh=${forceRefresh}, startingBalance=${startingBalanceData?.starting_balance}`);
     setLoading(true);
     setError(null);
     
     try {
-      // Fetch data from API
-      const data = await fetchFinanceDataFromAPI(dateRange, forceRefresh);
+      // Fetch data from API, passing the starting balance if available
+      const data = await fetchFinanceDataFromAPI(dateRange, forceRefresh, startingBalanceData);
       
       // Store raw response for debugging
       console.log("📑 Setting raw response data:", data);
       setRawResponse(data);
       
+      // Ensure the starting balance is included in the data
+      const dataWithBalance = startingBalanceData 
+        ? { ...data, starting_balance: startingBalanceData.starting_balance } 
+        : data;
+      
       // Update cache status information
-      if (data.cache_status) {
-        updateCacheStatus(data.cache_status);
+      if (dataWithBalance.cache_status) {
+        updateCacheStatus(dataWithBalance.cache_status);
       }
       
       // Process the financial data - now handles both data structures
-      const processedData = processFinancialData(data, stripeIncomeData);
+      const processedData = processFinancialData(dataWithBalance, stripeIncomeData);
       
       // Update state with processed data
       console.log("🔄 Setting financial data:", processedData);

@@ -9,9 +9,15 @@ interface BalanceCardProps {
 }
 
 const BalanceCard: React.FC<BalanceCardProps> = ({ startingBalance }) => {
-  const displayValue = startingBalance !== undefined 
-    ? formatCurrency(startingBalance) 
+  // Convert undefined to null to avoid display issues
+  const balanceValue = startingBalance !== undefined ? startingBalance : null;
+  
+  // Format the balance for display or show "No establecido"
+  const displayValue = balanceValue !== null 
+    ? formatCurrency(balanceValue) 
     : "No establecido";
+
+  console.log('BalanceCard rendering with startingBalance:', startingBalance, 'displayValue:', displayValue);
 
   return (
     <FinanceSummaryCard

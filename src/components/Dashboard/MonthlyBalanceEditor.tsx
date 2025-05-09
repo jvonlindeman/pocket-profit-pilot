@@ -57,6 +57,7 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
   // Update form values when data is loaded
   useEffect(() => {
     if (balance !== null) {
+      console.log('MonthlyBalanceEditor: updating form with balance:', balance);
       form.reset({
         balance: balance,
         notes: notes || '',
@@ -65,6 +66,7 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
       
       // Notify parent component if needed
       if (onBalanceChange) {
+        console.log('MonthlyBalanceEditor: notifying parent of balance:', balance);
         onBalanceChange(balance);
       }
     }
@@ -75,11 +77,12 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
   const capitalizedMonth = formattedMonth.charAt(0).toUpperCase() + formattedMonth.slice(1);
 
   // Handle form submission
-  const onSubmit = (data: FormValues) => {
-    saveBalance(data.balance, data.notes, data.stripeOverride);
+  const onSubmit = async (data: FormValues) => {
+    console.log('MonthlyBalanceEditor: saving balance:', data.balance);
+    const success = await saveBalance(data.balance, data.notes, data.stripeOverride);
     
-    // Notify parent component if needed
-    if (onBalanceChange) {
+    if (success && onBalanceChange) {
+      console.log('MonthlyBalanceEditor: notifying parent of new balance:', data.balance);
       onBalanceChange(data.balance);
     }
   };

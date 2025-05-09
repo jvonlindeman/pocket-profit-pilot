@@ -40,7 +40,8 @@ const Index = () => {
     usingCachedData,
     partialRefresh,
     cacheStats,
-    stripeOverride
+    stripeOverride,
+    startingBalance
   } = useFinanceData();
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
@@ -101,7 +102,7 @@ const Index = () => {
   const handleForceRefresh = () => {
     console.log("Force refresh requested (bypassing cache)");
     toast({
-      title: 'Forzando actualización',
+      title: 'Forzando actualizaci��n',
       description: 'Obteniendo datos directamente de la API...',
     });
     refreshData(true); // Force refresh from API
@@ -364,7 +365,14 @@ const Index = () => {
 
             {/* Balance Mensual Inicial */}
             <div className="mb-6">
-              <MonthlyBalanceEditor currentDate={dateRange.startDate} />
+              <MonthlyBalanceEditor 
+                currentDate={dateRange.startDate}
+                onBalanceChange={(newBalance) => {
+                  console.log('Balance changed to:', newBalance);
+                  // Refresh data after balance change
+                  refreshData(false);
+                }}
+              />
             </div>
 
             {/* Resumen financiero */}
