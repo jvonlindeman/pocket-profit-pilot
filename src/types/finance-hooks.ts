@@ -40,9 +40,9 @@ export interface FinanceDataFetcher {
   cacheStatus: CacheStatus;
   fetchFinancialData: (
     dateRange: DateRange, 
-    forceRefresh?: boolean,
     stripeIncomeData: { amount: number, isOverridden: boolean },
-    startingBalanceData?: { starting_balance: number }
+    startingBalanceData?: { starting_balance: number },
+    forceRefresh?: boolean
   ) => Promise<FinancialData | null>;
   clearCacheAndRefresh: (dateRange: DateRange) => Promise<boolean>;
   resetCircuitBreakerState: () => void;
