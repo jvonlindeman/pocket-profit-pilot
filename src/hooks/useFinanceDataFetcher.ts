@@ -1,11 +1,20 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { DateRange, FinancialData } from '@/types/financial';
 import { useToast } from '@/hooks/use-toast';
 import { DEFAULT_FINANCIAL_DATA } from '@/constants/financialDefaults';
 import { useFinanceAPI } from '@/hooks/useFinanceAPI';
 import { useCacheManagement } from '@/hooks/useCacheManagement';
 import { transformFinancialData } from '@/utils/financeDataTransformer';
+
+// Global state to track requests across component lifecycles
+const globalState = {
+  isRefreshing: false,
+  lastRefreshTime: 0,
+  refreshCount: 0,
+  maxRefreshes: 5,
+  minRefreshInterval: 5000, // 5 seconds
+};
 
 export const useFinanceDataFetcher = () => {
   const [financialData, setFinancialData] = useState<FinancialData>(DEFAULT_FINANCIAL_DATA);
@@ -15,6 +24,9 @@ export const useFinanceDataFetcher = () => {
   const [rawResponse, setRawResponse] = useState<any>(null);
   const [regularIncome, setRegularIncome] = useState<number>(0);
   const [collaboratorExpenses, setCollaboratorExpenses] = useState<any[]>([]);
+
+  // Create a local ref to track if a refresh is in progress
+  const localRefreshingRef = useRef<boolean>(false);
   
   const { toast } = useToast();
   const { fetchFinanceDataFromAPI } = useFinanceAPI();
@@ -27,6 +39,41 @@ export const useFinanceDataFetcher = () => {
     stripeIncomeData: { amount: number, isOverridden: boolean },
     startingBalanceData?: { starting_balance: number }
   ) => {
+    // Check if we're already refreshing - first check global state, then local ref
+    if (globalState.isRefreshing || localRefreshingRef.current) {
+      console.warn("⚠️ Fetch operation already in progress, skipping duplicate request");
+      return null;
+    }
+    
+    // Check if we've hit the maximum refresh count
+    if (!forceRefresh && globalState.refreshCount >= globalState.maxRefreshes) {
+      console.warn(`⚠️ Maximum refresh count (${globalState.maxRefreshes}) reached, preventing potential infinite loop`);
+      toast({
+        title: "Demasiados refrescos",
+        description: "Se ha alcanzado el límite de refrescos para evitar un bucle infinito. Por favor, intente más tarde o use el botón 'Refrescar'.",
+        variant: "destructive"
+      });
+      return null;
+    }
+    
+    // Check if it's too soon for another refresh
+    const now = Date.now();
+    if (!forceRefresh && globalState.lastRefreshTime > 0) {
+      const timeSinceLastRefresh = now - globalState.lastRefreshTime;
+      if (timeSinceLastRefresh < globalState.minRefreshInterval) {
+        console.warn(`⚠️ Too soon for another refresh. Last refresh was ${timeSinceLastRefresh}ms ago`);
+        return null;
+      }
+    }
+    
+    // Set both global and local refresh flags
+    globalState.isRefreshing = true;
+    localRefreshingRef.current = true;
+    
+    // Track refresh count and time
+    globalState.refreshCount++;
+    globalState.lastRefreshTime = now;
+    
     console.log(`📊 Fetching financial data with forceRefresh=${forceRefresh}, startingBalance=${startingBalanceData?.starting_balance}`);
     setLoading(true);
     setError(null);
@@ -88,11 +135,24 @@ export const useFinanceDataFetcher = () => {
       return DEFAULT_FINANCIAL_DATA;
     } finally {
       setLoading(false);
+      // Reset both global and local refresh flags
+      globalState.isRefreshing = false;
+      localRefreshingRef.current = false;
     }
   }, [fetchFinanceDataFromAPI, updateCacheStatus, toast]);
 
   // Clear cache and force refresh data
   const clearCacheAndRefresh = useCallback(async (dateRange: DateRange) => {
+    // Use circuit breaker here as well
+    if (globalState.isRefreshing || localRefreshingRef.current) {
+      console.warn("⚠️ Cache clear operation already in progress, skipping duplicate request");
+      return false;
+    }
+    
+    // Set flags to prevent concurrent operations
+    globalState.isRefreshing = true;
+    localRefreshingRef.current = true;
+    
     setLoading(true);
     setError(null);
     
@@ -100,8 +160,20 @@ export const useFinanceDataFetcher = () => {
       return await clearCacheForDateRange(dateRange);
     } finally {
       setLoading(false);
+      globalState.isRefreshing = false;
+      localRefreshingRef.current = false;
     }
   }, [clearCacheForDateRange]);
+
+  // Reset global state counters method - can be called to reset the circuit breaker
+  const resetCircuitBreaker = useCallback(() => {
+    console.log("🔄 Resetting circuit breaker counters");
+    globalState.refreshCount = 0;
+    globalState.lastRefreshTime = 0;
+    globalState.isRefreshing = false;
+    localRefreshingRef.current = false;
+    return true;
+  }, []);
 
   return {
     financialData,
@@ -116,5 +188,8 @@ export const useFinanceDataFetcher = () => {
     cacheStatus,
     fetchFinancialData,
     clearCacheAndRefresh,
+    resetCircuitBreaker,
+    isRefreshing: globalState.isRefreshing || localRefreshingRef.current,
+    refreshCount: globalState.refreshCount
   };
 };

@@ -8,9 +8,9 @@ import { useFinanceDataFetcher } from '@/hooks/useFinanceDataFetcher';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 
 // Maximum number of refreshes to prevent runaway loops
-const MAX_REFRESHES_PER_SESSION = 5;
+const MAX_REFRESHES_PER_SESSION = 3;
 // Minimum time between refreshes in milliseconds
-const MIN_REFRESH_INTERVAL = 3000;
+const MIN_REFRESH_INTERVAL = 10000; // 10 seconds
 
 export const useFinanceData = () => {
   // Use our custom hooks for specific functionality
@@ -38,7 +38,9 @@ export const useFinanceData = () => {
     cacheStatus,
     fetchFinancialData,
     clearCacheAndRefresh: clearCacheFromDataFetcher,
-    setFinancialData
+    resetCircuitBreaker,
+    setFinancialData,
+    isRefreshing
   } = dataFetcher;
   
   // Add a ref to track if the balance has been synced to avoid infinite loops
@@ -51,26 +53,44 @@ export const useFinanceData = () => {
   const refreshCountRef = useRef<number>(0);
   // Track data initialization to prevent attempting to refresh before ready
   const wasInitializedRef = useRef<boolean>(false);
+  // Track current data range to avoid unnecessary refreshes
+  const currentDateRangeRef = useRef<DateRange | null>(null);
 
   // Reset refresh count when component mounts or date range changes
   useEffect(() => {
-    console.log('🔄 Date range changed, resetting refresh count');
-    refreshCountRef.current = 0;
-    // Reset the last refresh time when date range changes
-    lastRefreshTimeRef.current = 0;
-  }, [dateRange]);
+    // Only reset counters if the date range has actually changed
+    if (!currentDateRangeRef.current || 
+        currentDateRangeRef.current.startDate !== dateRange.startDate || 
+        currentDateRangeRef.current.endDate !== dateRange.endDate) {
+      console.log('🔄 Date range changed, resetting refresh count');
+      refreshCountRef.current = 0;
+      // Reset the last refresh time when date range changes
+      lastRefreshTimeRef.current = 0;
+      // Update current date range ref
+      currentDateRangeRef.current = { ...dateRange };
+      
+      // Also reset the global circuit breaker
+      resetCircuitBreaker();
+    }
+  }, [dateRange, resetCircuitBreaker]);
   
   // Main function to fetch and process financial data
   const refreshData = useCallback(async (forceRefresh: boolean = false) => {
-    // Check if we're already refreshing
-    if (isRefreshingRef.current) {
+    // Check if we're already refreshing from any source
+    if (isRefreshing || isRefreshingRef.current) {
       console.log('🔄 Already refreshing data, skipping duplicate refresh');
       return false;
     }
     
     // Check if we've hit the maximum number of refreshes
-    if (refreshCountRef.current >= MAX_REFRESHES_PER_SESSION) {
-      console.warn(`⚠️ Maximum refresh count (${MAX_REFRESHES_PER_SESSION}) reached, preventing potential infinite loop`);
+    if (refreshCountRef.current >= MAX_REFRESHES_PER_SESSION && !forceRefresh) {
+      const message = `⚠️ Maximum refresh count (${MAX_REFRESHES_PER_SESSION}) reached, preventing potential infinite loop`;
+      console.warn(message);
+      toast({
+        title: "Límite de refrescos alcanzado",
+        description: "Para evitar bucles infinitos, se ha limitado el número de refrescos automáticos. Use el botón de refrescar manual.",
+        variant: "destructive"
+      });
       return false;
     }
     
@@ -146,8 +166,12 @@ export const useFinanceData = () => {
           description: "Datos financieros actualizados correctamente",
         });
         return true;
+      } else if (result === null) {
+        // This is a special case where fetchFinancialData returns null due to circuit breaker
+        console.log("ℹ️ Fetch operation skipped by circuit breaker");
+        return false;
       } else {
-        console.error("❌ Failed to load financial data - result was null/undefined");
+        console.error("❌ Failed to load financial data - result was falsy");
         toast({
           variant: "destructive",
           title: "Error de carga",
@@ -166,7 +190,7 @@ export const useFinanceData = () => {
     } finally {
       isRefreshingRef.current = false;
     }
-  }, [dateRange, isDateInRange, loadStripeIncomeData, fetchFinancialData, setDataInitialized, toast, setStripeIncome]);
+  }, [dateRange, isDateInRange, loadStripeIncomeData, fetchFinancialData, setDataInitialized, toast, setStripeIncome, startingBalance, isRefreshing]);
 
   // Clear cache and refresh data
   const handleClearCacheAndRefresh = useCallback(async () => {
@@ -201,6 +225,20 @@ export const useFinanceData = () => {
       return false;
     }
   }, [dateRange, clearCacheFromDataFetcher, refreshData, toast]);
+
+  // Manual refresh function that resets circuit breaker and forces refresh
+  const forceManualRefresh = useCallback(async () => {
+    console.log('🔄 Manual refresh requested, resetting circuit breaker...');
+    
+    // Reset all counters and flags
+    refreshCountRef.current = 0;
+    lastRefreshTimeRef.current = 0;
+    isRefreshingRef.current = false;
+    resetCircuitBreaker();
+    
+    // Force a refresh
+    return await refreshData(true);
+  }, [refreshData, resetCircuitBreaker]);
 
   // Update data when date range changes - REMOVED startingBalance from dependencies!
   useEffect(() => {
@@ -295,6 +333,10 @@ export const useFinanceData = () => {
     // Functions
     refreshData,
     clearCacheAndRefresh: handleClearCacheAndRefresh,
+    forceManualRefresh,
+    
+    // Status information
+    isRefreshing: isRefreshing || isRefreshingRef.current,
+    refreshCount: refreshCountRef.current
   };
 };
-

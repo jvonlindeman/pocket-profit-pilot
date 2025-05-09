@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -19,6 +20,7 @@ interface TransactionRequest {
   startDate: string;
   endDate: string;
   forceRefresh?: boolean;
+  starting_balance?: number;
 }
 
 interface Transaction {
@@ -58,8 +60,9 @@ const isCacheFresh = (cachedData: any[], maxHoursOld = 24, requestStartDate: str
   const currentMonthYear = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
   const requestMonthYear = requestStartDate.substring(0, 7); // Extract YYYY-MM from date
   
-  // For current month data, use 1 hour; for historical data, use maxHoursOld (default 24 hours)
-  const freshnessPeriod = (requestMonthYear === currentMonthYear) ? 1 : maxHoursOld;
+  // For current month data, use a more lenient timeframe of 4 hours; for historical data, use maxHoursOld (default 24 hours)
+  // UPDATED: Increased current month cache freshness period from 1 to 4 hours to reduce refresh frequency
+  const freshnessPeriod = (requestMonthYear === currentMonthYear) ? 4 : maxHoursOld;
   
   console.log(`Cache age: ${cacheAgeHours.toFixed(2)} hours, freshness threshold: ${freshnessPeriod} hours`);
   
@@ -67,6 +70,7 @@ const isCacheFresh = (cachedData: any[], maxHoursOld = 24, requestStartDate: str
 };
 
 // Improved cache coverage check that doesn't require a transaction for every day
+// UPDATED: More lenient check for current month data
 const cacheCoversDateRange = (cachedData: any[], startDate: string, endDate: string): boolean => {
   if (!cachedData || cachedData.length === 0) return false;
   
@@ -78,8 +82,19 @@ const cacheCoversDateRange = (cachedData: any[], startDate: string, endDate: str
   const requestStart = new Date(startDate);
   const requestEnd = new Date(endDate);
   
+  // Get current date for comparison
+  const today = new Date();
+  const currentMonthYear = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  const requestMonthYear = startDate.substring(0, 7); // Extract YYYY-MM from date
+  
+  // For current month, be more lenient with coverage - we just need the start of the month to be covered
+  const isCurrentMonth = (requestMonthYear === currentMonthYear);
+  
   // Check if the cache spans the entire requested date range
-  const spansDateRange = earliestCachedDate <= requestStart && latestCachedDate >= requestEnd;
+  // UPDATED: For current month, we only need to verify that the earliest date is covered
+  const spansDateRange = isCurrentMonth ?
+    (earliestCachedDate <= new Date(requestStart.getTime() + (3 * 24 * 60 * 60 * 1000))) : // Within 3 days for current month
+    (earliestCachedDate <= requestStart && latestCachedDate >= requestEnd);
   
   // Also check if we have a reasonable sample of different transaction types
   const hasIncomeTransactions = cachedData.some(tx => tx.type === 'income');
@@ -94,6 +109,7 @@ const cacheCoversDateRange = (cachedData: any[], startDate: string, endDate: str
   // Log coverage details for debugging
   console.log(`Cache coverage check - Range ${startDate} to ${endDate}:`, {
     spansDateRange,
+    isCurrentMonth,
     transactionCount: cachedData.length,
     hasIncomeTransactions,
     hasExpenseTransactions,
@@ -111,14 +127,15 @@ const cacheCoversDateRange = (cachedData: any[], startDate: string, endDate: str
   const isHistoricalMonth = new Date() > new Date(endDate);
   const isCurrentMonthRequest = endDate.substring(0, 7) === new Date().toISOString().substring(0, 7);
   
-  // For historical months, be more lenient about coverage
-  // For current month, be more strict (require full coverage)
+  // UPDATED: More lenient cache coverage check
+  // For current month: be more lenient about what constitutes "good coverage"
+  // For historical months: be even more lenient
   const hasGoodCoverage = isCurrentMonthRequest ? 
-    // For current month: strict requirements
-    (spansDateRange && hasIncomeTransactions && hasExpenseTransactions && hasZohoTransactions) : 
-    // For historical months: more lenient
-    ((spansDateRange || (isHistoricalMonth && cachedData.length > 10)) && 
-     hasIncomeTransactions && hasExpenseTransactions && hasZohoTransactions);
+    // For current month: more lenient requirements
+    ((spansDateRange || cachedData.length > 5) && hasIncomeTransactions && hasExpenseTransactions) : 
+    // For historical months: even more lenient
+    ((spansDateRange || (isHistoricalMonth && cachedData.length > 5)) && 
+     (hasIncomeTransactions || hasExpenseTransactions));
     
   return hasGoodCoverage;
 };
@@ -274,9 +291,9 @@ serve(async (req: Request) => {
       );
     }
     
-    const { startDate, endDate, forceRefresh = false } = requestBody;
+    const { startDate, endDate, forceRefresh = false, starting_balance } = requestBody;
     
-    console.log("Edge function parsed dates:", { startDate, endDate, forceRefresh });
+    console.log("Edge function parsed dates:", { startDate, endDate, forceRefresh, starting_balance });
     
     if (!startDate || !endDate) {
       console.error("Missing start or end date");
@@ -298,12 +315,16 @@ serve(async (req: Request) => {
       console.log(`Found ${cachedTransactions.length} cached transactions for range ${startDate} to ${endDate}`);
       
       // Check if the data is recent and covers the entire range
-      const isFresh = isCacheFresh(cachedTransactions, 24, startDate);
+      const isFresh = isCacheFresh(cachedTransactions, 48, startDate); // UPDATED: More lenient freshness (48 hours)
       const fullCoverage = cacheCoversDateRange(cachedTransactions, startDate, endDate);
       
-      // If not forcing refresh AND cache is fresh AND has full coverage, return cached data
-      if (!forceRefresh && isFresh && fullCoverage) {
-        console.log("Returning fresh and complete cached transactions:", cachedTransactions.length);
+      // If not forcing refresh AND (cache is fresh AND has full coverage OR cache has at least some minimum items), return cached data
+      // UPDATED: More lenient condition - for current month, if we have at least some transactions, consider it valid
+      const isCurrentMonth = new Date().toISOString().substring(0, 7) === startDate.substring(0, 7);
+      const hasMinimumCoverage = isCurrentMonth ? cachedTransactions.length >= 5 : fullCoverage;
+      
+      if (!forceRefresh && (isFresh && hasMinimumCoverage)) {
+        console.log("Returning cached transactions that meet our criteria:", cachedTransactions.length);
         return new Response(
           JSON.stringify({
             fromCache: true,
@@ -315,7 +336,7 @@ serve(async (req: Request) => {
             data: cachedTransactions,
             cacheStats: {
               isFresh,
-              fullCoverage,
+              fullCoverage: hasMinimumCoverage,
               cachedCount: cachedTransactions.length
             }
           }),
@@ -323,11 +344,11 @@ serve(async (req: Request) => {
         );
       }
       
-      console.log(`Cache ${!isFresh ? 'is stale' : ''} ${!fullCoverage ? 'has incomplete coverage' : ''} ${forceRefresh ? 'force refresh requested' : ''}`);
+      console.log(`Cache ${!isFresh ? 'is stale' : ''} ${!hasMinimumCoverage ? 'has incomplete coverage' : ''} ${forceRefresh ? 'force refresh requested' : ''}`);
       
       // NEW: Smart partial cache check logic
       // If we're not forcing a refresh, check if we can do a partial refresh
-      if (!forceRefresh) {
+      if (!forceRefresh && cachedTransactions.length > 0) {
         // Get the month-year from the request dates 
         const startMonthYear = startDate.substring(0, 7); // YYYY-MM
         const endMonthYear = endDate.substring(0, 7); // YYYY-MM
@@ -499,7 +520,7 @@ serve(async (req: Request) => {
       console.log("No cached data found or cache error:", cacheError);
     }
     
-    // Force refresh requested or no suitable cached data, fetch new data from make.com webhook
+    // Only proceed with full refresh if we haven't already done a partial refresh above
     console.log("Edge function fetching fresh data from make.com webhook");
     
     // CRITICAL: Use exactly the dates received from the client without any modifications
@@ -507,8 +528,21 @@ serve(async (req: Request) => {
     console.log("Edge function sending dates to webhook:", {
       startDate,
       endDate,
-      forceRefresh
+      forceRefresh,
+      starting_balance
     });
+    
+    // Prepare the webhook request payload
+    const webhookPayload: any = {
+      startDate: startDate,
+      endDate: endDate,
+      forceRefresh: forceRefresh
+    };
+    
+    // Include starting balance if it exists
+    if (starting_balance !== undefined) {
+      webhookPayload.starting_balance = starting_balance;
+    }
     
     // Call the make.com webhook
     console.log("Edge function calling make.com webhook:", makeWebhookUrl);
@@ -517,11 +551,7 @@ serve(async (req: Request) => {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        startDate: startDate,
-        endDate: endDate,
-        forceRefresh: forceRefresh
-      })
+      body: JSON.stringify(webhookPayload)
     });
     
     console.log(`Edge function: make.com webhook response status: ${webhookResponse.status}`);

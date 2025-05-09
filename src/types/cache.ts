@@ -8,6 +8,13 @@ export interface CacheStats {
   newCount: number;
   totalCount?: number;
   isFresh?: boolean;
+  fullCoverage?: boolean;
+  partialRefreshAttempted?: boolean;
+  partialRefreshSuccess?: boolean;
+  cachedDateRange?: {
+    start: string;
+    end: string;
+  };
 }
 
 export interface CacheStatus {
@@ -15,4 +22,13 @@ export interface CacheStatus {
   partialRefresh: boolean;
   stats: CacheStats | null;
   lastRefresh: Date | null;
+  refreshAttempts?: number; // Track number of refresh attempts
+  lastRefreshAttempt?: Date; // Track time of last refresh attempt
+}
+
+export interface CacheControl {
+  maxRefreshesPerSession: number;
+  minRefreshInterval: number; // in milliseconds
+  refreshCount: number;
+  lastRefreshTime: number;
 }
