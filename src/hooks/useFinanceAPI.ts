@@ -62,7 +62,7 @@ export const useFinanceAPI = () => {
       } catch (invokeError: any) {
         console.error("❌ Error calling zoho-transactions function:", invokeError);
         
-        // Fallback to direct fetch
+        // Fallback to direct fetch with more detailed error handling
         console.log("⚠️ Falling back to direct fetch method");
         const queryParams = new URLSearchParams({
           start_date: formattedStartDate,
@@ -77,10 +77,20 @@ export const useFinanceAPI = () => {
         
         try {
           console.log("⚠️ Attempting direct fetch with URL:", `/functions/v1/zoho-transactions?${queryParams.toString()}`);
-          const response = await withTimeout(
-            fetch(`/functions/v1/zoho-transactions?${queryParams.toString()}`),
-            API_TIMEOUT_MS
-          );
+          
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+          
+          const response = await fetch(`/functions/v1/zoho-transactions?${queryParams.toString()}`, {
+            signal: controller.signal,
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache',
+              'If-Modified-Since': new Date(0).toUTCString()
+            }
+          });
+          
+          clearTimeout(timeoutId);
           
           if (!response.ok) {
             console.error("❌ HTTP error response:", response.status, response.statusText);
@@ -99,17 +109,37 @@ export const useFinanceAPI = () => {
           console.log("✅ Data received from direct API call:", data);
           return data;
         } catch (fetchError: any) {
+          // Check if this is an abort error
+          if (fetchError.name === 'AbortError') {
+            console.error("❌ Direct fetch aborted due to timeout");
+            throw new Error(`La petición se canceló después de ${API_TIMEOUT_MS/1000} segundos de espera`);
+          }
+          
           console.error("❌ Error with direct fetch call:", fetchError);
+          // Throw the original error if direct fetch also fails
           throw invokeError || fetchError || new Error("Error al obtener datos financieros");
         }
       }
     } catch (err: any) {
       console.error("❌ Error in fetchFinanceDataFromAPI:", err);
+      
+      // Create a more user-friendly error message
+      let errorMessage = "Error desconocido al obtener datos financieros";
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      } else if (err && typeof err === 'object') {
+        errorMessage = JSON.stringify(err);
+      }
+      
+      // Show toast with more detailed error message
       toast({
         variant: "destructive",
         title: "Error de comunicación con el API",
-        description: err instanceof Error ? err.message : "Error desconocido al obtener datos financieros",
+        description: errorMessage,
       });
+      
       throw err;
     }
   }, [toast]);

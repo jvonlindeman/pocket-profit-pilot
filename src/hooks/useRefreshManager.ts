@@ -1,6 +1,5 @@
 
-import { useCallback, useRef } from 'react';
-import { DateRange } from '@/types/financial';
+import { useCallback, useRef, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { getCircuitBreaker } from '@/utils/circuitBreaker';
 
@@ -10,6 +9,7 @@ import { getCircuitBreaker } from '@/utils/circuitBreaker';
 export function useRefreshManager() {
   // Reference to track if a refresh is in progress at the component level
   const isRefreshingRef = useRef<boolean>(false);
+  const [lastError, setLastError] = useState<Error | null>(null);
   const { toast } = useToast();
   
   // Get singleton circuit breaker instance
@@ -53,9 +53,13 @@ export function useRefreshManager() {
   /**
    * End a refresh operation
    */
-  const endRefresh = useCallback((): void => {
+  const endRefresh = useCallback((error: Error | null = null): void => {
     isRefreshingRef.current = false;
-    circuitBreaker.endRefresh();
+    circuitBreaker.endRefresh(error);
+    
+    if (error) {
+      setLastError(error);
+    }
   }, []);
   
   /**
@@ -64,8 +68,14 @@ export function useRefreshManager() {
   const resetCircuitBreaker = useCallback((): void => {
     console.log('🔄 Resetting circuit breaker');
     isRefreshingRef.current = false;
+    setLastError(null);
     circuitBreaker.reset();
-  }, []);
+    
+    toast({
+      title: "Estado de datos restablecido",
+      description: "Todos los indicadores de actualización se han restablecido",
+    });
+  }, [toast]);
   
   /**
    * Wrapper for refresh operations that handles circuit breaker
@@ -74,16 +84,72 @@ export function useRefreshManager() {
     operation: () => Promise<T>,
     forceRefresh = false
   ): Promise<T | null> => {
-    if (!startRefresh(forceRefresh)) {
+    // For forced refresh operations, we still check if we're already refreshing locally
+    if (isRefreshingRef.current && !forceRefresh) {
+      console.log('⚠️ Operation skipped, refresh already in progress in this component');
       return null;
     }
     
-    try {
-      return await operation();
-    } finally {
-      endRefresh();
+    if (forceRefresh) {
+      // For forced operations, we bypass the circuit breaker and reset local state
+      isRefreshingRef.current = false;
+      
+      try {
+        isRefreshingRef.current = true;
+        circuitBreaker.startRefresh(true);
+        const result = await operation();
+        circuitBreaker.endRefresh();
+        isRefreshingRef.current = false;
+        return result;
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        circuitBreaker.endRefresh(error);
+        isRefreshingRef.current = false;
+        setLastError(error);
+        throw error;
+      }
+    } else {
+      // For normal operations, we use the circuit breaker normally
+      if (!startRefresh(forceRefresh)) {
+        // If we couldn't start the refresh, we queue the operation
+        try {
+          console.log('🔄 Queuing operation in circuit breaker');
+          return await circuitBreaker.queueOperation(operation) as T;
+        } catch (err) {
+          const error = err instanceof Error ? err : new Error(String(err));
+          setLastError(error);
+          throw error;
+        }
+      }
+      
+      try {
+        return await operation();
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        setLastError(error);
+        throw error;
+      } finally {
+        endRefresh();
+      }
     }
   }, [startRefresh, endRefresh]);
+  
+  /**
+   * Emergency recovery method - forces a reset of all flags
+   */
+  const emergencyRecovery = useCallback(() => {
+    console.log('🚨 EMERGENCY RECOVERY - Forcing reset of all refresh flags');
+    isRefreshingRef.current = false;
+    setLastError(null);
+    circuitBreaker.reset();
+    
+    toast({
+      title: "Recuperación de emergencia completada",
+      description: "Se han restablecido todos los estados. Intente actualizar los datos nuevamente.",
+    });
+    
+    return true;
+  }, [toast]);
   
   return {
     canRefresh,
@@ -91,7 +157,11 @@ export function useRefreshManager() {
     endRefresh,
     resetCircuitBreaker,
     withRefreshProtection,
+    emergencyRecovery,
     isRefreshing: isRefreshingRef.current || circuitBreaker.getState().isRefreshing,
-    refreshCount: circuitBreaker.getState().refreshCount
+    refreshCount: circuitBreaker.getState().refreshCount,
+    lastError,
+    hasErrors: circuitBreaker.getState().consecutiveErrorCount > 0,
+    errorCount: circuitBreaker.getState().consecutiveErrorCount
   };
 }

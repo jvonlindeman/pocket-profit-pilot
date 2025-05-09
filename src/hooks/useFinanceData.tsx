@@ -36,11 +36,21 @@ export const useFinanceData = () => {
     fetchFinancialData,
     clearCacheAndRefresh: clearCacheFromDataFetcher,
     setFinancialData,
+    resetCircuitBreakerState
   } = dataFetcher;
   
-  // Use our new utilities
+  // Use our improved refresh manager
   const refreshManager = useRefreshManager();
-  const { isRefreshing, refreshCount, withRefreshProtection, resetCircuitBreaker } = refreshManager;
+  const { 
+    isRefreshing, 
+    refreshCount, 
+    withRefreshProtection, 
+    resetCircuitBreaker, 
+    emergencyRecovery,
+    lastError,
+    hasErrors,
+    errorCount
+  } = refreshManager;
   
   const { syncBalance } = useBalanceSync();
   
@@ -96,33 +106,39 @@ export const useFinanceData = () => {
         startingBalanceData
       });
       
-      const result = await fetchFinancialData(
-        dateRange, 
-        forceRefresh, 
-        {
-          amount: stripeData?.amount || 0,
-          isOverridden: stripeData?.isOverridden || false
-        },
-        startingBalanceData
-      );
-      
-      if (result) {
-        console.log('✅ Financial data loaded successfully:', result);
-        setDataInitialized(true);
-        wasInitializedRef.current = true;
+      try {
+        const result = await fetchFinancialData(
+          dateRange, 
+          forceRefresh, 
+          {
+            amount: stripeData?.amount || 0,
+            isOverridden: stripeData?.isOverridden || false
+          },
+          startingBalanceData
+        );
         
-        toast({
-          title: "Datos cargados",
-          description: "Datos financieros actualizados correctamente",
-        });
-        return true;
-      } else {
-        console.error("❌ Failed to load financial data - result was falsy");
-        toast({
-          variant: "destructive",
-          title: "Error de carga",
-          description: "No se pudieron cargar los datos financieros",
-        });
+        if (result) {
+          console.log('✅ Financial data loaded successfully:', result);
+          setDataInitialized(true);
+          wasInitializedRef.current = true;
+          
+          toast({
+            title: "Datos cargados",
+            description: "Datos financieros actualizados correctamente",
+          });
+          return true;
+        } else {
+          console.error("❌ Failed to load financial data - result was falsy");
+          toast({
+            variant: "destructive",
+            title: "Error de carga",
+            description: "No se pudieron cargar los datos financieros",
+          });
+          return false;
+        }
+      } catch (error) {
+        console.error("❌ Error in refreshData:", error);
+        // We don't need to show a toast here because fetchFinancialData already shows one
         return false;
       }
     }, forceRefresh);
@@ -181,6 +197,17 @@ export const useFinanceData = () => {
     return await refreshData(true);
   }, [refreshData, resetCircuitBreaker]);
 
+  // Handle emergency recovery - reset all states
+  const handleEmergencyRecovery = useCallback(() => {
+    // Reset both refresh manager and data fetcher states
+    emergencyRecovery();
+    resetCircuitBreakerState();
+    
+    // Toast is already shown by the emergencyRecovery function
+    
+    return true;
+  }, [emergencyRecovery, resetCircuitBreakerState]);
+
   // Update data when date range changes - removed startingBalance from dependencies!
   useEffect(() => {
     if (dataInitialized) {
@@ -203,7 +230,7 @@ export const useFinanceData = () => {
   // Completely separate effect for handling startingBalance changes
   useEffect(() => {
     syncBalance(startingBalance, financialData, setFinancialData, dataInitialized);
-  }, [startingBalance, financialData, setFinancialData, dataInitialized]);
+  }, [startingBalance, financialData, setFinancialData, dataInitialized, syncBalance]);
 
   return {
     // Date range management
@@ -241,9 +268,15 @@ export const useFinanceData = () => {
     refreshData,
     clearCacheAndRefresh: handleClearCacheAndRefresh,
     forceManualRefresh,
+    emergencyRecovery: handleEmergencyRecovery,
     
     // Status information
     isRefreshing,
-    refreshCount
+    refreshCount,
+    
+    // Error information
+    lastError,
+    hasErrors,
+    errorCount
   };
 };

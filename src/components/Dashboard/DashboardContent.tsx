@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import StripeTransactionManager from './StripeTransactionManager';
 import MonthlyBalanceInput from './MonthlyBalanceInput';
 import CacheStatusDisplay from './CacheStatusDisplay';
+import DataLoadingErrorRecovery from './DataLoadingErrorRecovery';
 
 const DashboardContent: React.FC = () => {
   const {
@@ -26,7 +27,11 @@ const DashboardContent: React.FC = () => {
     partialRefresh,
     cacheStats,
     isRefreshing,
-    refreshCount
+    refreshCount,
+    lastError,
+    hasErrors,
+    errorCount,
+    emergencyRecovery
   } = useFinanceData();
 
   const handleDateRangeChanged = (newStartDate: Date, newEndDate: Date) => {
@@ -45,6 +50,17 @@ const DashboardContent: React.FC = () => {
 
   return (
     <div className="w-full space-y-6">
+      {/* Error recovery alert, only appears when errors are detected */}
+      {hasErrors && (
+        <DataLoadingErrorRecovery 
+          hasErrors={hasErrors}
+          errorCount={errorCount}
+          lastError={lastError}
+          onReset={emergencyRecovery}
+          isRefreshing={isRefreshing}
+        />
+      )}
+
       <div className="flex flex-col md:flex-row gap-6">
         <div className="w-full md:w-1/2 lg:w-2/3">
           <DateRangeSelector

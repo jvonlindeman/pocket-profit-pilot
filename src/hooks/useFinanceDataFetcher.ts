@@ -7,6 +7,7 @@ import { useFinanceAPI } from '@/hooks/useFinanceAPI';
 import { useCacheManagement } from '@/hooks/useCacheManagement';
 import { transformFinancialData } from '@/utils/financeDataTransformer';
 import { getCircuitBreaker } from '@/utils/circuitBreaker';
+import { retryWithBackoff } from '@/utils/apiUtils';
 
 export const useFinanceDataFetcher = () => {
   const [financialData, setFinancialData] = useState<FinancialData>(DEFAULT_FINANCIAL_DATA);
@@ -26,6 +27,14 @@ export const useFinanceDataFetcher = () => {
   
   // Get circuit breaker instance
   const circuitBreaker = getCircuitBreaker();
+
+  // Reset circuit breaker state
+  const resetCircuitBreakerState = useCallback(() => {
+    localRefreshingRef.current = false;
+    circuitBreaker.reset();
+    setError(null);
+    console.log('🔄 Circuit breaker state reset in data fetcher');
+  }, []);
 
   // Fetch financial data from the API or cache
   const fetchFinancialData = useCallback(async (
@@ -48,8 +57,12 @@ export const useFinanceDataFetcher = () => {
     setError(null);
     
     try {
-      // Fetch data from API, passing the starting balance if available
-      const data = await fetchFinanceDataFromAPI(dateRange, forceRefresh, startingBalanceData);
+      // Use retry with backoff for better reliability
+      const data = await retryWithBackoff(
+        () => fetchFinanceDataFromAPI(dateRange, forceRefresh, startingBalanceData),
+        forceRefresh ? 2 : 1, // More retries for forced refresh
+        1000
+      );
       
       // Store raw response for debugging
       console.log("📑 Setting raw response data:", data);
@@ -94,12 +107,13 @@ export const useFinanceDataFetcher = () => {
       setDataInitialized(true);
       return processedData;
     } catch (err: any) {
+      const errorMessage = err instanceof Error ? err.message : "Error desconocido al obtener datos";
       console.error("❌ Error fetching financial data:", err);
-      setError(err instanceof Error ? err.message : "Error desconocido al obtener datos");
+      setError(errorMessage);
       toast({
         variant: "destructive",
         title: "Error al obtener datos",
-        description: err instanceof Error ? err.message : "Error desconocido al obtener datos",
+        description: errorMessage,
       });
       return DEFAULT_FINANCIAL_DATA;
     } finally {
@@ -125,19 +139,15 @@ export const useFinanceDataFetcher = () => {
     
     try {
       return await clearCacheForDateRange(dateRange);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Error desconocido al limpiar caché";
+      setError(errorMessage);
+      return false;
     } finally {
       setLoading(false);
       localRefreshingRef.current = false;
     }
   }, [clearCacheForDateRange]);
-
-  // Reset global state counters method - can be called to reset the circuit breaker
-  const resetCircuitBreaker = useCallback(() => {
-    console.log("🔄 Resetting circuit breaker counters");
-    circuitBreaker.reset();
-    localRefreshingRef.current = false;
-    return true;
-  }, []);
 
   return {
     financialData,
@@ -152,7 +162,7 @@ export const useFinanceDataFetcher = () => {
     cacheStatus,
     fetchFinancialData,
     clearCacheAndRefresh,
-    resetCircuitBreaker,
+    resetCircuitBreakerState,
     isRefreshing: circuitBreaker.getState().isRefreshing || localRefreshingRef.current,
     refreshCount: circuitBreaker.getState().refreshCount
   };
