@@ -31,7 +31,10 @@ const DashboardContent: React.FC = () => {
 
   const handleDateRangeChanged = (newStartDate: Date, newEndDate: Date) => {
     if (newStartDate && newEndDate) {
-      updateDateRange(newStartDate, newEndDate);
+      updateDateRange({
+        startDate: newStartDate,
+        endDate: newEndDate
+      });
     }
   };
 

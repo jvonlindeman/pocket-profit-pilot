@@ -97,7 +97,7 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions, onC
         const type = row.original.type;
         return (
           <Badge 
-            variant={type === 'income' ? 'success' : 'destructive'}
+            variant={type === 'income' ? 'secondary' : 'destructive'}
           >
             {type === 'income' ? 'Ingreso' : 'Gasto'}
           </Badge>

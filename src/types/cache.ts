@@ -15,6 +15,7 @@ export interface CacheStats {
     start: string;
     end: string;
   };
+  lastRefresh?: string | null;
 }
 
 export interface CacheStatus {
