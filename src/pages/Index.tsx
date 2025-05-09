@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary/index';
@@ -129,8 +128,19 @@ const Index = () => {
     });
   };
 
-  // Prepare Stripe data for chart
+  // Prepare Stripe data for chart - add safety checks
   const getStripeDataForChart = () => {
+    // Check if we have valid data structure
+    if (!financialData || 
+        !financialData.dailyData || 
+        !financialData.dailyData.income || 
+        !financialData.dailyData.income.labels || 
+        !Array.isArray(financialData.dailyData.income.labels) ||
+        !financialData.dailyData.income.labels.length) {
+      // Return empty data structure when data is not available
+      return { labels: [], values: [] };
+    }
+
     // Si solo hay un valor de Stripe para todo el período, distribúyelo a lo largo del gráfico
     if (stripeIncome > 0) {
       const labels = financialData.dailyData.income.labels;
@@ -369,11 +379,11 @@ const Index = () => {
             {/* Gráficos */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
               <RevenueChart 
-                incomeData={financialData.dailyData.income} 
-                expenseData={financialData.dailyData.expense}
+                incomeData={financialData.dailyData?.income || { labels: [], values: [] }} 
+                expenseData={financialData.dailyData?.expense || { labels: [], values: [] }}
                 stripeData={getStripeDataForChart()}
               />
-              <ExpenseChart expenseData={financialData.expenseByCategory} />
+              <ExpenseChart expenseData={financialData.expenseByCategory || []} />
             </div>
 
             {/* Nuevo gráfico de colaboradores */}
@@ -385,7 +395,11 @@ const Index = () => {
 
             {/* Análisis de rentabilidad */}
             <div className="mt-6">
-              <ProfitAnalysis monthlyData={financialData.monthlyData} />
+              <ProfitAnalysis monthlyData={financialData.monthlyData || {
+                income: { labels: [], values: [] },
+                expense: { labels: [], values: [] },
+                profit: { labels: [], values: [] }
+              }} />
             </div>
 
             {/* Listado de transacciones */}
@@ -406,7 +420,7 @@ const Index = () => {
           <ZohoDebug />
         </div>
 
-        {/* Sección de depuración del webhook - solo mostrar en modo debug */}
+        {/* Sección de depuraci��n del webhook - solo mostrar en modo debug */}
         {debugMode && (
           <>
             <div className="mt-4">

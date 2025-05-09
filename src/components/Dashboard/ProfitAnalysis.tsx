@@ -13,12 +13,27 @@ interface ProfitAnalysisProps {
 }
 
 const ProfitAnalysis: React.FC<ProfitAnalysisProps> = ({ monthlyData }) => {
-  // Preparamos los datos para el gráfico
+  // Ensure we have valid data before trying to map it
+  if (!monthlyData || !monthlyData.income || !monthlyData.income.labels || !Array.isArray(monthlyData.income.labels)) {
+    // Return a placeholder when data is not available
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Análisis de Rentabilidad Mensual (USD)</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center h-[350px] bg-gray-50">
+          <p className="text-gray-500">No hay datos suficientes para mostrar el gráfico</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Now we can safely prepare chart data
   const chartData = monthlyData.income.labels.map((label, index) => ({
     name: label,
-    ingresos: monthlyData.income.values[index],
-    gastos: monthlyData.expense.values[index],
-    beneficio: monthlyData.profit.values[index]
+    ingresos: monthlyData.income.values[index] || 0,
+    gastos: monthlyData.expense.values[index] || 0,
+    beneficio: monthlyData.profit.values[index] || 0
   }));
 
   const formatCurrency = (value: number) => {

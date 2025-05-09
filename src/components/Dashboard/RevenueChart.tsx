@@ -11,17 +11,33 @@ interface RevenueChartProps {
 }
 
 const RevenueChart: React.FC<RevenueChartProps> = ({ incomeData, expenseData, stripeData }) => {
-  // Preparamos los datos para el gráfico
+  // Add safety check before processing data
+  if (!incomeData || !incomeData.labels || !Array.isArray(incomeData.labels) || !incomeData.labels.length) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Evolución de Ingresos y Gastos (USD)</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center h-[350px] bg-gray-50">
+          <p className="text-gray-500">No hay datos suficientes para mostrar el gráfico</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Safely prepare chart data
   const chartData = incomeData.labels.map((label, index) => {
-    const stripeValue = stripeData && stripeData.values.length > index ? stripeData.values[index] : 0;
-    const regularIncome = incomeData.values[index];
+    const stripeValue = stripeData && stripeData.values && stripeData.values.length > index ? stripeData.values[index] || 0 : 0;
+    const regularIncome = incomeData.values && incomeData.values[index] ? incomeData.values[index] : 0;
+    const expense = expenseData.values && expenseData.values[index] ? expenseData.values[index] : 0;
+    
     return {
       name: label,
       ingresos_regulares: regularIncome,
       stripe: stripeValue,
       ingresos_totales: regularIncome + stripeValue,
-      gastos: expenseData.values[index],
-      beneficio: (regularIncome + stripeValue) - expenseData.values[index]
+      gastos: expense,
+      beneficio: (regularIncome + stripeValue) - expense
     };
   });
 
