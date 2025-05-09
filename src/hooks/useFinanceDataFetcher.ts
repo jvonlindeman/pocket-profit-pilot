@@ -8,19 +8,10 @@ import { useCacheManagement } from '@/hooks/useCacheManagement';
 import { transformFinancialData } from '@/utils/financeDataTransformer';
 import { getCircuitBreaker } from '@/utils/circuitBreaker';
 import { retryWithBackoff } from '@/utils/apiUtils';
+import { useFinanceDataState } from '@/hooks/useFinanceDataState';
+import { useFinanceErrorHandler } from '@/hooks/useFinanceErrorHandler';
 
 export const useFinanceDataFetcher = () => {
-  const [financialData, setFinancialData] = useState<FinancialData>(DEFAULT_FINANCIAL_DATA);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [dataInitialized, setDataInitialized] = useState<boolean>(false);
-  const [rawResponse, setRawResponse] = useState<any>(null);
-  const [regularIncome, setRegularIncome] = useState<number>(0);
-  const [collaboratorExpenses, setCollaboratorExpenses] = useState<any[]>([]);
-
-  // Create a local ref to track if a refresh is in progress
-  const localRefreshingRef = useRef<boolean>(false);
-  
   const { toast } = useToast();
   const { fetchFinanceDataFromAPI } = useFinanceAPI();
   const { cacheStatus, updateCacheStatus, clearCacheForDateRange } = useCacheManagement();
@@ -28,13 +19,28 @@ export const useFinanceDataFetcher = () => {
   // Get circuit breaker instance
   const circuitBreaker = getCircuitBreaker();
 
-  // Reset circuit breaker state
-  const resetCircuitBreakerState = useCallback(() => {
-    localRefreshingRef.current = false;
-    circuitBreaker.reset();
-    setError(null);
-    console.log('🔄 Circuit breaker state reset in data fetcher');
-  }, []);
+  // Use our new hooks for state management and error handling
+  const {
+    financialData,
+    setFinancialData,
+    loading,
+    setLoading,
+    dataInitialized,
+    setDataInitialized,
+    rawResponse,
+    setRawResponse,
+    regularIncome,
+    setRegularIncome,
+    collaboratorExpenses,
+    setCollaboratorExpenses
+  } = useFinanceDataState();
+  
+  const {
+    error,
+    setError,
+    resetCircuitBreakerState,
+    localRefreshingRef
+  } = useFinanceErrorHandler();
 
   // Fetch financial data from the API or cache
   const fetchFinancialData = useCallback(async (
@@ -121,7 +127,19 @@ export const useFinanceDataFetcher = () => {
       // Reset local refresh flag
       localRefreshingRef.current = false;
     }
-  }, [fetchFinanceDataFromAPI, updateCacheStatus, toast]);
+  }, [
+    fetchFinanceDataFromAPI, 
+    updateCacheStatus, 
+    toast, 
+    setFinancialData, 
+    setLoading, 
+    setError, 
+    setRawResponse, 
+    setCollaboratorExpenses, 
+    setRegularIncome, 
+    setDataInitialized, 
+    localRefreshingRef
+  ]);
 
   // Clear cache and force refresh data
   const clearCacheAndRefresh = useCallback(async (dateRange: DateRange) => {
@@ -147,7 +165,7 @@ export const useFinanceDataFetcher = () => {
       setLoading(false);
       localRefreshingRef.current = false;
     }
-  }, [clearCacheForDateRange]);
+  }, [clearCacheForDateRange, setLoading, setError, localRefreshingRef]);
 
   return {
     financialData,
