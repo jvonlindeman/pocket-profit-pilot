@@ -7,6 +7,11 @@ import { useStripeIncome } from '@/hooks/useStripeIncome';
 import { useFinanceDataFetcher } from '@/hooks/useFinanceDataFetcher';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 
+// Maximum number of refreshes to prevent runaway loops
+const MAX_REFRESHES_PER_SESSION = 5;
+// Minimum time between refreshes in milliseconds
+const MIN_REFRESH_INTERVAL = 3000;
+
 export const useFinanceData = () => {
   // Use our custom hooks for specific functionality
   const dateRangeHook = useDateRange();
@@ -40,13 +45,46 @@ export const useFinanceData = () => {
   const balanceSyncedRef = useRef<number | null>(null);
   // Add a ref to track if we're in a refresh operation to prevent cascading updates
   const isRefreshingRef = useRef<boolean>(false);
+  // Track last refresh time to prevent too frequent refreshes
+  const lastRefreshTimeRef = useRef<number>(0);
+  // Track number of refreshes to prevent runaway loops
+  const refreshCountRef = useRef<number>(0);
+  // Track data initialization to prevent attempting to refresh before ready
+  const wasInitializedRef = useRef<boolean>(false);
 
+  // Reset refresh count when component mounts or date range changes
+  useEffect(() => {
+    console.log('🔄 Date range changed, resetting refresh count');
+    refreshCountRef.current = 0;
+    // Reset the last refresh time when date range changes
+    lastRefreshTimeRef.current = 0;
+  }, [dateRange]);
+  
   // Main function to fetch and process financial data
   const refreshData = useCallback(async (forceRefresh: boolean = false) => {
+    // Check if we're already refreshing
     if (isRefreshingRef.current) {
       console.log('🔄 Already refreshing data, skipping duplicate refresh');
       return false;
     }
+    
+    // Check if we've hit the maximum number of refreshes
+    if (refreshCountRef.current >= MAX_REFRESHES_PER_SESSION) {
+      console.warn(`⚠️ Maximum refresh count (${MAX_REFRESHES_PER_SESSION}) reached, preventing potential infinite loop`);
+      return false;
+    }
+    
+    // Check if it's too soon for another refresh
+    const now = Date.now();
+    const timeSinceLastRefresh = now - lastRefreshTimeRef.current;
+    if (!forceRefresh && lastRefreshTimeRef.current > 0 && timeSinceLastRefresh < MIN_REFRESH_INTERVAL) {
+      console.log(`⏱️ Too soon for another refresh. Last refresh was ${timeSinceLastRefresh}ms ago. Min interval is ${MIN_REFRESH_INTERVAL}ms`);
+      return false;
+    }
+    
+    // Increment refresh count and update last refresh time
+    refreshCountRef.current++;
+    lastRefreshTimeRef.current = now;
     
     isRefreshingRef.current = true;
     try {
@@ -67,9 +105,11 @@ export const useFinanceData = () => {
       }
       
       // Prepare starting balance data, only if we have a valid value
+      // IMPORTANT: Get startingBalance from ref to avoid circular dependency
+      const currentBalance = startingBalance;
       let startingBalanceData = undefined;
-      if (startingBalance !== undefined && startingBalance !== null) {
-        startingBalanceData = { starting_balance: startingBalance };
+      if (currentBalance !== undefined && currentBalance !== null) {
+        startingBalanceData = { starting_balance: currentBalance };
         console.log('💰 Passing starting balance to API:', startingBalanceData);
       } else {
         console.log('💰 No starting balance to pass to API');
@@ -94,10 +134,11 @@ export const useFinanceData = () => {
       if (result) {
         console.log('✅ Financial data loaded successfully:', result);
         setDataInitialized(true);
+        wasInitializedRef.current = true;
         
         // When data loads successfully, update our balance sync ref to prevent unnecessary updates
-        if (startingBalance !== undefined && startingBalance !== null) {
-          balanceSyncedRef.current = startingBalance;
+        if (currentBalance !== undefined && currentBalance !== null) {
+          balanceSyncedRef.current = currentBalance;
         }
         
         toast({
@@ -125,7 +166,7 @@ export const useFinanceData = () => {
     } finally {
       isRefreshingRef.current = false;
     }
-  }, [dateRange, isDateInRange, loadStripeIncomeData, fetchFinancialData, setDataInitialized, toast, setStripeIncome, startingBalance]);
+  }, [dateRange, isDateInRange, loadStripeIncomeData, fetchFinancialData, setDataInitialized, toast, setStripeIncome]);
 
   // Clear cache and refresh data
   const handleClearCacheAndRefresh = useCallback(async () => {
@@ -136,7 +177,7 @@ export const useFinanceData = () => {
     });
     
     try {
-      const success = await clearCacheAndRefresh(dateRange);
+      const success = await clearCacheForDateRange(dateRange);
       if (success) {
         console.log('✅ Cache cleared successfully');
         // Force refresh the data after clearing cache
@@ -159,27 +200,41 @@ export const useFinanceData = () => {
       });
       return false;
     }
-  }, [dateRange, clearCacheAndRefresh, refreshData, toast]);
+  }, [dateRange, clearCacheForDateRange, refreshData, toast]);
 
-  // Update data when date range changes - REMOVED startingBalance from dependencies
+  // Update data when date range changes - REMOVED startingBalance from dependencies!
   useEffect(() => {
     if (dataInitialized) {
       console.log('📅 Date range changed, refreshing data:', { dateRange });
       refreshData(false);
     }
-  }, [dateRange, dataInitialized, refreshData]);
+  }, [dateRange, dataInitialized, refreshData]); // startingBalance removed from dependencies
 
   // Separate effect for debugging initialization state
   useEffect(() => {
     console.log('🔍 Finance data component mounted or data initialized state changed:', { dataInitialized });
+    
+    // Initial data load if not already initialized
+    if (dataInitialized && !wasInitializedRef.current) {
+      console.log('🚀 Data initialized but wasInitializedRef is false, setting to true');
+      wasInitializedRef.current = true;
+    }
   }, [dataInitialized]);
 
-  // Separate effect for handling startingBalance changes to avoid cascading updates
+  // Completely separate effect for handling startingBalance changes - with better debouncing
   useEffect(() => {
+    // Skip this effect during component initialization or if data isn't loaded yet
+    if (!dataInitialized || !financialData) {
+      console.log('💡 Skipping balance effect - data not initialized or financial data not loaded yet');
+      return;
+    }
+
+    // Get the current financial data balance for comparison
+    const currentFinancialDataBalance = financialData.summary.startingBalance;
+    
     // Only proceed if we have both financialData and a valid startingBalance
-    if (financialData && startingBalance !== undefined && startingBalance !== null) {
-      // Check if the balance is different from what's in financialData OR from our last synced value
-      const currentFinancialDataBalance = financialData.summary.startingBalance;
+    if (startingBalance !== undefined && startingBalance !== null) {
+      // Check if the balance is different from what's in financialData AND from our last synced value
       const needsUpdate = (currentFinancialDataBalance === undefined || 
                           currentFinancialDataBalance !== startingBalance) &&
                           balanceSyncedRef.current !== startingBalance;
@@ -203,7 +258,7 @@ export const useFinanceData = () => {
         console.log('📊 No need to update financial data with starting balance - already synced or unchanged');
       }
     }
-  }, [financialData, startingBalance, setFinancialData]);
+  }, [startingBalance, financialData, setFinancialData, dataInitialized]);
 
   return {
     // Date range management
