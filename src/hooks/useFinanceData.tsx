@@ -6,7 +6,8 @@ import { useDateRange } from '@/hooks/useDateRange';
 import { useStripeIncome } from '@/hooks/useStripeIncome';
 import { useFinanceDataFetcher } from '@/hooks/useFinanceDataFetcher';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
-import { useRefreshManager } from '@/hooks/useRefreshManager';
+import { useDataRefresh } from '@/hooks/useDataRefresh';
+import { useDataLoading } from '@/hooks/useDataLoading';
 import { useBalanceSync } from '@/hooks/useBalanceSync';
 
 export const useFinanceData = () => {
@@ -39,18 +40,21 @@ export const useFinanceData = () => {
     resetCircuitBreakerState
   } = dataFetcher;
   
-  // Use our improved refresh manager
-  const refreshManager = useRefreshManager();
+  const dataRefresh = useDataRefresh();
   const { 
     isRefreshing, 
     refreshCount, 
     withRefreshProtection, 
-    resetCircuitBreaker, 
-    emergencyRecovery,
+    forceManualRefresh: forceManualRefreshAction,
+    handleClearCacheAndRefresh,
+    handleEmergencyRecovery,
     lastError,
     hasErrors,
     errorCount
-  } = refreshManager;
+  } = dataRefresh;
+  
+  const dataLoading = useDataLoading();
+  const { loadFinancialData } = dataLoading;
   
   const { syncBalance } = useBalanceSync();
   
@@ -66,82 +70,26 @@ export const useFinanceData = () => {
         currentDateRangeRef.current.startDate !== dateRange.startDate || 
         currentDateRangeRef.current.endDate !== dateRange.endDate) {
       console.log('🔄 Date range changed, resetting refresh count');
-      resetCircuitBreaker();
+      dataRefresh.resetCircuitBreaker();
       // Update current date range ref
       currentDateRangeRef.current = { ...dateRange };
     }
-  }, [dateRange, resetCircuitBreaker]);
+  }, [dateRange, dataRefresh]);
   
   // Main function to fetch and process financial data
   const refreshData = useCallback(async (forceRefresh: boolean = false) => {
-    return await withRefreshProtection(async () => {
-      console.log('🔄 Starting data refresh with forceRefresh =', forceRefresh);
-      toast({
-        title: "Cargando datos",
-        description: `${forceRefresh ? 'Forzando actualización' : 'Actualizando'} datos financieros...`,
-      });
-      
-      // First load Stripe income data
-      console.log('📊 Loading Stripe income data...');
-      const stripeData = await loadStripeIncomeData(dateRange, isDateInRange);
-      console.log('💰 Loaded Stripe income data:', stripeData);
-      
-      // Set the Stripe income value after loading to ensure it's available
-      if (stripeData) {
-        setStripeIncome(stripeData.amount || 0);
-      }
-      
-      // Prepare starting balance data, only if we have a valid value
-      let startingBalanceData = undefined;
-      if (startingBalance !== undefined && startingBalance !== null) {
-        startingBalanceData = { starting_balance: startingBalance };
-        console.log('💰 Passing starting balance to API:', startingBalanceData);
-      } else {
-        console.log('💰 No starting balance to pass to API');
-      }
-      
-      // Then fetch the main financial data including Stripe
-      console.log('📈 Fetching financial data with stripe data and starting balance:', {
-        stripeData,
-        startingBalanceData
-      });
-      
-      try {
-        const result = await fetchFinancialData(
-          dateRange, 
-          forceRefresh, 
-          {
-            amount: stripeData?.amount || 0,
-            isOverridden: stripeData?.isOverridden || false
-          },
-          startingBalanceData
-        );
-        
-        if (result) {
-          console.log('✅ Financial data loaded successfully:', result);
-          setDataInitialized(true);
-          wasInitializedRef.current = true;
-          
-          toast({
-            title: "Datos cargados",
-            description: "Datos financieros actualizados correctamente",
-          });
-          return true;
-        } else {
-          console.error("❌ Failed to load financial data - result was falsy");
-          toast({
-            variant: "destructive",
-            title: "Error de carga",
-            description: "No se pudieron cargar los datos financieros",
-          });
-          return false;
-        }
-      } catch (error) {
-        console.error("❌ Error in refreshData:", error);
-        // We don't need to show a toast here because fetchFinancialData already shows one
-        return false;
-      }
-    }, forceRefresh);
+    return await loadFinancialData(
+      dateRange,
+      isDateInRange,
+      loadStripeIncomeData,
+      setStripeIncome,
+      fetchFinancialData,
+      startingBalance,
+      withRefreshProtection,
+      setDataInitialized,
+      toast,
+      forceRefresh
+    );
   }, [
     dateRange, 
     isDateInRange, 
@@ -151,62 +99,28 @@ export const useFinanceData = () => {
     toast, 
     setStripeIncome, 
     startingBalance, 
-    withRefreshProtection
+    withRefreshProtection,
+    loadFinancialData
   ]);
 
   // Clear cache and refresh data
-  const handleClearCacheAndRefresh = useCallback(async () => {
-    return await withRefreshProtection(async () => {
-      console.log('🗑️ Clearing cache and refreshing data...');
-      toast({
-        title: "Limpiando caché",
-        description: "Eliminando datos en caché y obteniendo datos frescos...",
-      });
-      
-      try {
-        const success = await clearCacheFromDataFetcher(dateRange);
-        if (success) {
-          console.log('✅ Cache cleared successfully');
-          // Force refresh the data after clearing cache
-          return await refreshData(true);
-        } else {
-          console.error('❌ Failed to clear cache');
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: "No se pudo limpiar el caché",
-          });
-          return false;
-        }
-      } catch (err) {
-        console.error('🚨 Error clearing cache:', err);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: err instanceof Error ? err.message : "Error desconocido al limpiar caché",
-        });
-        return false;
-      }
-    }, true);
-  }, [dateRange, clearCacheFromDataFetcher, refreshData, toast, withRefreshProtection]);
+  const clearCacheAndRefreshData = useCallback(async () => {
+    return await handleClearCacheAndRefresh(
+      clearCacheFromDataFetcher,
+      refreshData,
+      dateRange
+    );
+  }, [dateRange, clearCacheFromDataFetcher, refreshData, handleClearCacheAndRefresh]);
 
   // Manual refresh function that resets circuit breaker and forces refresh
   const forceManualRefresh = useCallback(async () => {
-    console.log('🔄 Manual refresh requested, resetting circuit breaker...');
-    resetCircuitBreaker();
-    return await refreshData(true);
-  }, [refreshData, resetCircuitBreaker]);
+    return await forceManualRefreshAction(refreshData);
+  }, [refreshData, forceManualRefreshAction]);
 
   // Handle emergency recovery - reset all states
-  const handleEmergencyRecovery = useCallback(() => {
-    // Reset both refresh manager and data fetcher states
-    emergencyRecovery();
-    resetCircuitBreakerState();
-    
-    // Toast is already shown by the emergencyRecovery function
-    
-    return true;
-  }, [emergencyRecovery, resetCircuitBreakerState]);
+  const emergencyRecovery = useCallback(() => {
+    return handleEmergencyRecovery(resetCircuitBreakerState);
+  }, [handleEmergencyRecovery, resetCircuitBreakerState]);
 
   // Update data when date range changes - removed startingBalance from dependencies!
   useEffect(() => {
@@ -266,9 +180,9 @@ export const useFinanceData = () => {
     
     // Functions
     refreshData,
-    clearCacheAndRefresh: handleClearCacheAndRefresh,
+    clearCacheAndRefresh: clearCacheAndRefreshData,
     forceManualRefresh,
-    emergencyRecovery: handleEmergencyRecovery,
+    emergencyRecovery,
     
     // Status information
     isRefreshing,

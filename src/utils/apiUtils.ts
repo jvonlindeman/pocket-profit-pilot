@@ -64,3 +64,67 @@ export const safeJSONParse = (text: string): any | null => {
     return null;
   }
 };
+
+/**
+ * Safely execute an async function with error handling
+ * @param fn Function to execute
+ * @param fallback Fallback value to return if function fails
+ * @returns Result of function or fallback value
+ */
+export const safeAsync = async <T>(fn: () => Promise<T>, fallback: T): Promise<T> => {
+  try {
+    return await fn();
+  } catch (err) {
+    console.error('Error in async function:', err);
+    return fallback;
+  }
+};
+
+/**
+ * Format an error for display
+ * @param error Error to format
+ * @returns Formatted error string
+ */
+export const formatError = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  } else if (typeof error === 'string') {
+    return error;
+  } else if (error && typeof error === 'object') {
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return 'Unknown error object';
+    }
+  }
+  return 'Unknown error';
+};
+
+/**
+ * Create an abortable fetch with timeout
+ * @param url URL to fetch
+ * @param options Fetch options
+ * @param timeoutMs Timeout in milliseconds
+ * @returns Response from fetch
+ */
+export const abortableFetch = async (
+  url: string, 
+  options?: RequestInit, 
+  timeoutMs: number = 30000
+): Promise<Response> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+};
