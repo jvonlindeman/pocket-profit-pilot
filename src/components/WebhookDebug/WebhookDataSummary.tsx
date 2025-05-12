@@ -66,15 +66,20 @@ const WebhookDataSummary: React.FC<WebhookDataSummaryProps> = ({ rawData }) => {
       }, 0)
     : 0;
   
+  // Calculate net income and other totals
+  const totalIncome = stripeIncome + paymentTotal;
+  const totalExpense = collaboratorTotal + expenseTotal;
+  const netTotal = totalIncome - totalExpense;
+  
   // Log the totals for debugging
   console.log("WebhookDataSummary calculated totals:", {
     stripeIncome,
     collaboratorTotal,
     expenseTotal,
     paymentTotal,
-    totalIncome: stripeIncome + paymentTotal,
-    totalExpense: collaboratorTotal + expenseTotal,
-    netTotal: stripeIncome + paymentTotal - collaboratorTotal - expenseTotal
+    totalIncome,
+    totalExpense,
+    netTotal
   });
   
   const formatCurrency = (amount: number) => {
@@ -102,7 +107,7 @@ const WebhookDataSummary: React.FC<WebhookDataSummaryProps> = ({ rawData }) => {
             </li>
             <li className="flex justify-between text-blue-600 font-medium border-t border-gray-200 pt-1 mt-1">
               <span>Total Income:</span>
-              <span>{formatCurrency(stripeIncome + paymentTotal)}</span>
+              <span>{formatCurrency(totalIncome)}</span>
             </li>
           </ul>
         </div>
@@ -120,7 +125,7 @@ const WebhookDataSummary: React.FC<WebhookDataSummaryProps> = ({ rawData }) => {
             </li>
             <li className="flex justify-between text-red-600 font-medium border-t border-gray-200 pt-1 mt-1">
               <span>Total Expenses:</span>
-              <span>{formatCurrency(collaboratorTotal + expenseTotal)}</span>
+              <span>{formatCurrency(totalExpense)}</span>
             </li>
           </ul>
         </div>
@@ -129,11 +134,26 @@ const WebhookDataSummary: React.FC<WebhookDataSummaryProps> = ({ rawData }) => {
       <div className="mt-3 pt-2 border-t border-gray-200">
         <div className="flex justify-between items-center">
           <span className="text-sm font-semibold">Net Income:</span>
-          <span className={`text-sm font-bold ${(stripeIncome + paymentTotal - collaboratorTotal - expenseTotal) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {formatCurrency(stripeIncome + paymentTotal - collaboratorTotal - expenseTotal)}
+          <span className={`text-sm font-bold ${netTotal >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            {formatCurrency(netTotal)}
           </span>
         </div>
       </div>
+      
+      {(totalIncome > 0 || totalExpense > 0) && (
+        <div className="mt-3 pt-2 border-t border-gray-200 text-xs text-gray-600">
+          <div className="bg-blue-50 p-2 rounded">
+            <p className="font-medium">Debug Info:</p>
+            <p>Raw data exists but may not be displaying in transactions. Check transformation in apiClient.ts.</p>
+            <p>Data categories: {[
+              rawData.stripe ? 'Stripe' : '',
+              collaboratorCount > 0 ? 'Collaborators' : '',
+              expenseCount > 0 ? 'Expenses' : '',
+              paymentCount > 0 ? 'Payments' : ''
+            ].filter(Boolean).join(', ')}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

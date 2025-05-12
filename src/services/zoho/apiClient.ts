@@ -55,7 +55,7 @@ const transformWebhookData = (responseData: any): Transaction[] => {
     const stripeAmount = parseNumericValue(responseData.stripe);
     console.log('Parsed stripe amount:', stripeAmount);
     if (stripeAmount > 0) {
-      const stripeTransaction = {
+      const stripeTransaction: Transaction = {
         id: `stripe-${new Date().toISOString().split('T')[0]}`,
         date: new Date().toISOString().split('T')[0],
         amount: stripeAmount,
@@ -80,7 +80,7 @@ const transformWebhookData = (responseData: any): Transaction[] => {
       console.log(`Collaborator ${collab.vendor_name || 'unknown'}, amount: ${amount}`);
       
       if (amount > 0) {
-        const collabTransaction = {
+        const collabTransaction: Transaction = {
           id: `colaborador-${index}-${collab.date || new Date().toISOString().split('T')[0]}`,
           date: collab.date || new Date().toISOString().split('T')[0],
           amount: amount,
@@ -106,7 +106,7 @@ const transformWebhookData = (responseData: any): Transaction[] => {
       console.log(`Expense: ${expense.account_name || 'unknown'}, amount: ${amount}`);
       
       if (amount > 0) {
-        const expenseTransaction = {
+        const expenseTransaction: Transaction = {
           id: `expense-${index}-${expense.date || new Date().toISOString().split('T')[0]}`,
           date: expense.date || new Date().toISOString().split('T')[0],
           amount: amount,
@@ -134,7 +134,7 @@ const transformWebhookData = (responseData: any): Transaction[] => {
       console.log(`Payment from ${payment.customer_name || 'unknown'}, amount: ${amount}`);
       
       if (amount > 0) {
-        const paymentTransaction = {
+        const paymentTransaction: Transaction = {
           id: `payment-${index}-${payment.date || new Date().toISOString().split('T')[0]}`,
           date: payment.date || new Date().toISOString().split('T')[0],
           amount: amount,
