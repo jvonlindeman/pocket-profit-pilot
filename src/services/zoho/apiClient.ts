@@ -1,5 +1,6 @@
 
 import { Transaction } from "../../types/financial";
+import { supabase } from "../../integrations/supabase/client";
 
 export const fetchTransactionsFromWebhook = async (
   startDate: Date,
@@ -15,10 +16,10 @@ export const fetchTransactionsFromWebhook = async (
   console.log(`Force refresh: ${forceRefresh}, Return raw response: ${returnRawResponse}`);
   
   try {
-    // Get the Supabase URL from environment
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    // Use the Supabase URL directly from the supabase client instead of environment variables
+    const supabaseUrl = "https://rstexocnpvtxfhqbnetn.supabase.co";
     if (!supabaseUrl) {
-      throw new Error('Missing Supabase URL in environment variables');
+      throw new Error('Missing Supabase URL in configuration');
     }
     
     // Create the function URL
