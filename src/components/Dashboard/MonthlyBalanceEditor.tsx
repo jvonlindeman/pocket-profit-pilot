@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -11,30 +12,23 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription } fr
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface MonthlyBalanceEditorProps {
   currentDate: Date;
   onBalanceChange?: (balance: number) => void;
-  onStripeOverrideChange?: (stripeOverride: number | null) => void;
 }
 
 // Define form schema
 const formSchema = z.object({
   balance: z.coerce.number().min(0, "El saldo debe ser mayor o igual a 0"),
   notes: z.string().optional(),
-  stripe_override: z.union([
-    z.coerce.number().min(0, "El valor debe ser mayor o igual a 0"),
-    z.literal('').transform(() => null)
-  ])
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
 const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({ 
   currentDate,
-  onBalanceChange,
-  onStripeOverrideChange
+  onBalanceChange 
 }) => {
   // Initialize form with zodResolver
   const form = useForm<FormValues>({
@@ -42,13 +36,8 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
     defaultValues: {
       balance: 0,
       notes: '',
-      stripe_override: ''
     },
   });
-
-  // Track previous values to prevent unnecessary updates
-  const prevStripeOverrideRef = useRef<number | null>(null);
-  const prevBalanceRef = useRef<number | undefined>(undefined);
 
   // Get the monthly balance data
   const {
@@ -56,7 +45,6 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
     error,
     monthlyBalance,
     updateMonthlyBalance,
-    updateStripeOverride,
     currentMonthYear,
   } = useMonthlyBalance({ currentDate });
 
@@ -66,22 +54,14 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
       form.reset({
         balance: monthlyBalance.balance,
         notes: monthlyBalance.notes || '',
-        stripe_override: monthlyBalance.stripe_override !== null ? 
-          monthlyBalance.stripe_override : ''
       });
       
-      // Only notify parent components if values have changed
-      if (onBalanceChange && prevBalanceRef.current !== monthlyBalance.balance) {
+      // Notify parent component if needed
+      if (onBalanceChange) {
         onBalanceChange(monthlyBalance.balance);
-        prevBalanceRef.current = monthlyBalance.balance;
-      }
-      
-      if (onStripeOverrideChange && prevStripeOverrideRef.current !== monthlyBalance.stripe_override) {
-        onStripeOverrideChange(monthlyBalance.stripe_override);
-        prevStripeOverrideRef.current = monthlyBalance.stripe_override;
       }
     }
-  }, [monthlyBalance, form, onBalanceChange, onStripeOverrideChange]);
+  }, [monthlyBalance, form, onBalanceChange]);
 
   // Format month name in Spanish
   const formattedMonth = format(currentDate, 'MMMM yyyy', { locale: es });
@@ -89,142 +69,70 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
 
   // Handle form submission
   const onSubmit = (data: FormValues) => {
-    updateMonthlyBalance(
-      data.balance, 
-      data.notes, 
-      data.stripe_override === '' ? null : data.stripe_override
-    );
+    updateMonthlyBalance(data.balance, data.notes);
     
-    // Only notify parent components if values have changed
-    if (onBalanceChange && prevBalanceRef.current !== data.balance) {
+    // Notify parent component if needed
+    if (onBalanceChange) {
       onBalanceChange(data.balance);
-      prevBalanceRef.current = data.balance;
-    }
-    
-    const newStripeOverride = data.stripe_override === '' ? null : data.stripe_override;
-    if (onStripeOverrideChange && prevStripeOverrideRef.current !== newStripeOverride) {
-      onStripeOverrideChange(newStripeOverride);
-      prevStripeOverrideRef.current = newStripeOverride;
-    }
-  };
-
-  // Handle specific Stripe override update
-  const handleStripeOverrideUpdate = (value: string) => {
-    const numValue = value === '' ? null : parseFloat(value);
-    
-    // Only update if value has changed
-    if (prevStripeOverrideRef.current !== numValue) {
-      updateStripeOverride(numValue);
-      
-      if (onStripeOverrideChange) {
-        onStripeOverrideChange(numValue);
-        prevStripeOverrideRef.current = numValue;
-      }
     }
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Configuración: {capitalizedMonth}</CardTitle>
+        <CardTitle>Balance Inicial: {capitalizedMonth}</CardTitle>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="balance">
-          <TabsList className="mb-4">
-            <TabsTrigger value="balance">Balance Inicial</TabsTrigger>
-            <TabsTrigger value="stripe">Stripe Manual</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="balance">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="balance"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Saldo Inicial ($)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          step="0.01" 
-                          placeholder="0.00" 
-                          {...field} 
-                          disabled={loading}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Saldo al inicio del mes antes de cualquier transacción
-                      </FormDescription>
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="notes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Notas</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="Añade notas o comentarios sobre este balance" 
-                          {...field}
-                          disabled={loading}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                
-                <Button 
-                  type="submit" 
-                  className="w-full"
-                  disabled={loading}
-                >
-                  {monthlyBalance ? 'Actualizar Balance' : 'Guardar Balance'}
-                </Button>
-              </form>
-            </Form>
-          </TabsContent>
-          
-          <TabsContent value="stripe">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="stripe_override"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Ingresos Stripe Manual ($)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          step="0.01" 
-                          placeholder="Dejar vacío para usar datos automáticos" 
-                          {...field} 
-                          disabled={loading}
-                          value={field.value ?? ''}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Sobrescribe los ingresos de Stripe para este mes. Dejar vacío para usar datos automáticos.
-                      </FormDescription>
-                    </FormItem>
-                  )}
-                />
-                
-                <Button 
-                  type="submit" 
-                  className="w-full"
-                  disabled={loading}
-                >
-                  {monthlyBalance?.stripe_override !== null ? 'Actualizar Valor' : 'Guardar Valor'}
-                </Button>
-              </form>
-            </Form>
-          </TabsContent>
-        </Tabs>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="balance"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Saldo Inicial ($)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      step="0.01" 
+                      placeholder="0.00" 
+                      {...field} 
+                      disabled={loading}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Saldo al inicio del mes antes de cualquier transacción
+                  </FormDescription>
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Notas</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Añade notas o comentarios sobre este balance" 
+                      {...field}
+                      disabled={loading}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            
+            <Button 
+              type="submit" 
+              className="w-full"
+              disabled={loading}
+            >
+              {monthlyBalance ? 'Actualizar Balance' : 'Guardar Balance'}
+            </Button>
+          </form>
+        </Form>
         
         {error && (
           <div className="mt-4 text-sm text-red-500">

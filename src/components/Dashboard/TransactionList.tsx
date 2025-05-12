@@ -1,89 +1,63 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Transaction } from '@/types/financial';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from "@/components/ui/card";
-import IncomeTransactions from './Transactions/IncomeTransactions';
-import ExpenseTransactions from './Transactions/ExpenseTransactions';
-import CollaboratorTransactions from './Transactions/CollaboratorTransactions';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import CacheStats from './CacheStats';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface TransactionListProps {
   transactions: Transaction[];
   onRefresh?: () => void;
   isLoading?: boolean;
-  startDate?: Date;
-  endDate?: Date;
 }
 
-const TransactionList: React.FC<TransactionListProps> = ({ 
-  transactions, 
-  onRefresh, 
-  isLoading = false,
-  startDate,
-  endDate
-}) => {
-  // Filter transactions by type and category first
-  const incomeTransactions = transactions.filter(tx => tx.type === 'income');
-  const collaboratorTransactions = transactions.filter(tx => 
-    tx.type === 'expense' && tx.category === 'Pagos a colaboradores'
-  );
-  const expenseTransactions = transactions.filter(tx => 
-    tx.type === 'expense' && tx.category !== 'Pagos a colaboradores'
-  );
+const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefresh, isLoading = false }) => {
+  const [filter, setFilter] = useState<'all' | 'income' | 'expense'>('all');
   
-  // Count transactions by type
-  const incomeCount = incomeTransactions.length;
-  const expenseCount = expenseTransactions.length;
-  const collaboratorCount = collaboratorTransactions.length;
-  
-  // Calculate totals after filtering
-  const getTotals = () => {
-    const incomeTotal = incomeTransactions.reduce((sum, tx) => sum + tx.amount, 0);
-    const expenseTotal = expenseTransactions.reduce((sum, tx) => sum + tx.amount, 0);
-    const collaboratorTotal = collaboratorTransactions.reduce((sum, tx) => sum + tx.amount, 0);
-    
-    const totalExpenses = expenseTotal + collaboratorTotal;
-      
-    return { 
-      incomeTotal, 
-      expenseTotal, 
-      collaboratorTotal,
-      totalExpenses,  
-      netTotal: incomeTotal - totalExpenses 
-    };
-  };
-  
-  const totals = getTotals();
-  
-  // Log transaction counts and totals for debugging
-  console.log("Transaction List Stats:", { 
-    total: transactions.length,
-    income: incomeCount, 
-    expense: expenseCount, 
-    collaborator: collaboratorCount,
-    incomeTotal: totals.incomeTotal,
-    expenseTotal: totals.expenseTotal,
-    collaboratorTotal: totals.collaboratorTotal,
-    totalExpenses: totals.totalExpenses,
-    netTotal: totals.netTotal
-  });
-  
-  if (expenseTransactions.length > 0) {
-    console.log("Sample expense transaction:", expenseTransactions[0]);
-  }
-  if (collaboratorTransactions.length > 0) {
-    console.log("Sample collaborator transaction:", collaboratorTransactions[0]);
-  }
+  // Aplicamos filtro
+  const filteredTransactions = filter === 'all' 
+    ? transactions 
+    : transactions.filter(tx => tx.type === filter);
 
-  // Format currency helper function
+  // Formato de fecha
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      
+      // Check if the date is valid
+      if (isNaN(date.getTime())) {
+        console.error(`Invalid date string: ${dateString}`);
+        return 'Invalid date';
+      }
+      
+      return new Intl.DateTimeFormat('es-ES').format(date);
+    } catch (error) {
+      console.error(`Error formatting date: ${dateString}`, error);
+      return 'Invalid date';
+    }
+  };
+
+  // Formato de moneda (ahora mostramos en USD por defecto)
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -91,78 +65,71 @@ const TransactionList: React.FC<TransactionListProps> = ({
     }).format(amount);
   };
 
+  // Handle refresh button click
+  const handleRefresh = () => {
+    if (onRefresh) {
+      onRefresh();
+    }
+  };
+
   return (
     <>
       {onRefresh && (
-        <CacheStats 
-          onRefresh={onRefresh} 
-          isLoading={isLoading || false} 
-          startDate={startDate}
-          endDate={endDate}
-        />
+        <CacheStats onRefresh={handleRefresh} isLoading={isLoading || false} />
       )}
       <Card>
         <CardHeader>
-          <CardTitle>Transacciones</CardTitle>
-          <CardDescription>Lista detallada de ingresos y gastos en USD</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Transacciones</CardTitle>
+              <CardDescription>Lista detallada de ingresos y gastos en USD</CardDescription>
+            </div>
+            <Select value={filter} onValueChange={(value: any) => setFilter(value)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filtrar por tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="income">Ingresos</SelectItem>
+                <SelectItem value="expense">Gastos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="all" className="w-full">
-            <TabsList className="grid grid-cols-4 mb-4">
-              <TabsTrigger value="all">Todos ({transactions.length})</TabsTrigger>
-              <TabsTrigger value="income">Ingresos ({incomeCount})</TabsTrigger>
-              <TabsTrigger value="expenses">Gastos ({expenseCount})</TabsTrigger>
-              <TabsTrigger value="collaborators">Colaboradores ({collaboratorCount})</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="all">
-              {transactions.length === 0 ? (
-                <div className="text-center py-10 text-gray-500">
-                  No hay transacciones para mostrar
-                </div>
+          <Table className="finance-table">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Fecha</TableHead>
+                <TableHead>Descripción</TableHead>
+                <TableHead>Categoría</TableHead>
+                <TableHead>Fuente</TableHead>
+                <TableHead className="text-right">Importe (USD)</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredTransactions.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-6 text-gray-500">
+                    No hay transacciones que mostrar
+                  </TableCell>
+                </TableRow>
               ) : (
-                <div className="space-y-4">
-                  {collaboratorCount > 0 && <CollaboratorTransactions transactions={collaboratorTransactions} />}
-                  {incomeCount > 0 && <IncomeTransactions transactions={incomeTransactions} />}
-                  {expenseCount > 0 && <ExpenseTransactions transactions={expenseTransactions} />}
-                </div>
+                filteredTransactions.map((transaction) => (
+                  <TableRow key={transaction.id}>
+                    <TableCell>{formatDate(transaction.date)}</TableCell>
+                    <TableCell>{transaction.description}</TableCell>
+                    <TableCell>{transaction.category}</TableCell>
+                    <TableCell>{transaction.source}</TableCell>
+                    <TableCell className={`text-right font-medium ${transaction.type === 'income' ? 'income-text' : 'expense-text'}`}>
+                      {transaction.type === 'income' ? '+' : '-'} {formatCurrency(transaction.amount)}
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
-            </TabsContent>
-            
-            <TabsContent value="income">
-              <IncomeTransactions transactions={incomeTransactions} />
-            </TabsContent>
-            
-            <TabsContent value="expenses">
-              <ExpenseTransactions transactions={expenseTransactions} />
-            </TabsContent>
-            
-            <TabsContent value="collaborators">
-              <CollaboratorTransactions transactions={collaboratorTransactions} />
-            </TabsContent>
-          </Tabs>
+            </TableBody>
+          </Table>
         </CardContent>
-        <CardFooter className="bg-gray-50 border-t text-sm text-gray-500 flex flex-col sm:flex-row sm:justify-between p-4">
-          <div className="mb-2 sm:mb-0">
-            <span>
-              Mostrando {transactions.length} transacciones en total
-            </span>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4">
-            <div className="text-blue-600 font-medium">
-              Ingresos: {formatCurrency(totals.incomeTotal)} ({incomeCount})
-            </div>
-            <div className="text-amber-600 font-medium">
-              Colaboradores: {formatCurrency(totals.collaboratorTotal)} ({collaboratorCount})
-            </div>
-            <div className="text-red-600 font-medium">
-              Otros gastos: {formatCurrency(totals.expenseTotal)} ({expenseCount})
-            </div>
-            <div className={`font-semibold ${totals.netTotal >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              Neto: {formatCurrency(totals.netTotal)}
-            </div>
-          </div>
-        </CardFooter>
       </Card>
     </>
   );

@@ -16,15 +16,14 @@ export interface FinancialSummary {
   otherExpense: number;
   profit: number;
   profitMargin: number;
-  startingBalance?: number;
-  stripeOverride?: number | null;
+  startingBalance?: number; // Added starting balance field
 }
 
 export interface CategorySummary {
   category: string;
   amount: number;
   percentage: number;
-  date?: string;
+  date?: string; // Fecha opcional para los colaboradores
 }
 
 export interface DateRange {
@@ -57,7 +56,7 @@ export interface CollaboratorData {
   name: string;
   amount: number;
   percentage: number;
-  date?: string;
+  date?: string; // Fecha opcional para los colaboradores
 }
 
 export interface MonthlyBalance {
@@ -67,21 +66,4 @@ export interface MonthlyBalance {
   notes: string | null;
   created_at: string;
   updated_at: string;
-  stripe_override: number | null;
-  opex_amount: number;
-  itbm_amount: number;
-  profit_percentage: number;
-}
-
-export interface SalaryCalculation {
-  zohoIncome: number;
-  opexAmount: number;
-  taxAmount: number;
-  itbmAmount: number;
-  profitAmount: number;
-  zohoSalaryProfit: number;
-  halfZohoSalaryProfit: number;
-  stripeTotal: number;
-  halfStripeTotal: number;
-  totalSalary: number;
 }

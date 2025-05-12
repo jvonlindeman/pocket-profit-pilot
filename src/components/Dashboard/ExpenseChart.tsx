@@ -16,42 +16,14 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenseData }) => {
 
   // Colores personalizados según categorías
   const getCategoryColor = (category: string) => {
-    const lowerCategory = category.toLowerCase();
     const colors: Record<string, string> = {
-      'software': '#7E8E99', // Grayish blue for software
-      'softwares especiales': '#7E8E99',
-      'tools': '#9b87f5', // Purple for tools
-      'personal': '#6E59A5', // Darker purple for personal
-      'ai tools': '#8B5CF6', // Vivid purple for AI tools
-      'herramientas ia': '#8B5CF6',
-      'seo tools': '#D6BCFA', // Light purple for SEO
-      'publicidad': '#F97316', // Orange for ads
-      'publicidad y marketing': '#F97316',
-      'google ads': '#0EA5E9', // Blue for Google Ads
-      'google ads costos clientes': '#0EA5E9',
-      'facebook ads': '#D946EF', // Pink for Facebook Ads
-      'fb ig ads presupuesto': '#D946EF',
-      'impuestos': '#64748B', // Slate for taxes
-      'impuesto municipal': '#64748B',
-      'servidores': '#1EAEDB', // Bright blue for servers
-      'comisiones': '#F59E0B', // Amber for commissions
-      'gastos de comisiones': '#F59E0B',
-      'cargos bancarios': '#10B981', // Emerald for bank charges
-      'gastos de cargos bancarios': '#10B981',
-      'estacionamiento': '#EC4899', // Pink for parking
-      'itbms': '#8B5CF6', // Purple for taxes
-      'itbms por pagar': '#8B5CF6',
-      'default': '#94a3b8' // Default slate gray color
+      'software': '#9b59b6',
+      'tools': '#f39c12',
+      'personal': '#1abc9c',
+      'default': '#95a5a6'
     };
 
-    // Try to find a match for the category
-    for (const [key, value] of Object.entries(colors)) {
-      if (lowerCategory.includes(key)) {
-        return value;
-      }
-    }
-
-    return colors.default;
+    return colors[category.toLowerCase()] || colors.default;
   };
 
   // Preparamos datos para el gráfico
@@ -102,12 +74,7 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenseData }) => {
                 dataKey="value"
               >
                 {chartData.map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
-                    fill={getCategoryColor(entry.name)} 
-                    stroke="#fff"
-                    strokeWidth={1}
-                  />
+                  <Cell key={`cell-${index}`} fill={getCategoryColor(entry.name)} />
                 ))}
               </Pie>
               <Tooltip content={<CustomTooltip />} />
@@ -116,17 +83,8 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenseData }) => {
                 verticalAlign="middle" 
                 align="right"
                 formatter={(value, entry, index) => {
-                  // Make sure index is a valid number before accessing chartData
-                  if (index !== undefined && index >= 0 && index < chartData.length) {
-                    const item = chartData[index];
-                    return (
-                      <span className="text-sm" style={{ color: getCategoryColor(value) }}>
-                        {value} ({item.percentage})
-                      </span>
-                    );
-                  }
-                  // Fallback in case index is undefined or out of bounds
-                  return <span className="text-sm">{value}</span>;
+                  const item = chartData[index];
+                  return <span className="text-sm">{value} ({item.percentage})</span>;
                 }}
               />
             </PieChart>

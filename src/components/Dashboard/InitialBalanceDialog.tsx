@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "@/components/ui/form";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -39,7 +39,7 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
   currentDate,
   onBalanceSaved
 }) => {
-  const { updateMonthlyBalance, loading, monthlyBalance, checkBalanceExists } = useMonthlyBalance({ currentDate });
+  const { updateMonthlyBalance, loading } = useMonthlyBalance({ currentDate });
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -48,22 +48,6 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
       notes: '',
     },
   });
-
-  // Load existing balance data when dialog opens or when monthlyBalance changes
-  useEffect(() => {
-    if (open && monthlyBalance) {
-      form.reset({
-        balance: monthlyBalance.balance,
-        notes: monthlyBalance.notes || '',
-      });
-    } else if (open) {
-      // If dialog is opened but no balance exists yet, reset to defaults
-      form.reset({
-        balance: 0,
-        notes: '',
-      });
-    }
-  }, [open, monthlyBalance, form]);
 
   // Format month name in Spanish
   const formattedMonth = format(currentDate, 'MMMM yyyy', { locale: es });
@@ -107,7 +91,6 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
                   <FormDescription>
                     Saldo al inicio del mes antes de cualquier transacción
                   </FormDescription>
-                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -125,7 +108,6 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
                       disabled={loading}
                     />
                   </FormControl>
-                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -135,7 +117,7 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
                 type="submit" 
                 disabled={loading}
               >
-                {monthlyBalance ? 'Actualizar Balance' : 'Guardar y Continuar'}
+                Guardar y Continuar
               </Button>
             </DialogFooter>
           </form>

@@ -104,80 +104,33 @@ const calculateTotalByCategory = (transactions: Transaction[], type: 'income' | 
 };
 
 // Main function to process and format transaction data into a FinancialData object
-export const processTransactionData = (
-  transactions: Transaction[], 
-  startingBalance?: number,
-  stripeOverride?: number | null
-): FinancialData => {
-  // Calculate income and expense totals
+export const processTransactionData = (transactions: Transaction[], startingBalance?: number): FinancialData => {
+  // Calcular income y expense total
   let totalIncome = 0;
   let totalExpense = 0;
   let collaboratorExpense = 0;
   let otherExpense = 0;
-  let originalStripeIncome = 0;
-  let regularIncome = 0;  // Zoho income
-  
-  console.log(`Processing ${transactions.length} transactions with categories: `, 
-    [...new Set(transactions.map(t => t.category))].join(', '));
-  
-  // Log all collaborator transactions if any
-  const collaboratorTransactions = transactions.filter(tx => 
-    tx.type === 'expense' && tx.category === 'Pagos a colaboradores');
-    
-  if (collaboratorTransactions.length > 0) {
-    console.log(`Found ${collaboratorTransactions.length} collaborator transactions:`, 
-      collaboratorTransactions.map(t => ({ 
-        id: t.id, 
-        description: t.description,
-        amount: t.amount
-      }))
-    );
-  } else {
-    console.log('No collaborator transactions found in the data');
-  }
-  
+
   transactions.forEach(transaction => {
     if (transaction.type === 'income') {
-      // Track original Stripe income separately
-      if (transaction.source === 'Stripe') {
-        originalStripeIncome += transaction.amount;
-      } else {
-        // This is regular Zoho income
-        regularIncome += transaction.amount;
-      }
       totalIncome += transaction.amount;
     } else {
       totalExpense += transaction.amount;
       
-      // Separate collaborator expenses from the rest
+      // Separar gastos de colaboradores del resto
       if (transaction.category === 'Pagos a colaboradores') {
         collaboratorExpense += transaction.amount;
-        console.log(`Adding collaborator expense: ${transaction.description} - $${transaction.amount}`);
       } else {
         otherExpense += transaction.amount;
       }
     }
   });
 
-  console.log(`Expense breakdown - Collaborator: $${collaboratorExpense}, Other: $${otherExpense}, Total: $${totalExpense}`);
+  // Include starting balance in profit calculation if provided
+  const profit = (startingBalance !== undefined ? startingBalance : 0) + totalIncome - totalExpense;
+  const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0;
 
-  // Apply Stripe override if provided
-  let stripeIncome = originalStripeIncome;
-  if (stripeOverride !== undefined && stripeOverride !== null) {
-    // Adjust the total income by removing original Stripe income and adding the override
-    totalIncome = totalIncome - originalStripeIncome + stripeOverride;
-    stripeIncome = stripeOverride;
-  }
-
-  // Calculate profit as: Starting balance + Regular income + Stripe income - Total expenses
-  // This properly subtracts the expenses from the calculation
-  const profit = (startingBalance !== undefined ? startingBalance : 0) + regularIncome + stripeIncome - totalExpense;
-  
-  // Calculate profit margin excluding the starting balance from the calculation
-  // (profit - startingBalance) / totalIncome
-  const profitMargin = totalIncome > 0 ? ((profit - (startingBalance !== undefined ? startingBalance : 0)) / totalIncome) * 100 : 0;
-
-  // Create summary object
+  // Crear objeto de resumen
   const summary: FinancialSummary = {
     totalIncome,
     totalExpense,
@@ -185,19 +138,18 @@ export const processTransactionData = (
     otherExpense,
     profit,
     profitMargin,
-    startingBalance,
-    stripeOverride
+    startingBalance
   };
 
-  // Calculate data by category
+  // Calcular datos por categoría
   const incomeBySource = calculateTotalByCategory(transactions, 'income');
   const expenseByCategory = calculateTotalByCategory(transactions, 'expense');
 
-  // Calculate daily and monthly data
+  // Calcular datos diarios y mensuales
   const dailyData = calculateDailyData(transactions);
   const monthlyData = calculateMonthlyData(transactions);
 
-  // Return complete object
+  // Devolver objeto completo
   return {
     summary,
     transactions,

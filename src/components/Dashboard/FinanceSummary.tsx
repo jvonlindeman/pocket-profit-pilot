@@ -7,8 +7,8 @@ import { Card, CardContent } from "@/components/ui/card";
 interface FinanceSummaryProps {
   summary: FinancialSummary;
   expenseCategories?: CategorySummary[];
-  stripeIncome?: number;
-  regularIncome?: number;
+  stripeIncome?: number; // Nuevo parámetro para ingresos de Stripe
+  regularIncome?: number; // Nuevo parámetro para ingresos regulares de Zoho
 }
 
 const FinanceSummary: React.FC<FinanceSummaryProps> = ({ 
@@ -32,19 +32,6 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
       maximumFractionDigits: 1
     }).format(percentage / 100);
   };
-
-  // Log values to help debugging
-  console.log("Finance Summary Data:", {
-    startingBalance: summary.startingBalance,
-    stripeIncome,
-    regularIncome,
-    totalIncome: summary.totalIncome,
-    collaboratorExpense: summary.collaboratorExpense,
-    otherExpense: summary.otherExpense,
-    totalExpense: summary.totalExpense,
-    profit: summary.profit,
-    profitMargin: summary.profitMargin
-  });
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in">
@@ -148,7 +135,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
             </div>
           </div>
           <div className="text-2xl font-bold text-red-500 animate-value">
-            {formatCurrency(summary.totalExpense || 0)}
+            {formatCurrency(summary.totalExpense)}
           </div>
         </CardContent>
       </Card>
@@ -157,7 +144,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
       <Card className="finance-card">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Beneficio Bruto</h3>
+            <h3 className="text-sm font-medium text-gray-500">Beneficio Neto</h3>
             <div className="p-2 bg-blue-50 rounded-full">
               <TrendingUpIcon className="h-4 w-4 text-blue-500" />
             </div>
