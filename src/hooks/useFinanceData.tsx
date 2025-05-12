@@ -74,6 +74,33 @@ export const useFinanceData = () => {
     ZohoService.checkAndRefreshCache(preservedStartDate, preservedEndDate);
   }, []);
 
+  // Función para procesar y separar ingresos
+  const processIncomeTypes = useCallback((transactions: Transaction[]) => {
+    let stripeAmount = 0;
+    let regularAmount = 0;
+    
+    transactions.forEach(transaction => {
+      if (transaction.type === 'income') {
+        if (transaction.source === 'Stripe') {
+          stripeAmount += transaction.amount;
+        } else {
+          regularAmount += transaction.amount;
+        }
+      }
+    });
+    
+    // If there's a stripe override value, use that instead of calculated value
+    if (stripeOverride !== null) {
+      console.log("Using stripe override value:", stripeOverride, "instead of calculated:", stripeAmount);
+      stripeAmount = stripeOverride;
+    }
+    
+    setStripeIncome(stripeAmount);
+    setRegularIncome(regularAmount);
+    
+    return { stripeAmount, regularAmount };
+  }, [stripeOverride]);
+
   // Fetch monthly balance for the selected month
   const fetchMonthlyBalance = useCallback(async (date: Date) => {
     try {
@@ -180,33 +207,6 @@ export const useFinanceData = () => {
       console.error("Error updating stripe override:", err);
     }
   }, [dateRange.startDate, transactions, processIncomeTypes]);
-
-  // Función para procesar y separar ingresos
-  const processIncomeTypes = useCallback((transactions: Transaction[]) => {
-    let stripeAmount = 0;
-    let regularAmount = 0;
-    
-    transactions.forEach(transaction => {
-      if (transaction.type === 'income') {
-        if (transaction.source === 'Stripe') {
-          stripeAmount += transaction.amount;
-        } else {
-          regularAmount += transaction.amount;
-        }
-      }
-    });
-    
-    // If there's a stripe override value, use that instead of calculated value
-    if (stripeOverride !== null) {
-      console.log("Using stripe override value:", stripeOverride, "instead of calculated:", stripeAmount);
-      stripeAmount = stripeOverride;
-    }
-    
-    setStripeIncome(stripeAmount);
-    setRegularIncome(regularAmount);
-    
-    return { stripeAmount, regularAmount };
-  }, [stripeOverride]);
 
   // Función para procesar datos de colaboradores
   const processCollaboratorData = useCallback((rawResponse: any) => {
