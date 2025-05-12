@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useFinanceData } from '@/hooks/useFinanceData';
-import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
+import { useSimplifiedFinanceData } from '@/hooks/useSimplifiedFinanceData';
 import { useToast } from '@/hooks/use-toast';
 import InitialBalanceDialog from '@/components/Dashboard/InitialBalanceDialog';
 import ZohoDebug from '@/components/ZohoDebug';
@@ -26,7 +25,7 @@ const Index = () => {
     loading,
     error,
     getCurrentMonthRange,
-    refreshData,
+    fetchFinancialData,
     dataInitialized,
     rawResponse,
     stripeIncome,
@@ -37,12 +36,11 @@ const Index = () => {
     initialLoadAttempted,
     getStripeDataForChart,
     refreshStatus
-  } = useFinanceData();
+  } = useSimplifiedFinanceData();
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
   const [localLoading, setLocalLoading] = useState(false); // Local loading state
-  const { checkBalanceExists } = useMonthlyBalance({ currentDate: dateRange.startDate });
   const { toast } = useToast();
 
   // Format dates for titles
@@ -64,32 +62,19 @@ const Index = () => {
   const handleInitialLoad = async () => {
     // If already loading, prevent duplicate loads
     if (loading || localLoading) {
-      console.log('💫 Initial load already in progress, skipping duplicate request');
+      console.log('Initial load already in progress, skipping duplicate request');
       return;
     }
     
-    console.log('💫 handleInitialLoad called, checking balance exists');
-    
-    // Set local loading state
     setLocalLoading(true);
     
     try {
-      // Check if we need to set the initial balance first
-      const balanceExists = await checkBalanceExists();
+      toast({
+        title: 'Cargando datos financieros',
+        description: 'Obteniendo datos de Zoho Books y Stripe',
+      });
       
-      if (!balanceExists) {
-        // Show dialog to set initial balance
-        console.log('💰 No initial balance found, showing dialog');
-        setShowBalanceDialog(true);
-      } else {
-        // Balance already exists, just load data
-        console.log('💰 Initial balance exists, loading data');
-        toast({
-          title: 'Cargando datos financieros',
-          description: 'Obteniendo datos de Zoho Books y Stripe',
-        });
-        await refreshData(true); // Always force refresh
-      }
+      await fetchFinancialData(true);
     } catch (error) {
       console.error('Error in handleInitialLoad:', error);
       toast({
@@ -102,41 +87,23 @@ const Index = () => {
     }
   };
 
-  // Handle balance saved in dialog
-  const handleBalanceSaved = async () => {
-    // Set local loading state
-    setLocalLoading(true);
-    
-    try {
-      toast({
-        title: 'Balance inicial guardado',
-        description: 'Cargando datos financieros...',
-      });
-      await refreshData(true); // Always force refresh
-    } catch (error) {
-      console.error('Error in handleBalanceSaved:', error);
-    } finally {
-      setLocalLoading(false);
-    }
-  };
-
   // Handler for refreshing data
   const handleRefresh = async () => {
     // If already loading, prevent duplicate loads
     if (loading || localLoading) {
-      console.log('💫 Refresh already in progress, skipping duplicate request');
+      console.log('Refresh already in progress, skipping duplicate request');
       return;
     }
     
     setLocalLoading(true);
     
     try {
-      console.log("Standard refresh requested (always forcing refresh)");
       toast({
         title: 'Actualizando datos',
         description: 'Obteniendo datos más recientes...',
       });
-      await refreshData(true); // Always force refresh
+      
+      await fetchFinancialData(true);
     } catch (error) {
       console.error('Error in handleRefresh:', error);
     } finally {
@@ -157,7 +124,7 @@ const Index = () => {
 
   // Add debug logs to track user interaction and component state
   useEffect(() => {
-    console.log('🔄 Index component state:', { 
+    console.log('Index component state:', { 
       dataInitialized, 
       loading, 
       localLoading,
@@ -183,7 +150,7 @@ const Index = () => {
         open={showBalanceDialog} 
         onOpenChange={setShowBalanceDialog} 
         currentDate={dateRange.startDate}
-        onBalanceSaved={handleBalanceSaved}
+        onBalanceSaved={handleRefresh}
       />
       
       {/* Dashboard Header */}
@@ -263,7 +230,7 @@ const Index = () => {
         <DebugPanel 
           debugMode={debugMode}
           dateRange={dateRange}
-          refreshData={refreshData}
+          refreshData={fetchFinancialData}
           rawResponse={rawResponse}
         />
       </main>
