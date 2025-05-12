@@ -68,24 +68,34 @@ export const useFinanceData = () => {
     ZohoService.checkAndRefreshCache(newRange.startDate, newRange.endDate);
   };
 
+  // Track last stripe override value to prevent duplicate toast notifications
+  const lastStripeOverrideRef = React.useRef<number | null>(null);
+  
   // Update stripe override with immediate processing refresh
   const updatedUpdateStripeOverride = async (override: number | null) => {
     console.log(`Updating Stripe override to: ${override}`);
-    await updateStripeOverride(override, dateRange.startDate);
     
-    // Apply the stripe override to transactions
-    if (transactions.length > 0 && override !== null) {
-      console.log(`Applying Stripe override: ${override} to transactions`);
-      applyStripeOverride(override);
+    // Only proceed if the value is actually changing
+    if (override !== lastStripeOverrideRef.current) {
+      await updateStripeOverride(override, dateRange.startDate);
       
-      // Show a toast to confirm the update
-      toast({
-        title: "Stripe manual override applied",
-        description: `Stripe income set to $${override.toFixed(2)}`,
-      });
+      // Apply the stripe override to transactions
+      if (transactions.length > 0 && override !== null) {
+        console.log(`Applying Stripe override: ${override} to transactions`);
+        applyStripeOverride(override);
+        
+        // Show a toast to confirm the update
+        toast({
+          title: "Stripe manual override applied",
+          description: `Stripe income set to $${override.toFixed(2)}`,
+        });
+        
+        // Update the ref to prevent duplicate toasts
+        lastStripeOverrideRef.current = override;
+      }
+      
+      processIncomeTypes(transactions, override);
     }
-    
-    processIncomeTypes(transactions, override);
   };
 
   // Update starting balance with fixed date argument
@@ -124,7 +134,8 @@ export const useFinanceData = () => {
         processCollaboratorData(rawResponse);
       }
       
-      // Apply stripe override to transactions when available
+      // Apply stripe override to transactions when available, but don't show toast here
+      // (toast is only shown when the value is explicitly changed by the user)
       if (stripeOverride !== null) {
         console.log(`Applying Stripe override: ${stripeOverride} to transactions`);
         applyStripeOverride(stripeOverride);
@@ -138,6 +149,11 @@ export const useFinanceData = () => {
     console.log(`Parameters: OPEX=${opexAmount}, ITBM=${itbmAmount}%, Profit=${profitPercentage}%`);
     calculateSalary(regularIncome, stripeIncome, opexAmount, itbmAmount, profitPercentage);
   }, [regularIncome, stripeIncome, opexAmount, itbmAmount, profitPercentage, calculateSalary]);
+
+  // Initialize the last stripe override ref with the current value
+  useEffect(() => {
+    lastStripeOverrideRef.current = stripeOverride;
+  }, []);
 
   return {
     dateRange,

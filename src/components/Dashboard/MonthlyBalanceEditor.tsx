@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -46,6 +46,10 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
     },
   });
 
+  // Track previous values to prevent unnecessary updates
+  const prevStripeOverrideRef = useRef<number | null>(null);
+  const prevBalanceRef = useRef<number | undefined>(undefined);
+
   // Get the monthly balance data
   const {
     loading,
@@ -66,13 +70,15 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
           monthlyBalance.stripe_override : ''
       });
       
-      // Notify parent component if needed
-      if (onBalanceChange) {
+      // Only notify parent components if values have changed
+      if (onBalanceChange && prevBalanceRef.current !== monthlyBalance.balance) {
         onBalanceChange(monthlyBalance.balance);
+        prevBalanceRef.current = monthlyBalance.balance;
       }
       
-      if (onStripeOverrideChange) {
+      if (onStripeOverrideChange && prevStripeOverrideRef.current !== monthlyBalance.stripe_override) {
         onStripeOverrideChange(monthlyBalance.stripe_override);
+        prevStripeOverrideRef.current = monthlyBalance.stripe_override;
       }
     }
   }, [monthlyBalance, form, onBalanceChange, onStripeOverrideChange]);
@@ -89,23 +95,31 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
       data.stripe_override === '' ? null : data.stripe_override
     );
     
-    // Notify parent component if needed
-    if (onBalanceChange) {
+    // Only notify parent components if values have changed
+    if (onBalanceChange && prevBalanceRef.current !== data.balance) {
       onBalanceChange(data.balance);
+      prevBalanceRef.current = data.balance;
     }
     
-    if (onStripeOverrideChange) {
-      onStripeOverrideChange(data.stripe_override === '' ? null : data.stripe_override);
+    const newStripeOverride = data.stripe_override === '' ? null : data.stripe_override;
+    if (onStripeOverrideChange && prevStripeOverrideRef.current !== newStripeOverride) {
+      onStripeOverrideChange(newStripeOverride);
+      prevStripeOverrideRef.current = newStripeOverride;
     }
   };
 
   // Handle specific Stripe override update
   const handleStripeOverrideUpdate = (value: string) => {
     const numValue = value === '' ? null : parseFloat(value);
-    updateStripeOverride(numValue);
     
-    if (onStripeOverrideChange) {
-      onStripeOverrideChange(numValue);
+    // Only update if value has changed
+    if (prevStripeOverrideRef.current !== numValue) {
+      updateStripeOverride(numValue);
+      
+      if (onStripeOverrideChange) {
+        onStripeOverrideChange(numValue);
+        prevStripeOverrideRef.current = numValue;
+      }
     }
   };
 
