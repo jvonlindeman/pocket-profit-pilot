@@ -72,20 +72,27 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
   };
 
   // Set or update the monthly balance
-  const updateMonthlyBalance = async (balance: number, notes?: string) => {
+  const updateMonthlyBalance = async (balance: number, notes?: string, stripeOverride?: number | null) => {
     setLoading(true);
     setError(null);
 
     try {
+      const updateData: any = {
+        balance,
+        notes: notes || null,
+      };
+      
+      // Only include stripe_override if provided
+      if (stripeOverride !== undefined) {
+        updateData.stripe_override = stripeOverride;
+      }
+      
       // Check if we're updating or inserting
       if (monthlyBalance) {
         // Update existing record
         const { data, error } = await supabase
           .from('monthly_balances')
-          .update({
-            balance,
-            notes: notes || monthlyBalance.notes,
-          })
+          .update(updateData)
           .eq('month_year', currentMonthYear)
           .select();
 
@@ -102,8 +109,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
           .from('monthly_balances')
           .insert({
             month_year: currentMonthYear,
-            balance,
-            notes: notes || null,
+            ...updateData,
           })
           .select();
 
