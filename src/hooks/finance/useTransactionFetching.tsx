@@ -70,6 +70,8 @@ export const useTransactionFetching = (
   const fetchData = useCallback(async (forceRefresh = false) => {
     console.log("Fetching financial data...");
     console.log(`Date range: ${formatDateYYYYMMDD(dateRange.startDate)} to ${formatDateYYYYMMDD(dateRange.endDate)}`);
+    console.log(`Force refresh: ${forceRefresh}`);
+    
     setLoading(true);
     setError(null);
     setUsingCachedData(false);
@@ -88,7 +90,7 @@ export const useTransactionFetching = (
       });
       
       // Obtener transacciones de Zoho Books - usando las fechas exactas sin modificaciones
-      console.log(`Calling ZohoService.getTransactions with dates: ${startDateFormatted} to ${endDateFormatted}`);
+      console.log(`Calling ZohoService.getTransactions with dates: ${startDateFormatted} to ${endDateFormatted}, forceRefresh: ${forceRefresh}`);
       const zohoData = await ZohoService.getTransactions(
         dateRange.startDate, 
         dateRange.endDate,
@@ -96,9 +98,15 @@ export const useTransactionFetching = (
       );
       console.log(`Received ${zohoData.length} transactions from Zoho`);
       
-      // Log expense transactions specifically to debug the $0 issue
+      // Log transaction types to help debug
+      const zohoIncome = zohoData.filter(tx => tx.type === 'income');
       const zohoExpenses = zohoData.filter(tx => tx.type === 'expense');
-      console.log(`Received ${zohoExpenses.length} expense transactions from Zoho`);
+      console.log(`Zoho data breakdown: ${zohoIncome.length} income, ${zohoExpenses.length} expenses`);
+      
+      if (zohoIncome.length > 0) {
+        console.log("Sample income transaction:", zohoIncome[0]);
+      }
+      
       if (zohoExpenses.length > 0) {
         console.log("Sample expense transaction:", zohoExpenses[0]);
       }
@@ -127,6 +135,30 @@ export const useTransactionFetching = (
       // Combinar los datos
       const combinedData = [...zohoData, ...stripeData];
       console.log("Combined transactions:", combinedData.length);
+      
+      // Crucial logging: Check what we're about to set as the transactions state
+      console.log("About to set transactions state with:", {
+        count: combinedData.length,
+        income: combinedData.filter(tx => tx.type === 'income').length,
+        expense: combinedData.filter(tx => tx.type === 'expense').length,
+        firstFew: combinedData.slice(0, 3).map(tx => ({
+          id: tx.id,
+          type: tx.type,
+          amount: tx.amount,
+          source: tx.source
+        }))
+      });
+      
+      // Log amount totals for income and expense
+      const incomeTotal = combinedData
+        .filter(tx => tx.type === 'income')
+        .reduce((sum, tx) => sum + tx.amount, 0);
+      
+      const expenseTotal = combinedData
+        .filter(tx => tx.type === 'expense')
+        .reduce((sum, tx) => sum + tx.amount, 0);
+        
+      console.log(`Transaction totals: Income=${incomeTotal}, Expense=${expenseTotal}, Net=${incomeTotal-expenseTotal}`);
       
       // Actualizar estado
       setTransactions(combinedData);

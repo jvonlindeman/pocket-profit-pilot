@@ -49,6 +49,23 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   salaryCalculation,
   onSalaryCalculatorValuesChange
 }) => {
+  // Check if we actually have data to display
+  const hasTransactions = financialData.transactions && financialData.transactions.length > 0;
+  const hasRawData = stripeIncome > 0 || regularIncome > 0 || 
+                    (collaboratorExpenses && collaboratorExpenses.length > 0);
+                    
+  // Log data availability for debugging
+  console.log("DashboardContent data check:", {
+    hasTransactions,
+    transactionCount: financialData.transactions?.length || 0,
+    hasRawData,
+    stripeIncome,
+    regularIncome,
+    collaboratorExpensesCount: collaboratorExpenses?.length || 0,
+    totalIncome: financialData.summary.totalIncome,
+    totalExpense: financialData.summary.totalExpense
+  });
+  
   // Prepare Stripe data for chart
   const getStripeDataForChart = () => {
     // Si solo hay un valor de Stripe para todo el período, distribúyelo a lo largo del gráfico
@@ -78,11 +95,21 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
     expenseCategoryCount: financialData.expenseByCategory?.length || 0
   });
   
+  // Log a sample of transactions, if available
   if (financialData.transactions?.length > 0) {
+    console.log("First few transactions:", financialData.transactions.slice(0, 3));
+    
     const expenseTransactions = financialData.transactions.filter(tx => tx.type === 'expense');
-    console.log(`Found ${expenseTransactions.length} expense transactions out of ${financialData.transactions.length} total`);
+    const incomeTransactions = financialData.transactions.filter(tx => tx.type === 'income');
+    
+    console.log(`Found ${expenseTransactions.length} expense transactions and ${incomeTransactions.length} income transactions out of ${financialData.transactions.length} total`);
+    
     if (expenseTransactions.length > 0) {
       console.log("Sample expense transaction:", expenseTransactions[0]);
+    }
+    
+    if (incomeTransactions.length > 0) {
+      console.log("Sample income transaction:", incomeTransactions[0]);
     }
   }
 
@@ -91,8 +118,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
       {/* Periodo y botón de actualización */}
       <PeriodHeader periodTitle={periodTitle} onRefresh={handleRefresh} />
 
-      {/* Información de depuración */}
-      {financialData.transactions.length === 0 && <EmptyStateWarning />}
+      {/* Información de depuración - Only show if we truly have no data */}
+      {!hasTransactions && !hasRawData && !loading && <EmptyStateWarning />}
 
       {/* Balance Mensual Inicial y Override de Stripe */}
       <div className="mb-6">

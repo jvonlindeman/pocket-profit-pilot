@@ -12,37 +12,70 @@ const WebhookDataSummary: React.FC<WebhookDataSummaryProps> = ({ rawData }) => {
   const parseNumericValue = (value: any): number => {
     if (typeof value === 'number') return value;
     if (typeof value === 'string') {
-      // Handle European number format (comma as decimal separator)
-      const normalizedValue = value.replace(/\./g, '').replace(',', '.');
-      const parsed = parseFloat(normalizedValue);
+      // Handle European number format (dots for thousands, comma as decimal separator)
+      if (value.includes('.') && value.includes(',')) {
+        const normalizedValue = value.replace(/\./g, '').replace(',', '.');
+        const parsed = parseFloat(normalizedValue);
+        return isNaN(parsed) ? 0 : parsed;
+      }
+      
+      // Simple comma as decimal separator
+      if (value.includes(',') && !value.includes('.')) {
+        const normalizedValue = value.replace(',', '.');
+        const parsed = parseFloat(normalizedValue);
+        return isNaN(parsed) ? 0 : parsed;
+      }
+      
+      // Try direct parsing
+      const parsed = parseFloat(value);
       return isNaN(parsed) ? 0 : parsed;
     }
     return 0;
   };
   
-  // Calculate summary values
+  // Calculate summary values with more robust checks
   const stripeIncome = rawData.stripe ? parseNumericValue(rawData.stripe) : 0;
   
   const collaboratorCount = rawData.colaboradores && Array.isArray(rawData.colaboradores) 
     ? rawData.colaboradores.length : 0;
     
   const collaboratorTotal = rawData.colaboradores && Array.isArray(rawData.colaboradores)
-    ? rawData.colaboradores.reduce((sum: number, item: any) => sum + parseNumericValue(item.total), 0)
+    ? rawData.colaboradores.reduce((sum: number, item: any) => {
+        if (!item || typeof item.total === 'undefined') return sum;
+        return sum + parseNumericValue(item.total);
+      }, 0)
     : 0;
     
   const expenseCount = rawData.expenses && Array.isArray(rawData.expenses)
     ? rawData.expenses.length : 0;
     
   const expenseTotal = rawData.expenses && Array.isArray(rawData.expenses)
-    ? rawData.expenses.reduce((sum: number, item: any) => sum + parseNumericValue(item.total), 0)
+    ? rawData.expenses.reduce((sum: number, item: any) => {
+        if (!item || typeof item.total === 'undefined') return sum;
+        return sum + parseNumericValue(item.total);
+      }, 0)
     : 0;
     
   const paymentCount = rawData.payments && Array.isArray(rawData.payments)
     ? rawData.payments.length : 0;
     
   const paymentTotal = rawData.payments && Array.isArray(rawData.payments)
-    ? rawData.payments.reduce((sum: number, item: any) => sum + parseNumericValue(item.amount), 0)
+    ? rawData.payments.reduce((sum: number, item: any) => {
+        if (!item || typeof item.amount === 'undefined') return sum;
+        return sum + parseNumericValue(item.amount);
+      }, 0)
     : 0;
+  
+  // Log the totals for debugging
+  console.log("WebhookDataSummary calculated totals:", {
+    stripeIncome,
+    collaboratorTotal,
+    expenseTotal,
+    paymentTotal,
+    totalIncome: stripeIncome + paymentTotal,
+    totalExpense: collaboratorTotal + expenseTotal,
+    netTotal: stripeIncome + paymentTotal - collaboratorTotal - expenseTotal
+  });
   
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {

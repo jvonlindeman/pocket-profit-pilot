@@ -6,15 +6,37 @@ const MAKE_WEBHOOK_URL = "https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihl
 
 /**
  * Helper function to parse numeric values that might come as strings with different formats
+ * This is a crucial function as European number formats use comma as decimal separator
  */
 const parseNumericValue = (value: any): number => {
+  console.log(`Parsing numeric value: ${value} (type: ${typeof value})`);
+  
   if (typeof value === 'number') return value;
+  
   if (typeof value === 'string') {
-    // Handle both dot and comma as decimal separators
-    const normalizedValue = value.replace(/\./g, '').replace(',', '.');
-    const parsed = parseFloat(normalizedValue);
+    // Special handling for European format numbers (e.g. "6.333,91")
+    // First, detect if it's likely a European format (dots for thousands, comma for decimal)
+    if (value.includes('.') && value.includes(',')) {
+      // European format: replace dots (thousands) with nothing, then comma with dot
+      const normalizedValue = value.replace(/\./g, '').replace(',', '.');
+      console.log(`European format detected. Normalized to: ${normalizedValue}`);
+      const parsed = parseFloat(normalizedValue);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+    
+    // Simple comma as decimal separator
+    if (value.includes(',') && !value.includes('.')) {
+      const normalizedValue = value.replace(',', '.');
+      console.log(`Comma decimal separator detected. Normalized to: ${normalizedValue}`);
+      const parsed = parseFloat(normalizedValue);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+    
+    // Standard number format
+    const parsed = parseFloat(value);
     return isNaN(parsed) ? 0 : parsed;
   }
+  
   return 0;
 };
 
@@ -22,6 +44,9 @@ const parseNumericValue = (value: any): number => {
  * Transforms webhook response data into Transaction objects
  */
 const transformWebhookData = (responseData: any): Transaction[] => {
+  console.log('Starting transformation of webhook data');
+  console.log('Raw data structure:', Object.keys(responseData));
+  
   const transactions: Transaction[] = [];
   
   // Process stripe income if present
@@ -30,7 +55,7 @@ const transformWebhookData = (responseData: any): Transaction[] => {
     const stripeAmount = parseNumericValue(responseData.stripe);
     console.log('Parsed stripe amount:', stripeAmount);
     if (stripeAmount > 0) {
-      transactions.push({
+      const stripeTransaction = {
         id: `stripe-${new Date().toISOString().split('T')[0]}`,
         date: new Date().toISOString().split('T')[0],
         amount: stripeAmount,
@@ -38,7 +63,9 @@ const transformWebhookData = (responseData: any): Transaction[] => {
         category: 'Ingresos por plataforma',
         source: 'Stripe',
         type: 'income'
-      });
+      };
+      transactions.push(stripeTransaction);
+      console.log('Added Stripe transaction:', stripeTransaction);
     }
   }
   
@@ -46,18 +73,24 @@ const transformWebhookData = (responseData: any): Transaction[] => {
   if (responseData.colaboradores && Array.isArray(responseData.colaboradores)) {
     console.log(`Processing ${responseData.colaboradores.length} collaborator expenses`);
     responseData.colaboradores.forEach((collab: any, index: number) => {
+      if (!collab) return; // Skip null/undefined items
+      
+      console.log(`Processing collaborator: ${JSON.stringify(collab)}`);
       const amount = parseNumericValue(collab.total);
-      console.log(`Collaborator ${collab.vendor_name}, amount: ${amount}`);
+      console.log(`Collaborator ${collab.vendor_name || 'unknown'}, amount: ${amount}`);
+      
       if (amount > 0) {
-        transactions.push({
+        const collabTransaction = {
           id: `colaborador-${index}-${collab.date || new Date().toISOString().split('T')[0]}`,
           date: collab.date || new Date().toISOString().split('T')[0],
           amount: amount,
-          description: collab.vendor_name || 'Pago a colaborador',
+          description: `Pago a colaborador: ${collab.vendor_name || 'Sin nombre'}`,
           category: 'Pagos a colaboradores',
           source: 'Zoho',
           type: 'expense'
-        });
+        };
+        transactions.push(collabTransaction);
+        console.log('Added collaborator transaction:', collabTransaction.id, collabTransaction.amount);
       }
     });
   }
@@ -66,18 +99,26 @@ const transformWebhookData = (responseData: any): Transaction[] => {
   if (responseData.expenses && Array.isArray(responseData.expenses)) {
     console.log(`Processing ${responseData.expenses.length} regular expenses`);
     responseData.expenses.forEach((expense: any, index: number) => {
+      if (!expense) return; // Skip null/undefined items
+      
+      console.log(`Processing expense: ${JSON.stringify(expense)}`);
       const amount = parseNumericValue(expense.total);
-      console.log(`Expense: ${expense.account_name}, amount: ${amount}`);
+      console.log(`Expense: ${expense.account_name || 'unknown'}, amount: ${amount}`);
+      
       if (amount > 0) {
-        transactions.push({
+        const expenseTransaction = {
           id: `expense-${index}-${expense.date || new Date().toISOString().split('T')[0]}`,
           date: expense.date || new Date().toISOString().split('T')[0],
           amount: amount,
-          description: expense.vendor_name || expense.account_name || 'Gasto',
+          description: expense.vendor_name 
+            ? `${expense.vendor_name}` 
+            : expense.account_name || 'Gasto sin descripción',
           category: expense.account_name || 'Otros gastos',
           source: 'Zoho',
           type: 'expense'
-        });
+        };
+        transactions.push(expenseTransaction);
+        console.log('Added expense transaction:', expenseTransaction.id, expenseTransaction.amount);
       }
     });
   }
@@ -86,18 +127,24 @@ const transformWebhookData = (responseData: any): Transaction[] => {
   if (responseData.payments && Array.isArray(responseData.payments)) {
     console.log(`Processing ${responseData.payments.length} regular income payments`);
     responseData.payments.forEach((payment: any, index: number) => {
+      if (!payment) return; // Skip null/undefined items
+      
+      console.log(`Processing payment: ${JSON.stringify(payment)}`);
       const amount = parseNumericValue(payment.amount);
-      console.log(`Payment from ${payment.customer_name}, amount: ${amount}`);
+      console.log(`Payment from ${payment.customer_name || 'unknown'}, amount: ${amount}`);
+      
       if (amount > 0) {
-        transactions.push({
+        const paymentTransaction = {
           id: `payment-${index}-${payment.date || new Date().toISOString().split('T')[0]}`,
           date: payment.date || new Date().toISOString().split('T')[0],
           amount: amount,
-          description: payment.customer_name || 'Ingreso',
+          description: `Pago de ${payment.customer_name || 'Cliente'}`,
           category: 'Ingresos regulares',
           source: 'Zoho',
           type: 'income'
-        });
+        };
+        transactions.push(paymentTransaction);
+        console.log('Added payment transaction:', paymentTransaction.id, paymentTransaction.amount);
       }
     });
   }
@@ -105,9 +152,11 @@ const transformWebhookData = (responseData: any): Transaction[] => {
   console.log(`Transformed ${transactions.length} total transactions`);
   
   // Order transactions by date (newest first)
-  return transactions.sort((a, b) => {
+  const sortedTransactions = transactions.sort((a, b) => {
     return new Date(b.date).getTime() - new Date(a.date).getTime();
   });
+  
+  return sortedTransactions;
 };
 
 export const fetchTransactionsFromWebhook = async (
@@ -184,7 +233,15 @@ export const fetchTransactionsFromWebhook = async (
       return responseData.data;
     }
     
-    console.warn('Could not parse transactions from response:', responseData);
+    console.warn('Could not parse transactions from response. Attempting direct transformation:', responseData);
+    // Try direct transformation as a last resort
+    const directTransformTransactions = transformWebhookData(responseData);
+    if (directTransformTransactions.length > 0) {
+      console.log(`Direct transformation yielded ${directTransformTransactions.length} transactions`);
+      return directTransformTransactions;
+    }
+    
+    console.warn('All parsing attempts failed. No transactions could be extracted from the response');
     return [];
   } catch (error) {
     console.error('Error fetching from webhook:', error);
