@@ -1,6 +1,6 @@
 
 import { FinancialData, DateRange, Transaction } from '@/types/financial';
-import { formatDateYYYYMMDD } from '@/lib/date-utils';
+import { formatDateForAPI } from '@/lib/date-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { processTransactionData } from '@/services/zoho/utils';
 import { getMockTransactions } from '@/services/zoho/mockData';
@@ -22,8 +22,8 @@ export const DirectFetchService = {
       console.log('DirectFetchService: Fetching data from', startDate, 'to', endDate);
       
       // Format dates for the API
-      const formattedStartDate = formatDateYYYYMMDD(startDate);
-      const formattedEndDate = formatDateYYYYMMDD(endDate);
+      const formattedStartDate = formatDateForAPI(startDate);
+      const formattedEndDate = formatDateForAPI(endDate);
       
       // Call the Supabase edge function with our explicitly formatted dates
       const { data, error } = await supabase.functions.invoke("zoho-transactions", {
@@ -132,11 +132,3 @@ export const DirectFetchService = {
     }
   }
 };
-
-// Helper function to format date in YYYY-MM-DD format without timezone shifts
-function formatDateYYYYMMDD(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
