@@ -5,99 +5,103 @@ interface WebhookDataSummaryProps {
   rawData: any;
 }
 
-export default function WebhookDataSummary({ rawData }: WebhookDataSummaryProps) {
-  // Function to count the number of items in a specific category
-  const countItems = (data: any, type: string) => {
-    if (!data) return 0;
-    
-    // If the data is an array of cached transactions
-    if (Array.isArray(data) && data.length > 0 && 'type' in data[0]) {
-      return data.filter(item => item.type === type).length;
+const WebhookDataSummary: React.FC<WebhookDataSummaryProps> = ({ rawData }) => {
+  if (!rawData) return null;
+  
+  // Helper function to parse numeric values that might have different formats
+  const parseNumericValue = (value: any): number => {
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+      const normalizedValue = value.replace(',', '.');
+      const parsed = parseFloat(normalizedValue);
+      return isNaN(parsed) ? 0 : parsed;
     }
-    
-    // If dealing with newly processed cached transactions
-    if (data.cached_transactions && Array.isArray(data.cached_transactions)) {
-      return data.cached_transactions.filter((item: any) => item.type === type).length;
-    }
-    
-    // Using raw webhook data
-    let count = 0;
-    
-    // Count stripe income
-    if (type === 'income' && data.stripe) {
-      count += 1; // Stripe income is counted as one item
-    }
-    
-    // Count regular income (payments)
-    if (type === 'income' && Array.isArray(data.payments)) {
-      count += data.payments.length;
-    }
-    
-    // Count expenses
-    if (type === 'expense') {
-      // Count collaborator expenses
-      if (Array.isArray(data.colaboradores)) {
-        count += data.colaboradores.length;
-      }
-      
-      // Count regular expenses (excluding "Impuestos")
-      if (Array.isArray(data.expenses)) {
-        count += data.expenses.filter((exp: any) => exp.account_name !== "Impuestos").length;
-      }
-    }
-    
-    return count;
+    return 0;
   };
   
-  // Function to check if data is from cache
-  const isFromCache = (data: any) => {
-    // Check if the data is an array of cached transactions
-    if (Array.isArray(data) && data.length > 0 && 'sync_date' in data[0]) {
-      return true;
-    }
+  // Calculate summary values
+  const stripeIncome = rawData.stripe ? parseNumericValue(rawData.stripe) : 0;
+  
+  const collaboratorCount = rawData.colaboradores && Array.isArray(rawData.colaboradores) 
+    ? rawData.colaboradores.length : 0;
     
-    return false;
+  const collaboratorTotal = rawData.colaboradores && Array.isArray(rawData.colaboradores)
+    ? rawData.colaboradores.reduce((sum: number, item: any) => sum + parseNumericValue(item.total), 0)
+    : 0;
+    
+  const expenseCount = rawData.expenses && Array.isArray(rawData.expenses)
+    ? rawData.expenses.length : 0;
+    
+  const expenseTotal = rawData.expenses && Array.isArray(rawData.expenses)
+    ? rawData.expenses.reduce((sum: number, item: any) => sum + parseNumericValue(item.total), 0)
+    : 0;
+    
+  const paymentCount = rawData.payments && Array.isArray(rawData.payments)
+    ? rawData.payments.length : 0;
+    
+  const paymentTotal = rawData.payments && Array.isArray(rawData.payments)
+    ? rawData.payments.reduce((sum: number, item: any) => sum + parseNumericValue(item.amount), 0)
+    : 0;
+  
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
   };
-  
-  // Get cache information
-  const getCacheInfo = (data: any) => {
-    if (!isFromCache(data)) return null;
-    
-    // If the data is an array of cached transactions
-    if (Array.isArray(data) && data.length > 0 && 'sync_date' in data[0]) {
-      const latestSync = new Date(Math.max(...data.map(tx => new Date(tx.sync_date).getTime())));
-      return {
-        timestamp: latestSync,
-        count: data.length
-      };
-    }
-    
-    return null;
-  };
-  
-  const cacheInfo = getCacheInfo(rawData);
-  const incomeCount = countItems(rawData, 'income');
-  const expenseCount = countItems(rawData, 'expense');
-  
+
   return (
-    <div className="mb-4 p-2 bg-blue-50 border border-blue-100 rounded">
-      <p className="text-sm text-blue-800 font-medium">Resumen de Datos</p>
+    <div className="bg-white p-4 rounded-md shadow-sm border border-gray-200 mb-4">
+      <h3 className="text-sm font-semibold mb-2">Data Summary</h3>
       
-      {cacheInfo ? (
-        <div className="mt-1 text-xs text-blue-700 bg-blue-100 p-1 rounded border border-blue-200 mb-2">
-          <p className="font-semibold">Datos obtenidos de caché</p>
-          <p>Última sincronización: {cacheInfo.timestamp.toLocaleString()}</p>
-          <p>Total de transacciones cacheadas: {cacheInfo.count}</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <h4 className="text-xs font-medium text-gray-500">Income</h4>
+          <ul className="text-sm space-y-1 mt-1">
+            <li className="flex justify-between">
+              <span>Stripe:</span> 
+              <span className="font-medium">{formatCurrency(stripeIncome)}</span>
+            </li>
+            <li className="flex justify-between">
+              <span>Payments:</span>
+              <span className="font-medium">{paymentCount} entries ({formatCurrency(paymentTotal)})</span>
+            </li>
+            <li className="flex justify-between text-blue-600 font-medium border-t border-gray-200 pt-1 mt-1">
+              <span>Total Income:</span>
+              <span>{formatCurrency(stripeIncome + paymentTotal)}</span>
+            </li>
+          </ul>
         </div>
-      ) : (
-        <p className="mt-1 text-xs text-blue-700">Datos obtenidos directamente de la API</p>
-      )}
+        
+        <div>
+          <h4 className="text-xs font-medium text-gray-500">Expenses</h4>
+          <ul className="text-sm space-y-1 mt-1">
+            <li className="flex justify-between">
+              <span>Collaborators:</span>
+              <span className="font-medium">{collaboratorCount} entries ({formatCurrency(collaboratorTotal)})</span>
+            </li>
+            <li className="flex justify-between">
+              <span>Regular Expenses:</span>
+              <span className="font-medium">{expenseCount} entries ({formatCurrency(expenseTotal)})</span>
+            </li>
+            <li className="flex justify-between text-red-600 font-medium border-t border-gray-200 pt-1 mt-1">
+              <span>Total Expenses:</span>
+              <span>{formatCurrency(collaboratorTotal + expenseTotal)}</span>
+            </li>
+          </ul>
+        </div>
+      </div>
       
-      <div className="mt-1 text-xs text-blue-700">
-        <p>Total Ingresos: {incomeCount}</p>
-        <p>Total Gastos: {expenseCount}</p>
-        <p>Total Transacciones: {incomeCount + expenseCount}</p>
+      <div className="mt-3 pt-2 border-t border-gray-200">
+        <div className="flex justify-between items-center">
+          <span className="text-sm font-semibold">Net Income:</span>
+          <span className={`text-sm font-bold ${(stripeIncome + paymentTotal - collaboratorTotal - expenseTotal) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            {formatCurrency(stripeIncome + paymentTotal - collaboratorTotal - expenseTotal)}
+          </span>
+        </div>
       </div>
     </div>
   );
-}
+};
+
+export default WebhookDataSummary;

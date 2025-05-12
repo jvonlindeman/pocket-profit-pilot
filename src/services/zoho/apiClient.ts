@@ -25,13 +25,13 @@ const transformWebhookData = (responseData: any): Transaction[] => {
   const transactions: Transaction[] = [];
   
   // Process stripe income if present
-  if (responseData.stripe && typeof responseData.stripe === 'object') {
+  if (responseData.stripe) {
     console.log('Processing stripe income data:', responseData.stripe);
-    const stripeAmount = parseNumericValue(responseData.stripe.amount);
+    const stripeAmount = parseNumericValue(responseData.stripe);
     if (stripeAmount > 0) {
       transactions.push({
-        id: `stripe-${responseData.stripe.date || new Date().toISOString().split('T')[0]}`,
-        date: responseData.stripe.date || new Date().toISOString().split('T')[0],
+        id: `stripe-${new Date().toISOString().split('T')[0]}`,
+        date: new Date().toISOString().split('T')[0],
         amount: stripeAmount,
         description: 'Ingresos de Stripe',
         category: 'Ingresos por plataforma',
@@ -45,13 +45,13 @@ const transformWebhookData = (responseData: any): Transaction[] => {
   if (responseData.colaboradores && Array.isArray(responseData.colaboradores)) {
     console.log(`Processing ${responseData.colaboradores.length} collaborator expenses`);
     responseData.colaboradores.forEach((collab: any, index: number) => {
-      const amount = parseNumericValue(collab.amount);
+      const amount = parseNumericValue(collab.total);
       if (amount > 0) {
         transactions.push({
           id: `colaborador-${index}-${collab.date || new Date().toISOString().split('T')[0]}`,
           date: collab.date || new Date().toISOString().split('T')[0],
           amount: amount,
-          description: collab.name || 'Pago a colaborador',
+          description: collab.vendor_name || 'Pago a colaborador',
           category: 'Pagos a colaboradores',
           source: 'Zoho',
           type: 'expense'
@@ -64,14 +64,14 @@ const transformWebhookData = (responseData: any): Transaction[] => {
   if (responseData.expenses && Array.isArray(responseData.expenses)) {
     console.log(`Processing ${responseData.expenses.length} regular expenses`);
     responseData.expenses.forEach((expense: any, index: number) => {
-      const amount = parseNumericValue(expense.amount);
+      const amount = parseNumericValue(expense.total);
       if (amount > 0) {
         transactions.push({
           id: `expense-${index}-${expense.date || new Date().toISOString().split('T')[0]}`,
           date: expense.date || new Date().toISOString().split('T')[0],
           amount: amount,
-          description: expense.description || 'Gasto',
-          category: expense.category || 'Otros gastos',
+          description: expense.vendor_name || expense.account_name || 'Gasto',
+          category: expense.account_name || 'Otros gastos',
           source: 'Zoho',
           type: 'expense'
         });
@@ -89,8 +89,8 @@ const transformWebhookData = (responseData: any): Transaction[] => {
           id: `payment-${index}-${payment.date || new Date().toISOString().split('T')[0]}`,
           date: payment.date || new Date().toISOString().split('T')[0],
           amount: amount,
-          description: payment.description || 'Ingreso',
-          category: payment.category || 'Otros ingresos',
+          description: payment.customer_name || 'Ingreso',
+          category: 'Ingresos regulares',
           source: 'Zoho',
           type: 'income'
         });
