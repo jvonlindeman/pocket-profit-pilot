@@ -1,3 +1,4 @@
+
 export interface Transaction {
   id: string;
   date: string;
@@ -67,4 +68,20 @@ export interface MonthlyBalance {
   created_at: string;
   updated_at: string;
   stripe_override: number | null;
+  opex_amount: number;
+  itbm_amount: number;
+  profit_percentage: number;
+}
+
+export interface SalaryCalculation {
+  zohoIncome: number;
+  opexAmount: number;
+  taxAmount: number;
+  itbmAmount: number;
+  profitAmount: number;
+  zohoSalaryProfit: number;
+  halfZohoSalaryProfit: number;
+  stripeTotal: number;
+  halfStripeTotal: number;
+  totalSalary: number;
 }

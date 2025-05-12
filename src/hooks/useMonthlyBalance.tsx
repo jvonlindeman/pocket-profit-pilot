@@ -72,21 +72,47 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
   };
 
   // Set or update the monthly balance
-  const updateMonthlyBalance = async (balance: number, notes?: string, stripeOverride?: number | null) => {
+  const updateMonthlyBalance = async (
+    balance: number, 
+    notes?: string, 
+    stripeOverride?: number | null,
+    opexAmount?: number,
+    itbmAmount?: number,
+    profitPercentage?: number
+  ) => {
     setLoading(true);
     setError(null);
 
     try {
+      // Prepare update data
+      const updateData: any = {
+        balance,
+        notes: notes || monthlyBalance?.notes,
+      };
+      
+      // Only include fields that are provided
+      if (stripeOverride !== undefined) {
+        updateData.stripe_override = stripeOverride;
+      }
+      
+      if (opexAmount !== undefined) {
+        updateData.opex_amount = opexAmount;
+      }
+      
+      if (itbmAmount !== undefined) {
+        updateData.itbm_amount = itbmAmount;
+      }
+      
+      if (profitPercentage !== undefined) {
+        updateData.profit_percentage = profitPercentage;
+      }
+
       // Check if we're updating or inserting
       if (monthlyBalance) {
         // Update existing record
         const { data, error } = await supabase
           .from('monthly_balances')
-          .update({
-            balance,
-            notes: notes || monthlyBalance.notes,
-            stripe_override: stripeOverride !== undefined ? stripeOverride : monthlyBalance.stripe_override
-          })
+          .update(updateData)
           .eq('month_year', currentMonthYear)
           .select();
 
@@ -95,7 +121,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
         
         toast({
           title: "Balance actualizado",
-          description: `Se actualizó el balance inicial de ${format(currentDate, 'MMMM yyyy')}`,
+          description: `Se actualizó el balance de ${format(currentDate, 'MMMM yyyy')}`,
         });
       } else {
         // Create new record
@@ -105,7 +131,10 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
             month_year: currentMonthYear,
             balance,
             notes: notes || null,
-            stripe_override: stripeOverride
+            stripe_override: stripeOverride,
+            opex_amount: opexAmount || 0,
+            itbm_amount: itbmAmount || 0,
+            profit_percentage: profitPercentage || 1.0
           })
           .select();
 
@@ -114,7 +143,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
         
         toast({
           title: "Balance creado",
-          description: `Se creó el balance inicial de ${format(currentDate, 'MMMM yyyy')}`,
+          description: `Se creó el balance de ${format(currentDate, 'MMMM yyyy')}`,
         });
       }
       
@@ -139,44 +168,42 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
   const updateStripeOverride = async (stripeOverride: number | null) => {
     if (!monthlyBalance) {
       // If no monthly balance exists yet, create one with default balance and the stripe override
-      return updateMonthlyBalance(0, null, stripeOverride);
+      return updateMonthlyBalance(0, undefined, stripeOverride);
     }
     
-    setLoading(true);
-    setError(null);
-
-    try {
-      const { data, error } = await supabase
-        .from('monthly_balances')
-        .update({
-          stripe_override: stripeOverride
-        })
-        .eq('month_year', currentMonthYear)
-        .select();
-
-      if (error) throw error;
-      setMonthlyBalance(data[0] || null);
-      
-      toast({
-        title: "Valor de Stripe actualizado",
-        description: `Se actualizó el valor manual de Stripe para ${format(currentDate, 'MMMM yyyy')}`,
-      });
-      
-      return true;
-    } catch (err: any) {
-      console.error("Error updating Stripe override:", err);
-      setError(err.message || "Error al actualizar el valor manual de Stripe");
-      
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar el valor manual de Stripe",
-        variant: "destructive",
-      });
-      
-      return false;
-    } finally {
-      setLoading(false);
+    return updateMonthlyBalance(
+      monthlyBalance.balance,
+      monthlyBalance.notes || undefined,
+      stripeOverride
+    );
+  };
+  
+  // Update salary calculator values
+  const updateSalaryCalculatorValues = async (
+    opexAmount: number,
+    itbmAmount: number,
+    profitPercentage: number
+  ) => {
+    if (!monthlyBalance) {
+      // If no monthly balance exists yet, create one with default values
+      return updateMonthlyBalance(
+        0, 
+        undefined, 
+        null, 
+        opexAmount, 
+        itbmAmount, 
+        profitPercentage
+      );
     }
+    
+    return updateMonthlyBalance(
+      monthlyBalance.balance,
+      monthlyBalance.notes || undefined,
+      monthlyBalance.stripe_override,
+      opexAmount,
+      itbmAmount,
+      profitPercentage
+    );
   };
 
   // Fetch the balance when the current date changes
@@ -190,6 +217,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     monthlyBalance,
     updateMonthlyBalance,
     updateStripeOverride,
+    updateSalaryCalculatorValues,
     fetchMonthlyBalance,
     checkBalanceExists,
     currentMonthYear,

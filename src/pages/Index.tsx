@@ -27,7 +27,13 @@ const Index = () => {
     regularIncome,
     collaboratorExpenses,
     stripeOverride,
-    updateStripeOverride
+    updateStripeOverride,
+    // New salary calculator props
+    opexAmount,
+    itbmAmount,
+    profitPercentage,
+    salaryCalculation,
+    updateSalaryCalculatorValues
   } = useFinanceData();
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
@@ -87,6 +93,11 @@ const Index = () => {
   const handleStripeOverrideChange = (value: number | null) => {
     updateStripeOverride(value);
   };
+  
+  // Handler for salary calculator values changes
+  const handleSalaryCalculatorValuesChange = (opex: number, itbm: number, profitPct: number) => {
+    updateSalaryCalculatorValues(opex, itbm, profitPct);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -129,6 +140,12 @@ const Index = () => {
             collaboratorExpenses={collaboratorExpenses}
             stripeOverride={stripeOverride}
             onStripeOverrideChange={handleStripeOverrideChange}
+            // New salary calculator props
+            opexAmount={opexAmount}
+            itbmAmount={itbmAmount}
+            profitPercentage={profitPercentage}
+            salaryCalculation={salaryCalculation}
+            onSalaryCalculatorValuesChange={handleSalaryCalculatorValuesChange}
           />
         )}
         

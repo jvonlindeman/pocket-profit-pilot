@@ -50,8 +50,11 @@ export type Database = {
           balance: number
           created_at: string
           id: number
+          itbm_amount: number | null
           month_year: string
           notes: string | null
+          opex_amount: number | null
+          profit_percentage: number | null
           stripe_override: number | null
           updated_at: string
         }
@@ -59,8 +62,11 @@ export type Database = {
           balance: number
           created_at?: string
           id?: number
+          itbm_amount?: number | null
           month_year: string
           notes?: string | null
+          opex_amount?: number | null
+          profit_percentage?: number | null
           stripe_override?: number | null
           updated_at?: string
         }
@@ -68,8 +74,11 @@ export type Database = {
           balance?: number
           created_at?: string
           id?: number
+          itbm_amount?: number | null
           month_year?: string
           notes?: string | null
+          opex_amount?: number | null
+          profit_percentage?: number | null
           stripe_override?: number | null
           updated_at?: string
         }

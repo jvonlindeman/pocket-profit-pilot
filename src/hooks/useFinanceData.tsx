@@ -20,17 +20,23 @@ export const useFinanceData = () => {
   const {
     startingBalance,
     stripeOverride,
+    opexAmount,
+    itbmAmount,
+    profitPercentage,
     fetchMonthlyBalance,
     updateStartingBalance,
-    updateStripeOverride
+    updateStripeOverride,
+    updateSalaryCalculatorValues
   } = useMonthlyBalanceOperations();
 
   const {
     stripeIncome,
     regularIncome,
     collaboratorExpenses,
+    salaryCalculation,
     processIncomeTypes,
-    processCollaboratorData
+    processCollaboratorData,
+    calculateSalary
   } = useFinanceProcessing();
 
   const {
@@ -68,6 +74,13 @@ export const useFinanceData = () => {
   const updatedUpdateStartingBalance = async (balance: number, notes?: string) => {
     await updateStartingBalance(balance, dateRange.startDate, notes);
   };
+  
+  // Update salary calculator values
+  const updatedUpdateSalaryCalculatorValues = async (opex: number, itbm: number, profitPct: number) => {
+    await updateSalaryCalculatorValues(opex, itbm, profitPct, dateRange.startDate);
+    // Recalculate salary with new values
+    calculateSalary(regularIncome, stripeIncome, opex, itbm, profitPct);
+  };
 
   // Process income and collaborator data when transactions or stripeOverride change
   useEffect(() => {
@@ -80,6 +93,11 @@ export const useFinanceData = () => {
       }
     }
   }, [transactions, stripeOverride, processIncomeTypes, processCollaboratorData, rawResponse]);
+  
+  // Calculate salary whenever income data or salary parameters change
+  useEffect(() => {
+    calculateSalary(regularIncome, stripeIncome, opexAmount, itbmAmount, profitPercentage);
+  }, [regularIncome, stripeIncome, opexAmount, itbmAmount, profitPercentage, calculateSalary]);
 
   return {
     dateRange,
@@ -98,6 +116,12 @@ export const useFinanceData = () => {
     updateStartingBalance: updatedUpdateStartingBalance,
     stripeOverride,
     updateStripeOverride: updatedUpdateStripeOverride,
-    usingCachedData
+    usingCachedData,
+    // New salary calculator props
+    opexAmount,
+    itbmAmount,
+    profitPercentage,
+    salaryCalculation,
+    updateSalaryCalculatorValues: updatedUpdateSalaryCalculatorValues
   };
 };

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
 import RevenueChart from '@/components/Dashboard/RevenueChart';
@@ -6,7 +5,8 @@ import ExpenseChart from '@/components/Dashboard/ExpenseChart';
 import CollaboratorChart from '@/components/Dashboard/CollaboratorChart';
 import ProfitAnalysis from '@/components/Dashboard/ProfitAnalysis';
 import TransactionList from '@/components/Dashboard/TransactionList';
-import { FinancialData, CategorySummary, DateRange } from '@/types/financial';
+import SalaryProfitCalculator from '@/components/Dashboard/SalaryProfitCalculator';
+import { FinancialData, CategorySummary, DateRange, SalaryCalculation } from '@/types/financial';
 import EmptyStateWarning from './EmptyStateWarning';
 import PeriodHeader from './PeriodHeader';
 import MonthlyBalanceEditor from '@/components/Dashboard/MonthlyBalanceEditor';
@@ -22,6 +22,12 @@ interface DashboardContentProps {
   collaboratorExpenses: CategorySummary[];
   stripeOverride?: number | null;
   onStripeOverrideChange?: (value: number | null) => void;
+  // New props for salary calculator
+  opexAmount: number;
+  itbmAmount: number;
+  profitPercentage: number;
+  salaryCalculation: SalaryCalculation;
+  onSalaryCalculatorValuesChange: (opex: number, itbm: number, profitPct: number) => void;
 }
 
 const DashboardContent: React.FC<DashboardContentProps> = ({
@@ -34,7 +40,13 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   regularIncome,
   collaboratorExpenses,
   stripeOverride,
-  onStripeOverrideChange
+  onStripeOverrideChange,
+  // New props
+  opexAmount,
+  itbmAmount,
+  profitPercentage,
+  salaryCalculation,
+  onSalaryCalculatorValuesChange
 }) => {
   // Prepare Stripe data for chart
   const getStripeDataForChart = () => {
@@ -87,6 +99,20 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
         stripeIncome={stripeIncome}
         regularIncome={regularIncome}
       />
+
+      {/* New Salary Profit Calculator */}
+      <div className="mt-6">
+        <SalaryProfitCalculator
+          zohoIncome={regularIncome}
+          stripeIncome={stripeIncome}
+          opexAmount={opexAmount}
+          itbmAmount={itbmAmount}
+          profitPercentage={profitPercentage}
+          salaryCalculation={salaryCalculation}
+          onUpdateValues={onSalaryCalculatorValuesChange}
+          isLoading={loading}
+        />
+      </div>
 
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">

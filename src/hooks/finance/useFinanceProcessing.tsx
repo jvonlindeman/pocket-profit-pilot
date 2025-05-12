@@ -1,11 +1,22 @@
-
 import { useState, useCallback } from 'react';
-import { Transaction, CategorySummary } from '@/types/financial';
+import { Transaction, CategorySummary, SalaryCalculation } from '@/types/financial';
 
 export const useFinanceProcessing = () => {
   const [stripeIncome, setStripeIncome] = useState<number>(0);
   const [regularIncome, setRegularIncome] = useState<number>(0);
   const [collaboratorExpenses, setCollaboratorExpenses] = useState<any[]>([]);
+  const [salaryCalculation, setSalaryCalculation] = useState<SalaryCalculation>({
+    zohoIncome: 0,
+    opexAmount: 0,
+    taxAmount: 0,
+    itbmAmount: 0,
+    profitAmount: 0,
+    zohoSalaryProfit: 0,
+    halfZohoSalaryProfit: 0,
+    stripeTotal: 0,
+    halfStripeTotal: 0,
+    totalSalary: 0
+  });
   
   // Función para procesar y separar ingresos
   const processIncomeTypes = useCallback((transactions: Transaction[], stripeOverride: number | null) => {
@@ -64,11 +75,59 @@ export const useFinanceProcessing = () => {
     return formattedData;
   }, []);
 
+  // New function to calculate salary based on financial data
+  const calculateSalary = useCallback(
+    (
+      zohoIncome: number, 
+      stripeIncome: number, 
+      opexAmount: number, 
+      itbmAmount: number, 
+      profitPercentage: number
+    ) => {
+      // Calculate tax amount (5% of Zoho income)
+      const taxAmount = zohoIncome * 0.05;
+      
+      // Calculate profit amount (configurable percentage of Zoho income)
+      const profitAmount = zohoIncome * (profitPercentage / 100);
+      
+      // Calculate Zoho salary profit (Zoho income - OPEX - tax - ITBM - profit)
+      const zohoSalaryProfit = zohoIncome - opexAmount - taxAmount - itbmAmount - profitAmount;
+      
+      // Calculate half of Zoho salary profit (50%)
+      const halfZohoSalaryProfit = zohoSalaryProfit / 2;
+      
+      // Calculate half of Stripe income (50%)
+      const halfStripeTotal = stripeIncome / 2;
+      
+      // Calculate total salary (50% of Zoho profit + 50% of Stripe profit)
+      const totalSalary = halfZohoSalaryProfit + halfStripeTotal;
+      
+      const calculation = {
+        zohoIncome,
+        opexAmount,
+        taxAmount,
+        itbmAmount,
+        profitAmount,
+        zohoSalaryProfit,
+        halfZohoSalaryProfit,
+        stripeTotal: stripeIncome,
+        halfStripeTotal,
+        totalSalary
+      };
+      
+      setSalaryCalculation(calculation);
+      return calculation;
+    },
+    []
+  );
+
   return {
     stripeIncome,
     regularIncome,
     collaboratorExpenses,
+    salaryCalculation,
     processIncomeTypes,
-    processCollaboratorData
+    processCollaboratorData,
+    calculateSalary
   };
 };
