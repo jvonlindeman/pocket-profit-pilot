@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import ZohoService from '@/services/zohoService';
 import StripeService from '@/services/stripeService';
@@ -32,8 +31,8 @@ export const useFinanceData = () => {
     return { startDate, endDate };
   });
 
-  // Datos financieros procesados
-  const financialData = processTransactionData(transactions, startingBalance);
+  // Datos financieros procesados - Now includes stripeOverride
+  const financialData = processTransactionData(transactions, startingBalance, stripeOverride);
 
   // Function to format date in YYYY-MM-DD format without timezone shifts
   const formatDateYYYYMMDD = (date: Date): string => {

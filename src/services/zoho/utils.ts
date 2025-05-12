@@ -104,15 +104,24 @@ const calculateTotalByCategory = (transactions: Transaction[], type: 'income' | 
 };
 
 // Main function to process and format transaction data into a FinancialData object
-export const processTransactionData = (transactions: Transaction[], startingBalance?: number): FinancialData => {
+export const processTransactionData = (
+  transactions: Transaction[], 
+  startingBalance?: number,
+  stripeOverride?: number | null
+): FinancialData => {
   // Calcular income y expense total
   let totalIncome = 0;
   let totalExpense = 0;
   let collaboratorExpense = 0;
   let otherExpense = 0;
+  let originalStripeIncome = 0;
 
   transactions.forEach(transaction => {
     if (transaction.type === 'income') {
+      // Track original Stripe income separately
+      if (transaction.source === 'Stripe') {
+        originalStripeIncome += transaction.amount;
+      }
       totalIncome += transaction.amount;
     } else {
       totalExpense += transaction.amount;
@@ -126,6 +135,12 @@ export const processTransactionData = (transactions: Transaction[], startingBala
     }
   });
 
+  // Apply Stripe override if provided
+  if (stripeOverride !== undefined && stripeOverride !== null) {
+    // Adjust the total income by removing original Stripe income and adding the override
+    totalIncome = totalIncome - originalStripeIncome + stripeOverride;
+  }
+
   // Include starting balance in profit calculation if provided
   const profit = (startingBalance !== undefined ? startingBalance : 0) + totalIncome - totalExpense;
   const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0;
@@ -138,7 +153,8 @@ export const processTransactionData = (transactions: Transaction[], startingBala
     otherExpense,
     profit,
     profitMargin,
-    startingBalance
+    startingBalance,
+    stripeOverride
   };
 
   // Calcular datos por categoría

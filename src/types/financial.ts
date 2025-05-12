@@ -1,4 +1,3 @@
-
 export interface Transaction {
   id: string;
   date: string;
@@ -16,14 +15,15 @@ export interface FinancialSummary {
   otherExpense: number;
   profit: number;
   profitMargin: number;
-  startingBalance?: number; // Added starting balance field
+  startingBalance?: number;
+  stripeOverride?: number | null;
 }
 
 export interface CategorySummary {
   category: string;
   amount: number;
   percentage: number;
-  date?: string; // Fecha opcional para los colaboradores
+  date?: string;
 }
 
 export interface DateRange {
@@ -56,7 +56,7 @@ export interface CollaboratorData {
   name: string;
   amount: number;
   percentage: number;
-  date?: string; // Fecha opcional para los colaboradores
+  date?: string;
 }
 
 export interface MonthlyBalance {
@@ -66,5 +66,5 @@ export interface MonthlyBalance {
   notes: string | null;
   created_at: string;
   updated_at: string;
-  stripe_override: number | null; // Added stripe_override field
+  stripe_override: number | null;
 }
