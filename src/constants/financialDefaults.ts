@@ -4,9 +4,6 @@ import { FinancialData } from '@/types/financial';
 // API timeout in milliseconds
 export const API_TIMEOUT_MS = 30000; // 30 seconds
 
-// Default financial data for initialization
-export const DEFAULT_FINANCIAL_DATA = emptyFinancialData;
-
 // Empty financial data object to use as initial state
 export const emptyFinancialData: FinancialData = {
   summary: {
@@ -30,3 +27,6 @@ export const emptyFinancialData: FinancialData = {
     profit: { labels: [], values: [] }
   }
 };
+
+// Default financial data for initialization (defined after emptyFinancialData)
+export const DEFAULT_FINANCIAL_DATA = emptyFinancialData;
