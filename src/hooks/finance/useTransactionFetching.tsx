@@ -19,6 +19,8 @@ export const useTransactionFetching = (
 
   // Function to apply Stripe income override to transactions list
   const applyStripeOverride = useCallback((stripeOverride: number) => {
+    console.log(`Applying Stripe override: ${stripeOverride}`);
+    
     setTransactions(currentTransactions => {
       // Find the Stripe transaction if it exists
       const hasStripeTransaction = currentTransactions.some(tx => 
@@ -28,6 +30,7 @@ export const useTransactionFetching = (
       if (!hasStripeTransaction) {
         // If no Stripe transaction exists, create a new one
         const today = new Date().toISOString().split('T')[0];
+        console.log(`Creating new Stripe transaction with override: ${stripeOverride}`);
         const newStripeTransaction: Transaction = {
           id: `stripe-override-${today}`,
           date: today,
@@ -42,6 +45,7 @@ export const useTransactionFetching = (
       }
       
       // Update existing Stripe transactions
+      console.log(`Updating existing Stripe transaction with override: ${stripeOverride}`);
       return currentTransactions.map(tx => {
         if (tx.source === 'Stripe' && tx.type === 'income') {
           // Check if the description already includes (Manual)
@@ -60,6 +64,7 @@ export const useTransactionFetching = (
   // Función para cargar los datos
   const fetchData = useCallback(async (forceRefresh = false) => {
     console.log("Fetching financial data...");
+    console.log(`Date range: ${dateRange.startDate.toISOString()} to ${dateRange.endDate.toISOString()}`);
     setLoading(true);
     setError(null);
     setUsingCachedData(false);
@@ -70,8 +75,8 @@ export const useTransactionFetching = (
       
       // Log exact date objects for debugging
       console.log("Original dateRange from datepicker:", {
-        startDate: dateRange.startDate,
-        endDate: dateRange.endDate
+        startDate: dateRange.startDate.toISOString(),
+        endDate: dateRange.endDate.toISOString()
       });
       
       // Format dates using our custom formatter to avoid timezone shifts
@@ -79,18 +84,20 @@ export const useTransactionFetching = (
       const endDateFormatted = formatDateYYYYMMDD(dateRange.endDate);
       
       console.log("Fetching with exact formatted dates:", {
-        startDateRaw: dateRange.startDate,
+        startDateRaw: dateRange.startDate.toISOString(),
         startDateFormatted,
-        endDateRaw: dateRange.endDate,
+        endDateRaw: dateRange.endDate.toISOString(),
         endDateFormatted
       });
       
       // Obtener transacciones de Zoho Books - usando las fechas exactas sin modificaciones
+      console.log(`Calling ZohoService.getTransactions with dates: ${startDateFormatted} to ${endDateFormatted}`);
       const zohoData = await ZohoService.getTransactions(
         dateRange.startDate, 
         dateRange.endDate,
         forceRefresh
       );
+      console.log(`Received ${zohoData.length} transactions from Zoho`);
 
       // Detectar si estamos usando datos en caché basado en la respuesta
       const rawResponseData = ZohoService.getLastRawResponse();
@@ -102,14 +109,15 @@ export const useTransactionFetching = (
       // Obtener la respuesta cruda actual para depuración inmediatamente después
       const rawData = ZohoService.getLastRawResponse();
       setRawResponse(rawData);
-      console.log("Fetched raw response for debugging:", rawData);
+      console.log("Fetched raw response for debugging:", rawData ? "Raw data available" : "No raw data");
 
       // Obtener transacciones de Stripe - usando las fechas exactas sin modificaciones
-      console.log("Fetching from Stripe:", dateRange.startDate, dateRange.endDate);
+      console.log("Fetching from Stripe:", dateRange.startDate.toISOString(), dateRange.endDate.toISOString());
       const stripeData = await StripeService.getTransactions(
         dateRange.startDate,
         dateRange.endDate
       );
+      console.log(`Received ${stripeData.length} transactions from Stripe`);
 
       // Combinar los datos
       const combinedData = [...zohoData, ...stripeData];
@@ -126,7 +134,7 @@ export const useTransactionFetching = (
       const rawData = ZohoService.getLastRawResponse();
       if (rawData) {
         setRawResponse(rawData);
-        console.log("Set raw response after error:", rawData);
+        console.log("Set raw response after error:", rawData ? "Raw data available" : "No raw data");
       }
     } finally {
       setLoading(false);
@@ -135,6 +143,7 @@ export const useTransactionFetching = (
 
   // Función pública para refrescar datos (forzando o no)
   const refreshData = useCallback((force = false) => {
+    console.log(`Refreshing data with force=${force}`);
     fetchData(force);
   }, [fetchData]);
 

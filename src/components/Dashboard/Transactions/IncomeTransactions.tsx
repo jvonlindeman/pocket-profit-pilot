@@ -27,6 +27,7 @@ const IncomeTransactions: React.FC<IncomeTransactionsProps> = ({ transactions })
         return 'Invalid date';
       }
       
+      // Use es-ES locale for date formatting
       return new Intl.DateTimeFormat('es-ES').format(date);
     } catch (error) {
       console.error(`Error formatting date: ${dateString}`, error);

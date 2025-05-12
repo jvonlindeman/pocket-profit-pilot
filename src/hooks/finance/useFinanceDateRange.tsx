@@ -11,30 +11,34 @@ export const useFinanceDateRange = () => {
     const startDate = endOfMonth(subMonths(today, 1));
     // Último día del mes actual
     const endDate = endOfMonth(today);
-    console.log("Initial date range:", startDate, "to", endDate);
+    console.log("Initial date range:", startDate.toISOString(), "to", endDate.toISOString());
     return { startDate, endDate };
   });
 
   // Function to format date in YYYY-MM-DD format without timezone shifts
   const formatDateYYYYMMDD = (date: Date): string => {
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   // Obtener el rango del mes actual
   const getCurrentMonthRange = useCallback(() => {
     const today = new Date();
-    return {
-      startDate: new Date(today.getFullYear(), today.getMonth(), 1),
-      endDate: endOfMonth(today)
-    };
+    const startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endDate = endOfMonth(today);
+    console.log("Current month range:", startDate.toISOString(), "to", endDate.toISOString());
+    return { startDate, endDate };
   }, []);
 
   // Función para actualizar el rango de fechas
   const updateDateRange = useCallback((newRange: { startDate: Date; endDate: Date }) => {
-    console.log("Date range updated:", newRange);
+    console.log("Date range updated:", 
+      newRange.startDate.toISOString(), "to", 
+      newRange.endDate.toISOString()
+    );
     console.log("Exact date values:", {
-      startDate: newRange.startDate,
-      endDate: newRange.endDate,
       startDateFormatted: formatDateYYYYMMDD(newRange.startDate),
       endDateFormatted: formatDateYYYYMMDD(newRange.endDate)
     });
