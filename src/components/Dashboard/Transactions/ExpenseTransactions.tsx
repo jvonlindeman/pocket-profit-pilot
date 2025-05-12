@@ -17,7 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatDate, formatCurrency } from '@/lib/date-utils';
 
 interface ExpenseTransactionsProps {
   transactions: Transaction[];
@@ -34,20 +33,34 @@ const ExpenseTransactions: React.FC<ExpenseTransactionsProps> = ({ transactions 
     ? transactions 
     : transactions.filter(tx => tx.category === categoryFilter);
   
-  // Calculate total expenses
-  const totalExpenses = filteredTransactions.reduce((sum, tx) => sum + tx.amount, 0);
-
-  // Calculate category percentage when filtered
-  const getCategoryPercentage = () => {
-    if (categoryFilter === 'all') return null;
-    
-    const totalAllExpenses = transactions.reduce((sum, tx) => sum + tx.amount, 0);
-    const percentage = (totalExpenses / totalAllExpenses) * 100;
-    
-    return percentage.toFixed(1);
+  // Format date
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      
+      // Check if the date is valid
+      if (isNaN(date.getTime())) {
+        console.error(`Invalid date string: ${dateString}`);
+        return 'Invalid date';
+      }
+      
+      return new Intl.DateTimeFormat('es-ES').format(date);
+    } catch (error) {
+      console.error(`Error formatting date: ${dateString}`, error);
+      return 'Invalid date';
+    }
   };
 
-  const categoryPercentage = getCategoryPercentage();
+  // Format currency
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
+  };
+
+  // Calculate total expenses
+  const totalExpenses = filteredTransactions.reduce((sum, tx) => sum + tx.amount, 0);
 
   return (
     <div className="bg-red-50 p-4 rounded-md mb-4">
@@ -56,9 +69,6 @@ const ExpenseTransactions: React.FC<ExpenseTransactionsProps> = ({ transactions 
         <div className="flex items-center space-x-2">
           <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
             Total: {formatCurrency(totalExpenses)}
-            {categoryFilter !== 'all' && categoryPercentage && (
-              <span className="ml-1 text-xs">({categoryPercentage}% del total)</span>
-            )}
           </Badge>
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
             <SelectTrigger className="w-[180px] bg-white border-red-200 focus:ring-red-500">
@@ -112,23 +122,6 @@ const ExpenseTransactions: React.FC<ExpenseTransactionsProps> = ({ transactions 
           )}
         </TableBody>
       </Table>
-      
-      {/* Summary section when filtering by category */}
-      {categoryFilter !== 'all' && (
-        <div className="mt-4 pt-3 border-t border-red-200">
-          <div className="flex justify-between items-center text-sm">
-            <span className="font-medium text-red-800">
-              Total para {categoryFilter}:
-            </span>
-            <div className="flex flex-col items-end">
-              <span className="font-semibold text-red-800">{formatCurrency(totalExpenses)}</span>
-              {categoryPercentage && (
-                <span className="text-xs text-red-600">{categoryPercentage}% del total de gastos</span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

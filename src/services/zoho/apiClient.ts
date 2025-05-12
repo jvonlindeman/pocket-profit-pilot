@@ -6,10 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 // Format date in YYYY-MM-DD format without timezone shifts
 const formatDateYYYYMMDD = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
 
 // Helper function to ensure source is either 'Zoho' or 'Stripe'
@@ -57,7 +54,7 @@ const isCacheFresh = (cachedData: any[], maxHoursOld = 24): boolean => {
   return cacheAgeHours < freshnessPeriod;
 };
 
-// Improved cache coverage check with more lenient matching
+// Improved cache coverage check
 const cacheCoversDateRange = (cachedData: any[], startDate: string, endDate: string): boolean => {
   if (!cachedData || cachedData.length === 0) return false;
   
@@ -70,16 +67,13 @@ const cacheCoversDateRange = (cachedData: any[], startDate: string, endDate: str
   const requestEnd = new Date(endDate);
   
   // Check if the cache spans the entire requested date range
-  // Be more lenient - allow 1 day difference on each end
-  const oneDayMs = 24 * 60 * 60 * 1000;
-  const spansDateRange = 
-    (earliestCachedDate <= new Date(requestStart.getTime() + oneDayMs)) && 
-    (latestCachedDate >= new Date(requestEnd.getTime() - oneDayMs));
+  const spansDateRange = earliestCachedDate <= requestStart && latestCachedDate >= requestEnd;
   
   // Also check if we have a reasonable sample of different transaction types
   const hasIncomeTransactions = cachedData.some(tx => tx.type === 'income');
   const hasExpenseTransactions = cachedData.some(tx => tx.type === 'expense');
   const hasZohoTransactions = cachedData.some(tx => tx.source === 'Zoho');
+  const hasStripeTransactions = cachedData.some(tx => tx.source === 'Stripe');
   
   // Log coverage details for debugging
   console.log(`ZohoService: Cache coverage check - Range ${startDate} to ${endDate}:`, {
@@ -88,19 +82,23 @@ const cacheCoversDateRange = (cachedData: any[], startDate: string, endDate: str
     hasIncomeTransactions,
     hasExpenseTransactions,
     hasZohoTransactions,
+    hasStripeTransactions,
     earliestCachedDate: earliestCachedDate.toISOString().split('T')[0],
     latestCachedDate: latestCachedDate.toISOString().split('T')[0],
     requestStartDate: requestStart.toISOString().split('T')[0], 
     requestEndDate: requestEnd.toISOString().split('T')[0]
   });
   
-  // We consider the cache complete if:
-  // 1. It approximately spans the date range OR we have a substantial number of transactions 
-  // 2. We have a good mix of transaction types
-  const hasGoodCoverage = (spansDateRange || cachedData.length > 30) && 
+  // We consider the cache complete if it spans the date range and has representative transaction types
+  // For old months we won't be too strict about having stripe data since it might not be relevant
+  const isCurrentMonth = (requestStart.getMonth() === new Date().getMonth() && 
+                          requestStart.getFullYear() === new Date().getFullYear());
+                          
+  const hasGoodCoverage = spansDateRange && 
                          hasIncomeTransactions && 
                          hasExpenseTransactions && 
-                         hasZohoTransactions;
+                         hasZohoTransactions &&
+                         (hasStripeTransactions || !isCurrentMonth || cachedData.length > 10);
   
   console.log(`ZohoService: Cache coverage result: ${hasGoodCoverage ? "Complete coverage" : "Incomplete coverage"}`);
   
@@ -117,18 +115,6 @@ export const fetchTransactionsFromWebhook = async (
   try {
     console.log("ZohoService: Fetching transactions from", startDate, "to", endDate, 
       forceRefresh ? "with force refresh" : "using cache if available");
-    
-    // Fix any dates in the future (wrong year)
-    const currentYear = new Date().getFullYear();
-    if (startDate.getFullYear() > currentYear) {
-      console.log(`ZohoService: Correcting future year in startDate: ${startDate.toISOString()}`);
-      startDate.setFullYear(currentYear);
-    }
-    
-    if (endDate.getFullYear() > currentYear) {
-      console.log(`ZohoService: Correcting future year in endDate: ${endDate.toISOString()}`);
-      endDate.setFullYear(currentYear);
-    }
     
     // Log exact date objects for debugging
     console.log("ZohoService: Raw date objects:", {
@@ -193,8 +179,8 @@ export const fetchTransactionsFromWebhook = async (
       console.log("ZohoService: Force refresh requested, bypassing cache");
     }
     
-    // Call the Supabase edge function with proper forceRefresh parameter and our explicitly formatted dates
-    console.log("ZohoService: Calling Supabase edge function with formatted dates and forceRefresh =", forceRefresh);
+    // Call the Supabase edge function with proper forceRefresh parameter
+    console.log("ZohoService: Calling Supabase edge function with forceRefresh =", forceRefresh);
     const { data, error } = await supabase.functions.invoke("zoho-transactions", {
       body: {
         startDate: formattedStartDate,
@@ -287,3 +273,120 @@ export const fetchTransactionsFromWebhook = async (
     return returnRawResponse ? { error: err instanceof Error ? err.message : 'Unknown error', raw_response: null } : getMockTransactions(startDate, endDate);
   }
 };
+
+// Helper function to process raw transaction data from the API into the Transaction type
+const processRawTransactions = (data: any): Transaction[] => {
+  if (!data) {
+    console.error("No data received from webhook");
+    return [];
+  }
+  
+  const result: Transaction[] = [];
+  
+  // If we received a raw_response instead of structured data, log it but return empty array
+  if (data.raw_response && (!data.stripe && !data.colaboradores && !data.expenses && !data.payments)) {
+    console.error("Received raw_response but no structured data:", data.raw_response);
+    return [];
+  }
+  
+  // Process Stripe income if available (new format)
+  if (data.stripe) {
+    try {
+      // Parse the string to a number, handling comma as decimal separator
+      const stripeAmount = parseFloat(String(data.stripe).replace(".", "").replace(",", "."));
+      if (!isNaN(stripeAmount) && stripeAmount > 0) {
+        const today = new Date().toISOString().split('T')[0];
+        result.push({
+          id: `stripe-income-${today}-${stripeAmount}`,
+          date: today,
+          amount: stripeAmount,
+          description: 'Ingresos de Stripe',
+          category: 'Ingresos por plataforma',
+          source: 'Stripe',
+          type: 'income'
+        });
+      }
+    } catch (e) {
+      console.error("Error processing Stripe income:", e);
+    }
+  }
+  
+  // Process collaborator expenses (new format with proper array) - Ahora con fechas
+  if (Array.isArray(data.colaboradores)) {
+    data.colaboradores.forEach((item: any, index: number) => {
+      if (item && typeof item.total !== 'undefined' && item.vendor_name) {
+        const amount = Number(item.total);
+        if (amount > 0) {
+          // Usar la fecha del colaborador si está disponible, o la fecha actual
+          const collaboratorDate = item.date || new Date().toISOString().split('T')[0];
+          
+          result.push({
+            id: `colaborador-${item.vendor_name.replace(/\s/g, '-')}-${collaboratorDate}-${amount}`,
+            date: collaboratorDate,
+            amount,
+            description: `Pago a colaborador: ${item.vendor_name}`,
+            category: 'Pagos a colaboradores',
+            source: 'Zoho',
+            type: 'expense'
+          });
+        }
+      }
+    });
+  }
+  
+  // Process regular expenses (new format with proper array)
+  // Filter out expenses with category "Impuestos"
+  if (Array.isArray(data.expenses)) {
+    data.expenses.forEach((item: any, index: number) => {
+      // Skip expenses with account_name "Impuestos"
+      if (item && typeof item.total !== 'undefined' && item.account_name !== "Impuestos") {
+        const amount = Number(item.total);
+        if (amount > 0) {
+          const expenseDate = item.date || new Date().toISOString().split('T')[0];
+          const vendorName = item.vendor_name || '';
+          const accountName = item.account_name || 'Gastos generales';
+          
+          result.push({
+            id: `expense-${(vendorName || accountName || '').replace(/\s/g, '-')}-${expenseDate}-${amount}`,
+            date: expenseDate,
+            amount,
+            description: vendorName 
+              ? `Pago a ${vendorName}` 
+              : `${accountName}`,
+            category: accountName,
+            source: 'Zoho',
+            type: 'expense'
+          });
+        }
+      }
+    });
+  }
+  
+  // Process payments (income) (new format with proper array)
+  if (Array.isArray(data.payments)) {
+    data.payments.forEach((item: any, index: number) => {
+      if (item && typeof item.amount !== 'undefined' && item.customer_name) {
+        const amount = Number(item.amount);
+        if (amount > 0) {
+          const paymentDate = item.date || new Date().toISOString().split('T')[0];
+          const customerName = item.customer_name;
+          const invoiceId = item.invoice_id || '';
+          
+          result.push({
+            id: `income-${customerName.replace(/\s/g, '-')}-${paymentDate}-${invoiceId || index}`,
+            date: paymentDate,
+            amount,
+            description: `Ingreso de ${customerName}`,
+            category: 'Ingresos',
+            source: 'Zoho',
+            type: 'income'
+          });
+        }
+      }
+    });
+  }
+  
+  // Sort by date (newer first)
+  return result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+};
+

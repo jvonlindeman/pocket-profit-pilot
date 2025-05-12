@@ -16,14 +16,14 @@ export interface FinancialSummary {
   otherExpense: number;
   profit: number;
   profitMargin: number;
-  startingBalance?: number;
+  startingBalance?: number; // Added starting balance field
 }
 
 export interface CategorySummary {
   category: string;
   amount: number;
   percentage: number;
-  date?: string;
+  date?: string; // Fecha opcional para los colaboradores
 }
 
 export interface DateRange {
@@ -56,7 +56,7 @@ export interface CollaboratorData {
   name: string;
   amount: number;
   percentage: number;
-  date?: string;
+  date?: string; // Fecha opcional para los colaboradores
 }
 
 export interface MonthlyBalance {
@@ -64,32 +64,6 @@ export interface MonthlyBalance {
   month_year: string;
   balance: number;
   notes: string | null;
-  stripe_override: number | null;
   created_at: string;
   updated_at: string;
-}
-
-export interface StripeIncomeData {
-  amount: number;
-  isOverridden: boolean;
-  override: number | null;
-}
-
-export interface FinancialDataState {
-  data: FinancialData;
-  loading: boolean;
-  error: string | null;
-  initialized: boolean;
-  cacheStatus: {
-    usingCachedData: boolean;
-    partialRefresh: boolean;
-    stats: CacheStats | null;
-  };
-}
-
-export interface CacheStats {
-  cachedCount: number;
-  newCount: number;
-  totalCount: number;
-  lastRefresh?: string | null;
 }

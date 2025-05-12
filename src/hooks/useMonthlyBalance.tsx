@@ -1,164 +1,150 @@
 
-import { useState, useCallback, useEffect } from 'react';
-import { format as formatDate } from 'date-fns';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { MonthlyBalance } from '@/types/financial';
+import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 interface UseMonthlyBalanceProps {
   currentDate: Date;
 }
 
 export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [balance, setBalance] = useState<number | null>(null);
-  const [notes, setNotes] = useState<string | null>(null);
-  const [stripeOverride, setStripeOverride] = useState<number | null>(null);
   const [monthlyBalance, setMonthlyBalance] = useState<MonthlyBalance | null>(null);
-  
-  // Format the current month-year
-  const currentMonthYear = formatDate(currentDate, 'yyyy-MM');
+  const { toast } = useToast();
 
-  // Function to check if a balance exists for the current month and load data
-  const checkBalanceExists = useCallback(async (): Promise<boolean> => {
+  // Format the month_year for database queries (YYYY-MM)
+  const formatMonthYear = (date: Date) => {
+    return format(date, 'yyyy-MM');
+  };
+
+  // Get the current month-year string
+  const currentMonthYear = formatMonthYear(currentDate);
+
+  // Fetch the monthly balance for the given date
+  const fetchMonthlyBalance = async () => {
+    setLoading(true);
+    setError(null);
+
     try {
-      setLoading(true);
-      const monthYear = formatDate(currentDate, 'yyyy-MM');
-      
       const { data, error } = await supabase
         .from('monthly_balances')
         .select('*')
-        .eq('month_year', monthYear)
+        .eq('month_year', currentMonthYear)
         .single();
-      
+
       if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
-        console.error("Error checking balance:", error);
-        setError(error.message);
+        throw error;
+      }
+
+      setMonthlyBalance(data || null);
+      return data || null;
+    } catch (err: any) {
+      console.error("Error fetching monthly balance:", err);
+      setError(err.message || "Error al cargar el balance mensual");
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Check if a balance exists for the current month
+  const checkBalanceExists = async (): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase
+        .from('monthly_balances')
+        .select('id')
+        .eq('month_year', currentMonthYear)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error checking monthly balance:", error);
         return false;
       }
-      
-      if (data) {
-        setBalance(data.balance);
-        setNotes(data.notes);
-        setStripeOverride(data.stripe_override);
-        setMonthlyBalance(data as MonthlyBalance);
-        console.log("Loaded monthly balance data:", data);
-        return true;
-      }
-      
-      return false;
+
+      return !!data;
     } catch (err) {
       console.error("Error in checkBalanceExists:", err);
       return false;
-    } finally {
-      setLoading(false);
     }
-  }, [currentDate]);
+  };
 
-  // Function to save or update the balance and stripe override
-  const saveBalance = useCallback(async (
-    value: number, 
-    noteText?: string,
-    stripeOverrideValue?: number | null
-  ): Promise<boolean> => {
+  // Set or update the monthly balance
+  const updateMonthlyBalance = async (balance: number, notes?: string) => {
+    setLoading(true);
+    setError(null);
+
     try {
-      setLoading(true);
-      setError(null);
-      
-      const monthYear = formatDate(currentDate, 'yyyy-MM');
-      
-      // Check if a record already exists
-      const { data: existingData, error: checkError } = await supabase
-        .from('monthly_balances')
-        .select('*')
-        .eq('month_year', monthYear)
-        .single();
-      
-      if (checkError && checkError.code !== 'PGRST116') {
-        console.error("Error checking existing balance:", checkError);
-        setError(checkError.message);
-        return false;
-      }
-      
-      // Prepare update data with potential stripe override
-      const updateData = {
-        balance: value,
-        notes: noteText ?? existingData?.notes ?? null,
-        stripe_override: typeof stripeOverrideValue !== 'undefined' ? stripeOverrideValue : existingData?.stripe_override
-      };
-      
-      // Perform update or insert
-      let result;
-      
-      if (existingData) {
+      // Check if we're updating or inserting
+      if (monthlyBalance) {
         // Update existing record
-        result = await supabase
+        const { data, error } = await supabase
           .from('monthly_balances')
-          .update(updateData)
-          .eq('month_year', monthYear);
+          .update({
+            balance,
+            notes: notes || monthlyBalance.notes,
+          })
+          .eq('month_year', currentMonthYear)
+          .select();
+
+        if (error) throw error;
+        setMonthlyBalance(data[0] || null);
+        
+        toast({
+          title: "Balance actualizado",
+          description: `Se actualizó el balance inicial de ${format(currentDate, 'MMMM yyyy')}`,
+        });
       } else {
         // Create new record
-        result = await supabase
+        const { data, error } = await supabase
           .from('monthly_balances')
           .insert({
-            month_year: monthYear,
-            ...updateData
-          });
-      }
-      
-      if (result.error) {
-        console.error("Error saving balance:", result.error);
-        setError(result.error.message);
-        return false;
-      }
-      
-      // Update local state
-      setBalance(value);
-      if (noteText !== undefined) setNotes(noteText);
-      if (stripeOverrideValue !== undefined) {
-        console.log("Updating stripe override value:", stripeOverrideValue);
-        setStripeOverride(stripeOverrideValue);
-      }
-      
-      // Fetch the updated data to update the monthlyBalance state
-      const { data: updatedData } = await supabase
-        .from('monthly_balances')
-        .select('*')
-        .eq('month_year', monthYear)
-        .single();
+            month_year: currentMonthYear,
+            balance,
+            notes: notes || null,
+          })
+          .select();
+
+        if (error) throw error;
+        setMonthlyBalance(data[0] || null);
         
-      if (updatedData) {
-        setMonthlyBalance(updatedData as MonthlyBalance);
+        toast({
+          title: "Balance creado",
+          description: `Se creó el balance inicial de ${format(currentDate, 'MMMM yyyy')}`,
+        });
       }
       
       return true;
-    } catch (err) {
-      console.error("Error in saveBalance:", err);
-      setError(err instanceof Error ? err.message : 'Unknown error saving balance');
+    } catch (err: any) {
+      console.error("Error updating monthly balance:", err);
+      setError(err.message || "Error al actualizar el balance mensual");
+      
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el balance mensual",
+        variant: "destructive",
+      });
+      
       return false;
     } finally {
       setLoading(false);
     }
-  }, [currentDate]);
+  };
 
-  // For backward compatibility with existing code
-  const updateMonthlyBalance = saveBalance;
-
-  // Load data when currentDate changes
+  // Fetch the balance when the current date changes
   useEffect(() => {
-    checkBalanceExists();
-  }, [currentDate, checkBalanceExists]);
+    fetchMonthlyBalance();
+  }, [currentMonthYear]);
 
   return {
     loading,
     error,
-    balance,
-    notes,
-    stripeOverride,
-    checkBalanceExists,
-    saveBalance,
-    updateMonthlyBalance, // Alias for saveBalance for backward compatibility
     monthlyBalance,
-    currentMonthYear
+    updateMonthlyBalance,
+    fetchMonthlyBalance,
+    checkBalanceExists,
+    currentMonthYear,
   };
 };

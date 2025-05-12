@@ -3,23 +3,16 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, RefreshCcw, Database, AlertTriangle, Trash2, Calendar } from 'lucide-react';
+import { AlertCircle, RefreshCcw, Database, AlertTriangle, Trash2 } from 'lucide-react';
 import ZohoService from '@/services/zohoService';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 
 interface CacheStatsProps {
   onRefresh: () => void;
   isLoading: boolean;
   startDate?: Date;
   endDate?: Date;
-}
-
-interface DateRange {
-  earliestDate: string | null;
-  latestDate: string | null;
-  transactionCount: number;
 }
 
 const CacheStats: React.FC<CacheStatsProps> = ({ onRefresh, isLoading, startDate, endDate }) => {
@@ -34,13 +27,11 @@ const CacheStats: React.FC<CacheStatsProps> = ({ onRefresh, isLoading, startDate
   
   const [cachedCount, setCachedCount] = useState<number | null>(null);
   const [isCacheLoading, setIsCacheLoading] = useState<boolean>(false);
-  const [globalDateRange, setGlobalDateRange] = useState<DateRange | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     // Update stats when component mounts
     setStats(ZohoService.getCacheStats());
-    fetchGlobalDateRange();
     
     // Update stats every 15 seconds
     const interval = setInterval(() => {
@@ -56,46 +47,6 @@ const CacheStats: React.FC<CacheStatsProps> = ({ onRefresh, isLoading, startDate
       checkCachedCount();
     }
   }, [startDate, endDate]);
-
-  // Function to fetch the global date range of cached transactions
-  const fetchGlobalDateRange = async () => {
-    setIsCacheLoading(true);
-    try {
-      // Get the earliest and latest dates in the entire cache
-      const { data: earliest, error: earliestError } = await supabase
-        .from("cached_transactions")
-        .select("date")
-        .order("date", { ascending: true })
-        .limit(1);
-
-      const { data: latest, error: latestError } = await supabase
-        .from("cached_transactions")
-        .select("date")
-        .order("date", { ascending: false })
-        .limit(1);
-
-      const { count, error: countError } = await supabase
-        .from("cached_transactions")
-        .select("*", { count: 'exact', head: true });
-
-      if (earliestError || latestError || countError) {
-        console.error("Error fetching global date range:", earliestError || latestError || countError);
-        return;
-      }
-
-      if (earliest && earliest.length > 0 && latest && latest.length > 0) {
-        setGlobalDateRange({
-          earliestDate: earliest[0].date,
-          latestDate: latest[0].date,
-          transactionCount: count || 0
-        });
-      }
-    } catch (err) {
-      console.error("Error fetching global date range:", err);
-    } finally {
-      setIsCacheLoading(false);
-    }
-  };
   
   // Function to load the cached transaction count
   const checkCachedCount = async () => {
@@ -128,9 +79,6 @@ const CacheStats: React.FC<CacheStatsProps> = ({ onRefresh, isLoading, startDate
       // Set count to 0 and trigger a refresh
       setCachedCount(0);
       onRefresh(); // Refresh to fetch fresh data
-      
-      // Also update the global date range
-      fetchGlobalDateRange();
     } catch (err) {
       console.error("Error clearing cache:", err);
       toast({
@@ -150,12 +98,6 @@ const CacheStats: React.FC<CacheStatsProps> = ({ onRefresh, isLoading, startDate
     if (hitRateNum >= 80) return "default"; // Changed from "success" to "default"
     if (hitRateNum >= 50) return "default";
     return "secondary";
-  };
-
-  // Format dates for display
-  const formatDate = (dateString: string | null): string => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString();
   };
 
   return (
@@ -189,10 +131,7 @@ const CacheStats: React.FC<CacheStatsProps> = ({ onRefresh, isLoading, startDate
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => {
-                onRefresh();
-                fetchGlobalDateRange();
-              }}
+              onClick={onRefresh}
               disabled={isLoading || isCacheLoading}
               className="h-8 px-2"
             >
@@ -236,22 +175,6 @@ const CacheStats: React.FC<CacheStatsProps> = ({ onRefresh, isLoading, startDate
             <span className="font-mono">{stats.lastRefreshRelative}</span>
           </div>
         </div>
-        
-        {/* Global cache date range */}
-        {globalDateRange && (
-          <div className="flex items-center mt-3 text-xs bg-blue-50 p-2 rounded">
-            <Calendar className="h-3.5 w-3.5 mr-1 text-blue-600" />
-            <div className="flex-grow">
-              <span className="font-medium">Total cached date range:</span>{' '}
-              <span className="ml-1">
-                {formatDate(globalDateRange.earliestDate)} - {formatDate(globalDateRange.latestDate)}
-              </span>
-              <span className="ml-2 text-blue-700 font-medium">
-                ({globalDateRange.transactionCount} transactions)
-              </span>
-            </div>
-          </div>
-        )}
         
         {/* Current range cache status */}
         {startDate && endDate && (

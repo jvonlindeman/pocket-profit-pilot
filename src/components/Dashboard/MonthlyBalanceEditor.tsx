@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { MonthlyBalance } from '@/types/financial';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription } from '@/components/ui/form';
 import { useForm } from 'react-hook-form';
@@ -21,10 +22,6 @@ interface MonthlyBalanceEditorProps {
 const formSchema = z.object({
   balance: z.coerce.number().min(0, "El saldo debe ser mayor o igual a 0"),
   notes: z.string().optional(),
-  stripeOverride: z.preprocess(
-    (val) => (val === "" ? null : Number(val)),
-    z.number().min(0, "El valor debe ser mayor o igual a 0").nullable()
-  )
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -39,7 +36,6 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
     defaultValues: {
       balance: 0,
       notes: '',
-      stripeOverride: null
     },
   });
 
@@ -47,42 +43,36 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
   const {
     loading,
     error,
-    balance,
-    notes,
-    stripeOverride,
-    saveBalance,
     monthlyBalance,
+    updateMonthlyBalance,
+    currentMonthYear,
   } = useMonthlyBalance({ currentDate });
 
   // Update form values when data is loaded
   useEffect(() => {
-    if (balance !== null) {
-      console.log('MonthlyBalanceEditor: updating form with balance:', balance);
+    if (monthlyBalance) {
       form.reset({
-        balance: balance,
-        notes: notes || '',
-        stripeOverride: stripeOverride
+        balance: monthlyBalance.balance,
+        notes: monthlyBalance.notes || '',
       });
       
       // Notify parent component if needed
       if (onBalanceChange) {
-        console.log('MonthlyBalanceEditor: notifying parent of balance:', balance);
-        onBalanceChange(balance);
+        onBalanceChange(monthlyBalance.balance);
       }
     }
-  }, [balance, notes, stripeOverride, form, onBalanceChange]);
+  }, [monthlyBalance, form, onBalanceChange]);
 
   // Format month name in Spanish
   const formattedMonth = format(currentDate, 'MMMM yyyy', { locale: es });
   const capitalizedMonth = formattedMonth.charAt(0).toUpperCase() + formattedMonth.slice(1);
 
   // Handle form submission
-  const onSubmit = async (data: FormValues) => {
-    console.log('MonthlyBalanceEditor: saving balance:', data.balance);
-    const success = await saveBalance(data.balance, data.notes, data.stripeOverride);
+  const onSubmit = (data: FormValues) => {
+    updateMonthlyBalance(data.balance, data.notes);
     
-    if (success && onBalanceChange) {
-      console.log('MonthlyBalanceEditor: notifying parent of new balance:', data.balance);
+    // Notify parent component if needed
+    if (onBalanceChange) {
       onBalanceChange(data.balance);
     }
   };
@@ -119,33 +109,6 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
             
             <FormField
               control={form.control}
-              name="stripeOverride"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Anular Ingreso de Stripe ($)</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="number" 
-                      step="0.01" 
-                      placeholder="Dejar en blanco para usar datos automáticos" 
-                      {...field}
-                      value={field.value === null ? '' : field.value}
-                      onChange={(e) => {
-                        const value = e.target.value === '' ? null : parseFloat(e.target.value);
-                        field.onChange(value);
-                      }}
-                      disabled={loading}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Opcional: Anula el valor automático de Stripe para este mes
-                  </FormDescription>
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
               name="notes"
               render={({ field }) => (
                 <FormItem>
@@ -166,7 +129,7 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
               className="w-full"
               disabled={loading}
             >
-              {balance !== null ? 'Actualizar Balance' : 'Guardar Balance'}
+              {monthlyBalance ? 'Actualizar Balance' : 'Guardar Balance'}
             </Button>
           </form>
         </Form>

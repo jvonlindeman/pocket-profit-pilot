@@ -13,49 +13,13 @@ interface ProfitAnalysisProps {
 }
 
 const ProfitAnalysis: React.FC<ProfitAnalysisProps> = ({ monthlyData }) => {
-  // Ensure we have valid data before trying to map it
-  if (!monthlyData || 
-      !monthlyData.income || 
-      !monthlyData.income.labels || 
-      !Array.isArray(monthlyData.income.labels) || 
-      monthlyData.income.labels.length === 0) {
-    // Return a placeholder when data is not available
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Análisis de Rentabilidad Mensual (USD)</CardTitle>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center h-[350px] bg-gray-50">
-          <p className="text-gray-500">No hay datos suficientes para mostrar el gráfico</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Now we can safely prepare chart data
-  const chartData = monthlyData.income.labels.map((label, index) => {
-    // Make sure all values are numbers with fallbacks to 0
-    const incomeValue = monthlyData.income.values && Array.isArray(monthlyData.income.values) && 
-                        index < monthlyData.income.values.length ? 
-                        Number(monthlyData.income.values[index] || 0) : 0;
-    
-    const expenseValue = monthlyData.expense && monthlyData.expense.values && 
-                         Array.isArray(monthlyData.expense.values) && 
-                         index < monthlyData.expense.values.length ? 
-                         Number(monthlyData.expense.values[index] || 0) : 0;
-    
-    const profitValue = monthlyData.profit && monthlyData.profit.values && 
-                        Array.isArray(monthlyData.profit.values) && 
-                        index < monthlyData.profit.values.length ? 
-                        Number(monthlyData.profit.values[index] || 0) : 0;
-    
-    return {
-      name: label || `Month ${index + 1}`,
-      ingresos: incomeValue,
-      gastos: expenseValue,
-      beneficio: profitValue
-    };
-  });
+  // Preparamos los datos para el gráfico
+  const chartData = monthlyData.income.labels.map((label, index) => ({
+    name: label,
+    ingresos: monthlyData.income.values[index],
+    gastos: monthlyData.expense.values[index],
+    beneficio: monthlyData.profit.values[index]
+  }));
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {

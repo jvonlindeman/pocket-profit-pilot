@@ -9,55 +9,10 @@ interface ExpenseChartProps {
 }
 
 const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenseData }) => {
-  // Debug logging to verify data
-  console.log('💸 ExpenseChart received data:', expenseData);
-  
-  // Safety check for the entire expense data array
-  if (!expenseData || !Array.isArray(expenseData) || expenseData.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Distribución de Gastos (USD)</CardTitle>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center h-[250px] bg-gray-50">
-          <p className="text-gray-500">No hay datos suficientes para mostrar el gráfico</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Make a defensive copy of the data and ensure all required properties exist
-  const safeExpenseData = expenseData.map(item => ({
-    category: item.category || 'Sin categoría',
-    amount: typeof item.amount === 'number' ? item.amount : 0,
-    percentage: typeof item.percentage === 'number' ? item.percentage : 0
-  }));
-
-  // Filtramos los pagos a colaboradores de los datos - updated to catch all variations
-  const filteredExpenseData = safeExpenseData.filter(item => {
-    const category = (item.category || '').toLowerCase();
-    return !(
-      category === 'pagos a colaboradores' || 
-      category === 'colaboradores' || 
-      category === 'collaborators' ||
-      category.includes('colaborador') ||
-      category.includes('collaborator')
-    );
-  });
-
-  // Safety check for filtered data
-  if (filteredExpenseData.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Distribución de Gastos (USD)</CardTitle>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center h-[250px] bg-gray-50">
-          <p className="text-gray-500">No hay gastos distintos a pagos a colaboradores para mostrar</p>
-        </CardContent>
-      </Card>
-    );
-  }
+  // Filtramos los pagos a colaboradores de los datos
+  const filteredExpenseData = expenseData.filter(item => 
+    item.category.toLowerCase() !== 'pagos a colaboradores'
+  );
 
   // Colores personalizados según categorías
   const getCategoryColor = (category: string) => {
@@ -68,16 +23,14 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenseData }) => {
       'default': '#95a5a6'
     };
 
-    return colors[(category || '').toLowerCase()] || colors.default;
+    return colors[category.toLowerCase()] || colors.default;
   };
 
-  // Preparamos datos para el gráfico with safety checks for percentage
+  // Preparamos datos para el gráfico
   const chartData = filteredExpenseData.map((item) => ({
     name: item.category,
     value: item.amount,
-    percentage: item.percentage !== undefined && !isNaN(item.percentage) 
-      ? item.percentage.toFixed(1) + '%' 
-      : '0.0%'
+    percentage: item.percentage.toFixed(1) + '%'
   }));
 
   // Formateo de moneda (ahora en USD)
@@ -90,12 +43,12 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenseData }) => {
 
   // Renderizado personalizado para el tooltip
   const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length && payload[0]) {
+    if (active && payload && payload.length) {
       return (
         <div className="bg-white p-3 shadow-md rounded-md border border-gray-100">
           <p className="text-sm font-medium">{payload[0].name}</p>
           <p className="text-sm">{formatCurrency(payload[0].value)}</p>
-          <p className="text-sm text-gray-500">{payload[0].payload?.percentage || '0.0%'}</p>
+          <p className="text-sm text-gray-500">{payload[0].payload.percentage}</p>
         </div>
       );
     }
@@ -131,7 +84,7 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenseData }) => {
                 align="right"
                 formatter={(value, entry, index) => {
                   const item = chartData[index];
-                  return <span className="text-sm">{value} ({item?.percentage || '0.0%'})</span>;
+                  return <span className="text-sm">{value} ({item.percentage})</span>;
                 }}
               />
             </PieChart>

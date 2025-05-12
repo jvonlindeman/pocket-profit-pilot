@@ -10,13 +10,38 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
-import { formatDate, formatCurrency } from '@/lib/date-utils';
 
 interface IncomeTransactionsProps {
   transactions: Transaction[];
 }
 
 const IncomeTransactions: React.FC<IncomeTransactionsProps> = ({ transactions }) => {
+  // Format date
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      
+      // Check if the date is valid
+      if (isNaN(date.getTime())) {
+        console.error(`Invalid date string: ${dateString}`);
+        return 'Invalid date';
+      }
+      
+      return new Intl.DateTimeFormat('es-ES').format(date);
+    } catch (error) {
+      console.error(`Error formatting date: ${dateString}`, error);
+      return 'Invalid date';
+    }
+  };
+
+  // Format currency
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
+  };
+
   // Calculate total income
   const totalIncome = transactions.reduce((sum, tx) => sum + tx.amount, 0);
 

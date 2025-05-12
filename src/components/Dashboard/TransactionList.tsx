@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Transaction } from '@/types/financial';
 import {
   Card,
@@ -14,7 +14,6 @@ import ExpenseTransactions from './Transactions/ExpenseTransactions';
 import CollaboratorTransactions from './Transactions/CollaboratorTransactions';
 import CacheStats from './CacheStats';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatCurrency } from '@/utils/financialUtils';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -31,12 +30,6 @@ const TransactionList: React.FC<TransactionListProps> = ({
   startDate,
   endDate
 }) => {
-  // Debug render information
-  useEffect(() => {
-    console.log('TransactionList rendered with', transactions.length, 'transactions', 
-      isLoading ? '(loading)' : '(not loading)');
-  }, [transactions, isLoading]);
-  
   // Filter transactions by type
   const incomeTransactions = transactions.filter(tx => tx.type === 'income');
   const expenseTransactions = transactions.filter(tx => 
@@ -65,13 +58,6 @@ const TransactionList: React.FC<TransactionListProps> = ({
   const incomeCount = incomeTransactions.length;
   const expenseCount = expenseTransactions.length;
   const collaboratorCount = collaboratorTransactions.length;
-  
-  console.log('Transaction counts:', {
-    total: transactions.length,
-    income: incomeCount,
-    expense: expenseCount,
-    collaborator: collaboratorCount
-  });
 
   return (
     <>
@@ -145,6 +131,14 @@ const TransactionList: React.FC<TransactionListProps> = ({
       </Card>
     </>
   );
+};
+
+// Format currency helper function
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD'
+  }).format(amount);
 };
 
 export default TransactionList;

@@ -27,29 +27,9 @@ const normalizeType = (type: string): 'income' | 'expense' => {
 
 // Helper to create a date range key for caching
 const createDateRangeKey = (startDate: Date, endDate: Date): string => {
-  const start = formatDateYYYYMMDD(startDate);
-  const end = formatDateYYYYMMDD(endDate);
+  const start = startDate.toISOString().split('T')[0];
+  const end = endDate.toISOString().split('T')[0];
   return `${start}_${end}`;
-};
-
-// Format date in YYYY-MM-DD format without timezone shifts
-const formatDateYYYYMMDD = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-// Fix date to ensure it's in the correct year
-const fixDateYear = (date: Date): Date => {
-  const currentYear = new Date().getFullYear();
-  if (date.getFullYear() > currentYear) {
-    const correctedDate = new Date(date);
-    correctedDate.setFullYear(currentYear);
-    console.log(`ZohoService: Corrected future date from ${date.toISOString()} to ${correctedDate.toISOString()}`);
-    return correctedDate;
-  }
-  return date;
 };
 
 // Implementation that connects to Zoho Books API via make.com webhook
@@ -60,41 +40,24 @@ const ZohoService = {
       console.log("ZohoService: Getting transactions for", startDate, "to", endDate, 
         forceRefresh ? "with force refresh" : "using cache if available");
       
-      // Fix any dates that might be in the wrong year
-      startDate = fixDateYear(startDate);
-      endDate = fixDateYear(endDate);
-      
       // Track the requested date range to know if we've fetched it before
       const rangeKey = createDateRangeKey(startDate, endDate);
       
-      // Format dates for logging - explicit format to avoid timezone issues
-      const formattedStartDate = formatDateYYYYMMDD(startDate);
-      const formattedEndDate = formatDateYYYYMMDD(endDate);
-      
-      console.log(`ZohoService: Formatted dates for cache lookup: ${formattedStartDate} to ${formattedEndDate}`);
-      
       // First check if we have cached transactions in the database
       if (!forceRefresh) {
+        // Format dates for DB query
+        const formattedStartDate = startDate.toISOString().split('T')[0];
+        const formattedEndDate = endDate.toISOString().split('T')[0];
+        
         try {
-          // Add more debugging for cache lookup
-          console.log(`ZohoService: Querying cache for date range ${formattedStartDate} to ${formattedEndDate}`);
-          
           const { data: cachedTransactions, error } = await supabase
             .from("cached_transactions")
             .select("*")
             .gte("date", formattedStartDate)
             .lte("date", formattedEndDate);
           
-          if (error) {
-            console.error("ZohoService: Error querying cache:", error);
-          }
-          
           if (!error && cachedTransactions && cachedTransactions.length > 0) {
             console.log(`ZohoService: Found ${cachedTransactions.length} cached transactions in database`);
-            
-            // Additional logging for date coverage
-            const dateSet = new Set(cachedTransactions.map(tx => tx.date));
-            console.log(`ZohoService: Cache covers ${dateSet.size} unique dates: ${Array.from(dateSet).slice(0, 10).join(', ')}${dateSet.size > 10 ? '...' : ''}`);
             
             // Check if the data is recent enough based on the date range
             const currentMonth = new Date().getMonth() === startDate.getMonth() && 
@@ -112,19 +75,6 @@ const ZohoService = {
             const cacheAgeHours = cacheAge / (1000 * 60 * 60);
             
             console.log(`ZohoService: Cache age: ${cacheAgeHours.toFixed(2)} hours, freshness threshold: ${maxHoursOld} hours`);
-            
-            // Count transactions by month to verify coverage
-            const monthCounts: Record<string, number> = {};
-            cachedTransactions.forEach(tx => {
-              const monthYear = tx.date.substring(0, 7); // YYYY-MM
-              monthCounts[monthYear] = (monthCounts[monthYear] || 0) + 1;
-            });
-            console.log("ZohoService: Cache distribution by month:", monthCounts);
-            
-            // Check start and end date coverage specifically
-            const hasStartDate = cachedTransactions.some(tx => tx.date === formattedStartDate);
-            const hasEndDate = cachedTransactions.some(tx => tx.date === formattedEndDate);
-            console.log(`ZohoService: Cache coverage at boundaries - Has start date: ${hasStartDate}, Has end date: ${hasEndDate}`);
             
             if (cacheAgeHours < maxHoursOld) {
               // Cache is fresh, use it
@@ -203,7 +153,7 @@ const ZohoService = {
       cacheStats.misses++;
       cacheStats.lastRefresh = new Date();
       
-      // Call the API client with the returnRawResponse option - pass explicitly formatted dates
+      // Call the API client with the returnRawResponse option
       console.log("ZohoService: Fetching from API");
       const response = await fetchTransactionsFromWebhook(startDate, endDate, forceRefresh, true);
       
@@ -215,32 +165,6 @@ const ZohoService = {
       // If this was successful, record the date range as cached
       if (response && !response.error) {
         cacheStats.cachedRanges[rangeKey] = new Date();
-      }
-      
-      // Check if we got a partial refresh response
-      if (response && response.partialRefresh) {
-        console.log("ZohoService: Received partial refresh response");
-        lastRawResponse = {
-          ...response,
-          partialRefresh: true
-        };
-        
-        // Process the response based on its format
-        if (response.data && Array.isArray(response.data)) {
-          console.log(`ZohoService: Using ${response.data.length} transactions from partial refresh response`);
-          
-          const normalizedTransactions: Transaction[] = response.data.map(tx => ({
-            id: tx.id,
-            date: tx.date,
-            amount: Number(tx.amount),
-            description: tx.description || '',
-            category: tx.category,
-            source: normalizeSource(tx.source),
-            type: normalizeType(tx.type)
-          }));
-          
-          return normalizedTransactions;
-        }
       }
       
       // Process the response based on its format
@@ -307,8 +231,8 @@ const ZohoService = {
       
       // Try to get transactions from cache as fallback
       try {
-        const formattedStartDate = formatDateYYYYMMDD(startDate);
-        const formattedEndDate = formatDateYYYYMMDD(endDate);
+        const formattedStartDate = startDate.toISOString().split('T')[0];
+        const formattedEndDate = endDate.toISOString().split('T')[0];
         
         const { data: fallbackCache } = await supabase
           .from("cached_transactions")
@@ -342,10 +266,6 @@ const ZohoService = {
   // Force refresh transactions and bypass cache
   forceRefresh: async (startDate: Date, endDate: Date): Promise<Transaction[]> => {
     console.log("ZohoService: Force refreshing transactions from", startDate, "to", endDate);
-    
-    // Fix any dates that might be in the wrong year
-    startDate = fixDateYear(startDate);
-    endDate = fixDateYear(endDate);
     
     // Track the requested date range as freshly cached
     const rangeKey = createDateRangeKey(startDate, endDate);
@@ -452,22 +372,9 @@ const ZohoService = {
     try {
       console.log(`ZohoService: Clearing cache for date range ${startDate.toISOString()} to ${endDate.toISOString()}`);
       
-      // Fix any dates that might be in the wrong year
-      startDate = fixDateYear(startDate);
-      endDate = fixDateYear(endDate);
-      
       // Format dates for DB query
-      const formattedStartDate = formatDateYYYYMMDD(startDate);
-      const formattedEndDate = formatDateYYYYMMDD(endDate);
-      
-      // Check how many transactions we're about to delete
-      const { count: beforeCount } = await supabase
-        .from("cached_transactions")
-        .select("*", { count: 'exact', head: true })
-        .gte("date", formattedStartDate)
-        .lte("date", formattedEndDate);
-        
-      console.log(`ZohoService: Found ${beforeCount || 0} transactions to delete in range`);
+      const formattedStartDate = startDate.toISOString().split('T')[0];
+      const formattedEndDate = endDate.toISOString().split('T')[0];
       
       // Delete all transactions in the date range
       const { error } = await supabase
@@ -481,20 +388,11 @@ const ZohoService = {
         return false;
       }
       
-      // Check if delete was successful
-      const { count: afterCount } = await supabase
-        .from("cached_transactions")
-        .select("*", { count: 'exact', head: true })
-        .gte("date", formattedStartDate)
-        .lte("date", formattedEndDate);
-        
-      const deletedCount = (beforeCount || 0) - (afterCount || 0);
-      
       // Remove from tracking
       const rangeKey = createDateRangeKey(startDate, endDate);
       delete cacheStats.cachedRanges[rangeKey];
       
-      console.log(`ZohoService: Successfully cleared cache for range ${formattedStartDate} to ${formattedEndDate}, removed ${deletedCount} transactions`);
+      console.log(`ZohoService: Successfully cleared cache for range ${formattedStartDate} to ${formattedEndDate}`);
       return true;
     } catch (error) {
       console.error("ZohoService: Error in clearCacheForDateRange", error);
@@ -505,20 +403,12 @@ const ZohoService = {
   // Check for stale cache and refresh if needed
   checkAndRefreshCache: async (startDate: Date, endDate: Date): Promise<void> => {
     try {
-      // Fix any dates that might be in the wrong year
-      startDate = fixDateYear(startDate);
-      endDate = fixDateYear(endDate);
-      
-      // Format dates for DB query
-      const formattedStartDate = formatDateYYYYMMDD(startDate);
-      const formattedEndDate = formatDateYYYYMMDD(endDate);
-      
       // Get cached data for the date range
       const { data: cachedTransactions } = await supabase
         .from("cached_transactions")
         .select("sync_date")
-        .gte("date", formattedStartDate)
-        .lte("date", formattedEndDate)
+        .gte("date", startDate.toISOString().split('T')[0])
+        .lte("date", endDate.toISOString().split('T')[0])
         .order('sync_date', { ascending: false })
         .limit(1);
       
@@ -543,8 +433,6 @@ const ZohoService = {
               .then(() => console.log("ZohoService: Background cache refresh completed"))
               .catch(err => console.error("ZohoService: Background cache refresh failed", err));
           }, 100);
-        } else {
-          console.log(`ZohoService: Cache is fresh (less than ${refreshThresholdHours} hours old)`);
         }
       } else {
         // No cached data, do an immediate refresh
@@ -563,16 +451,9 @@ const ZohoService = {
   // Get count of transactions in database for a specific date range
   getCachedTransactionCount: async (startDate: Date, endDate: Date): Promise<number> => {
     try {
-      // Fix any dates that might be in the wrong year
-      startDate = fixDateYear(startDate);
-      endDate = fixDateYear(endDate);
-      
       // Format dates for DB query
-      const formattedStartDate = formatDateYYYYMMDD(startDate);
-      const formattedEndDate = formatDateYYYYMMDD(endDate);
-      
-      // Also log dates to help debug any formatting issues
-      console.log(`ZohoService: Checking cached count for range ${formattedStartDate} to ${formattedEndDate}`);
+      const formattedStartDate = startDate.toISOString().split('T')[0];
+      const formattedEndDate = endDate.toISOString().split('T')[0];
       
       const { count, error } = await supabase
         .from("cached_transactions")
@@ -585,52 +466,9 @@ const ZohoService = {
         return 0;
       }
       
-      console.log(`ZohoService: Found ${count || 0} cached transactions in range`);
       return count || 0;
     } catch (error) {
       console.error("ZohoService: Error in getCachedTransactionCount", error);
-      return 0;
-    }
-  },
-  
-  // Debug: Find and remove transactions with future years
-  cleanupFutureDates: async (): Promise<number> => {
-    try {
-      const currentYear = new Date().getFullYear();
-      const futureYearPrefix = `${currentYear + 1}`;
-      
-      // Count transactions with future years
-      const { count, error: countError } = await supabase
-        .from("cached_transactions")
-        .select("*", { count: 'exact', head: true })
-        .like("date", `${futureYearPrefix}-%`);
-        
-      if (countError) {
-        console.error("ZohoService: Error counting future transactions", countError);
-        return 0;
-      }
-      
-      console.log(`ZohoService: Found ${count || 0} transactions with future year ${futureYearPrefix}`);
-      
-      if (count && count > 0) {
-        // Delete transactions with future years
-        const { error: deleteError } = await supabase
-          .from("cached_transactions")
-          .delete()
-          .like("date", `${futureYearPrefix}-%`);
-          
-        if (deleteError) {
-          console.error("ZohoService: Error deleting future transactions", deleteError);
-          return 0;
-        }
-        
-        console.log(`ZohoService: Successfully deleted ${count} transactions with future year ${futureYearPrefix}`);
-        return count;
-      }
-      
-      return 0;
-    } catch (error) {
-      console.error("ZohoService: Error in cleanupFutureDates", error);
       return 0;
     }
   }

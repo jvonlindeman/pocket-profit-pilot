@@ -11,50 +11,17 @@ interface RevenueChartProps {
 }
 
 const RevenueChart: React.FC<RevenueChartProps> = ({ incomeData, expenseData, stripeData }) => {
-  // Add safety check before processing data
-  if (!incomeData || 
-      !incomeData.labels || 
-      !Array.isArray(incomeData.labels) || 
-      incomeData.labels.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Evolución de Ingresos y Gastos (USD)</CardTitle>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center h-[350px] bg-gray-50">
-          <p className="text-gray-500">No hay datos suficientes para mostrar el gráfico</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Safely prepare chart data with strong type checks and fallbacks
+  // Preparamos los datos para el gráfico
   const chartData = incomeData.labels.map((label, index) => {
-    // Make sure all values exist and are valid numbers
-    const stripeValue = stripeData && 
-                        stripeData.values && 
-                        Array.isArray(stripeData.values) && 
-                        index < stripeData.values.length ? 
-                          Number(stripeData.values[index] || 0) : 0;
-                          
-    const regularIncome = incomeData.values && 
-                          Array.isArray(incomeData.values) && 
-                          index < incomeData.values.length ? 
-                            Number(incomeData.values[index] || 0) : 0;
-                            
-    const expense = expenseData && 
-                    expenseData.values && 
-                    Array.isArray(expenseData.values) && 
-                    index < expenseData.values.length ? 
-                      Number(expenseData.values[index] || 0) : 0;
-    
+    const stripeValue = stripeData && stripeData.values.length > index ? stripeData.values[index] : 0;
+    const regularIncome = incomeData.values[index];
     return {
-      name: label || `Day ${index + 1}`,
+      name: label,
       ingresos_regulares: regularIncome,
       stripe: stripeValue,
       ingresos_totales: regularIncome + stripeValue,
-      gastos: expense,
-      beneficio: (regularIncome + stripeValue) - expense
+      gastos: expenseData.values[index],
+      beneficio: (regularIncome + stripeValue) - expenseData.values[index]
     };
   });
 

@@ -52,7 +52,6 @@ export type Database = {
           id: number
           month_year: string
           notes: string | null
-          stripe_override: number | null
           updated_at: string
         }
         Insert: {
@@ -61,7 +60,6 @@ export type Database = {
           id?: number
           month_year: string
           notes?: string | null
-          stripe_override?: number | null
           updated_at?: string
         }
         Update: {
@@ -70,7 +68,6 @@ export type Database = {
           id?: number
           month_year?: string
           notes?: string | null
-          stripe_override?: number | null
           updated_at?: string
         }
         Relationships: []
