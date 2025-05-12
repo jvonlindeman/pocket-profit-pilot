@@ -41,11 +41,7 @@ export const useCacheManagement = () => {
           cachedCount: statusData.stats.cached_count || statusData.stats.cachedCount || 0,
           newCount: statusData.stats.new_count || statusData.stats.newCount || 0,
           totalCount: statusData.stats.total_count || statusData.stats.totalCount || 0,
-          isFresh: statusData.stats.isFresh,
-          fullCoverage: statusData.stats.fullCoverage,
-          partialRefreshAttempted: statusData.stats.partialRefreshAttempted,
-          partialRefreshSuccess: statusData.stats.partialRefreshSuccess,
-          cachedDateRange: statusData.stats.cachedDateRange
+          lastRefresh: statusData.stats.lastRefresh
         } : prevStatus.stats,
         lastRefresh: now,
         refreshAttempts: (prevStatus.refreshAttempts || 0) + 1,

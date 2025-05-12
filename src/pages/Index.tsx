@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 import { useToast } from '@/hooks/use-toast';
@@ -38,7 +38,8 @@ const Index = () => {
     partialRefresh,
     cacheStats,
     stripeOverride,
-    startingBalance
+    startingBalance,
+    initialLoadAttempted
   } = useFinanceData();
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
@@ -57,17 +58,23 @@ const Index = () => {
 
   // Título del periodo
   const periodTitle = `${formatDateForTitle(dateRange.startDate)} - ${formatDateForTitle(dateRange.endDate)}`;
+  
+  // Check if we should show welcome banner
+  const shouldShowWelcome = !dataInitialized && !initialLoadAttempted;
 
   // Manejador para cargar datos iniciales
   const handleInitialLoad = async () => {
+    console.log('💫 handleInitialLoad called, checking balance exists');
     // Check if we need to set the initial balance first
     const balanceExists = await checkBalanceExists();
     
     if (!balanceExists) {
       // Show dialog to set initial balance
+      console.log('💰 No initial balance found, showing dialog');
       setShowBalanceDialog(true);
     } else {
       // Balance already exists, just load data
+      console.log('💰 Initial balance exists, loading data');
       toast({
         title: 'Cargando datos financieros',
         description: 'Obteniendo datos de Zoho Books y Stripe',
@@ -148,6 +155,18 @@ const Index = () => {
     return { labels: [], values: [] };
   };
 
+  // Add debug logs to track user interaction and component state
+  useEffect(() => {
+    console.log('🔄 Index component state:', { 
+      dataInitialized, 
+      loading, 
+      error, 
+      showBalanceDialog,
+      initialLoadAttempted,
+      shouldShowWelcome
+    });
+  }, [dataInitialized, loading, error, showBalanceDialog, initialLoadAttempted]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Dialog to set initial balance */}
@@ -169,11 +188,11 @@ const Index = () => {
 
       {/* Contenido principal */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {!dataInitialized && (
+        {shouldShowWelcome && (
           <WelcomeBanner handleInitialLoad={handleInitialLoad} />
         )}
         
-        {loading && (
+        {loading && !dataInitialized && (
           <LoadingIndicator />
         )}
         

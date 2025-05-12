@@ -20,7 +20,7 @@ interface CacheStatusDisplayProps {
   lastRefresh: Date | null;
   onRefreshClick: () => void;
   isRefreshing: boolean;
-  refreshCount?: number; // Made optional
+  refreshCount?: number;
 }
 
 export const CacheStatusDisplay: React.FC<CacheStatusDisplayProps> = ({

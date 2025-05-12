@@ -59,6 +59,8 @@ export const useFinanceData = () => {
   
   const { syncBalance } = useBalanceSync();
   
+  // Ref to track if initial load was attempted
+  const initialLoadAttemptedRef = useRef<boolean>(false);
   // Track data initialization to prevent attempting to refresh before ready
   const wasInitializedRef = useRef<boolean>(false);
   // Track current data range to avoid unnecessary refreshes
@@ -79,6 +81,10 @@ export const useFinanceData = () => {
   
   // Main function to fetch and process financial data
   const refreshData = useCallback(async (forceRefresh: boolean = false) => {
+    console.log('🔄 refreshData called with forceRefresh =', forceRefresh, 
+               'initialLoadAttemptedRef =', initialLoadAttemptedRef.current);
+    initialLoadAttemptedRef.current = true;
+    
     return await loadFinancialData(
       dateRange,
       isDateInRange,
@@ -123,7 +129,7 @@ export const useFinanceData = () => {
     return handleEmergencyRecovery(resetErrorState);
   }, [handleEmergencyRecovery, resetErrorState]);
 
-  // Update data when date range changes
+  // Update data when date range changes, but only if already initialized
   useEffect(() => {
     if (dataInitialized) {
       console.log('📅 Date range changed, refreshing data:', { dateRange });
@@ -131,9 +137,13 @@ export const useFinanceData = () => {
     }
   }, [dateRange, dataInitialized, refreshData]);
 
-  // Separate effect for debugging initialization state
+  // Log initialization state for debugging
   useEffect(() => {
-    console.log('🔍 Finance data component mounted or data initialized state changed:', { dataInitialized });
+    console.log('🔍 Finance data component mounted or data initialized state changed:', { 
+      dataInitialized,
+      initialLoadAttempted: initialLoadAttemptedRef.current,
+      wasInitialized: wasInitializedRef.current
+    });
     
     // Initial data load if not already initialized
     if (dataInitialized && !wasInitializedRef.current) {
@@ -187,6 +197,7 @@ export const useFinanceData = () => {
     
     // Status information
     isRefreshing,
+    initialLoadAttempted: initialLoadAttemptedRef.current,
     
     // Error information
     lastError,
