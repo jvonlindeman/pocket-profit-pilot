@@ -39,6 +39,13 @@ export const CacheStatusDisplay: React.FC<CacheStatusDisplayProps> = ({
     ? formatDistanceToNow(new Date(lastRefresh), { addSuffix: true, locale: es }) 
     : "Nunca";
   
+  // Handler with anti-bounce protection
+  const handleRefreshClick = () => {
+    if (!isRefreshing) {
+      onRefreshClick();
+    }
+  };
+  
   return (
     <Card className="shadow-sm">
       <CardHeader className="pb-2">
@@ -61,7 +68,7 @@ export const CacheStatusDisplay: React.FC<CacheStatusDisplayProps> = ({
             size="sm" 
             variant="outline" 
             className="flex items-center" 
-            onClick={onRefreshClick}
+            onClick={handleRefreshClick}
             disabled={isRefreshing}
           >
             <RefreshCw className={`h-3.5 w-3.5 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />

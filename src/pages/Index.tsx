@@ -44,6 +44,7 @@ const Index = () => {
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
+  const [localLoading, setLocalLoading] = useState(false); // Add local loading state
   const { checkBalanceExists } = useMonthlyBalance({ currentDate: dateRange.startDate });
   const { toast } = useToast();
 
@@ -64,62 +65,134 @@ const Index = () => {
 
   // Manejador para cargar datos iniciales
   const handleInitialLoad = async () => {
-    console.log('💫 handleInitialLoad called, checking balance exists');
-    // Check if we need to set the initial balance first
-    const balanceExists = await checkBalanceExists();
+    // If already loading, prevent duplicate loads
+    if (loading || localLoading) {
+      console.log('💫 Initial load already in progress, skipping duplicate request');
+      return;
+    }
     
-    if (!balanceExists) {
-      // Show dialog to set initial balance
-      console.log('💰 No initial balance found, showing dialog');
-      setShowBalanceDialog(true);
-    } else {
-      // Balance already exists, just load data
-      console.log('💰 Initial balance exists, loading data');
+    console.log('💫 handleInitialLoad called, checking balance exists');
+    
+    // Set local loading state
+    setLocalLoading(true);
+    
+    try {
+      // Check if we need to set the initial balance first
+      const balanceExists = await checkBalanceExists();
+      
+      if (!balanceExists) {
+        // Show dialog to set initial balance
+        console.log('💰 No initial balance found, showing dialog');
+        setShowBalanceDialog(true);
+      } else {
+        // Balance already exists, just load data
+        console.log('💰 Initial balance exists, loading data');
+        toast({
+          title: 'Cargando datos financieros',
+          description: 'Obteniendo datos de Zoho Books y Stripe',
+        });
+        await refreshData(false); // Use cache when available
+      }
+    } catch (error) {
+      console.error('Error in handleInitialLoad:', error);
       toast({
-        title: 'Cargando datos financieros',
-        description: 'Obteniendo datos de Zoho Books y Stripe',
+        title: 'Error',
+        description: 'Ocurrió un error al cargar los datos iniciales',
+        variant: 'destructive'
       });
-      refreshData(false); // Use cache when available
+    } finally {
+      setLocalLoading(false);
     }
   };
 
   // Handle balance saved in dialog
-  const handleBalanceSaved = () => {
-    toast({
-      title: 'Balance inicial guardado',
-      description: 'Cargando datos financieros...',
-    });
-    refreshData(false); // Use cache when available
+  const handleBalanceSaved = async () => {
+    // Set local loading state
+    setLocalLoading(true);
+    
+    try {
+      toast({
+        title: 'Balance inicial guardado',
+        description: 'Cargando datos financieros...',
+      });
+      await refreshData(false); // Use cache when available
+    } catch (error) {
+      console.error('Error in handleBalanceSaved:', error);
+    } finally {
+      setLocalLoading(false);
+    }
   };
 
   // Manejador para actualizar datos
-  const handleRefresh = () => {
-    console.log("Standard refresh requested (will use cache if available)");
-    toast({
-      title: 'Actualizando datos',
-      description: 'Obteniendo datos más recientes...',
-    });
-    refreshData(false); // Use the cache when available
+  const handleRefresh = async () => {
+    // If already loading, prevent duplicate loads
+    if (loading || localLoading) {
+      console.log('💫 Refresh already in progress, skipping duplicate request');
+      return;
+    }
+    
+    setLocalLoading(true);
+    
+    try {
+      console.log("Standard refresh requested (will use cache if available)");
+      toast({
+        title: 'Actualizando datos',
+        description: 'Obteniendo datos más recientes...',
+      });
+      await refreshData(false); // Use the cache when available
+    } catch (error) {
+      console.error('Error in handleRefresh:', error);
+    } finally {
+      setLocalLoading(false);
+    }
   };
 
   // Manejador para forzar actualización desde API
-  const handleForceRefresh = () => {
-    console.log("Force refresh requested (bypassing cache)");
-    toast({
-      title: 'Forzando actualización',
-      description: 'Obteniendo datos directamente de la API...',
-    });
-    refreshData(true); // Force refresh from API
+  const handleForceRefresh = async () => {
+    // If already loading, prevent duplicate loads
+    if (loading || localLoading) {
+      console.log('💫 Force refresh already in progress, skipping duplicate request');
+      return;
+    }
+    
+    setLocalLoading(true);
+    
+    try {
+      console.log("Force refresh requested (bypassing cache)");
+      toast({
+        title: 'Forzando actualización',
+        description: 'Obteniendo datos directamente de la API...',
+      });
+      await refreshData(true); // Force refresh from API
+    } catch (error) {
+      console.error('Error in handleForceRefresh:', error);
+    } finally {
+      setLocalLoading(false);
+    }
   };
 
   // Manejador para limpiar caché y forzar actualización
-  const handleClearCacheAndRefresh = () => {
-    console.log("Clear cache and force refresh requested");
-    toast({
-      title: 'Limpiando caché y forzando actualización',
-      description: 'Limpiando caché y obteniendo datos frescos...',
-    });
-    clearCacheAndRefresh(); // Clear cache and force refresh
+  const handleClearCacheAndRefresh = async () => {
+    // If already loading, prevent duplicate loads
+    if (loading || localLoading) {
+      console.log('💫 Clear cache already in progress, skipping duplicate request');
+      return;
+    }
+    
+    setLocalLoading(true);
+    
+    try {
+      console.log("Clear cache and force refresh requested");
+      toast({
+        title: 'Limpiando caché y forzando actualización',
+        description: 'Limpiando caché y obteniendo datos frescos...',
+      });
+      await clearCacheAndRefresh(); // Clear cache and force refresh
+    } catch (error) {
+      console.error('Error in handleClearCacheAndRefresh:', error);
+    } finally {
+      setLocalLoading(false);
+    }
   };
 
   // Manejador para alternar modo de depuración
@@ -160,12 +233,16 @@ const Index = () => {
     console.log('🔄 Index component state:', { 
       dataInitialized, 
       loading, 
+      localLoading,
       error, 
       showBalanceDialog,
       initialLoadAttempted,
       shouldShowWelcome
     });
-  }, [dataInitialized, loading, error, showBalanceDialog, initialLoadAttempted]);
+  }, [dataInitialized, loading, localLoading, error, showBalanceDialog, initialLoadAttempted]);
+
+  // Combined loading state
+  const isLoading = loading || localLoading;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -189,7 +266,10 @@ const Index = () => {
       {/* Contenido principal */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {shouldShowWelcome && (
-          <WelcomeBanner handleInitialLoad={handleInitialLoad} />
+          <WelcomeBanner 
+            handleInitialLoad={handleInitialLoad} 
+            isLoading={isLoading}
+          />
         )}
         
         {loading && !dataInitialized && (
@@ -247,7 +327,7 @@ const Index = () => {
               collaboratorExpenses={collaboratorExpenses}
               dateRange={dateRange}
               handleRefresh={handleRefresh}
-              loading={loading}
+              loading={isLoading}
               getStripeDataForChart={getStripeDataForChart}
             />
           </>

@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useRef } from 'react';
+import { useCallback } from 'react';
 import { DateRange, FinancialData } from '@/types/financial';
 import { useToast } from '@/hooks/use-toast';
 import { DEFAULT_FINANCIAL_DATA } from '@/constants/financialDefaults';
@@ -75,13 +75,13 @@ export const useFinanceDataFetcher = () => {
         ? { ...data, starting_balance: startingBalanceData.starting_balance } 
         : data;
       
-      // Update cache status information
-      if (dataWithBalance.cache_status) {
-        updateCacheStatus(dataWithBalance.cache_status);
-      }
+      // Process the financial data using the transformer - now returns both financialData and cacheStatus
+      const { financialData: processedData, cacheStatus: newCacheStatus } = transformFinancialData(dataWithBalance, stripeIncomeData);
       
-      // Process the financial data using the transformer
-      const processedData = transformFinancialData(dataWithBalance, stripeIncomeData, updateCacheStatus);
+      // Update cache status separately after the transformation
+      if (newCacheStatus) {
+        updateCacheStatus(newCacheStatus);
+      }
       
       // Extract and set collaborator expenses if available
       if (data.collaborator_expenses && Array.isArray(data.collaborator_expenses)) {
@@ -117,7 +117,7 @@ export const useFinanceDataFetcher = () => {
         title: "Error al obtener datos",
         description: errorMessage,
       });
-      return DEFAULT_FINANCIAL_DATA;
+      return null;
     } finally {
       setLoading(false);
       // Reset local refresh flag

@@ -44,17 +44,18 @@ export const DEFAULT_FINANCIAL_DATA: FinancialData = {
  * Transform the raw API response into structured financial data
  * @param data Raw data from API
  * @param stripeIncomeData Stripe income data
- * @param updateCacheStatus Function to update cache status
- * @returns Processed financial data
+ * @returns Processed financial data and cache status information
  */
 export const transformFinancialData = (
   data: any,
-  stripeIncomeData: { amount: number, isOverridden: boolean },
-  updateCacheStatus?: (data: any) => void
-): FinancialData => {
+  stripeIncomeData: { amount: number, isOverridden: boolean }
+): { financialData: FinancialData, cacheStatus: any } => {
   if (!data) {
     console.warn("No data provided to transformFinancialData, returning default data");
-    return DEFAULT_FINANCIAL_DATA;
+    return { 
+      financialData: DEFAULT_FINANCIAL_DATA, 
+      cacheStatus: null 
+    };
   }
 
   // Initialize transactions array
@@ -104,10 +105,10 @@ export const transformFinancialData = (
 
   // Calculate income by source
   const incomeBySource = calculateIncomeBySource(transactions);
-
-  // Update cache status if provided
-  if (updateCacheStatus && (data.cache_status || data.fromCache || data.cached)) {
-    updateCacheStatus({
+  
+  // Extract cache status information to return separately
+  const cacheStatus = data.cache_status || data.fromCache || data.cached ? 
+    {
       usingCachedData: data.fromCache || data.cached || data.using_cached_data || false,
       partialRefresh: data.partialRefresh || data.partial_refresh || false,
       stats: data.cacheStats || data.cache_stats ? 
@@ -117,8 +118,8 @@ export const transformFinancialData = (
           totalCount: data.cacheStats?.totalCount || data.cache_stats?.total_count || 0,
         } 
         : null
-    });
-  }
+    } 
+    : null;
 
   // Construct and return the transformed financial data
   const transformedData: FinancialData = {
@@ -138,5 +139,8 @@ export const transformFinancialData = (
     incomeBySource,
   };
 
-  return transformedData;
+  return {
+    financialData: transformedData,
+    cacheStatus
+  };
 };

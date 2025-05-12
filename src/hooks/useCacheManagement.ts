@@ -1,17 +1,9 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { DateRange } from '@/types/financial';
-import { CacheStatus, CacheStats, CacheControl } from '@/types/cache';
+import { CacheStatus, CacheStats } from '@/types/cache';
 import { useToast } from '@/hooks/use-toast';
 import ZohoService from '@/services/zohoService';
-
-// Global cache control to prevent too frequent refreshes across component re-renders
-const globalCacheControl: CacheControl = {
-  maxRefreshesPerSession: 3,
-  minRefreshInterval: 10000, // 10 seconds minimum between refreshes
-  refreshCount: 0,
-  lastRefreshTime: 0
-};
 
 export const useCacheManagement = () => {
   const [cacheStatus, setCacheStatus] = useState<CacheStatus>({
@@ -58,29 +50,12 @@ export const useCacheManagement = () => {
   }, []);
 
   /**
-   * Check if a refresh operation can proceed based on global limits
+   * Check if a refresh operation can proceed
    */
   const canRefresh = useCallback((): { allowed: boolean; reason?: string } => {
     // Check if refresh is already in progress
     if (refreshInProgressRef.current) {
       return { allowed: false, reason: 'Refresh already in progress' };
-    }
-    
-    // Check if we've hit the maximum number of refreshes
-    if (globalCacheControl.refreshCount >= globalCacheControl.maxRefreshesPerSession) {
-      return { allowed: false, reason: 'Maximum refresh limit reached' };
-    }
-    
-    // Check if it's too soon for another refresh
-    const now = Date.now();
-    const timeSinceLastRefresh = now - globalCacheControl.lastRefreshTime;
-    
-    if (globalCacheControl.lastRefreshTime > 0 && 
-        timeSinceLastRefresh < globalCacheControl.minRefreshInterval) {
-      return { 
-        allowed: false, 
-        reason: `Too soon since last refresh (${Math.round(timeSinceLastRefresh / 1000)}s ago)` 
-      };
     }
     
     return { allowed: true };
@@ -114,10 +89,6 @@ export const useCacheManagement = () => {
       
       // Mark refresh in progress
       refreshInProgressRef.current = true;
-      
-      // Track refresh count and time
-      globalCacheControl.refreshCount++;
-      globalCacheControl.lastRefreshTime = Date.now();
       
       const success = await ZohoService.clearCacheForDateRange(dateRange.startDate, dateRange.endDate);
       
