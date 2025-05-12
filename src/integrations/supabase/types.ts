@@ -9,65 +9,41 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      cached_transactions: {
-        Row: {
-          amount: number
-          category: string
-          date: string
-          description: string | null
-          external_id: string
-          id: string
-          source: string
-          sync_date: string
-          type: string
-        }
-        Insert: {
-          amount: number
-          category: string
-          date: string
-          description?: string | null
-          external_id: string
-          id?: string
-          source: string
-          sync_date?: string
-          type: string
-        }
-        Update: {
-          amount?: number
-          category?: string
-          date?: string
-          description?: string | null
-          external_id?: string
-          id?: string
-          source?: string
-          sync_date?: string
-          type?: string
-        }
-        Relationships: []
-      }
       monthly_balances: {
         Row: {
           balance: number
           created_at: string
           id: number
+          itbm_amount: number | null
           month_year: string
           notes: string | null
+          opex_amount: number | null
+          profit_percentage: number | null
+          stripe_override: number | null
           updated_at: string
         }
         Insert: {
           balance: number
           created_at?: string
           id?: number
+          itbm_amount?: number | null
           month_year: string
           notes?: string | null
+          opex_amount?: number | null
+          profit_percentage?: number | null
+          stripe_override?: number | null
           updated_at?: string
         }
         Update: {
           balance?: number
           created_at?: string
           id?: number
+          itbm_amount?: number | null
           month_year?: string
           notes?: string | null
+          opex_amount?: number | null
+          profit_percentage?: number | null
+          stripe_override?: number | null
           updated_at?: string
         }
         Relationships: []
