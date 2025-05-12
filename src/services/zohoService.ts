@@ -45,7 +45,7 @@ const ZohoService = {
         // Update cache stats
         cacheStats.hits++;
         if (response.data && response.data.length > 0 && response.data[0].sync_date) {
-          const latestSync = new Date(Math.max(...response.data.map(tx => new Date(tx.sync_date).getTime())));
+          const latestSync = new Date(Math.max(...response.data.map((tx: any) => new Date(tx.sync_date).getTime())));
           cacheStats.lastRefresh = latestSync;
         }
         
@@ -54,7 +54,7 @@ const ZohoService = {
         
         // If raw response contains data directly, transform and return it
         if (response.data && Array.isArray(response.data)) {
-          const normalizedTransactions: Transaction[] = response.data.map(tx => ({
+          const normalizedTransactions: Transaction[] = response.data.map((tx: any) => ({
             id: tx.id,
             date: tx.date,
             amount: Number(tx.amount),
@@ -76,7 +76,7 @@ const ZohoService = {
           console.log("ZohoService: Using freshly fetched and processed data,", 
             response.cached_transactions.length, "transactions");
             
-          const normalizedTransactions: Transaction[] = response.cached_transactions.map(tx => ({
+          const normalizedTransactions: Transaction[] = response.cached_transactions.map((tx: any) => ({
             id: tx.id,
             date: tx.date,
             amount: Number(tx.amount),
@@ -110,34 +110,7 @@ const ZohoService = {
         lastRawResponse = { error: error instanceof Error ? error.message : "Unknown error" };
       }
       
-      // Try to get transactions from cache as fallback
-      try {
-        const { data: fallbackCache } = await supabase
-          .from("cached_transactions")
-          .select("*")
-          .gte("date", startDate.toISOString().split('T')[0])
-          .lte("date", endDate.toISOString().split('T')[0]);
-          
-        if (fallbackCache && fallbackCache.length > 0) {
-          console.log("ZohoService: Using cache as fallback after error");
-          
-          // Transform fallback cache data to match Transaction type
-          const normalizedTransactions: Transaction[] = fallbackCache.map(tx => ({
-            id: tx.id,
-            date: tx.date,
-            amount: Number(tx.amount),
-            description: tx.description || '',
-            category: tx.category,
-            source: normalizeSource(tx.source),
-            type: normalizeType(tx.type)
-          }));
-          
-          return normalizedTransactions;
-        }
-      } catch (fallbackError) {
-        console.error("ZohoService: Error getting fallback cache", fallbackError);
-      }
-      
+      console.warn("ZohoService: Returning mock data due to error");
       return getMockTransactions(startDate, endDate);
     }
   },
@@ -213,33 +186,7 @@ const ZohoService = {
   
   // Check for stale cache and refresh if needed
   checkAndRefreshCache: async (startDate: Date, endDate: Date): Promise<void> => {
-    try {
-      const { data: cachedTransactions } = await supabase
-        .from("cached_transactions")
-        .select("sync_date")
-        .gte("date", startDate.toISOString().split('T')[0])
-        .lte("date", endDate.toISOString().split('T')[0])
-        .order('sync_date', { ascending: false })
-        .limit(1);
-      
-      if (cachedTransactions && cachedTransactions.length > 0) {
-        const latestSync = new Date(cachedTransactions[0].sync_date);
-        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-        
-        // If cache is more than 2 hours old, refresh in the background
-        if (latestSync < twoHoursAgo) {
-          console.log("ZohoService: Cache is stale, refreshing in background");
-          // Use setTimeout to make this non-blocking
-          setTimeout(() => {
-            ZohoService.forceRefresh(startDate, endDate)
-              .then(() => console.log("ZohoService: Background cache refresh completed"))
-              .catch(err => console.error("ZohoService: Background cache refresh failed", err));
-          }, 100);
-        }
-      }
-    } catch (error) {
-      console.error("ZohoService: Error checking cache age", error);
-    }
+    console.log("ZohoService: checkAndRefreshCache - Cache handling removed");
   }
 };
 
