@@ -7,8 +7,8 @@ import { Card, CardContent } from "@/components/ui/card";
 interface FinanceSummaryProps {
   summary: FinancialSummary;
   expenseCategories?: CategorySummary[];
-  stripeIncome?: number; // Nuevo parámetro para ingresos de Stripe
-  regularIncome?: number; // Nuevo parámetro para ingresos regulares de Zoho
+  stripeIncome?: number;
+  regularIncome?: number;
 }
 
 const FinanceSummary: React.FC<FinanceSummaryProps> = ({ 

@@ -147,10 +147,13 @@ export const processTransactionData = (
     stripeIncome = stripeOverride;
   }
 
-  // Calculate profit as the sum of the three values: Stripe income + Regular income + Starting balance
-  // This follows the calculation shown in the image: 21177.79 + 19798.28 + 11517.89 = 32701.22344
-  const profit = (startingBalance !== undefined ? startingBalance : 0) + regularIncome + stripeIncome;
-  const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0;
+  // Calculate profit as: Starting balance + Regular income + Stripe income - Total expenses
+  // This properly subtracts the expenses from the calculation
+  const profit = (startingBalance !== undefined ? startingBalance : 0) + regularIncome + stripeIncome - totalExpense;
+  
+  // Calculate profit margin excluding the starting balance from the calculation
+  // (profit - startingBalance) / totalIncome
+  const profitMargin = totalIncome > 0 ? ((profit - (startingBalance !== undefined ? startingBalance : 0)) / totalIncome) * 100 : 0;
 
   // Create summary object
   const summary: FinancialSummary = {
@@ -182,3 +185,4 @@ export const processTransactionData = (
     monthlyData
   };
 };
+
