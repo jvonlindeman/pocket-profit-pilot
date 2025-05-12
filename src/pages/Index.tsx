@@ -171,6 +171,11 @@ const Index = () => {
   // Combined loading state
   const isLoading = loading || localLoading;
 
+  // Simple function to handle debug information
+  const handleDebugRefresh = () => {
+    handleRefresh();
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Dialog to set initial balance */}
@@ -219,7 +224,7 @@ const Index = () => {
                 stripeIncome={stripeIncome}
                 stripeOverride={stripeOverride}
                 regularIncome={regularIncome}
-                handleClearCacheAndRefresh={handleRefresh}
+                handleClearCacheAndRefresh={handleDebugRefresh}
               />
             )}
 

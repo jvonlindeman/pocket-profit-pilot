@@ -9,6 +9,7 @@ import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 import { useSimpleDataRefresh } from '@/hooks/useSimpleDataRefresh';
 import { useDataLoading } from '@/hooks/useDataLoading';
 import { useBalanceSync } from '@/hooks/useBalanceSync';
+import { RefreshStatus } from '@/types/finance-hooks';
 
 export const useFinanceData = () => {
   // Use our custom hooks for specific functionality
@@ -145,8 +146,8 @@ export const useFinanceData = () => {
     syncBalance(startingBalance, financialData, setFinancialData, dataInitialized);
   }, [startingBalance, financialData, setFinancialData, dataInitialized, syncBalance]);
 
-  // Create a simple refresh status object
-  const refreshStatus = {
+  // Create a simple refresh status object with properly initialized values
+  const refreshStatus: RefreshStatus = {
     lastRefresh: new Date(),
     refreshAttempts: 0
   };
@@ -206,7 +207,7 @@ export const useFinanceData = () => {
     // Add missing functions from the error messages
     setFinancialData,
     
-    // Add simple refresh status
+    // Add properly initialized refresh status
     refreshStatus
   };
 };

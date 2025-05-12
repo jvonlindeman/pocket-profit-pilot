@@ -25,6 +25,12 @@ export interface FinanceErrorHandler {
   localRefreshingRef: React.MutableRefObject<boolean>;
 }
 
+// Types for refreshStatus
+export interface RefreshStatus {
+  lastRefresh: Date;
+  refreshAttempts: number;
+}
+
 // Types for useFianceDataFetcher return value
 export interface FinanceDataFetcher {
   financialData: FinancialData;
