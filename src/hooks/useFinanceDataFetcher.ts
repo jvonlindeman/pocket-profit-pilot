@@ -1,5 +1,5 @@
 
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { DateRange, FinancialData } from '@/types/financial';
 import { useToast } from '@/hooks/use-toast';
 import { DEFAULT_FINANCIAL_DATA } from '@/constants/financialDefaults';
@@ -13,9 +13,9 @@ import { useFinanceErrorHandler } from '@/hooks/useFinanceErrorHandler';
 export const useFinanceDataFetcher = () => {
   const { toast } = useToast();
   const { fetchFinanceDataFromAPI } = useFinanceAPI();
-  const { cacheStatus, updateCacheStatus, clearCacheForDateRange } = useCacheManagement();
+  const { cacheStatus, updateCacheStatus } = useCacheManagement();
 
-  // Use our new hooks for state management and error handling
+  // Use our hooks for state management and error handling
   const {
     financialData,
     setFinancialData,
@@ -38,20 +38,20 @@ export const useFinanceDataFetcher = () => {
     localRefreshingRef
   } = useFinanceErrorHandler();
 
-  // Fetch financial data from the API or cache
+  // Fetch financial data from the API
   const fetchFinancialData = useCallback(async (
     dateRange: DateRange, 
     stripeIncomeData: { amount: number, isOverridden: boolean },
     startingBalanceData?: { starting_balance: number },
-    forceRefresh: boolean = false
+    forceRefresh: boolean = true // Always force refresh
   ) => {
-    // Check if we're already refreshing using the local ref
-    if (localRefreshingRef.current && !forceRefresh) {
+    // Check if we're already refreshing
+    if (localRefreshingRef.current) {
       console.warn("⚠️ Fetch operation already in progress, skipping duplicate request");
       return null;
     }
     
-    // Set local refresh flags
+    // Set local refresh flag
     localRefreshingRef.current = true;
     
     console.log(`📊 Fetching financial data with forceRefresh=${forceRefresh}, startingBalance=${startingBalanceData?.starting_balance}`);
@@ -62,7 +62,7 @@ export const useFinanceDataFetcher = () => {
       // Use retry with backoff for better reliability
       const data = await retryWithBackoff(
         () => fetchFinanceDataFromAPI(dateRange, forceRefresh, startingBalanceData),
-        forceRefresh ? 2 : 1, // More retries for forced refresh
+        1, // No need for retries when we're always forcing refresh
         1000
       );
       
@@ -75,13 +75,11 @@ export const useFinanceDataFetcher = () => {
         ? { ...data, starting_balance: startingBalanceData.starting_balance } 
         : data;
       
-      // Process the financial data using the transformer - now returns both financialData and cacheStatus
-      const { financialData: processedData, cacheStatus: newCacheStatus } = transformFinancialData(dataWithBalance, stripeIncomeData);
+      // Process the financial data using the transformer
+      const { financialData: processedData } = transformFinancialData(dataWithBalance, stripeIncomeData);
       
-      // Update cache status separately after the transformation
-      if (newCacheStatus) {
-        updateCacheStatus(newCacheStatus);
-      }
+      // Update refresh status
+      updateCacheStatus();
       
       // Extract and set collaborator expenses if available
       if (data.collaborator_expenses && Array.isArray(data.collaborator_expenses)) {
@@ -124,48 +122,21 @@ export const useFinanceDataFetcher = () => {
       localRefreshingRef.current = false;
     }
   }, [
-    fetchFinanceDataFromAPI, 
-    updateCacheStatus, 
-    toast, 
-    setFinancialData, 
-    setLoading, 
-    setError, 
-    setRawResponse, 
-    setCollaboratorExpenses, 
-    setRegularIncome, 
-    setDataInitialized, 
+    fetchFinanceDataFromAPI,
+    updateCacheStatus,
+    toast,
+    setFinancialData,
+    setLoading,
+    setError,
+    setRawResponse,
+    setCollaboratorExpenses,
+    setRegularIncome,
+    setDataInitialized,
     localRefreshingRef
   ]);
 
-  // Clear cache and force refresh data
-  const clearCacheAndRefresh = useCallback(async (dateRange: DateRange) => {
-    // Use local refreshing ref
-    if (localRefreshingRef.current) {
-      console.warn("⚠️ Cache clear operation already in progress, skipping duplicate request");
-      return false;
-    }
-    
-    // Set flags to prevent concurrent operations
-    localRefreshingRef.current = true;
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      return await clearCacheForDateRange(dateRange);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Error desconocido al limpiar caché";
-      setError(errorMessage);
-      return false;
-    } finally {
-      setLoading(false);
-      localRefreshingRef.current = false;
-    }
-  }, [clearCacheForDateRange, setLoading, setError, localRefreshingRef]);
-
   return {
     financialData,
-    setFinancialData,
     loading,
     error,
     dataInitialized,
@@ -175,7 +146,6 @@ export const useFinanceDataFetcher = () => {
     collaboratorExpenses,
     cacheStatus,
     fetchFinancialData,
-    clearCacheAndRefresh,
     resetErrorState,
     isRefreshing: localRefreshingRef.current,
   };

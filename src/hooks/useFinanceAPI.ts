@@ -18,7 +18,7 @@ export const useFinanceAPI = () => {
    */
   const fetchFinanceDataFromAPI = useCallback(async (
     dateRange: DateRange,
-    forceRefresh: boolean = false,
+    forceRefresh: boolean = true, // Always force refresh by default
     startingBalanceData?: { starting_balance: number }
   ) => {
     try {
@@ -32,7 +32,7 @@ export const useFinanceAPI = () => {
       const params = {
         startDate: formattedStartDate,
         endDate: formattedEndDate,
-        forceRefresh: forceRefresh,
+        forceRefresh: true, // Always force refresh
         ...(startingBalanceData && { starting_balance: startingBalanceData.starting_balance })
       };
       
@@ -67,7 +67,7 @@ export const useFinanceAPI = () => {
         const queryParams = new URLSearchParams({
           start_date: formattedStartDate,
           end_date: formattedEndDate,
-          force_refresh: forceRefresh ? 'true' : 'false'
+          force_refresh: 'true' // Always force refresh
         });
         
         // Add starting_balance to query params if available

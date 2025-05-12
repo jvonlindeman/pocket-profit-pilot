@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import InitialBalanceDialog from '@/components/Dashboard/InitialBalanceDialog';
 import ZohoDebug from '@/components/ZohoDebug';
 
-// Import our new components
+// Import our components
 import DashboardHeader from '@/components/Dashboard/DashboardHeader';
 import DashboardFooter from '@/components/Dashboard/DashboardFooter';
 import WelcomeBanner from '@/components/Dashboard/WelcomeBanner';
@@ -14,7 +14,6 @@ import LoadingIndicator from '@/components/Dashboard/LoadingIndicator';
 import ErrorDisplay from '@/components/Dashboard/ErrorDisplay';
 import DebugInformation from '@/components/Dashboard/DebugInformation';
 import PeriodHeading from '@/components/Dashboard/PeriodHeading';
-import CacheNotification from '@/components/Dashboard/CacheNotification';
 import EmptyTransactionsNotification from '@/components/Dashboard/EmptyTransactionsNotification';
 import DebugPanel from '@/components/Dashboard/DebugPanel';
 import MainDashboard from '@/components/Dashboard/MainDashboard';
@@ -28,15 +27,11 @@ const Index = () => {
     error,
     getCurrentMonthRange,
     refreshData,
-    clearCacheAndRefresh,
     dataInitialized,
     rawResponse,
     stripeIncome,
     regularIncome,
     collaboratorExpenses,
-    usingCachedData,
-    partialRefresh,
-    cacheStats,
     stripeOverride,
     startingBalance,
     initialLoadAttempted
@@ -44,11 +39,11 @@ const Index = () => {
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
-  const [localLoading, setLocalLoading] = useState(false); // Add local loading state
+  const [localLoading, setLocalLoading] = useState(false); // Local loading state
   const { checkBalanceExists } = useMonthlyBalance({ currentDate: dateRange.startDate });
   const { toast } = useToast();
 
-  // Formateamos fechas para títulos
+  // Format dates for titles
   const formatDateForTitle = (date: Date) => {
     return new Date(date).toLocaleDateString('es-ES', {
       day: 'numeric',
@@ -57,13 +52,13 @@ const Index = () => {
     });
   };
 
-  // Título del periodo
+  // Period title
   const periodTitle = `${formatDateForTitle(dateRange.startDate)} - ${formatDateForTitle(dateRange.endDate)}`;
   
   // Check if we should show welcome banner
   const shouldShowWelcome = !dataInitialized && !initialLoadAttempted;
 
-  // Manejador para cargar datos iniciales
+  // Handler for initial data loading
   const handleInitialLoad = async () => {
     // If already loading, prevent duplicate loads
     if (loading || localLoading) {
@@ -91,7 +86,7 @@ const Index = () => {
           title: 'Cargando datos financieros',
           description: 'Obteniendo datos de Zoho Books y Stripe',
         });
-        await refreshData(false); // Use cache when available
+        await refreshData(true); // Always force refresh
       }
     } catch (error) {
       console.error('Error in handleInitialLoad:', error);
@@ -115,7 +110,7 @@ const Index = () => {
         title: 'Balance inicial guardado',
         description: 'Cargando datos financieros...',
       });
-      await refreshData(false); // Use cache when available
+      await refreshData(true); // Always force refresh
     } catch (error) {
       console.error('Error in handleBalanceSaved:', error);
     } finally {
@@ -123,7 +118,7 @@ const Index = () => {
     }
   };
 
-  // Manejador para actualizar datos
+  // Handler for refreshing data
   const handleRefresh = async () => {
     // If already loading, prevent duplicate loads
     if (loading || localLoading) {
@@ -134,12 +129,12 @@ const Index = () => {
     setLocalLoading(true);
     
     try {
-      console.log("Standard refresh requested (will use cache if available)");
+      console.log("Standard refresh requested (always forcing refresh)");
       toast({
         title: 'Actualizando datos',
         description: 'Obteniendo datos más recientes...',
       });
-      await refreshData(false); // Use the cache when available
+      await refreshData(true); // Always force refresh
     } catch (error) {
       console.error('Error in handleRefresh:', error);
     } finally {
@@ -147,55 +142,7 @@ const Index = () => {
     }
   };
 
-  // Manejador para forzar actualización desde API
-  const handleForceRefresh = async () => {
-    // If already loading, prevent duplicate loads
-    if (loading || localLoading) {
-      console.log('💫 Force refresh already in progress, skipping duplicate request');
-      return;
-    }
-    
-    setLocalLoading(true);
-    
-    try {
-      console.log("Force refresh requested (bypassing cache)");
-      toast({
-        title: 'Forzando actualización',
-        description: 'Obteniendo datos directamente de la API...',
-      });
-      await refreshData(true); // Force refresh from API
-    } catch (error) {
-      console.error('Error in handleForceRefresh:', error);
-    } finally {
-      setLocalLoading(false);
-    }
-  };
-
-  // Manejador para limpiar caché y forzar actualización
-  const handleClearCacheAndRefresh = async () => {
-    // If already loading, prevent duplicate loads
-    if (loading || localLoading) {
-      console.log('💫 Clear cache already in progress, skipping duplicate request');
-      return;
-    }
-    
-    setLocalLoading(true);
-    
-    try {
-      console.log("Clear cache and force refresh requested");
-      toast({
-        title: 'Limpiando caché y forzando actualización',
-        description: 'Limpiando caché y obteniendo datos frescos...',
-      });
-      await clearCacheAndRefresh(); // Clear cache and force refresh
-    } catch (error) {
-      console.error('Error in handleClearCacheAndRefresh:', error);
-    } finally {
-      setLocalLoading(false);
-    }
-  };
-
-  // Manejador para alternar modo de depuración
+  // Handler for toggling debug mode
   const toggleDebugMode = () => {
     setDebugMode(!debugMode);
     toast({
@@ -204,28 +151,6 @@ const Index = () => {
         ? 'Se mostrará información adicional para depuración' 
         : 'Se ocultará la información de depuración',
     });
-  };
-
-  // Prepare Stripe data for chart - add safety checks
-  const getStripeDataForChart = () => {
-    // Check if we have valid data structure
-    if (!financialData || 
-        !financialData.dailyData || 
-        !financialData.dailyData.income || 
-        !financialData.dailyData.income.labels || 
-        !Array.isArray(financialData.dailyData.income.labels) ||
-        !financialData.dailyData.income.labels.length) {
-      // Return empty data structure when data is not available
-      return { labels: [], values: [] };
-    }
-
-    // Si solo hay un valor de Stripe para todo el período, distribúyelo a lo largo del gráfico
-    if (stripeIncome > 0) {
-      const labels = financialData.dailyData.income.labels;
-      const values = new Array(labels.length).fill(stripeIncome / labels.length);
-      return { labels, values };
-    }
-    return { labels: [], values: [] };
   };
 
   // Add debug logs to track user interaction and component state
@@ -263,7 +188,7 @@ const Index = () => {
         debugMode={debugMode}
       />
 
-      {/* Contenido principal */}
+      {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {shouldShowWelcome && (
           <WelcomeBanner 
@@ -280,8 +205,6 @@ const Index = () => {
           <ErrorDisplay 
             error={error}
             handleRefresh={handleRefresh}
-            handleForceRefresh={handleForceRefresh}
-            handleClearCacheAndRefresh={handleClearCacheAndRefresh}
           />
         )}
         
@@ -294,23 +217,13 @@ const Index = () => {
                 stripeIncome={stripeIncome}
                 stripeOverride={stripeOverride}
                 regularIncome={regularIncome}
-                handleClearCacheAndRefresh={handleClearCacheAndRefresh}
               />
             )}
 
-            {/* Periodo y botones de actualización */}
+            {/* Period heading and refresh button */}
             <PeriodHeading 
               periodTitle={periodTitle}
               handleRefresh={handleRefresh}
-              handleForceRefresh={handleForceRefresh}
-              handleClearCacheAndRefresh={handleClearCacheAndRefresh}
-            />
-
-            {/* Cache Notifications */}
-            <CacheNotification 
-              usingCachedData={usingCachedData} 
-              partialRefresh={partialRefresh}
-              cacheStats={cacheStats}
             />
 
             {/* Empty transactions notification */}
@@ -328,12 +241,11 @@ const Index = () => {
               dateRange={dateRange}
               handleRefresh={handleRefresh}
               loading={isLoading}
-              getStripeDataForChart={getStripeDataForChart}
             />
           </>
         )}
 
-        {/* Zoho Debug componente mejorado */}
+        {/* Zoho Debug component */}
         <div className="mt-8">
           <ZohoDebug />
         </div>
