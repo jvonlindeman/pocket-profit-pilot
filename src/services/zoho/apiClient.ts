@@ -1,6 +1,8 @@
 
 import { Transaction } from "../../types/financial";
-import { supabase } from "../../integrations/supabase/client";
+
+// The direct make.com webhook URL
+const MAKE_WEBHOOK_URL = "https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihlmx22";
 
 export const fetchTransactionsFromWebhook = async (
   startDate: Date,
@@ -16,18 +18,11 @@ export const fetchTransactionsFromWebhook = async (
   console.log(`Force refresh: ${forceRefresh}, Return raw response: ${returnRawResponse}`);
   
   try {
-    // Use the Supabase URL directly from the supabase client instead of environment variables
-    const supabaseUrl = "https://rstexocnpvtxfhqbnetn.supabase.co";
-    if (!supabaseUrl) {
-      throw new Error('Missing Supabase URL in configuration');
-    }
+    // Now call the make.com webhook directly without using Supabase functions
+    console.log(`Calling make.com webhook directly at: ${MAKE_WEBHOOK_URL}`);
     
-    // Create the function URL
-    const functionUrl = `${supabaseUrl}/functions/v1/zoho-transactions`;
-    console.log(`Calling edge function at: ${functionUrl}`);
-    
-    // Call the edge function
-    const response = await fetch(functionUrl, {
+    // Call the webhook with appropriate parameters
+    const response = await fetch(MAKE_WEBHOOK_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -39,25 +34,25 @@ export const fetchTransactionsFromWebhook = async (
       })
     });
 
-    console.log(`Edge function response status: ${response.status}`);
+    console.log(`Webhook response status: ${response.status}`);
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Error from edge function:', errorText);
-      throw new Error(`Error from edge function: ${errorText}`);
+      console.error('Error from webhook:', errorText);
+      throw new Error(`Error from webhook: ${errorText}`);
     }
     
     const responseData = await response.json();
     console.log('Raw response data structure:', JSON.stringify(responseData, null, 2).substring(0, 500) + '...');
     
     if (returnRawResponse) {
-      console.log('Returning raw response from edge function');
+      console.log('Returning raw response from webhook');
       return responseData;
     }
     
     // Check each possible data structure in order
     if (responseData.cached_transactions && Array.isArray(responseData.cached_transactions)) {
-      console.log(`Got ${responseData.cached_transactions.length} cached transactions from edge function`);
+      console.log(`Got ${responseData.cached_transactions.length} cached transactions from webhook`);
       console.log('Sample transaction:', responseData.cached_transactions[0]);
       return responseData.cached_transactions;
     }
