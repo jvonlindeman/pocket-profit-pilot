@@ -1,6 +1,5 @@
 
-import { FinancialData, DateRange, CacheStats } from './financial';
-import { CacheStatus } from './cache';
+import { FinancialData, DateRange } from './financial';
 
 // Types for useFinanceDataState hook
 export interface FinanceDataState {
@@ -37,14 +36,12 @@ export interface FinanceDataFetcher {
   rawResponse: any;
   regularIncome: number;
   collaboratorExpenses: any[];
-  cacheStatus: CacheStatus;
   fetchFinancialData: (
     dateRange: DateRange, 
     stripeIncomeData: { amount: number, isOverridden: boolean },
     startingBalanceData?: { starting_balance: number },
     forceRefresh?: boolean
   ) => Promise<FinancialData | null>;
-  clearCacheAndRefresh: (dateRange: DateRange) => Promise<boolean>;
   resetErrorState: () => void;
   isRefreshing: boolean;
 }

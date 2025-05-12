@@ -35,6 +35,7 @@ const Index = () => {
     stripeOverride,
     startingBalance,
     initialLoadAttempted,
+    getStripeDataForChart,
     refreshStatus
   } = useFinanceData();
   
@@ -169,18 +170,6 @@ const Index = () => {
 
   // Combined loading state
   const isLoading = loading || localLoading;
-
-  // Simple dummy function for charts
-  const getStripeDataForChart = () => {
-    return [
-      { name: 'Jan', value: 0 },
-      { name: 'Feb', value: 0 },
-      { name: 'Mar', value: 0 },
-      { name: 'Apr', value: 0 },
-      { name: 'May', value: stripeIncome || 0 },
-      { name: 'Jun', value: 0 },
-    ];
-  };
 
   return (
     <div className="min-h-screen bg-gray-50">

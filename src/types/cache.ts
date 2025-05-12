@@ -4,4 +4,3 @@ export interface RefreshStatus {
   lastRefresh?: Date | null;
   refreshAttempts?: number;
 }
-

@@ -4,7 +4,6 @@ import { DateRange, FinancialData } from '@/types/financial';
 import { useToast } from '@/hooks/use-toast';
 import { DEFAULT_FINANCIAL_DATA } from '@/constants/financialDefaults';
 import { useFinanceAPI } from '@/hooks/useFinanceAPI';
-import { useCacheManagement } from '@/hooks/useCacheManagement';
 import { transformFinancialData } from '@/utils/financeDataTransformer';
 import { retryWithBackoff } from '@/utils/apiUtils';
 import { useFinanceDataState } from '@/hooks/useFinanceDataState';
@@ -13,7 +12,6 @@ import { useFinanceErrorHandler } from '@/hooks/useFinanceErrorHandler';
 export const useFinanceDataFetcher = () => {
   const { toast } = useToast();
   const { fetchFinanceDataFromAPI } = useFinanceAPI();
-  const { refreshStatus, updateRefreshStatus } = useCacheManagement();
 
   // Use our hooks for state management and error handling
   const {
@@ -78,9 +76,6 @@ export const useFinanceDataFetcher = () => {
       // Process the financial data using the transformer
       const { financialData: processedData } = transformFinancialData(dataWithBalance, stripeIncomeData);
       
-      // Update refresh status
-      updateRefreshStatus();
-      
       // Extract and set collaborator expenses if available
       if (data.collaborator_expenses && Array.isArray(data.collaborator_expenses)) {
         setCollaboratorExpenses(data.collaborator_expenses);
@@ -123,7 +118,6 @@ export const useFinanceDataFetcher = () => {
     }
   }, [
     fetchFinanceDataFromAPI,
-    updateRefreshStatus,
     toast,
     setFinancialData,
     setLoading,
@@ -144,7 +138,6 @@ export const useFinanceDataFetcher = () => {
     rawResponse,
     regularIncome,
     collaboratorExpenses,
-    refreshStatus,
     fetchFinancialData,
     resetErrorState,
     isRefreshing: localRefreshingRef.current,

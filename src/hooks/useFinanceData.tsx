@@ -33,9 +33,7 @@ export const useFinanceData = () => {
     rawResponse,
     regularIncome,
     collaboratorExpenses,
-    cacheStatus,
     fetchFinancialData,
-    clearCacheAndRefresh: clearCacheFromDataFetcher,
     resetErrorState,
     setFinancialData
   } = dataFetcher;
@@ -47,7 +45,6 @@ export const useFinanceData = () => {
     resetRefreshState,
     withRefreshProtection, 
     forceManualRefresh: forceManualRefreshAction,
-    handleClearCacheAndRefresh,
     handleEmergencyRecovery,
     lastError,
     hasErrors,
@@ -110,15 +107,6 @@ export const useFinanceData = () => {
     loadFinancialData
   ]);
 
-  // Clear cache and refresh data
-  const clearCacheAndRefreshData = useCallback(async () => {
-    return await handleClearCacheAndRefresh(
-      clearCacheFromDataFetcher,
-      refreshData,
-      dateRange
-    );
-  }, [dateRange, clearCacheFromDataFetcher, refreshData, handleClearCacheAndRefresh]);
-
   // Manual refresh function that resets refresh state and forces refresh
   const forceManualRefresh = useCallback(async () => {
     return await forceManualRefreshAction(refreshData);
@@ -157,20 +145,19 @@ export const useFinanceData = () => {
     syncBalance(startingBalance, financialData, setFinancialData, dataInitialized);
   }, [startingBalance, financialData, setFinancialData, dataInitialized, syncBalance]);
 
-  // Define default values for missing cache properties
-  const usingCachedData = false; // Simplified: always false since we're removing caching
-  const partialRefresh = false;  // Simplified: always false since we're removing caching
-  const cacheStats = {
-    cachedCount: 0,
-    newCount: 0,
-    totalCount: 0,
-    lastRefresh: cacheStatus.lastRefresh ? cacheStatus.lastRefresh.toISOString() : null
+  // Create a simple refresh status object
+  const refreshStatus = {
+    lastRefresh: new Date(),
+    refreshAttempts: 0
   };
 
   // Create a helper function for stripe data chart
-  const getStripeDataForChart = () => {
-    return { labels: [], values: [] }; // Simplified: empty data
-  };
+  const getStripeDataForChart = useCallback(() => {
+    return { 
+      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], 
+      values: [0, 0, 0, 0, stripeIncome || 0, 0] 
+    };
+  }, [stripeIncome]);
 
   return {
     // Date range management
@@ -196,17 +183,11 @@ export const useFinanceData = () => {
     // Expenses data
     collaboratorExpenses,
     
-    // Cache management
-    usingCachedData,
-    partialRefresh,
-    cacheStats,
-    
     // Debug information
     rawResponse,
     
     // Functions
     refreshData,
-    clearCacheAndRefresh: clearCacheAndRefreshData,
     forceManualRefresh,
     emergencyRecovery,
     
@@ -223,6 +204,9 @@ export const useFinanceData = () => {
     getStripeDataForChart,
     
     // Add missing functions from the error messages
-    setFinancialData
+    setFinancialData,
+    
+    // Add simple refresh status
+    refreshStatus
   };
 };

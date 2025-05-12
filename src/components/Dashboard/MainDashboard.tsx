@@ -7,7 +7,7 @@ import CollaboratorChart from '@/components/Dashboard/CollaboratorChart';
 import ProfitAnalysis from '@/components/Dashboard/ProfitAnalysis';
 import TransactionList from '@/components/Dashboard/TransactionList';
 import MonthlyBalanceEditor from '@/components/Dashboard/MonthlyBalanceEditor';
-import { FinancialData, DateRange } from '@/types/financial';
+import { FinancialData, DateRange, ChartData } from '@/types/financial';
 
 interface MainDashboardProps {
   financialData: FinancialData;

@@ -8,7 +8,6 @@ import { useFinanceData } from '@/hooks/useFinanceData';
 import { Skeleton } from '@/components/ui/skeleton';
 import StripeTransactionManager from './StripeTransactionManager';
 import MonthlyBalanceInput from './MonthlyBalanceInput';
-import CacheStatusDisplay from './CacheStatusDisplay';
 import DataLoadingErrorRecovery from './DataLoadingErrorRecovery';
 
 const DashboardContent: React.FC = () => {
@@ -21,12 +20,12 @@ const DashboardContent: React.FC = () => {
     updateDateRange,
     startingBalance,
     stripeOverride,
-    refreshStatus,
     isRefreshing,
     lastError,
     hasErrors,
     errorCount,
-    emergencyRecovery
+    emergencyRecovery,
+    refreshStatus
   } = useFinanceData();
 
   const handleDateRangeChanged = (newStartDate: Date, newEndDate: Date) => {
@@ -65,12 +64,17 @@ const DashboardContent: React.FC = () => {
           />
         </div>
         <div className="w-full md:w-1/2 lg:w-1/3">
-          <CacheStatusDisplay
-            lastRefresh={refreshStatus.lastRefresh}
-            onRefreshClick={refreshData}
-            isRefreshing={isRefreshing}
-            refreshCount={refreshStatus.refreshAttempts}
-          />
+          {refreshStatus && (
+            <div className="flex justify-end">
+              <button 
+                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600" 
+                onClick={() => refreshData(true)}
+                disabled={isRefreshing}
+              >
+                {isRefreshing ? 'Actualizando...' : 'Actualizar datos'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
       
