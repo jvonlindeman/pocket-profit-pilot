@@ -12,7 +12,8 @@ const WebhookDataSummary: React.FC<WebhookDataSummaryProps> = ({ rawData }) => {
   const parseNumericValue = (value: any): number => {
     if (typeof value === 'number') return value;
     if (typeof value === 'string') {
-      const normalizedValue = value.replace(',', '.');
+      // Handle European number format (comma as decimal separator)
+      const normalizedValue = value.replace(/\./g, '').replace(',', '.');
       const parsed = parseFloat(normalizedValue);
       return isNaN(parsed) ? 0 : parsed;
     }

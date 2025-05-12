@@ -11,7 +11,7 @@ const parseNumericValue = (value: any): number => {
   if (typeof value === 'number') return value;
   if (typeof value === 'string') {
     // Handle both dot and comma as decimal separators
-    const normalizedValue = value.replace(',', '.');
+    const normalizedValue = value.replace(/\./g, '').replace(',', '.');
     const parsed = parseFloat(normalizedValue);
     return isNaN(parsed) ? 0 : parsed;
   }
@@ -28,6 +28,7 @@ const transformWebhookData = (responseData: any): Transaction[] => {
   if (responseData.stripe) {
     console.log('Processing stripe income data:', responseData.stripe);
     const stripeAmount = parseNumericValue(responseData.stripe);
+    console.log('Parsed stripe amount:', stripeAmount);
     if (stripeAmount > 0) {
       transactions.push({
         id: `stripe-${new Date().toISOString().split('T')[0]}`,
@@ -46,6 +47,7 @@ const transformWebhookData = (responseData: any): Transaction[] => {
     console.log(`Processing ${responseData.colaboradores.length} collaborator expenses`);
     responseData.colaboradores.forEach((collab: any, index: number) => {
       const amount = parseNumericValue(collab.total);
+      console.log(`Collaborator ${collab.vendor_name}, amount: ${amount}`);
       if (amount > 0) {
         transactions.push({
           id: `colaborador-${index}-${collab.date || new Date().toISOString().split('T')[0]}`,
@@ -65,6 +67,7 @@ const transformWebhookData = (responseData: any): Transaction[] => {
     console.log(`Processing ${responseData.expenses.length} regular expenses`);
     responseData.expenses.forEach((expense: any, index: number) => {
       const amount = parseNumericValue(expense.total);
+      console.log(`Expense: ${expense.account_name}, amount: ${amount}`);
       if (amount > 0) {
         transactions.push({
           id: `expense-${index}-${expense.date || new Date().toISOString().split('T')[0]}`,
@@ -84,6 +87,7 @@ const transformWebhookData = (responseData: any): Transaction[] => {
     console.log(`Processing ${responseData.payments.length} regular income payments`);
     responseData.payments.forEach((payment: any, index: number) => {
       const amount = parseNumericValue(payment.amount);
+      console.log(`Payment from ${payment.customer_name}, amount: ${amount}`);
       if (amount > 0) {
         transactions.push({
           id: `payment-${index}-${payment.date || new Date().toISOString().split('T')[0]}`,
@@ -97,6 +101,8 @@ const transformWebhookData = (responseData: any): Transaction[] => {
       }
     });
   }
+  
+  console.log(`Transformed ${transactions.length} total transactions`);
   
   // Order transactions by date (newest first)
   return transactions.sort((a, b) => {
@@ -145,22 +151,20 @@ export const fetchTransactionsFromWebhook = async (
     const responseData = await response.json();
     console.log('Raw response data structure:', JSON.stringify(responseData, null, 2).substring(0, 500) + '...');
     
+    // Store raw response for debugging purposes
     if (returnRawResponse) {
-      console.log('Returning raw response from webhook');
       return responseData;
     }
     
     // First check if we have a cached_transactions array (already in the expected format)
     if (responseData.cached_transactions && Array.isArray(responseData.cached_transactions)) {
       console.log(`Got ${responseData.cached_transactions.length} cached transactions from webhook`);
-      console.log('Sample transaction:', responseData.cached_transactions[0]);
       return responseData.cached_transactions;
     }
     
     // If it's already an array in the expected format
     if (Array.isArray(responseData) && responseData.length > 0 && responseData[0].type !== undefined) {
       console.log(`Got ${responseData.length} transactions from direct array response`);
-      console.log('Sample transaction:', responseData[0]);
       return responseData;
     }
     
@@ -171,16 +175,12 @@ export const fetchTransactionsFromWebhook = async (
       console.log('Processing complex webhook response with multiple data types');
       const transformedTransactions = transformWebhookData(responseData);
       console.log(`Transformed ${transformedTransactions.length} transactions from webhook data`);
-      if (transformedTransactions.length > 0) {
-        console.log('Sample transformed transaction:', transformedTransactions[0]);
-      }
       return transformedTransactions;
     }
     
     // If we have a data property that contains the transactions
     if (responseData.data && Array.isArray(responseData.data)) {
       console.log(`Got ${responseData.data.length} transactions from data property`);
-      console.log('Sample transaction:', responseData.data[0]);
       return responseData.data;
     }
     
