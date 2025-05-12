@@ -8,17 +8,21 @@ import { endOfMonth, subMonths, format as formatDate } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 
 export const useFinanceData = () => {
-  // Estados
+  // States
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [dataInitialized, setDataInitialized] = useState<boolean>(false);
   const [rawResponse, setRawResponse] = useState<any>(null);
   const [stripeIncome, setStripeIncome] = useState<number>(0);
+  const [stripeFees, setStripeFees] = useState<number>(0);
+  const [stripeNet, setStripeNet] = useState<number>(0);
+  const [stripeFeePercentage, setStripeFeePercentage] = useState<number>(0);
   const [regularIncome, setRegularIncome] = useState<number>(0);
   const [collaboratorExpenses, setCollaboratorExpenses] = useState<any[]>([]);
   const [startingBalance, setStartingBalance] = useState<number | undefined>(undefined);
   const [usingCachedData, setUsingCachedData] = useState<boolean>(false);
+  const [useStripeOverride, setUseStripeOverride] = useState<boolean>(false);
   
   // Estado del rango de fechas - configurado para mostrar desde el último día del mes anterior hasta el último día del mes actual
   const [dateRange, setDateRange] = useState(() => {
@@ -92,9 +96,12 @@ export const useFinanceData = () => {
       if (data) {
         console.log("Fetched monthly balance:", data);
         setStartingBalance(data.balance);
+        // If stripe_override exists, set the flag to use it
+        setUseStripeOverride(!!data.stripe_override);
       } else {
         console.log("No monthly balance found for:", monthYear);
         setStartingBalance(undefined);
+        setUseStripeOverride(false);
       }
     } catch (err) {
       console.error("Error in fetchMonthlyBalance:", err);
@@ -102,7 +109,7 @@ export const useFinanceData = () => {
   }, []);
 
   // Update the starting balance
-  const updateStartingBalance = useCallback(async (balance: number, notes?: string) => {
+  const updateStartingBalance = useCallback(async (balance: number, notes?: string, stripeOverride?: number) => {
     try {
       const monthYear = formatDate(dateRange.startDate, 'yyyy-MM');
       
@@ -113,14 +120,22 @@ export const useFinanceData = () => {
         .eq('month_year', monthYear)
         .single();
       
+      const updateData: any = {
+        balance,
+        notes: notes || (existingData?.notes || null),
+      };
+      
+      // Only include stripe_override if it's provided
+      if (stripeOverride !== undefined) {
+        updateData.stripe_override = stripeOverride;
+        setUseStripeOverride(!!stripeOverride);
+      }
+      
       if (existingData) {
         // Update existing record
         await supabase
           .from('monthly_balances')
-          .update({
-            balance,
-            notes: notes || existingData.notes,
-          })
+          .update(updateData)
           .eq('month_year', monthYear);
       } else {
         // Create new record
@@ -128,36 +143,51 @@ export const useFinanceData = () => {
           .from('monthly_balances')
           .insert({
             month_year: monthYear,
-            balance,
-            notes: notes || null,
+            ...updateData
           });
       }
       
       setStartingBalance(balance);
+      
+      // Refresh data to reflect the change if using override
+      if (stripeOverride !== undefined) {
+        refreshData(false);
+      }
     } catch (err) {
       console.error("Error updating starting balance:", err);
     }
   }, [dateRange.startDate]);
 
+  // Toggle using stripe override
+  const toggleStripeOverride = useCallback(async (useOverride: boolean) => {
+    setUseStripeOverride(useOverride);
+    refreshData(false);
+  }, []);
+
   // Función para procesar y separar ingresos
-  const processIncomeTypes = useCallback((transactions: Transaction[]) => {
-    let stripeAmount = 0;
+  const processIncomeTypes = useCallback((transactions: Transaction[], stripeData: any) => {
     let regularAmount = 0;
     
+    // Calculate regular income (excluding Stripe transactions)
     transactions.forEach(transaction => {
-      if (transaction.type === 'income') {
-        if (transaction.source === 'Stripe') {
-          stripeAmount += transaction.amount;
-        } else {
-          regularAmount += transaction.amount;
-        }
+      if (transaction.type === 'income' && transaction.source !== 'Stripe') {
+        regularAmount += transaction.amount;
       }
     });
     
-    setStripeIncome(stripeAmount);
+    // Set Stripe income from the API response
+    setStripeIncome(stripeData.gross || 0);
+    setStripeFees(stripeData.fees || 0);
+    setStripeNet(stripeData.net || 0);
+    setStripeFeePercentage(stripeData.feePercentage || 0);
     setRegularIncome(regularAmount);
     
-    return { stripeAmount, regularAmount };
+    return { 
+      stripeGross: stripeData.gross || 0, 
+      stripeFees: stripeData.fees || 0, 
+      stripeNet: stripeData.net || 0,
+      regularAmount 
+    };
   }, []);
 
   // Función para procesar datos de colaboradores
@@ -244,15 +274,22 @@ export const useFinanceData = () => {
       console.log("Fetching from Stripe:", dateRange.startDate, dateRange.endDate);
       const stripeData = await StripeService.getTransactions(
         dateRange.startDate,
-        dateRange.endDate
+        dateRange.endDate,
+        useStripeOverride
       );
 
       // Combinar los datos
-      const combinedData = [...zohoData, ...stripeData];
+      const combinedData = [...zohoData, ...stripeData.transactions];
       console.log("Combined transactions:", combinedData.length);
+      console.log("Stripe data summary:", {
+        gross: stripeData.gross,
+        fees: stripeData.fees,
+        net: stripeData.net,
+        feePercentage: stripeData.feePercentage
+      });
       
       // Procesar ingresos separados
-      processIncomeTypes(combinedData);
+      processIncomeTypes(combinedData, stripeData);
       
       // Actualizar estado
       setTransactions(combinedData);
@@ -275,7 +312,8 @@ export const useFinanceData = () => {
     dateRange.endDate, 
     processIncomeTypes, 
     processCollaboratorData, 
-    fetchMonthlyBalance
+    fetchMonthlyBalance,
+    useStripeOverride
   ]);
 
   // Función pública para refrescar datos (forzando o no)
@@ -294,10 +332,15 @@ export const useFinanceData = () => {
     dataInitialized,
     rawResponse,
     stripeIncome,
+    stripeFees,
+    stripeNet,
+    stripeFeePercentage,
     regularIncome,
     collaboratorExpenses,
     startingBalance,
     updateStartingBalance,
-    usingCachedData
+    usingCachedData,
+    useStripeOverride,
+    toggleStripeOverride
   };
 };

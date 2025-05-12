@@ -1,20 +1,26 @@
 
 import React from 'react';
-import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, BadgeDollarSign, Users, Scale } from 'lucide-react';
+import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, BadgeDollarSign, Users, Scale, Scissors } from 'lucide-react';
 import { FinancialSummary, CategorySummary } from '@/types/financial';
 import { Card, CardContent } from "@/components/ui/card";
 
 interface FinanceSummaryProps {
   summary: FinancialSummary;
   expenseCategories?: CategorySummary[];
-  stripeIncome?: number; // Nuevo parámetro para ingresos de Stripe
-  regularIncome?: number; // Nuevo parámetro para ingresos regulares de Zoho
+  stripeIncome?: number; // Parámetro para ingresos brutos de Stripe
+  stripeFees?: number; // Nuevo parámetro para comisiones de Stripe
+  stripeNet?: number; // Nuevo parámetro para ingresos netos de Stripe
+  stripeFeePercentage?: number; // Porcentaje de comisión
+  regularIncome?: number; // Parámetro para ingresos regulares de Zoho
 }
 
 const FinanceSummary: React.FC<FinanceSummaryProps> = ({ 
   summary, 
   expenseCategories = [],
   stripeIncome = 0,
+  stripeFees = 0,
+  stripeNet = 0,
+  stripeFeePercentage = 0,
   regularIncome = 0
 }) => {
   const formatCurrency = (amount: number) => {
@@ -50,17 +56,50 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
         </CardContent>
       </Card>
 
-      {/* Ingresos Stripe */}
+      {/* Ingresos Stripe Brutos */}
       <Card className="finance-card">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Ingresos Stripe</h3>
+            <h3 className="text-sm font-medium text-gray-500">Stripe (Bruto)</h3>
             <div className="p-2 bg-green-50 rounded-full">
               <BadgeDollarSign className="h-4 w-4 text-green-500" />
             </div>
           </div>
           <div className="text-2xl font-bold text-green-500 animate-value">
             {formatCurrency(stripeIncome)}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Comisiones de Stripe */}
+      <Card className="finance-card">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-gray-500">Comisiones Stripe</h3>
+            <div className="p-2 bg-amber-50 rounded-full">
+              <Scissors className="h-4 w-4 text-amber-500" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-amber-500 animate-value">
+            {formatCurrency(stripeFees)}
+            <div className="text-sm mt-1 text-gray-500">
+              {stripeFeePercentage > 0 && formatPercentage(stripeFeePercentage)}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Ingresos Stripe Neto */}
+      <Card className="finance-card">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-gray-500">Stripe (Neto)</h3>
+            <div className="p-2 bg-green-50 rounded-full">
+              <BadgeDollarSign className="h-4 w-4 text-green-500" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-green-500 animate-value">
+            {formatCurrency(stripeNet)}
           </div>
         </CardContent>
       </Card>
@@ -106,21 +145,6 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
           </div>
           <div className="text-2xl font-bold text-amber-500 animate-value">
             {formatCurrency(summary.collaboratorExpense || 0)}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Otros Gastos */}
-      <Card className="finance-card">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Otros Gastos</h3>
-            <div className="p-2 bg-red-50 rounded-full">
-              <ArrowDownIcon className="h-4 w-4 text-red-500" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-red-500 animate-value">
-            {formatCurrency(summary.otherExpense || 0)}
           </div>
         </CardContent>
       </Card>

@@ -30,8 +30,16 @@ const Index = () => {
     dataInitialized,
     rawResponse,
     stripeIncome,
+    stripeFees,
+    stripeNet,
+    stripeFeePercentage,
     regularIncome,
-    collaboratorExpenses
+    collaboratorExpenses,
+    startingBalance,
+    updateStartingBalance,
+    usingCachedData,
+    useStripeOverride,
+    toggleStripeOverride
   } = useFinanceData();
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
@@ -75,6 +83,11 @@ const Index = () => {
       description: 'Cargando datos financieros...',
     });
     refreshData(true);
+  };
+
+  // Handle stripe override change
+  const handleStripeOverrideChange = (override: number | null) => {
+    toggleStripeOverride(!!override);
   };
 
   // Manejador para actualizar datos
@@ -186,7 +199,10 @@ const Index = () => {
 
             {/* Balance Mensual Inicial */}
             <div className="mb-6">
-              <MonthlyBalanceEditor currentDate={dateRange.startDate} />
+              <MonthlyBalanceEditor 
+                currentDate={dateRange.startDate} 
+                onStripeOverrideChange={handleStripeOverrideChange}
+              />
             </div>
 
             {/* Resumen financiero */}
@@ -194,6 +210,9 @@ const Index = () => {
               summary={financialData.summary} 
               expenseCategories={financialData.expenseByCategory}
               stripeIncome={stripeIncome}
+              stripeFees={stripeFees}
+              stripeNet={stripeNet}
+              stripeFeePercentage={stripeFeePercentage}
               regularIncome={regularIncome}
             />
 
