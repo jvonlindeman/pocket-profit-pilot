@@ -1,17 +1,11 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // CORS headers for browser requests
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-const supabaseUrl = Deno.env.get("SUPABASE_URL") as string;
-const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
-
-const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
 // The make.com webhook URL
 const makeWebhookUrl = "https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihlmx22";
@@ -42,78 +36,6 @@ const generateConsistentId = (transaction: Partial<Transaction>, index: number):
                     `${transaction.customer_name || transaction.vendor_name || 'unknown'}-${transaction.amount || 0}`;
   
   return `${source.toLowerCase()}-${type.toLowerCase()}-${date}-${identifier}`;
-};
-
-// Check if cache is fresh based on how old the data is
-// For current month data, use a shorter window (1 hour)
-// For historical data, use a longer window (24 hours)
-const isCacheFresh = (cachedData: any[], maxHoursOld = 24, requestStartDate: string = ''): boolean => {
-  if (!cachedData || cachedData.length === 0) return false;
-  
-  const latestSync = new Date(Math.max(...cachedData.map(tx => new Date(tx.sync_date).getTime())));
-  const cacheAge = Date.now() - latestSync.getTime();
-  const cacheAgeHours = cacheAge / (1000 * 60 * 60);
-  
-  // If it's the current month, use a shorter freshness window
-  const today = new Date();
-  const currentMonthYear = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-  const requestMonthYear = requestStartDate.substring(0, 7); // Extract YYYY-MM from date
-  
-  // For current month data, use 1 hour; for historical data, use maxHoursOld (default 24 hours)
-  const freshnessPeriod = (requestMonthYear === currentMonthYear) ? 1 : maxHoursOld;
-  
-  console.log(`Cache age: ${cacheAgeHours.toFixed(2)} hours, freshness threshold: ${freshnessPeriod} hours`);
-  
-  return cacheAgeHours < freshnessPeriod;
-};
-
-// Improved cache coverage check that doesn't require a transaction for every day
-const cacheCoversDateRange = (cachedData: any[], startDate: string, endDate: string): boolean => {
-  if (!cachedData || cachedData.length === 0) return false;
-  
-  // Get the earliest and latest dates in the cache
-  const cachedDates = cachedData.map(tx => new Date(tx.date));
-  const earliestCachedDate = new Date(Math.min(...cachedDates.map(date => date.getTime())));
-  const latestCachedDate = new Date(Math.max(...cachedDates.map(date => date.getTime())));
-  
-  const requestStart = new Date(startDate);
-  const requestEnd = new Date(endDate);
-  
-  // Check if the cache spans the entire requested date range
-  const spansDateRange = earliestCachedDate <= requestStart && latestCachedDate >= requestEnd;
-  
-  // Also check if we have a reasonable sample of different transaction types
-  const hasIncomeTransactions = cachedData.some(tx => tx.type === 'income');
-  const hasExpenseTransactions = cachedData.some(tx => tx.type === 'expense');
-  
-  // For Zoho and Stripe sources
-  const hasZohoTransactions = cachedData.some(tx => tx.source === 'Zoho');
-  const hasStripeTransactions = cachedData.some(tx => 
-    tx.source === 'Stripe' || cachedData.length > 10 // If we have many transactions, we might not need Stripe data
-  );
-  
-  // Log coverage details for debugging
-  console.log(`Cache coverage check - Range ${startDate} to ${endDate}:`, {
-    spansDateRange,
-    transactionCount: cachedData.length,
-    hasIncomeTransactions,
-    hasExpenseTransactions,
-    hasZohoTransactions,
-    hasStripeTransactions,
-    earliestCachedDate: earliestCachedDate.toISOString().split('T')[0],
-    latestCachedDate: latestCachedDate.toISOString().split('T')[0],
-    requestStartDate: requestStart.toISOString().split('T')[0],
-    requestEndDate: requestEnd.toISOString().split('T')[0]
-  });
-  
-  // We consider the cache complete if it spans the date range and has representative transaction types
-  const hasGoodCoverage = spansDateRange && 
-    hasIncomeTransactions && 
-    hasExpenseTransactions && 
-    hasZohoTransactions &&
-    hasStripeTransactions;
-    
-  return hasGoodCoverage;
 };
 
 serve(async (req: Request) => {
@@ -148,9 +70,9 @@ serve(async (req: Request) => {
         );
     }
     
-    const { startDate, endDate, forceRefresh = false } = requestBody;
+    const { startDate, endDate } = requestBody;
     
-    console.log("Edge function parsed dates:", { startDate, endDate, forceRefresh });
+    console.log("Edge function parsed dates:", { startDate, endDate });
     
     if (!startDate || !endDate) {
       console.error("Missing start or end date");
@@ -160,51 +82,13 @@ serve(async (req: Request) => {
       );
     }
     
-    // Check if we have cached data for this date range and don't need to refresh
-    if (!forceRefresh) {
-      console.log("Checking for cached transactions");
-      const { data: cachedTransactions, error: cacheError } = await supabase
-        .from("cached_transactions")
-        .select("*")
-        .gte("date", startDate)
-        .lte("date", endDate);
-        
-      if (!cacheError && cachedTransactions && cachedTransactions.length > 0) {
-        console.log(`Found ${cachedTransactions.length} cached transactions for range ${startDate} to ${endDate}`);
-        
-        // Check if the data is recent and covers the entire range
-        const isFresh = isCacheFresh(cachedTransactions, 24, startDate);
-        const fullCoverage = cacheCoversDateRange(cachedTransactions, startDate, endDate);
-        
-        if (isFresh && fullCoverage) {
-          console.log("Returning fresh and complete cached transactions:", cachedTransactions.length);
-          return new Response(
-            JSON.stringify({
-              fromCache: true,
-              cached: true,
-              data: cachedTransactions
-            }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        
-        console.log(`Cache ${!isFresh ? 'is stale' : ''} ${!fullCoverage ? 'has incomplete coverage' : ''}, fetching fresh data`);
-      } else {
-        console.log("No cached data found or cache error:", cacheError);
-      }
-    } else {
-      console.log("Force refresh requested, bypassing cache completely");
-    }
+    // Call the make.com webhook - Direct fetch only, no caching
+    console.log("Edge function fetching data from make.com webhook");
     
-    // No cached data or force refresh, fetch new data from make.com webhook
-    console.log("Edge function fetching fresh data from make.com webhook");
-    
-    // CRITICAL: Use exactly the dates received from the client without any modifications
     // Log the exact dates that will be sent to the webhook
     console.log("Edge function sending dates to webhook:", {
       startDate,
       endDate,
-      forceRefresh
     });
     
     // Call the make.com webhook
@@ -217,7 +101,7 @@ serve(async (req: Request) => {
       body: JSON.stringify({
         startDate: startDate,
         endDate: endDate,
-        forceRefresh: forceRefresh
+        forceRefresh: true // Always force refresh since we're not caching
       })
     });
     
@@ -366,13 +250,13 @@ serve(async (req: Request) => {
       }
     }
     
-    // Process collaborator expenses - Ahora incluyendo fechas
+    // Process collaborator expenses - including dates
     if (Array.isArray(webhookData.colaboradores)) {
       webhookData.colaboradores.forEach((item: any, index: number) => {
         if (item && typeof item.total !== 'undefined' && item.vendor_name) {
           const amount = Number(item.total);
           if (amount > 0) {
-            // Usar la fecha del colaborador si está disponible, o la fecha actual
+            // Use collaborator date if available, or current date
             const collaboratorDate = item.date || new Date().toISOString().split('T')[0];
             
             const collaboratorTransaction = {
@@ -473,75 +357,6 @@ serve(async (req: Request) => {
     }
     
     console.log(`Processed ${transactions.length} transactions for date range ${startDate} to ${endDate}`);
-    
-    // IMPROVED CACHING STRATEGY
-    if (transactions.length > 0) {
-      try {
-        console.log(`Caching ${transactions.length} transactions for date range ${startDate} to ${endDate}`);
-        
-        // Create an array with transactions enriched with sync_date
-        const transactionsWithSyncDate = transactions.map(tx => ({
-          ...tx,
-          sync_date: new Date().toISOString()
-        }));
-        
-        // First, delete all existing transactions for this date range
-        console.log(`Clearing all existing transactions in date range ${startDate} to ${endDate} before inserting new ones`);
-        
-        const { error: deleteRangeError } = await supabase
-          .from("cached_transactions")
-          .delete()
-          .gte("date", startDate)
-          .lte("date", endDate);
-        
-        if (deleteRangeError) {
-          console.error("Error clearing transactions in date range:", deleteRangeError);
-          // Continue with insert even if delete fails
-        }
-        
-        // Now insert all new transactions in batches
-        console.log(`Inserting ${transactionsWithSyncDate.length} transactions into cache`);
-        
-        // Break into smaller batches to avoid any size limitations
-        const batchSize = 50;
-        const batches = [];
-        
-        for (let i = 0; i < transactionsWithSyncDate.length; i += batchSize) {
-          batches.push(transactionsWithSyncDate.slice(i, i + batchSize));
-        }
-        
-        console.log(`Split into ${batches.length} batches for insertion`);
-        
-        // Process each batch
-        for (let i = 0; i < batches.length; i++) {
-          const batch = batches[i];
-          console.log(`Inserting batch ${i + 1} of ${batches.length} with ${batch.length} transactions`);
-          
-          try {
-            const { error: insertError } = await supabase
-              .from("cached_transactions")
-              .insert(batch);
-            
-            if (insertError) {
-              console.error(`Error inserting batch ${i + 1}:`, insertError);
-              
-              // If the error is due to conflicts, log but continue
-              if (insertError.code === '23505') { // Unique constraint violation
-                console.log(`Some transactions in batch ${i + 1} already exist, continuing with next batch`);
-              }
-            } else {
-              console.log(`Successfully inserted batch ${i + 1}`);
-            }
-          } catch (batchError) {
-            console.error(`Error processing batch ${i + 1}:`, batchError);
-          }
-        }
-        
-        console.log(`Cache update completed for date range ${startDate} to ${endDate}`);
-      } catch (dbError) {
-        console.error(`Database error when storing transactions for range ${startDate} to ${endDate}:`, dbError);
-      }
-    }
     
     // Add the original response to the data for debugging
     const responseData = {

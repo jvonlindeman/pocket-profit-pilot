@@ -15,7 +15,6 @@ export const useTransactionFetching = (
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [dataInitialized, setDataInitialized] = useState<boolean>(false);
   const [rawResponse, setRawResponse] = useState<any>(null);
-  const [usingCachedData, setUsingCachedData] = useState<boolean>(false);
 
   // Function to apply Stripe income override to transactions list
   const applyStripeOverride = useCallback((stripeOverride: number) => {
@@ -74,7 +73,6 @@ export const useTransactionFetching = (
     
     setLoading(true);
     setError(null);
-    setUsingCachedData(false);
 
     try {
       // Also fetch the monthly balance for the selected date range
@@ -109,13 +107,6 @@ export const useTransactionFetching = (
       
       if (zohoExpenses.length > 0) {
         console.log("Sample expense transaction:", zohoExpenses[0]);
-      }
-
-      // Detectar si estamos usando datos en caché basado en la respuesta
-      const rawResponseData = ZohoService.getLastRawResponse();
-      if (rawResponseData && rawResponseData.cached) {
-        console.log("Using cached data from previous response");
-        setUsingCachedData(true);
       }
 
       // Obtener la respuesta cruda actual para depuración inmediatamente después
@@ -191,7 +182,7 @@ export const useTransactionFetching = (
     error,
     dataInitialized,
     rawResponse,
-    usingCachedData,
+    usingCachedData: false, // Always false since caching is removed
     fetchData,
     refreshData,
     applyStripeOverride

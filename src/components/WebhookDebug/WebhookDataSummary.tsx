@@ -65,6 +65,22 @@ const WebhookDataSummary: React.FC<WebhookDataSummaryProps> = ({ rawData }) => {
         return sum + parseNumericValue(item.amount);
       }, 0)
     : 0;
+
+  // Check for transformed transactions (cached_transactions in the raw response)
+  const transformedTransactionsCount = rawData.cached_transactions && Array.isArray(rawData.cached_transactions) 
+    ? rawData.cached_transactions.length : 0;
+
+  const transformedIncome = transformedTransactionsCount > 0
+    ? rawData.cached_transactions
+        .filter((tx: any) => tx.type === 'income')
+        .reduce((sum: number, tx: any) => sum + parseNumericValue(tx.amount), 0)
+    : 0;
+
+  const transformedExpense = transformedTransactionsCount > 0
+    ? rawData.cached_transactions
+        .filter((tx: any) => tx.type === 'expense')
+        .reduce((sum: number, tx: any) => sum + parseNumericValue(tx.amount), 0)
+    : 0;
   
   // Calculate net income and other totals
   const totalIncome = stripeIncome + paymentTotal;
@@ -79,7 +95,10 @@ const WebhookDataSummary: React.FC<WebhookDataSummaryProps> = ({ rawData }) => {
     paymentTotal,
     totalIncome,
     totalExpense,
-    netTotal
+    netTotal,
+    transformedTransactionsCount,
+    transformedIncome,
+    transformedExpense
   });
   
   const formatCurrency = (amount: number) => {
@@ -139,6 +158,26 @@ const WebhookDataSummary: React.FC<WebhookDataSummaryProps> = ({ rawData }) => {
           </span>
         </div>
       </div>
+      
+      {transformedTransactionsCount > 0 && (
+        <div className="mt-3 pt-2 border-t border-gray-200">
+          <h4 className="text-xs font-medium text-gray-500 mb-1">Transformed Transactions</h4>
+          <div className="bg-green-50 p-2 rounded">
+            <p className="text-sm font-medium">Found {transformedTransactionsCount} transformed transactions</p>
+            <div className="grid grid-cols-2 gap-2 mt-1 text-xs">
+              <div>
+                <span>Income: </span>
+                <span className="font-medium">{formatCurrency(transformedIncome)}</span>
+              </div>
+              <div>
+                <span>Expense: </span>
+                <span className="font-medium">{formatCurrency(transformedExpense)}</span>
+              </div>
+            </div>
+            <p className="text-xs mt-1">These transactions have been properly formatted but may not be displaying in the UI.</p>
+          </div>
+        </div>
+      )}
       
       {(totalIncome > 0 || totalExpense > 0) && (
         <div className="mt-3 pt-2 border-t border-gray-200 text-xs text-gray-600">
