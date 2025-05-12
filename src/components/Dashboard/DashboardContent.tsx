@@ -17,15 +17,11 @@ const DashboardContent: React.FC = () => {
     loading,
     dataInitialized,
     refreshData,
-    clearCacheAndRefresh,
-    forceManualRefresh,
     dateRange,
     updateDateRange,
     startingBalance,
     stripeOverride,
-    usingCachedData,
-    partialRefresh,
-    cacheStats,
+    refreshStatus,
     isRefreshing,
     lastError,
     hasErrors,
@@ -70,12 +66,10 @@ const DashboardContent: React.FC = () => {
         </div>
         <div className="w-full md:w-1/2 lg:w-1/3">
           <CacheStatusDisplay
-            usingCachedData={usingCachedData}
-            partialRefresh={partialRefresh}
-            cacheStats={cacheStats}
-            lastRefresh={cacheStats?.lastRefresh ? new Date(cacheStats.lastRefresh) : null}
-            onRefreshClick={forceManualRefresh}
+            lastRefresh={refreshStatus.lastRefresh}
+            onRefreshClick={refreshData}
             isRefreshing={isRefreshing}
+            refreshCount={refreshStatus.refreshAttempts}
           />
         </div>
       </div>
@@ -116,7 +110,7 @@ const DashboardContent: React.FC = () => {
           />
           <TransactionsTable 
             transactions={financialData.transactions} 
-            onClearCacheClick={clearCacheAndRefresh}
+            onClearCacheClick={refreshData}
           />
         </>
       )}

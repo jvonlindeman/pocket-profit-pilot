@@ -13,7 +13,7 @@ import { useFinanceErrorHandler } from '@/hooks/useFinanceErrorHandler';
 export const useFinanceDataFetcher = () => {
   const { toast } = useToast();
   const { fetchFinanceDataFromAPI } = useFinanceAPI();
-  const { cacheStatus, updateCacheStatus } = useCacheManagement();
+  const { refreshStatus, updateRefreshStatus } = useCacheManagement();
 
   // Use our hooks for state management and error handling
   const {
@@ -43,7 +43,7 @@ export const useFinanceDataFetcher = () => {
     dateRange: DateRange, 
     stripeIncomeData: { amount: number, isOverridden: boolean },
     startingBalanceData?: { starting_balance: number },
-    forceRefresh: boolean = true // Always force refresh
+    forceRefresh: boolean = true 
   ) => {
     // Check if we're already refreshing
     if (localRefreshingRef.current) {
@@ -59,10 +59,10 @@ export const useFinanceDataFetcher = () => {
     setError(null);
     
     try {
-      // Use retry with backoff for better reliability
+      // Always fetch fresh data from API
       const data = await retryWithBackoff(
-        () => fetchFinanceDataFromAPI(dateRange, forceRefresh, startingBalanceData),
-        1, // No need for retries when we're always forcing refresh
+        () => fetchFinanceDataFromAPI(dateRange, true, startingBalanceData),
+        1,
         1000
       );
       
@@ -79,7 +79,7 @@ export const useFinanceDataFetcher = () => {
       const { financialData: processedData } = transformFinancialData(dataWithBalance, stripeIncomeData);
       
       // Update refresh status
-      updateCacheStatus();
+      updateRefreshStatus();
       
       // Extract and set collaborator expenses if available
       if (data.collaborator_expenses && Array.isArray(data.collaborator_expenses)) {
@@ -123,7 +123,7 @@ export const useFinanceDataFetcher = () => {
     }
   }, [
     fetchFinanceDataFromAPI,
-    updateCacheStatus,
+    updateRefreshStatus,
     toast,
     setFinancialData,
     setLoading,
@@ -135,13 +135,6 @@ export const useFinanceDataFetcher = () => {
     localRefreshingRef
   ]);
 
-  // Adding the missing clearCacheAndRefresh function
-  const clearCacheAndRefresh = useCallback(async (dateRange: DateRange) => {
-    console.log("Clearing cache and refreshing data for range:", dateRange);
-    // Since we're not implementing caching anymore, just return true
-    return true;
-  }, []);
-
   return {
     financialData,
     loading,
@@ -151,11 +144,10 @@ export const useFinanceDataFetcher = () => {
     rawResponse,
     regularIncome,
     collaboratorExpenses,
-    cacheStatus,
+    refreshStatus,
     fetchFinancialData,
-    clearCacheAndRefresh, // Added missing function
     resetErrorState,
     isRefreshing: localRefreshingRef.current,
-    setFinancialData, // Added missing function
+    setFinancialData,
   };
 };

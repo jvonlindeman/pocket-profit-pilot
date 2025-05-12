@@ -1,21 +1,17 @@
 
 import React from 'react';
-import { RefreshCw, RotateCw, Trash2 } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface PeriodHeadingProps {
   periodTitle: string;
   handleRefresh: () => void;
-  handleForceRefresh?: () => void;
-  handleClearCacheAndRefresh?: () => void;
 }
 
 const PeriodHeading: React.FC<PeriodHeadingProps> = ({
   periodTitle,
-  handleRefresh,
-  handleForceRefresh,
-  handleClearCacheAndRefresh
+  handleRefresh
 }) => {
   return (
     <div className="flex justify-between items-center mb-6">
@@ -31,40 +27,10 @@ const PeriodHeading: React.FC<PeriodHeadingProps> = ({
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Actualizar usando caché cuando esté disponible</p>
+              <p>Actualizar los datos</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
-
-        {handleForceRefresh && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={handleForceRefresh}>
-                  <RotateCw className="h-4 w-4 mr-2" /> Forzar actualización
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Ignorar caché y obtener datos frescos de la API</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
-
-        {handleClearCacheAndRefresh && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={handleClearCacheAndRefresh}>
-                  <Trash2 className="h-4 w-4 mr-2" /> Limpiar caché
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Limpiar caché y obtener datos completamente nuevos</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
       </div>
     </div>
   );

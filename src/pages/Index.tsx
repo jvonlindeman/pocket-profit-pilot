@@ -35,9 +35,7 @@ const Index = () => {
     stripeOverride,
     startingBalance,
     initialLoadAttempted,
-    clearCacheAndRefresh,
-    forceManualRefresh,
-    getStripeDataForChart
+    refreshStatus
   } = useFinanceData();
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
@@ -172,21 +170,16 @@ const Index = () => {
   // Combined loading state
   const isLoading = loading || localLoading;
 
-  // Handlers for the additional functions
-  const handleForceRefresh = async () => {
-    if (forceManualRefresh) {
-      await forceManualRefresh();
-    } else {
-      await handleRefresh();
-    }
-  };
-
-  const handleClearCacheAndRefresh = async () => {
-    if (clearCacheAndRefresh) {
-      await clearCacheAndRefresh();
-    } else {
-      await handleRefresh();
-    }
+  // Simple dummy function for charts
+  const getStripeDataForChart = () => {
+    return [
+      { name: 'Jan', value: 0 },
+      { name: 'Feb', value: 0 },
+      { name: 'Mar', value: 0 },
+      { name: 'Apr', value: 0 },
+      { name: 'May', value: stripeIncome || 0 },
+      { name: 'Jun', value: 0 },
+    ];
   };
 
   return (
@@ -225,8 +218,6 @@ const Index = () => {
           <ErrorDisplay 
             error={error}
             handleRefresh={handleRefresh}
-            handleForceRefresh={handleForceRefresh}
-            handleClearCacheAndRefresh={handleClearCacheAndRefresh}
           />
         )}
         
@@ -239,7 +230,7 @@ const Index = () => {
                 stripeIncome={stripeIncome}
                 stripeOverride={stripeOverride}
                 regularIncome={regularIncome}
-                handleClearCacheAndRefresh={handleClearCacheAndRefresh}
+                handleClearCacheAndRefresh={handleRefresh}
               />
             )}
 
@@ -247,8 +238,6 @@ const Index = () => {
             <PeriodHeading 
               periodTitle={periodTitle}
               handleRefresh={handleRefresh}
-              handleForceRefresh={handleForceRefresh}
-              handleClearCacheAndRefresh={handleClearCacheAndRefresh}
             />
 
             {/* Empty transactions notification */}

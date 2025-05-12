@@ -1,41 +1,33 @@
 
 import { useState, useCallback } from 'react';
-import { CacheStats } from '@/types/cache';
 
 export const useCacheManagement = () => {
-  const [cacheStatus, setCacheStatus] = useState<{
+  const [refreshStatus, setRefreshStatus] = useState<{
     lastRefresh: Date | null;
     refreshAttempts: number;
-    usingCachedData: boolean;
-    partialRefresh: boolean;
-    stats: CacheStats | null;
   }>({
     lastRefresh: null,
-    refreshAttempts: 0,
-    usingCachedData: false,
-    partialRefresh: false,
-    stats: null
+    refreshAttempts: 0
   });
 
   /**
    * Update the refresh status information
    */
-  const updateCacheStatus = useCallback(() => {
+  const updateRefreshStatus = useCallback(() => {
     const now = new Date();
-    setCacheStatus(prevStatus => ({
-      ...prevStatus,
+    setRefreshStatus(prevStatus => ({
       lastRefresh: now,
       refreshAttempts: (prevStatus.refreshAttempts || 0) + 1,
     }));
     
     console.log("🔄 Refresh status updated:", {
       time: now.toISOString(),
-      attempts: cacheStatus.refreshAttempts + 1
+      attempts: refreshStatus.refreshAttempts + 1
     });
-  }, [cacheStatus.refreshAttempts]);
+  }, [refreshStatus.refreshAttempts]);
 
   return {
-    cacheStatus,
-    updateCacheStatus
+    refreshStatus,
+    updateRefreshStatus
   };
 };
