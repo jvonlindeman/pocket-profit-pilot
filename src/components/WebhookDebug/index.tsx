@@ -20,9 +20,10 @@ interface WebhookDebugProps {
 }
 
 export default function WebhookDebug({ dateRange, refreshDataFunction, rawResponse }: WebhookDebugProps) {
-  const [loading, setLoading] = useState(false);
-  const [rawData, setRawData] = useState<any>(null);
+  // Initialize all state variables at the top
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [rawData, setRawData] = useState<any>(null);
 
   // Update local state when rawResponse from parent changes
   useEffect(() => {

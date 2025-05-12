@@ -30,7 +30,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
   startDate,
   endDate
 }) => {
-  // Filter transactions by type
+  // Filter transactions by type first before using the results
   const incomeTransactions = transactions.filter(tx => tx.type === 'income');
   const expenseTransactions = transactions.filter(tx => 
     tx.type === 'expense' && tx.category !== 'Pagos a colaboradores'
@@ -39,25 +39,21 @@ const TransactionList: React.FC<TransactionListProps> = ({
     tx.type === 'expense' && tx.category === 'Pagos a colaboradores'
   );
   
-  // Calculate totals
+  // Count transactions by type
+  const incomeCount = incomeTransactions.length;
+  const expenseCount = expenseTransactions.length;
+  const collaboratorCount = collaboratorTransactions.length;
+  
+  // Calculate totals after filtering
   const getTotals = () => {
-    const incomeTotal = transactions
-      .filter(tx => tx.type === 'income')
-      .reduce((sum, tx) => sum + tx.amount, 0);
-      
-    const expenseTotal = transactions
-      .filter(tx => tx.type === 'expense')
+    const incomeTotal = incomeTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+    const expenseTotal = [...expenseTransactions, ...collaboratorTransactions]
       .reduce((sum, tx) => sum + tx.amount, 0);
       
     return { incomeTotal, expenseTotal, netTotal: incomeTotal - expenseTotal };
   };
   
   const totals = getTotals();
-  
-  // Count transactions by type
-  const incomeCount = incomeTransactions.length;
-  const expenseCount = expenseTransactions.length;
-  const collaboratorCount = collaboratorTransactions.length;
   
   // Log transaction counts and totals for debugging
   console.log("Transaction List Stats:", { 
@@ -76,6 +72,14 @@ const TransactionList: React.FC<TransactionListProps> = ({
   if (collaboratorTransactions.length > 0) {
     console.log("Sample collaborator transaction:", collaboratorTransactions[0]);
   }
+
+  // Format currency helper function
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
+  };
 
   return (
     <>
@@ -149,14 +153,6 @@ const TransactionList: React.FC<TransactionListProps> = ({
       </Card>
     </>
   );
-};
-
-// Format currency helper function
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD'
-  }).format(amount);
 };
 
 export default TransactionList;

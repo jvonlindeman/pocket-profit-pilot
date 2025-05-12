@@ -7,7 +7,7 @@ export const fetchTransactionsFromWebhook = async (
   forceRefresh = false,
   returnRawResponse = false
 ) => {
-  // Format dates carefully for consistency
+  // Format dates carefully for consistency first, before using them
   const startDateFormatted = startDate.toISOString().split('T')[0]; // YYYY-MM-DD
   const endDateFormatted = endDate.toISOString().split('T')[0]; // YYYY-MM-DD
 
@@ -54,21 +54,19 @@ export const fetchTransactionsFromWebhook = async (
       return responseData;
     }
     
-    // Check if we received cached transactions directly
+    // Check each possible data structure in order
     if (responseData.cached_transactions && Array.isArray(responseData.cached_transactions)) {
       console.log(`Got ${responseData.cached_transactions.length} cached transactions from edge function`);
       console.log('Sample transaction:', responseData.cached_transactions[0]);
       return responseData.cached_transactions;
     }
     
-    // Check if transactions are in a data property
     if (responseData.data && Array.isArray(responseData.data)) {
       console.log(`Got ${responseData.data.length} transactions from data property`);
       console.log('Sample transaction:', responseData.data[0]);
       return responseData.data;
     }
     
-    // If the response is an array, assume it's transactions
     if (Array.isArray(responseData)) {
       console.log(`Got ${responseData.length} transactions from direct array response`);
       console.log('Sample transaction:', responseData[0]);
