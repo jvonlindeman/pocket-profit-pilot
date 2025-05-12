@@ -64,8 +64,9 @@ export const useFinanceData = () => {
     // Fetch monthly balance when date range changes
     fetchMonthlyBalance(newRange.startDate);
     
-    // Check if we need to refresh the cache
-    ZohoService.checkAndRefreshCache(newRange.startDate, newRange.endDate);
+    // No longer need to check for cache refresh since caching was removed
+    // Just load data directly
+    refreshData(true); // Force refresh data when date range changes
   };
 
   // Track last stripe override value to prevent duplicate toast notifications
