@@ -4,6 +4,106 @@ import { Transaction } from "../../types/financial";
 // The direct make.com webhook URL
 const MAKE_WEBHOOK_URL = "https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihlmx22";
 
+/**
+ * Helper function to parse numeric values that might come as strings with different formats
+ */
+const parseNumericValue = (value: any): number => {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    // Handle both dot and comma as decimal separators
+    const normalizedValue = value.replace(',', '.');
+    const parsed = parseFloat(normalizedValue);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+  return 0;
+};
+
+/**
+ * Transforms webhook response data into Transaction objects
+ */
+const transformWebhookData = (responseData: any): Transaction[] => {
+  const transactions: Transaction[] = [];
+  
+  // Process stripe income if present
+  if (responseData.stripe && typeof responseData.stripe === 'object') {
+    console.log('Processing stripe income data:', responseData.stripe);
+    const stripeAmount = parseNumericValue(responseData.stripe.amount);
+    if (stripeAmount > 0) {
+      transactions.push({
+        id: `stripe-${responseData.stripe.date || new Date().toISOString().split('T')[0]}`,
+        date: responseData.stripe.date || new Date().toISOString().split('T')[0],
+        amount: stripeAmount,
+        description: 'Ingresos de Stripe',
+        category: 'Ingresos por plataforma',
+        source: 'Stripe',
+        type: 'income'
+      });
+    }
+  }
+  
+  // Process collaborator expenses if present
+  if (responseData.colaboradores && Array.isArray(responseData.colaboradores)) {
+    console.log(`Processing ${responseData.colaboradores.length} collaborator expenses`);
+    responseData.colaboradores.forEach((collab: any, index: number) => {
+      const amount = parseNumericValue(collab.amount);
+      if (amount > 0) {
+        transactions.push({
+          id: `colaborador-${index}-${collab.date || new Date().toISOString().split('T')[0]}`,
+          date: collab.date || new Date().toISOString().split('T')[0],
+          amount: amount,
+          description: collab.name || 'Pago a colaborador',
+          category: 'Pagos a colaboradores',
+          source: 'Zoho',
+          type: 'expense'
+        });
+      }
+    });
+  }
+  
+  // Process regular expenses if present
+  if (responseData.expenses && Array.isArray(responseData.expenses)) {
+    console.log(`Processing ${responseData.expenses.length} regular expenses`);
+    responseData.expenses.forEach((expense: any, index: number) => {
+      const amount = parseNumericValue(expense.amount);
+      if (amount > 0) {
+        transactions.push({
+          id: `expense-${index}-${expense.date || new Date().toISOString().split('T')[0]}`,
+          date: expense.date || new Date().toISOString().split('T')[0],
+          amount: amount,
+          description: expense.description || 'Gasto',
+          category: expense.category || 'Otros gastos',
+          source: 'Zoho',
+          type: 'expense'
+        });
+      }
+    });
+  }
+  
+  // Process regular income/payments if present
+  if (responseData.payments && Array.isArray(responseData.payments)) {
+    console.log(`Processing ${responseData.payments.length} regular income payments`);
+    responseData.payments.forEach((payment: any, index: number) => {
+      const amount = parseNumericValue(payment.amount);
+      if (amount > 0) {
+        transactions.push({
+          id: `payment-${index}-${payment.date || new Date().toISOString().split('T')[0]}`,
+          date: payment.date || new Date().toISOString().split('T')[0],
+          amount: amount,
+          description: payment.description || 'Ingreso',
+          category: payment.category || 'Otros ingresos',
+          source: 'Zoho',
+          type: 'income'
+        });
+      }
+    });
+  }
+  
+  // Order transactions by date (newest first)
+  return transactions.sort((a, b) => {
+    return new Date(b.date).getTime() - new Date(a.date).getTime();
+  });
+};
+
 export const fetchTransactionsFromWebhook = async (
   startDate: Date,
   endDate: Date,
@@ -50,23 +150,38 @@ export const fetchTransactionsFromWebhook = async (
       return responseData;
     }
     
-    // Check each possible data structure in order
+    // First check if we have a cached_transactions array (already in the expected format)
     if (responseData.cached_transactions && Array.isArray(responseData.cached_transactions)) {
       console.log(`Got ${responseData.cached_transactions.length} cached transactions from webhook`);
       console.log('Sample transaction:', responseData.cached_transactions[0]);
       return responseData.cached_transactions;
     }
     
+    // If it's already an array in the expected format
+    if (Array.isArray(responseData) && responseData.length > 0 && responseData[0].type !== undefined) {
+      console.log(`Got ${responseData.length} transactions from direct array response`);
+      console.log('Sample transaction:', responseData[0]);
+      return responseData;
+    }
+    
+    // If it's a complex object with specific data structure, transform it
+    if (typeof responseData === 'object' && 
+        (responseData.stripe || responseData.colaboradores || 
+         responseData.expenses || responseData.payments)) {
+      console.log('Processing complex webhook response with multiple data types');
+      const transformedTransactions = transformWebhookData(responseData);
+      console.log(`Transformed ${transformedTransactions.length} transactions from webhook data`);
+      if (transformedTransactions.length > 0) {
+        console.log('Sample transformed transaction:', transformedTransactions[0]);
+      }
+      return transformedTransactions;
+    }
+    
+    // If we have a data property that contains the transactions
     if (responseData.data && Array.isArray(responseData.data)) {
       console.log(`Got ${responseData.data.length} transactions from data property`);
       console.log('Sample transaction:', responseData.data[0]);
       return responseData.data;
-    }
-    
-    if (Array.isArray(responseData)) {
-      console.log(`Got ${responseData.length} transactions from direct array response`);
-      console.log('Sample transaction:', responseData[0]);
-      return responseData;
     }
     
     console.warn('Could not parse transactions from response:', responseData);
