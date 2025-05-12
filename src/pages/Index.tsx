@@ -25,7 +25,9 @@ const Index = () => {
     rawResponse,
     stripeIncome,
     regularIncome,
-    collaboratorExpenses
+    collaboratorExpenses,
+    stripeOverride,
+    updateStripeOverride
   } = useFinanceData();
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
@@ -81,6 +83,11 @@ const Index = () => {
     refreshData(true);
   };
 
+  // Handler for stripe override changes
+  const handleStripeOverrideChange = (value: number | null) => {
+    updateStripeOverride(value);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Dialog to set initial balance */}
@@ -120,6 +127,8 @@ const Index = () => {
             stripeIncome={stripeIncome}
             regularIncome={regularIncome}
             collaboratorExpenses={collaboratorExpenses}
+            stripeOverride={stripeOverride}
+            onStripeOverrideChange={handleStripeOverrideChange}
           />
         )}
         

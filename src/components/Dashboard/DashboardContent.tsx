@@ -9,6 +9,7 @@ import TransactionList from '@/components/Dashboard/TransactionList';
 import { FinancialData, CategorySummary, DateRange } from '@/types/financial';
 import EmptyStateWarning from './EmptyStateWarning';
 import PeriodHeader from './PeriodHeader';
+import MonthlyBalanceEditor from '@/components/Dashboard/MonthlyBalanceEditor';
 
 interface DashboardContentProps {
   financialData: FinancialData;
@@ -19,6 +20,8 @@ interface DashboardContentProps {
   stripeIncome: number;
   regularIncome: number;
   collaboratorExpenses: CategorySummary[];
+  stripeOverride?: number | null;
+  onStripeOverrideChange?: (value: number | null) => void;
 }
 
 const DashboardContent: React.FC<DashboardContentProps> = ({
@@ -29,7 +32,9 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   dateRange,
   stripeIncome,
   regularIncome,
-  collaboratorExpenses
+  collaboratorExpenses,
+  stripeOverride,
+  onStripeOverrideChange
 }) => {
   // Prepare Stripe data for chart
   const getStripeDataForChart = () => {
@@ -42,6 +47,13 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
     return { labels: [], values: [] };
   };
 
+  // Handle Stripe override change
+  const handleStripeOverrideChange = (value: number | null) => {
+    if (onStripeOverrideChange) {
+      onStripeOverrideChange(value);
+    }
+  };
+
   return (
     <>
       {/* Periodo y botón de actualización */}
@@ -50,10 +62,23 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
       {/* Información de depuración */}
       {financialData.transactions.length === 0 && <EmptyStateWarning />}
 
-      {/* Balance Mensual Inicial */}
+      {/* Balance Mensual Inicial y Override de Stripe */}
       <div className="mb-6">
-        <MonthlyBalanceEditor currentDate={dateRange.startDate} />
+        <MonthlyBalanceEditor 
+          currentDate={dateRange.startDate} 
+          onStripeOverrideChange={handleStripeOverrideChange}
+        />
       </div>
+
+      {/* Mensaje de stripe override si está activo */}
+      {stripeOverride !== null && stripeOverride !== undefined && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-lg p-4 mb-6">
+          <p className="font-medium">Valor manual de Stripe: ${stripeOverride.toFixed(2)}</p>
+          <p className="mt-1 text-sm">
+            Los ingresos de Stripe mostrados son valores introducidos manualmente, no datos calculados.
+          </p>
+        </div>
+      )}
 
       {/* Resumen financiero */}
       <FinanceSummary 
@@ -98,7 +123,5 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
     </>
   );
 };
-
-import MonthlyBalanceEditor from '@/components/Dashboard/MonthlyBalanceEditor';
 
 export default DashboardContent;

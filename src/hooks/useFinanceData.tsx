@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import ZohoService from '@/services/zohoService';
 import StripeService from '@/services/stripeService';
@@ -19,6 +18,7 @@ export const useFinanceData = () => {
   const [collaboratorExpenses, setCollaboratorExpenses] = useState<any[]>([]);
   const [startingBalance, setStartingBalance] = useState<number | undefined>(undefined);
   const [usingCachedData, setUsingCachedData] = useState<boolean>(false);
+  const [stripeOverride, setStripeOverride] = useState<number | null>(null);
   
   // Estado del rango de fechas - configurado para mostrar desde el último día del mes anterior hasta el último día del mes actual
   const [dateRange, setDateRange] = useState(() => {
@@ -92,9 +92,11 @@ export const useFinanceData = () => {
       if (data) {
         console.log("Fetched monthly balance:", data);
         setStartingBalance(data.balance);
+        setStripeOverride(data.stripe_override);
       } else {
         console.log("No monthly balance found for:", monthYear);
         setStartingBalance(undefined);
+        setStripeOverride(null);
       }
     } catch (err) {
       console.error("Error in fetchMonthlyBalance:", err);
@@ -139,6 +141,46 @@ export const useFinanceData = () => {
     }
   }, [dateRange.startDate]);
 
+  // Update the stripe override value
+  const updateStripeOverride = useCallback(async (override: number | null) => {
+    try {
+      const monthYear = formatDate(dateRange.startDate, 'yyyy-MM');
+      
+      // Check if a record already exists
+      const { data: existingData } = await supabase
+        .from('monthly_balances')
+        .select('*')
+        .eq('month_year', monthYear)
+        .single();
+      
+      if (existingData) {
+        // Update existing record
+        await supabase
+          .from('monthly_balances')
+          .update({
+            stripe_override: override
+          })
+          .eq('month_year', monthYear);
+      } else {
+        // Create new record with default balance 0
+        await supabase
+          .from('monthly_balances')
+          .insert({
+            month_year: monthYear,
+            balance: 0,
+            stripe_override: override
+          });
+      }
+      
+      setStripeOverride(override);
+      
+      // Recalculate income with the new override value
+      processIncomeTypes(transactions);
+    } catch (err) {
+      console.error("Error updating stripe override:", err);
+    }
+  }, [dateRange.startDate, transactions, processIncomeTypes]);
+
   // Función para procesar y separar ingresos
   const processIncomeTypes = useCallback((transactions: Transaction[]) => {
     let stripeAmount = 0;
@@ -154,11 +196,17 @@ export const useFinanceData = () => {
       }
     });
     
+    // If there's a stripe override value, use that instead of calculated value
+    if (stripeOverride !== null) {
+      console.log("Using stripe override value:", stripeOverride, "instead of calculated:", stripeAmount);
+      stripeAmount = stripeOverride;
+    }
+    
     setStripeIncome(stripeAmount);
     setRegularIncome(regularAmount);
     
     return { stripeAmount, regularAmount };
-  }, []);
+  }, [stripeOverride]);
 
   // Función para procesar datos de colaboradores
   const processCollaboratorData = useCallback((rawResponse: any) => {
@@ -298,6 +346,8 @@ export const useFinanceData = () => {
     collaboratorExpenses,
     startingBalance,
     updateStartingBalance,
+    stripeOverride,
+    updateStripeOverride,
     usingCachedData
   };
 };

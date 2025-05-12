@@ -66,4 +66,5 @@ export interface MonthlyBalance {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  stripe_override: number | null; // Added stripe_override field
 }
