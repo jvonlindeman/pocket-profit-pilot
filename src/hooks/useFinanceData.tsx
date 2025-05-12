@@ -1,5 +1,5 @@
 
-import { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { processTransactionData } from '@/services/zoho/utils';
 import { useFinanceDateRange } from './finance/useFinanceDateRange';
 import { useFinanceProcessing } from './finance/useFinanceProcessing';
@@ -69,7 +69,7 @@ export const useFinanceData = () => {
   };
 
   // Track last stripe override value to prevent duplicate toast notifications
-  const lastStripeOverrideRef = React.useRef<number | null>(null);
+  const lastStripeOverrideRef = useRef<number | null>(null);
   
   // Update stripe override with immediate processing refresh
   const updatedUpdateStripeOverride = async (override: number | null) => {
