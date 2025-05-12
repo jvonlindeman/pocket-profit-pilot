@@ -60,18 +60,31 @@ const CollaboratorTransactions: React.FC<CollaboratorTransactionsProps> = ({ tra
 
   // Calculate total collaborator payments
   const totalPayments = transactions.reduce((sum, tx) => sum + tx.amount, 0);
+  
+  console.log(`Rendering ${transactions.length} collaborator transactions with total: ${totalPayments}`);
+  
+  // Log a few sample transactions for debugging
+  if (transactions.length > 0) {
+    console.log("Sample collaborator transactions:", 
+      transactions.slice(0, Math.min(3, transactions.length)).map(tx => ({
+        id: tx.id,
+        description: tx.description,
+        amount: tx.amount
+      }))
+    );
+  }
 
   return (
-    <div className="bg-blue-50 p-4 rounded-md mb-4">
+    <div className="bg-amber-50 p-4 rounded-md mb-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-semibold text-blue-800">Pagos a Colaboradores</h3>
-        <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+        <h3 className="text-lg font-semibold text-amber-800">Pagos a Colaboradores</h3>
+        <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200">
           Total: {formatCurrency(totalPayments)}
         </Badge>
       </div>
       
       <Table>
-        <TableHeader className="bg-blue-100">
+        <TableHeader className="bg-amber-100">
           <TableRow>
             <TableHead>Colaborador</TableHead>
             <TableHead>Fecha</TableHead>
@@ -93,10 +106,10 @@ const CollaboratorTransactions: React.FC<CollaboratorTransactionsProps> = ({ tra
               const initials = getInitials(collaboratorName);
               
               return (
-                <TableRow key={transaction.id} className="hover:bg-blue-100/50">
+                <TableRow key={transaction.id} className="hover:bg-amber-100/50">
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <Avatar className="h-8 w-8 bg-blue-200 text-blue-800">
+                      <Avatar className="h-8 w-8 bg-amber-200 text-amber-800">
                         <AvatarFallback>{initials}</AvatarFallback>
                       </Avatar>
                       <span>{collaboratorName}</span>
@@ -105,7 +118,7 @@ const CollaboratorTransactions: React.FC<CollaboratorTransactionsProps> = ({ tra
                   <TableCell>{formatDate(transaction.date)}</TableCell>
                   <TableCell>{transaction.description}</TableCell>
                   <TableCell>{transaction.source}</TableCell>
-                  <TableCell className="text-right font-medium text-red-600">
+                  <TableCell className="text-right font-medium text-amber-600">
                     - {formatCurrency(transaction.amount)}
                   </TableCell>
                 </TableRow>

@@ -117,6 +117,25 @@ export const processTransactionData = (
   let originalStripeIncome = 0;
   let regularIncome = 0;  // Zoho income
   
+  console.log(`Processing ${transactions.length} transactions with categories: `, 
+    [...new Set(transactions.map(t => t.category))].join(', '));
+  
+  // Log all collaborator transactions if any
+  const collaboratorTransactions = transactions.filter(tx => 
+    tx.type === 'expense' && tx.category === 'Pagos a colaboradores');
+    
+  if (collaboratorTransactions.length > 0) {
+    console.log(`Found ${collaboratorTransactions.length} collaborator transactions:`, 
+      collaboratorTransactions.map(t => ({ 
+        id: t.id, 
+        description: t.description,
+        amount: t.amount
+      }))
+    );
+  } else {
+    console.log('No collaborator transactions found in the data');
+  }
+  
   transactions.forEach(transaction => {
     if (transaction.type === 'income') {
       // Track original Stripe income separately
@@ -133,11 +152,14 @@ export const processTransactionData = (
       // Separate collaborator expenses from the rest
       if (transaction.category === 'Pagos a colaboradores') {
         collaboratorExpense += transaction.amount;
+        console.log(`Adding collaborator expense: ${transaction.description} - $${transaction.amount}`);
       } else {
         otherExpense += transaction.amount;
       }
     }
   });
+
+  console.log(`Expense breakdown - Collaborator: $${collaboratorExpense}, Other: $${otherExpense}, Total: $${totalExpense}`);
 
   // Apply Stripe override if provided
   let stripeIncome = originalStripeIncome;
@@ -185,4 +207,3 @@ export const processTransactionData = (
     monthlyData
   };
 };
-

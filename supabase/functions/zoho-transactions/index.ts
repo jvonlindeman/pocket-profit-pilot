@@ -252,10 +252,14 @@ serve(async (req: Request) => {
     
     // Process collaborator expenses - including dates
     if (Array.isArray(webhookData.colaboradores)) {
+      console.log(`Processing ${webhookData.colaboradores.length} collaborator records`);
+      
       webhookData.colaboradores.forEach((item: any, index: number) => {
         if (item && typeof item.total !== 'undefined' && item.vendor_name) {
           const amount = Number(item.total);
           if (amount > 0) {
+            console.log(`Processing collaborator: ${item.vendor_name}, amount: ${amount}`);
+            
             // Use collaborator date if available, or current date
             const collaboratorDate = item.date || new Date().toISOString().split('T')[0];
             
@@ -282,10 +286,14 @@ serve(async (req: Request) => {
           }
         }
       });
+      
+      console.log(`Added ${transactions.filter(tx => tx.category === 'Pagos a colaboradores').length} collaborator transactions`);
     }
     
     // Process regular expenses (ignoring "Impuestos" category)
     if (Array.isArray(webhookData.expenses)) {
+      console.log(`Processing ${webhookData.expenses.length} expense records`);
+      
       webhookData.expenses.forEach((item: any, index: number) => {
         if (item && typeof item.total !== 'undefined' && item.account_name !== "Impuestos") {
           const amount = Number(item.total);
@@ -319,10 +327,14 @@ serve(async (req: Request) => {
           }
         }
       });
+      
+      console.log(`Added ${transactions.filter(tx => tx.type === 'expense' && tx.category !== 'Pagos a colaboradores').length} regular expense transactions`);
     }
     
     // Process payments (income)
     if (Array.isArray(webhookData.payments)) {
+      console.log(`Processing ${webhookData.payments.length} payment records`);
+      
       webhookData.payments.forEach((item: any, index: number) => {
         if (item && typeof item.amount !== 'undefined' && item.customer_name) {
           const amount = Number(item.amount);
@@ -354,9 +366,12 @@ serve(async (req: Request) => {
           }
         }
       });
+      
+      console.log(`Added ${transactions.filter(tx => tx.type === 'income' && tx.source !== 'Stripe').length} income transactions`);
     }
     
     console.log(`Processed ${transactions.length} transactions for date range ${startDate} to ${endDate}`);
+    console.log(`Breakdown - Income: ${transactions.filter(tx => tx.type === 'income').length}, Expenses: ${transactions.filter(tx => tx.type === 'expense').length}, Collaborators: ${transactions.filter(tx => tx.category === 'Pagos a colaboradores').length}`);
     
     // Add the original response to the data for debugging
     const responseData = {

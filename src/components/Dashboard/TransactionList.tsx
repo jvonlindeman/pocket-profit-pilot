@@ -30,13 +30,13 @@ const TransactionList: React.FC<TransactionListProps> = ({
   startDate,
   endDate
 }) => {
-  // Filter transactions by type first before using the results
+  // Filter transactions by type and category first
   const incomeTransactions = transactions.filter(tx => tx.type === 'income');
-  const expenseTransactions = transactions.filter(tx => 
-    tx.type === 'expense' && tx.category !== 'Pagos a colaboradores'
-  );
   const collaboratorTransactions = transactions.filter(tx => 
     tx.type === 'expense' && tx.category === 'Pagos a colaboradores'
+  );
+  const expenseTransactions = transactions.filter(tx => 
+    tx.type === 'expense' && tx.category !== 'Pagos a colaboradores'
   );
   
   // Count transactions by type
@@ -47,10 +47,18 @@ const TransactionList: React.FC<TransactionListProps> = ({
   // Calculate totals after filtering
   const getTotals = () => {
     const incomeTotal = incomeTransactions.reduce((sum, tx) => sum + tx.amount, 0);
-    const expenseTotal = [...expenseTransactions, ...collaboratorTransactions]
-      .reduce((sum, tx) => sum + tx.amount, 0);
+    const expenseTotal = expenseTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+    const collaboratorTotal = collaboratorTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+    
+    const totalExpenses = expenseTotal + collaboratorTotal;
       
-    return { incomeTotal, expenseTotal, netTotal: incomeTotal - expenseTotal };
+    return { 
+      incomeTotal, 
+      expenseTotal, 
+      collaboratorTotal,
+      totalExpenses,  
+      netTotal: incomeTotal - totalExpenses 
+    };
   };
   
   const totals = getTotals();
@@ -63,6 +71,8 @@ const TransactionList: React.FC<TransactionListProps> = ({
     collaborator: collaboratorCount,
     incomeTotal: totals.incomeTotal,
     expenseTotal: totals.expenseTotal,
+    collaboratorTotal: totals.collaboratorTotal,
+    totalExpenses: totals.totalExpenses,
     netTotal: totals.netTotal
   });
   
@@ -142,8 +152,11 @@ const TransactionList: React.FC<TransactionListProps> = ({
             <div className="text-blue-600 font-medium">
               Ingresos: {formatCurrency(totals.incomeTotal)} ({incomeCount})
             </div>
+            <div className="text-amber-600 font-medium">
+              Colaboradores: {formatCurrency(totals.collaboratorTotal)} ({collaboratorCount})
+            </div>
             <div className="text-red-600 font-medium">
-              Gastos: {formatCurrency(totals.expenseTotal)} ({expenseCount + collaboratorCount})
+              Otros gastos: {formatCurrency(totals.expenseTotal)} ({expenseCount})
             </div>
             <div className={`font-semibold ${totals.netTotal >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               Neto: {formatCurrency(totals.netTotal)}
