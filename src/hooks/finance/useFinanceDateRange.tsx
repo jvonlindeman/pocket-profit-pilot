@@ -4,6 +4,15 @@ import { endOfMonth, subMonths, startOfMonth } from 'date-fns';
 import { DateRange } from '@/types/financial';
 
 export const useFinanceDateRange = () => {
+  // Function to format date in YYYY-MM-DD format without timezone shifts
+  // Define this function BEFORE using it in useState initialization
+  const formatDateYYYYMMDD = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
   // Estado del rango de fechas - configurado para mostrar desde el primer día del mes anterior hasta el último día del mes actual
   const [dateRange, setDateRange] = useState<DateRange>(() => {
     const today = new Date();
@@ -17,14 +26,6 @@ export const useFinanceDateRange = () => {
     );
     return { startDate, endDate };
   });
-
-  // Function to format date in YYYY-MM-DD format without timezone shifts
-  const formatDateYYYYMMDD = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
 
   // Obtener el rango del mes actual
   const getCurrentMonthRange = useCallback(() => {
