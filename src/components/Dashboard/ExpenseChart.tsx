@@ -83,8 +83,13 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenseData }) => {
                 verticalAlign="middle" 
                 align="right"
                 formatter={(value, entry, index) => {
-                  const item = chartData[index];
-                  return <span className="text-sm">{value} ({item.percentage})</span>;
+                  // Make sure index is a valid number before accessing chartData
+                  if (index !== undefined && index >= 0 && index < chartData.length) {
+                    const item = chartData[index];
+                    return <span className="text-sm">{value} ({item.percentage})</span>;
+                  }
+                  // Fallback in case index is undefined or out of bounds
+                  return <span className="text-sm">{value}</span>;
                 }}
               />
             </PieChart>
