@@ -188,7 +188,7 @@ const SalaryProfitCalculator: React.FC<SalaryProfitCalculatorProps> = ({
               </div>
               
               <div className="flex justify-between items-center text-red-600">
-                <span>- Impuestos (5%):</span>
+                <span>- Impuestos para ahorro (5%):</span>
                 <span>{formatCurrency(salaryCalculation.taxAmount)}</span>
               </div>
               
