@@ -17,6 +17,44 @@ export const useTransactionFetching = (
   const [rawResponse, setRawResponse] = useState<any>(null);
   const [usingCachedData, setUsingCachedData] = useState<boolean>(false);
 
+  // Function to apply Stripe income override to transactions list
+  const applyStripeOverride = useCallback((stripeOverride: number) => {
+    setTransactions(currentTransactions => {
+      // Find the Stripe transaction if it exists
+      const hasStripeTransaction = currentTransactions.some(tx => 
+        tx.source === 'Stripe' && tx.type === 'income'
+      );
+      
+      if (!hasStripeTransaction) {
+        // If no Stripe transaction exists, create a new one
+        const today = new Date().toISOString().split('T')[0];
+        const newStripeTransaction: Transaction = {
+          id: `stripe-override-${today}`,
+          date: today,
+          amount: stripeOverride,
+          description: 'Ingresos de Stripe (Manual)',
+          category: 'Ingresos por plataforma',
+          source: 'Stripe',
+          type: 'income'
+        };
+        
+        return [...currentTransactions, newStripeTransaction];
+      }
+      
+      // Update existing Stripe transactions
+      return currentTransactions.map(tx => {
+        if (tx.source === 'Stripe' && tx.type === 'income') {
+          return {
+            ...tx,
+            amount: stripeOverride,
+            description: tx.description + ' (Manual)',
+          };
+        }
+        return tx;
+      });
+    });
+  }, []);
+
   // Función para cargar los datos
   const fetchData = useCallback(async (forceRefresh = false) => {
     console.log("Fetching financial data...");
@@ -106,6 +144,7 @@ export const useTransactionFetching = (
     rawResponse,
     usingCachedData,
     fetchData,
-    refreshData
+    refreshData,
+    applyStripeOverride  // Export the new function
   };
 };

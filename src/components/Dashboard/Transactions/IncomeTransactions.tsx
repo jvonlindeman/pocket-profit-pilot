@@ -73,9 +73,21 @@ const IncomeTransactions: React.FC<IncomeTransactionsProps> = ({ transactions })
             </TableRow>
           ) : (
             transactions.map((transaction) => (
-              <TableRow key={transaction.id} className="hover:bg-green-100/50">
+              <TableRow 
+                key={transaction.id} 
+                className={`hover:bg-green-100/50 ${
+                  transaction.description.includes('(Manual)') ? 'bg-green-50' : ''
+                }`}
+              >
                 <TableCell>{formatDate(transaction.date)}</TableCell>
-                <TableCell>{transaction.description}</TableCell>
+                <TableCell>
+                  {transaction.description}
+                  {transaction.description.includes('(Manual)') && (
+                    <span className="ml-2 text-xs bg-green-200 text-green-800 px-2 py-1 rounded-full">
+                      Override
+                    </span>
+                  )}
+                </TableCell>
                 <TableCell>{transaction.category}</TableCell>
                 <TableCell>{transaction.source}</TableCell>
                 <TableCell className="text-right font-medium text-green-600">

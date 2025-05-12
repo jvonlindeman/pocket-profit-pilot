@@ -47,7 +47,8 @@ export const useFinanceData = () => {
     rawResponse,
     usingCachedData,
     fetchData,
-    refreshData
+    refreshData,
+    applyStripeOverride  // Add this to get the new function
   } = useTransactionFetching(dateRange, formatDateYYYYMMDD, fetchMonthlyBalance);
 
   // Process financial data with the latest state values
@@ -67,6 +68,12 @@ export const useFinanceData = () => {
   // Update stripe override with immediate processing refresh
   const updatedUpdateStripeOverride = async (override: number | null) => {
     await updateStripeOverride(override, dateRange.startDate);
+    
+    // Apply the stripe override to transactions
+    if (transactions.length > 0 && override !== null) {
+      applyStripeOverride(override);
+    }
+    
     processIncomeTypes(transactions, override);
   };
 
@@ -91,8 +98,13 @@ export const useFinanceData = () => {
       if (rawResponse) {
         processCollaboratorData(rawResponse);
       }
+      
+      // Apply stripe override to transactions when available
+      if (stripeOverride !== null) {
+        applyStripeOverride(stripeOverride);
+      }
     }
-  }, [transactions, stripeOverride, processIncomeTypes, processCollaboratorData, rawResponse]);
+  }, [transactions, stripeOverride, processIncomeTypes, processCollaboratorData, rawResponse, applyStripeOverride]);
   
   // Calculate salary whenever income data or salary parameters change
   useEffect(() => {
