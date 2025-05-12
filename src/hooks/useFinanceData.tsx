@@ -7,8 +7,11 @@ import { useMonthlyBalanceOperations } from './finance/useMonthlyBalanceOperatio
 import { useTransactionFetching } from './finance/useTransactionFetching';
 import ZohoService from '@/services/zohoService';
 import { format as formatDate } from 'date-fns';
+import { useToast } from './use-toast';
 
 export const useFinanceData = () => {
+  const { toast } = useToast();
+  
   // Use our custom hooks to organize functionality
   const {
     dateRange,
@@ -48,7 +51,7 @@ export const useFinanceData = () => {
     usingCachedData,
     fetchData,
     refreshData,
-    applyStripeOverride  // Add this to get the new function
+    applyStripeOverride
   } = useTransactionFetching(dateRange, formatDateYYYYMMDD, fetchMonthlyBalance);
 
   // Process financial data with the latest state values
@@ -67,11 +70,19 @@ export const useFinanceData = () => {
 
   // Update stripe override with immediate processing refresh
   const updatedUpdateStripeOverride = async (override: number | null) => {
+    console.log(`Updating Stripe override to: ${override}`);
     await updateStripeOverride(override, dateRange.startDate);
     
     // Apply the stripe override to transactions
     if (transactions.length > 0 && override !== null) {
+      console.log(`Applying Stripe override: ${override} to transactions`);
       applyStripeOverride(override);
+      
+      // Show a toast to confirm the update
+      toast({
+        title: "Stripe manual override applied",
+        description: `Stripe income set to $${override.toFixed(2)}`,
+      });
     }
     
     processIncomeTypes(transactions, override);
@@ -80,6 +91,12 @@ export const useFinanceData = () => {
   // Update starting balance with fixed date argument
   const updatedUpdateStartingBalance = async (balance: number, notes?: string) => {
     await updateStartingBalance(balance, dateRange.startDate, notes);
+    
+    // Show a toast to confirm the update
+    toast({
+      title: "Balance inicial actualizado",
+      description: `Nuevo balance: $${balance.toFixed(2)}`,
+    });
   };
   
   // Update salary calculator values
@@ -87,20 +104,29 @@ export const useFinanceData = () => {
     await updateSalaryCalculatorValues(opex, itbm, profitPct, dateRange.startDate);
     // Recalculate salary with new values
     calculateSalary(regularIncome, stripeIncome, opex, itbm, profitPct);
+    
+    // Show a toast to confirm the update
+    toast({
+      title: "Valores del calculador actualizados",
+      description: `OPEX: $${opex.toFixed(2)}, ITBM: ${itbm.toFixed(2)}%, Beneficio: ${profitPct.toFixed(1)}%`,
+    });
   };
 
   // Process income and collaborator data when transactions or stripeOverride change
   useEffect(() => {
     if (transactions.length > 0) {
+      console.log(`Processing ${transactions.length} transactions with stripeOverride: ${stripeOverride}`);
       processIncomeTypes(transactions, stripeOverride);
 
       // If there's raw response data, process collaborator data
       if (rawResponse) {
+        console.log("Processing collaborator data from raw response");
         processCollaboratorData(rawResponse);
       }
       
       // Apply stripe override to transactions when available
       if (stripeOverride !== null) {
+        console.log(`Applying Stripe override: ${stripeOverride} to transactions`);
         applyStripeOverride(stripeOverride);
       }
     }
@@ -108,6 +134,8 @@ export const useFinanceData = () => {
   
   // Calculate salary whenever income data or salary parameters change
   useEffect(() => {
+    console.log(`Calculating salary with income: Regular=${regularIncome}, Stripe=${stripeIncome}`);
+    console.log(`Parameters: OPEX=${opexAmount}, ITBM=${itbmAmount}%, Profit=${profitPercentage}%`);
     calculateSalary(regularIncome, stripeIncome, opexAmount, itbmAmount, profitPercentage);
   }, [regularIncome, stripeIncome, opexAmount, itbmAmount, profitPercentage, calculateSalary]);
 

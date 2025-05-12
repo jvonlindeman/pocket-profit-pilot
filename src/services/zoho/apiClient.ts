@@ -1,3 +1,4 @@
+
 import { Transaction } from "../../types/financial";
 
 export const fetchTransactionsFromWebhook = async (
@@ -46,6 +47,7 @@ export const fetchTransactionsFromWebhook = async (
     }
     
     const responseData = await response.json();
+    console.log('Raw response data structure:', JSON.stringify(responseData, null, 2).substring(0, 500) + '...');
     
     if (returnRawResponse) {
       console.log('Returning raw response from edge function');
@@ -55,18 +57,21 @@ export const fetchTransactionsFromWebhook = async (
     // Check if we received cached transactions directly
     if (responseData.cached_transactions && Array.isArray(responseData.cached_transactions)) {
       console.log(`Got ${responseData.cached_transactions.length} cached transactions from edge function`);
+      console.log('Sample transaction:', responseData.cached_transactions[0]);
       return responseData.cached_transactions;
     }
     
     // Check if transactions are in a data property
     if (responseData.data && Array.isArray(responseData.data)) {
       console.log(`Got ${responseData.data.length} transactions from data property`);
+      console.log('Sample transaction:', responseData.data[0]);
       return responseData.data;
     }
     
     // If the response is an array, assume it's transactions
     if (Array.isArray(responseData)) {
       console.log(`Got ${responseData.length} transactions from direct array response`);
+      console.log('Sample transaction:', responseData[0]);
       return responseData;
     }
     

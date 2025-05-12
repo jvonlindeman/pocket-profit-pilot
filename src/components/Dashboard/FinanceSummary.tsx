@@ -33,6 +33,19 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
     }).format(percentage / 100);
   };
 
+  // Log values to help debugging
+  console.log("Finance Summary Data:", {
+    startingBalance: summary.startingBalance,
+    stripeIncome,
+    regularIncome,
+    totalIncome: summary.totalIncome,
+    collaboratorExpense: summary.collaboratorExpense,
+    otherExpense: summary.otherExpense,
+    totalExpense: summary.totalExpense,
+    profit: summary.profit,
+    profitMargin: summary.profitMargin
+  });
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in">
       {/* Balance Inicial */}
@@ -135,7 +148,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
             </div>
           </div>
           <div className="text-2xl font-bold text-red-500 animate-value">
-            {formatCurrency(summary.totalExpense)}
+            {formatCurrency(summary.totalExpense || 0)}
           </div>
         </CardContent>
       </Card>

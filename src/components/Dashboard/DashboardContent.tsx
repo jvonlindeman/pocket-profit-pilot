@@ -1,3 +1,4 @@
+
 import React from 'react';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
 import RevenueChart from '@/components/Dashboard/RevenueChart';
@@ -62,9 +63,28 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   // Handle Stripe override change
   const handleStripeOverrideChange = (value: number | null) => {
     if (onStripeOverrideChange) {
+      console.log(`DashboardContent: Handling stripe override change to ${value}`);
       onStripeOverrideChange(value);
     }
   };
+  
+  // Log expense data to help debug the $0 issue
+  console.log("Financial Data Summary:", {
+    totalIncome: financialData.summary.totalIncome,
+    totalExpense: financialData.summary.totalExpense,
+    collaboratorExpense: financialData.summary.collaboratorExpense,
+    otherExpense: financialData.summary.otherExpense,
+    transactionCount: financialData.transactions?.length || 0,
+    expenseCategoryCount: financialData.expenseByCategory?.length || 0
+  });
+  
+  if (financialData.transactions?.length > 0) {
+    const expenseTransactions = financialData.transactions.filter(tx => tx.type === 'expense');
+    console.log(`Found ${expenseTransactions.length} expense transactions out of ${financialData.transactions.length} total`);
+    if (expenseTransactions.length > 0) {
+      console.log("Sample expense transaction:", expenseTransactions[0]);
+    }
+  }
 
   return (
     <>

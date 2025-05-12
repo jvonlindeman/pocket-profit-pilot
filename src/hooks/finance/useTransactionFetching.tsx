@@ -23,11 +23,16 @@ export const useTransactionFetching = (
     
     setTransactions(currentTransactions => {
       // Find the Stripe transaction if it exists
-      const hasStripeTransaction = currentTransactions.some(tx => 
+      const stripeTransactions = currentTransactions.filter(tx => 
         tx.source === 'Stripe' && tx.type === 'income'
       );
       
-      if (!hasStripeTransaction) {
+      // Create a new array with all non-Stripe transactions
+      const nonStripeTransactions = currentTransactions.filter(tx => 
+        !(tx.source === 'Stripe' && tx.type === 'income')
+      );
+      
+      if (stripeTransactions.length === 0) {
         // If no Stripe transaction exists, create a new one
         const today = new Date().toISOString().split('T')[0];
         console.log(`Creating new Stripe transaction with override: ${stripeOverride}`);
@@ -41,30 +46,30 @@ export const useTransactionFetching = (
           type: 'income'
         };
         
-        return [...currentTransactions, newStripeTransaction];
+        return [...nonStripeTransactions, newStripeTransaction];
       }
       
       // Update existing Stripe transactions
-      console.log(`Updating existing Stripe transaction with override: ${stripeOverride}`);
-      return currentTransactions.map(tx => {
-        if (tx.source === 'Stripe' && tx.type === 'income') {
-          // Check if the description already includes (Manual)
-          const baseDescription = tx.description.replace(' (Manual)', '');
-          return {
-            ...tx,
-            amount: stripeOverride,
-            description: baseDescription + ' (Manual)',
-          };
-        }
-        return tx;
+      console.log(`Updating ${stripeTransactions.length} existing Stripe transactions with override: ${stripeOverride}`);
+      const updatedStripeTransactions = stripeTransactions.map(tx => {
+        // Remove any existing (Manual) text to avoid duplication
+        const baseDescription = tx.description.replace(' (Manual)', '');
+        return {
+          ...tx,
+          amount: stripeOverride,
+          description: `${baseDescription} (Manual)`,
+        };
       });
+      
+      // Return combined transactions
+      return [...nonStripeTransactions, ...updatedStripeTransactions];
     });
   }, []);
 
   // Función para cargar los datos
   const fetchData = useCallback(async (forceRefresh = false) => {
     console.log("Fetching financial data...");
-    console.log(`Date range: ${dateRange.startDate.toISOString()} to ${dateRange.endDate.toISOString()}`);
+    console.log(`Date range: ${formatDateYYYYMMDD(dateRange.startDate)} to ${formatDateYYYYMMDD(dateRange.endDate)}`);
     setLoading(true);
     setError(null);
     setUsingCachedData(false);
@@ -73,20 +78,12 @@ export const useTransactionFetching = (
       // Also fetch the monthly balance for the selected date range
       await fetchMonthlyBalance(dateRange.startDate);
       
-      // Log exact date objects for debugging
-      console.log("Original dateRange from datepicker:", {
-        startDate: dateRange.startDate.toISOString(),
-        endDate: dateRange.endDate.toISOString()
-      });
-      
       // Format dates using our custom formatter to avoid timezone shifts
       const startDateFormatted = formatDateYYYYMMDD(dateRange.startDate);
       const endDateFormatted = formatDateYYYYMMDD(dateRange.endDate);
       
-      console.log("Fetching with exact formatted dates:", {
-        startDateRaw: dateRange.startDate.toISOString(),
+      console.log("Fetching with formatted dates:", {
         startDateFormatted,
-        endDateRaw: dateRange.endDate.toISOString(),
         endDateFormatted
       });
       
@@ -98,6 +95,13 @@ export const useTransactionFetching = (
         forceRefresh
       );
       console.log(`Received ${zohoData.length} transactions from Zoho`);
+      
+      // Log expense transactions specifically to debug the $0 issue
+      const zohoExpenses = zohoData.filter(tx => tx.type === 'expense');
+      console.log(`Received ${zohoExpenses.length} expense transactions from Zoho`);
+      if (zohoExpenses.length > 0) {
+        console.log("Sample expense transaction:", zohoExpenses[0]);
+      }
 
       // Detectar si estamos usando datos en caché basado en la respuesta
       const rawResponseData = ZohoService.getLastRawResponse();
@@ -109,10 +113,11 @@ export const useTransactionFetching = (
       // Obtener la respuesta cruda actual para depuración inmediatamente después
       const rawData = ZohoService.getLastRawResponse();
       setRawResponse(rawData);
-      console.log("Fetched raw response for debugging:", rawData ? "Raw data available" : "No raw data");
+      console.log("Raw response structure for debugging:", 
+        rawData ? typeof rawData : "No raw data");
 
       // Obtener transacciones de Stripe - usando las fechas exactas sin modificaciones
-      console.log("Fetching from Stripe:", dateRange.startDate.toISOString(), dateRange.endDate.toISOString());
+      console.log("Fetching from Stripe:", formatDateYYYYMMDD(dateRange.startDate), formatDateYYYYMMDD(dateRange.endDate));
       const stripeData = await StripeService.getTransactions(
         dateRange.startDate,
         dateRange.endDate
@@ -134,7 +139,8 @@ export const useTransactionFetching = (
       const rawData = ZohoService.getLastRawResponse();
       if (rawData) {
         setRawResponse(rawData);
-        console.log("Set raw response after error:", rawData ? "Raw data available" : "No raw data");
+        console.log("Set raw response after error:", 
+          rawData ? typeof rawData : "No raw data");
       }
     } finally {
       setLoading(false);

@@ -1,17 +1,20 @@
 
 import { useState, useCallback } from 'react';
-import { endOfMonth, subMonths } from 'date-fns';
+import { endOfMonth, subMonths, startOfMonth } from 'date-fns';
 import { DateRange } from '@/types/financial';
 
 export const useFinanceDateRange = () => {
-  // Estado del rango de fechas - configurado para mostrar desde el último día del mes anterior hasta el último día del mes actual
+  // Estado del rango de fechas - configurado para mostrar desde el primer día del mes anterior hasta el último día del mes actual
   const [dateRange, setDateRange] = useState<DateRange>(() => {
     const today = new Date();
-    // Último día del mes anterior
-    const startDate = endOfMonth(subMonths(today, 1));
+    // Primer día del mes anterior
+    const startDate = startOfMonth(subMonths(today, 1));
     // Último día del mes actual
     const endDate = endOfMonth(today);
-    console.log("Initial date range:", startDate.toISOString(), "to", endDate.toISOString());
+    console.log("Initial date range:", 
+      formatDateYYYYMMDD(startDate), "to", 
+      formatDateYYYYMMDD(endDate)
+    );
     return { startDate, endDate };
   });
 
@@ -28,20 +31,19 @@ export const useFinanceDateRange = () => {
     const today = new Date();
     const startDate = new Date(today.getFullYear(), today.getMonth(), 1);
     const endDate = endOfMonth(today);
-    console.log("Current month range:", startDate.toISOString(), "to", endDate.toISOString());
+    console.log("Current month range:", 
+      formatDateYYYYMMDD(startDate), "to", 
+      formatDateYYYYMMDD(endDate)
+    );
     return { startDate, endDate };
   }, []);
 
   // Función para actualizar el rango de fechas
   const updateDateRange = useCallback((newRange: { startDate: Date; endDate: Date }) => {
     console.log("Date range updated:", 
-      newRange.startDate.toISOString(), "to", 
-      newRange.endDate.toISOString()
+      formatDateYYYYMMDD(newRange.startDate), "to", 
+      formatDateYYYYMMDD(newRange.endDate)
     );
-    console.log("Exact date values:", {
-      startDateFormatted: formatDateYYYYMMDD(newRange.startDate),
-      endDateFormatted: formatDateYYYYMMDD(newRange.endDate)
-    });
     
     // Create shallow copies to preserve the exact selected dates
     const preservedStartDate = new Date(newRange.startDate);

@@ -58,6 +58,24 @@ const TransactionList: React.FC<TransactionListProps> = ({
   const incomeCount = incomeTransactions.length;
   const expenseCount = expenseTransactions.length;
   const collaboratorCount = collaboratorTransactions.length;
+  
+  // Log transaction counts and totals for debugging
+  console.log("Transaction List Stats:", { 
+    total: transactions.length,
+    income: incomeCount, 
+    expense: expenseCount, 
+    collaborator: collaboratorCount,
+    incomeTotal: totals.incomeTotal,
+    expenseTotal: totals.expenseTotal,
+    netTotal: totals.netTotal
+  });
+  
+  if (expenseTransactions.length > 0) {
+    console.log("Sample expense transaction:", expenseTransactions[0]);
+  }
+  if (collaboratorTransactions.length > 0) {
+    console.log("Sample collaborator transaction:", collaboratorTransactions[0]);
+  }
 
   return (
     <>

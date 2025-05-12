@@ -46,6 +46,14 @@ const IncomeTransactions: React.FC<IncomeTransactionsProps> = ({ transactions })
   // Calculate total income
   const totalIncome = transactions.reduce((sum, tx) => sum + tx.amount, 0);
 
+  // Check if we have any transactions
+  if (transactions.length === 0) {
+    console.log("No income transactions to display");
+  } else {
+    console.log(`Displaying ${transactions.length} income transactions`);
+    console.log('First transaction:', transactions[0]);
+  }
+
   return (
     <div className="bg-green-50 p-4 rounded-md mb-4">
       <div className="flex items-center justify-between mb-3">
@@ -73,31 +81,36 @@ const IncomeTransactions: React.FC<IncomeTransactionsProps> = ({ transactions })
               </TableCell>
             </TableRow>
           ) : (
-            transactions.map((transaction) => (
-              <TableRow 
-                key={transaction.id} 
-                className={`hover:bg-green-100/50 ${
-                  transaction.description.includes('(Manual)') ? 'bg-green-50' : ''
-                }`}
-              >
-                <TableCell>{formatDate(transaction.date)}</TableCell>
-                <TableCell>
-                  {transaction.description.includes('(Manual)') 
-                    ? transaction.description.replace(' (Manual)', '') 
-                    : transaction.description}
-                  {transaction.description.includes('(Manual)') && (
-                    <span className="ml-2 text-xs bg-green-200 text-green-800 px-2 py-1 rounded-full">
-                      Override
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell>{transaction.category}</TableCell>
-                <TableCell>{transaction.source}</TableCell>
-                <TableCell className="text-right font-medium text-green-600">
-                  + {formatCurrency(transaction.amount)}
-                </TableCell>
-              </TableRow>
-            ))
+            transactions.map((transaction) => {
+              const isManual = transaction.description.includes('(Manual)');
+              const cleanDescription = isManual 
+                ? transaction.description.replace(' (Manual)', '') 
+                : transaction.description;
+                
+              return (
+                <TableRow 
+                  key={transaction.id} 
+                  className={`hover:bg-green-100/50 ${
+                    isManual ? 'bg-green-50' : ''
+                  }`}
+                >
+                  <TableCell>{formatDate(transaction.date)}</TableCell>
+                  <TableCell className="flex items-center">
+                    <span>{cleanDescription}</span>
+                    {isManual && (
+                      <span className="ml-2 text-xs bg-green-200 text-green-800 px-2 py-1 rounded-full">
+                        Override
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>{transaction.category}</TableCell>
+                  <TableCell>{transaction.source}</TableCell>
+                  <TableCell className="text-right font-medium text-green-600">
+                    + {formatCurrency(transaction.amount)}
+                  </TableCell>
+                </TableRow>
+              );
+            })
           )}
         </TableBody>
       </Table>
