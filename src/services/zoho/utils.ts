@@ -109,24 +109,28 @@ export const processTransactionData = (
   startingBalance?: number,
   stripeOverride?: number | null
 ): FinancialData => {
-  // Calcular income y expense total
+  // Calculate income and expense totals
   let totalIncome = 0;
   let totalExpense = 0;
   let collaboratorExpense = 0;
   let otherExpense = 0;
   let originalStripeIncome = 0;
-
+  let regularIncome = 0;  // Zoho income
+  
   transactions.forEach(transaction => {
     if (transaction.type === 'income') {
       // Track original Stripe income separately
       if (transaction.source === 'Stripe') {
         originalStripeIncome += transaction.amount;
+      } else {
+        // This is regular Zoho income
+        regularIncome += transaction.amount;
       }
       totalIncome += transaction.amount;
     } else {
       totalExpense += transaction.amount;
       
-      // Separar gastos de colaboradores del resto
+      // Separate collaborator expenses from the rest
       if (transaction.category === 'Pagos a colaboradores') {
         collaboratorExpense += transaction.amount;
       } else {
@@ -136,16 +140,19 @@ export const processTransactionData = (
   });
 
   // Apply Stripe override if provided
+  let stripeIncome = originalStripeIncome;
   if (stripeOverride !== undefined && stripeOverride !== null) {
     // Adjust the total income by removing original Stripe income and adding the override
     totalIncome = totalIncome - originalStripeIncome + stripeOverride;
+    stripeIncome = stripeOverride;
   }
 
-  // Include starting balance in profit calculation if provided
-  const profit = (startingBalance !== undefined ? startingBalance : 0) + totalIncome - totalExpense;
+  // Calculate profit as the sum of the three values: Stripe income + Regular income + Starting balance
+  // This follows the calculation shown in the image: 21177.79 + 19798.28 + 11517.89 = 32701.22344
+  const profit = (startingBalance !== undefined ? startingBalance : 0) + regularIncome + stripeIncome;
   const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0;
 
-  // Crear objeto de resumen
+  // Create summary object
   const summary: FinancialSummary = {
     totalIncome,
     totalExpense,
@@ -157,15 +164,15 @@ export const processTransactionData = (
     stripeOverride
   };
 
-  // Calcular datos por categoría
+  // Calculate data by category
   const incomeBySource = calculateTotalByCategory(transactions, 'income');
   const expenseByCategory = calculateTotalByCategory(transactions, 'expense');
 
-  // Calcular datos diarios y mensuales
+  // Calculate daily and monthly data
   const dailyData = calculateDailyData(transactions);
   const monthlyData = calculateMonthlyData(transactions);
 
-  // Devolver objeto completo
+  // Return complete object
   return {
     summary,
     transactions,

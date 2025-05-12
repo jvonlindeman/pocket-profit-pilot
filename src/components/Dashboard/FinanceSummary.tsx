@@ -144,7 +144,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
       <Card className="finance-card">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Beneficio Neto</h3>
+            <h3 className="text-sm font-medium text-gray-500">Beneficio Bruto</h3>
             <div className="p-2 bg-blue-50 rounded-full">
               <TrendingUpIcon className="h-4 w-4 text-blue-500" />
             </div>
