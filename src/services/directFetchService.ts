@@ -1,6 +1,6 @@
 
 import { FinancialData, DateRange, Transaction } from '@/types/financial';
-import { formatDateForAPI } from '@/lib/date-utils';
+import { formatDateYYYYMMDD } from '@/lib/date-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { processTransactionData } from '@/services/zoho/utils';
 import { getMockTransactions } from '@/services/zoho/mockData';
@@ -22,8 +22,8 @@ export const DirectFetchService = {
       console.log('DirectFetchService: Fetching data from', startDate, 'to', endDate);
       
       // Format dates for the API
-      const formattedStartDate = formatDateForAPI(startDate);
-      const formattedEndDate = formatDateForAPI(endDate);
+      const formattedStartDate = formatDateYYYYMMDD(startDate);
+      const formattedEndDate = formatDateYYYYMMDD(endDate);
       
       // Call the Supabase edge function with our explicitly formatted dates
       const { data, error } = await supabase.functions.invoke("zoho-transactions", {

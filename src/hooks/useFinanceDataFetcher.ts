@@ -2,7 +2,7 @@
 import { useCallback, useRef } from 'react';
 import { DateRange, FinancialData } from '@/types/financial';
 import { useToast } from '@/hooks/use-toast';
-import { DEFAULT_FINANCIAL_DATA } from '@/constants/financialDefaults';
+import { emptyFinancialData } from '@/constants/financialDefaults';
 import { useFinanceAPI } from '@/hooks/useFinanceAPI';
 import { transformFinancialData } from '@/utils/financeDataTransformer';
 import { retryWithBackoff } from '@/utils/apiUtils';
