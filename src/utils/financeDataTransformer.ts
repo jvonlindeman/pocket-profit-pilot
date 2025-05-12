@@ -1,18 +1,18 @@
+
 import { Transaction, FinancialSummary, FinancialData, CategorySummary, CacheStats } from '@/types/financial';
 import { calculateDailyAndMonthlyData, calculateExpensesByCategory, calculateIncomeBySource } from './financeDataProcessor';
 import { safeParseNumber } from './financialUtils';
 
 // Helper function to safely extract a number from the data
 const getNumber = (value: any): number => {
-  const parsed = safeParseNumber(value);
-  return parsed.success ? parsed.value : 0;
+  return safeParseNumber(value);
 };
 
 // Helper function to initialize a default category summary
 const createDefaultCategorySummary = (): CategorySummary => ({
-  totalIncome: 0,
-  totalExpense: 0,
-  categories: [],
+  category: 'Default',
+  amount: 0,
+  percentage: 0
 });
 
 // Default financial data object
@@ -20,7 +20,10 @@ export const DEFAULT_FINANCIAL_DATA: FinancialData = {
   summary: {
     totalIncome: 0,
     totalExpense: 0,
-    netProfit: 0,
+    collaboratorExpense: 0,
+    otherExpense: 0,
+    profit: 0,
+    profitMargin: 0,
     startingBalance: 0,
   },
   transactions: [],
@@ -57,9 +60,6 @@ export const transformFinancialData = (
   // Initialize transactions array
   let transactions: Transaction[] = [];
 
-  // Initialize default category summary
-  const categorySummary = createDefaultCategorySummary();
-
   // Initialize starting balance
   const startingBalance = getNumber(data.starting_balance);
 
@@ -88,10 +88,16 @@ export const transformFinancialData = (
     .filter((tx) => tx.type === 'expense')
     .reduce((sum, tx) => sum + tx.amount, 0);
 
-  const netProfit = totalIncome - totalExpense;
+  const profit = totalIncome - totalExpense;
 
   // Calculate daily and monthly data
-  const { dailyData, monthlyData } = calculateDailyAndMonthlyData(transactions);
+  const { income, expense, monthlyData } = calculateDailyAndMonthlyData(transactions);
+
+  // Construct daily data
+  const dailyData = {
+    income,
+    expense
+  };
 
   // Calculate expenses by category
   const expenseByCategory = calculateExpensesByCategory(transactions);
@@ -109,7 +115,6 @@ export const transformFinancialData = (
           cachedCount: data.cacheStats?.cachedCount || data.cache_stats?.cached_count || 0,
           newCount: data.cacheStats?.newCount || data.cache_stats?.new_count || 0,
           totalCount: data.cacheStats?.totalCount || data.cache_stats?.total_count || 0,
-          lastRefresh: data.cacheStats?.lastRefresh || new Date().toISOString()
         } 
         : null
     });
@@ -120,7 +125,10 @@ export const transformFinancialData = (
     summary: {
       totalIncome,
       totalExpense,
-      netProfit,
+      collaboratorExpense: 0, // Set default value if not provided
+      otherExpense: 0, // Set default value if not provided
+      profit,
+      profitMargin: totalIncome > 0 ? (profit / totalIncome) * 100 : 0,
       startingBalance,
     },
     transactions,
