@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 interface ErrorDisplayProps {
   error: string;
   handleRefresh: () => void;
-  handleForceRefresh: () => void;
-  handleClearCacheAndRefresh: () => void;
+  handleForceRefresh?: () => void;
+  handleClearCacheAndRefresh?: () => void;
 }
 
 const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
@@ -23,12 +23,16 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
         <Button variant="outline" onClick={handleRefresh}>
           <RefreshCw className="h-4 w-4 mr-2" /> Reintentar
         </Button>
-        <Button variant="outline" onClick={handleForceRefresh}>
-          <RotateCw className="h-4 w-4 mr-2" /> Forzar actualización
-        </Button>
-        <Button variant="outline" onClick={handleClearCacheAndRefresh}>
-          <Trash2 className="h-4 w-4 mr-2" /> Limpiar caché y actualizar
-        </Button>
+        {handleForceRefresh && (
+          <Button variant="outline" onClick={handleForceRefresh}>
+            <RotateCw className="h-4 w-4 mr-2" /> Forzar actualización
+          </Button>
+        )}
+        {handleClearCacheAndRefresh && (
+          <Button variant="outline" onClick={handleClearCacheAndRefresh}>
+            <Trash2 className="h-4 w-4 mr-2" /> Limpiar caché y actualizar
+          </Button>
+        )}
       </div>
     </div>
   );

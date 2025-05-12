@@ -18,7 +18,7 @@ interface MainDashboardProps {
   dateRange: DateRange;
   handleRefresh: () => void;
   loading: boolean;
-  getStripeDataForChart: () => { labels: string[], values: number[] };
+  getStripeDataForChart?: () => { labels: string[], values: number[] };
 }
 
 const MainDashboard: React.FC<MainDashboardProps> = ({
@@ -32,6 +32,9 @@ const MainDashboard: React.FC<MainDashboardProps> = ({
   loading,
   getStripeDataForChart
 }) => {
+  // Default empty stripe data if the function is not provided
+  const stripeData = getStripeDataForChart ? getStripeDataForChart() : { labels: [], values: [] };
+
   return (
     <>
       {/* Balance Mensual Inicial */}
@@ -60,7 +63,7 @@ const MainDashboard: React.FC<MainDashboardProps> = ({
         <RevenueChart 
           incomeData={financialData.dailyData?.income || { labels: [], values: [] }} 
           expenseData={financialData.dailyData?.expense || { labels: [], values: [] }}
-          stripeData={getStripeDataForChart()}
+          stripeData={stripeData}
         />
         <ExpenseChart expenseData={financialData.expenseByCategory || []} />
       </div>

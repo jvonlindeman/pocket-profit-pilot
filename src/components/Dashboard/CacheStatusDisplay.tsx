@@ -17,13 +17,20 @@ interface CacheStatusDisplayProps {
   onRefreshClick: () => void;
   isRefreshing: boolean;
   refreshCount?: number;
+  // Add missing props from the error message
+  usingCachedData?: boolean;
+  partialRefresh?: boolean;
+  cacheStats?: any;
 }
 
 export const CacheStatusDisplay: React.FC<CacheStatusDisplayProps> = ({
   lastRefresh,
   onRefreshClick,
   isRefreshing,
-  refreshCount
+  refreshCount,
+  usingCachedData,
+  partialRefresh,
+  cacheStats
 }) => {
   // Calculate time since last refresh
   const lastRefreshTime = lastRefresh 

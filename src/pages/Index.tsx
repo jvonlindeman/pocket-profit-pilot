@@ -34,7 +34,10 @@ const Index = () => {
     collaboratorExpenses,
     stripeOverride,
     startingBalance,
-    initialLoadAttempted
+    initialLoadAttempted,
+    clearCacheAndRefresh,
+    forceManualRefresh,
+    getStripeDataForChart
   } = useFinanceData();
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
@@ -169,6 +172,23 @@ const Index = () => {
   // Combined loading state
   const isLoading = loading || localLoading;
 
+  // Handlers for the additional functions
+  const handleForceRefresh = async () => {
+    if (forceManualRefresh) {
+      await forceManualRefresh();
+    } else {
+      await handleRefresh();
+    }
+  };
+
+  const handleClearCacheAndRefresh = async () => {
+    if (clearCacheAndRefresh) {
+      await clearCacheAndRefresh();
+    } else {
+      await handleRefresh();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Dialog to set initial balance */}
@@ -205,6 +225,8 @@ const Index = () => {
           <ErrorDisplay 
             error={error}
             handleRefresh={handleRefresh}
+            handleForceRefresh={handleForceRefresh}
+            handleClearCacheAndRefresh={handleClearCacheAndRefresh}
           />
         )}
         
@@ -217,6 +239,7 @@ const Index = () => {
                 stripeIncome={stripeIncome}
                 stripeOverride={stripeOverride}
                 regularIncome={regularIncome}
+                handleClearCacheAndRefresh={handleClearCacheAndRefresh}
               />
             )}
 
@@ -224,6 +247,8 @@ const Index = () => {
             <PeriodHeading 
               periodTitle={periodTitle}
               handleRefresh={handleRefresh}
+              handleForceRefresh={handleForceRefresh}
+              handleClearCacheAndRefresh={handleClearCacheAndRefresh}
             />
 
             {/* Empty transactions notification */}
@@ -241,6 +266,7 @@ const Index = () => {
               dateRange={dateRange}
               handleRefresh={handleRefresh}
               loading={isLoading}
+              getStripeDataForChart={getStripeDataForChart}
             />
           </>
         )}

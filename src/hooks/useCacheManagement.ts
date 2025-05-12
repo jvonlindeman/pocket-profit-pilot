@@ -1,13 +1,20 @@
 
 import { useState, useCallback } from 'react';
+import { CacheStats } from '@/types/cache';
 
 export const useCacheManagement = () => {
   const [cacheStatus, setCacheStatus] = useState<{
     lastRefresh: Date | null;
     refreshAttempts: number;
+    usingCachedData: boolean;
+    partialRefresh: boolean;
+    stats: CacheStats | null;
   }>({
     lastRefresh: null,
-    refreshAttempts: 0
+    refreshAttempts: 0,
+    usingCachedData: false,
+    partialRefresh: false,
+    stats: null
   });
 
   /**
@@ -16,6 +23,7 @@ export const useCacheManagement = () => {
   const updateCacheStatus = useCallback(() => {
     const now = new Date();
     setCacheStatus(prevStatus => ({
+      ...prevStatus,
       lastRefresh: now,
       refreshAttempts: (prevStatus.refreshAttempts || 0) + 1,
     }));

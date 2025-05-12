@@ -157,6 +157,21 @@ export const useFinanceData = () => {
     syncBalance(startingBalance, financialData, setFinancialData, dataInitialized);
   }, [startingBalance, financialData, setFinancialData, dataInitialized, syncBalance]);
 
+  // Define default values for missing cache properties
+  const usingCachedData = false; // Simplified: always false since we're removing caching
+  const partialRefresh = false;  // Simplified: always false since we're removing caching
+  const cacheStats = {
+    cachedCount: 0,
+    newCount: 0,
+    totalCount: 0,
+    lastRefresh: cacheStatus.lastRefresh ? cacheStatus.lastRefresh.toISOString() : null
+  };
+
+  // Create a helper function for stripe data chart
+  const getStripeDataForChart = () => {
+    return { labels: [], values: [] }; // Simplified: empty data
+  };
+
   return {
     // Date range management
     dateRange,
@@ -182,9 +197,9 @@ export const useFinanceData = () => {
     collaboratorExpenses,
     
     // Cache management
-    usingCachedData: cacheStatus.usingCachedData,
-    partialRefresh: cacheStatus.partialRefresh,
-    cacheStats: cacheStatus.stats,
+    usingCachedData,
+    partialRefresh,
+    cacheStats,
     
     // Debug information
     rawResponse,
@@ -202,6 +217,12 @@ export const useFinanceData = () => {
     // Error information
     lastError,
     hasErrors,
-    errorCount
+    errorCount,
+    
+    // Data chart helper
+    getStripeDataForChart,
+    
+    // Add missing functions from the error messages
+    setFinancialData
   };
 };

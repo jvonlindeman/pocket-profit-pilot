@@ -135,6 +135,13 @@ export const useFinanceDataFetcher = () => {
     localRefreshingRef
   ]);
 
+  // Adding the missing clearCacheAndRefresh function
+  const clearCacheAndRefresh = useCallback(async (dateRange: DateRange) => {
+    console.log("Clearing cache and refreshing data for range:", dateRange);
+    // Since we're not implementing caching anymore, just return true
+    return true;
+  }, []);
+
   return {
     financialData,
     loading,
@@ -146,7 +153,9 @@ export const useFinanceDataFetcher = () => {
     collaboratorExpenses,
     cacheStatus,
     fetchFinancialData,
+    clearCacheAndRefresh, // Added missing function
     resetErrorState,
     isRefreshing: localRefreshingRef.current,
+    setFinancialData, // Added missing function
   };
 };

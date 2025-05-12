@@ -9,7 +9,7 @@ interface DebugInformationProps {
   stripeIncome: number;
   stripeOverride: any;
   regularIncome: number;
-  handleClearCacheAndRefresh: () => void;
+  handleClearCacheAndRefresh?: () => void;
 }
 
 const DebugInformation: React.FC<DebugInformationProps> = ({
@@ -53,11 +53,13 @@ const DebugInformation: React.FC<DebugInformationProps> = ({
             <span className="font-semibold">Starting Balance:</span> ${(financialData.summary.startingBalance || 0).toFixed(2)}
           </div>
         </div>
-        <div className="mt-2">
-          <Button variant="outline" size="sm" onClick={handleClearCacheAndRefresh} className="text-amber-700 border-amber-300 hover:bg-amber-100">
-            <Trash2 className="h-4 w-4 mr-2" /> Limpiar caché y forzar actualización
-          </Button>
-        </div>
+        {handleClearCacheAndRefresh && (
+          <div className="mt-2">
+            <Button variant="outline" size="sm" onClick={handleClearCacheAndRefresh} className="text-amber-700 border-amber-300 hover:bg-amber-100">
+              <Trash2 className="h-4 w-4 mr-2" /> Limpiar caché y forzar actualización
+            </Button>
+          </div>
+        )}
       </AlertDescription>
     </Alert>
   );
