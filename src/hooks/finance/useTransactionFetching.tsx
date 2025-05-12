@@ -44,10 +44,12 @@ export const useTransactionFetching = (
       // Update existing Stripe transactions
       return currentTransactions.map(tx => {
         if (tx.source === 'Stripe' && tx.type === 'income') {
+          // Check if the description already includes (Manual)
+          const baseDescription = tx.description.replace(' (Manual)', '');
           return {
             ...tx,
             amount: stripeOverride,
-            description: tx.description + ' (Manual)',
+            description: baseDescription + ' (Manual)',
           };
         }
         return tx;
@@ -145,6 +147,6 @@ export const useTransactionFetching = (
     usingCachedData,
     fetchData,
     refreshData,
-    applyStripeOverride  // Export the new function
+    applyStripeOverride
   };
 };

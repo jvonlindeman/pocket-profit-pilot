@@ -81,7 +81,9 @@ const IncomeTransactions: React.FC<IncomeTransactionsProps> = ({ transactions })
               >
                 <TableCell>{formatDate(transaction.date)}</TableCell>
                 <TableCell>
-                  {transaction.description}
+                  {transaction.description.includes('(Manual)') 
+                    ? transaction.description.replace(' (Manual)', '') 
+                    : transaction.description}
                   {transaction.description.includes('(Manual)') && (
                     <span className="ml-2 text-xs bg-green-200 text-green-800 px-2 py-1 rounded-full">
                       Override
