@@ -242,6 +242,10 @@ serve(async (req) => {
     // Calculate the total balance change from all transactions for validation
     const calculatedTotalNetChange = formattedTransactions.reduce((sum, t) => sum + t.amount, 0);
     console.log(`Validated Net Change: ${calculatedTotalNetChange}, Direct Net: ${totalNet}`);
+    
+    // IMPORTANT FIX: Deduct payout fees from the net amount to match bank transfer amount
+    const adjustedNet = totalNet - totalPayoutFees;
+    console.log(`Adjusted net after deducting payout fees (${totalPayoutFees}): ${adjustedNet}`);
 
     // Return structured data
     const response = {
@@ -254,7 +258,7 @@ serve(async (req) => {
         stripeFees: totalStripeFees,
         advances: totalAdvances,
         advanceFunding: totalAdvanceFunding,
-        net: totalNet,
+        net: adjustedNet, // Use the adjusted net value that deducts payout fees
         feePercentage: totalGross > 0 ? (totalFees / totalGross) * 100 : 0,
         transactionCount: formattedTransactions.length,
         totalTransactionCount: allTransactions.length,
