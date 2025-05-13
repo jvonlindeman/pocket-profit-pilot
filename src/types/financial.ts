@@ -7,6 +7,8 @@ export interface Transaction {
   category: string;
   source: 'Zoho' | 'Stripe';
   type: 'income' | 'expense';
+  fees?: number; // Added optional fees field
+  gross?: number; // Added optional gross amount field (before fees)
 }
 
 export interface FinancialSummary {

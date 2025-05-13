@@ -48,9 +48,13 @@ serve(async (req) => {
     // Format date params for the Stripe API (Unix timestamps)
     // Convert ISO date strings to Unix timestamps (seconds since epoch)
     const startTimestamp = Math.floor(new Date(startDate).getTime() / 1000);
-    const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000) + 86400; // Add one day to include the end date fully
+    // Add one day to include the end date fully (end of the day)
+    const endDateObj = new Date(endDate);
+    endDateObj.setHours(23, 59, 59, 999); // Set to end of day
+    const endTimestamp = Math.floor(endDateObj.getTime() / 1000);
 
     console.log(`Using timestamps: start=${startTimestamp}, end=${endTimestamp}`);
+    console.log(`Formatted dates: start=${new Date(startTimestamp * 1000).toISOString()}, end=${new Date(endTimestamp * 1000).toISOString()}`);
 
     // Initialize variables for pagination
     let hasMore = true;
@@ -73,6 +77,8 @@ serve(async (req) => {
         paginationParams.starting_after = lastId;
       }
       
+      console.log(`Fetching transactions with params:`, JSON.stringify(paginationParams));
+      
       // Make the API call with pagination parameters
       const transactionBatch = await stripe.balanceTransactions.list(paginationParams);
       
@@ -90,6 +96,16 @@ serve(async (req) => {
     }
 
     console.log(`Total transactions fetched: ${allTransactions.length}`);
+
+    // For debugging: log transaction creation dates
+    if (allTransactions.length > 0) {
+      console.log("Transaction date range:");
+      const dates = allTransactions.map(t => new Date(t.created * 1000));
+      const minDate = new Date(Math.min(...dates.map(d => d.getTime()))).toISOString();
+      const maxDate = new Date(Math.max(...dates.map(d => d.getTime()))).toISOString();
+      console.log(`First transaction: ${minDate}`);
+      console.log(`Last transaction: ${maxDate}`);
+    }
 
     // Process transactions to calculate totals and organize data
     let totalGross = 0;
@@ -112,14 +128,14 @@ serve(async (req) => {
         totalFees += fee;
         totalNet += net;
 
-        // Format as our internal Transaction type
+        // Format as our internal Transaction type - using NET amount as main amount
         formattedTransactions.push({
           id: `stripe-${transaction.id}`,
           date: new Date(transaction.created * 1000).toISOString().split('T')[0],
-          amount: amount, // Gross amount
+          amount: net, // Using NET amount after fees
           fees: fee,
-          net: net,
-          description: transaction.description || 'Stripe Payment',
+          gross: amount, // Keep track of the gross amount too
+          description: transaction.description || 'Stripe Payment (Net after fees)',
           category: 'Ingresos por plataforma',
           source: 'Stripe',
           type: 'income'

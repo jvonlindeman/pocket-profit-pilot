@@ -46,7 +46,7 @@ const StripeService = {
           id: `stripe-override-${startDate.toISOString().substring(0, 7)}`,
           date: startDate.toISOString().split('T')[0],
           amount: overrideAmount,
-          description: 'Ingresos de Stripe (valor manual)',
+          description: 'Ingresos de Stripe (valor manual) - Neto',
           category: 'Ingresos por plataforma',
           source: 'Stripe',
           type: 'income'

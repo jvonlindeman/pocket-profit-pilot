@@ -51,7 +51,7 @@ const StripeDebugData: React.FC<StripeDebugDataProps> = ({ rawData }) => {
                 ${rawData.summary?.fees.toFixed(2) || '0.00'}
               </div>
               <div className="bg-white p-2 rounded border border-blue-100">
-                <span className="font-medium">Net Amount: </span> 
+                <span className="font-medium">Net Amount (after fees): </span> 
                 ${rawData.summary?.net.toFixed(2) || '0.00'}
               </div>
               <div className="bg-white p-2 rounded border border-blue-100">
@@ -63,14 +63,15 @@ const StripeDebugData: React.FC<StripeDebugDataProps> = ({ rawData }) => {
 
           {hasTransactions && (
             <div>
-              <h3 className="font-medium text-gray-700 mb-2">Transaction Details</h3>
+              <h3 className="font-medium text-gray-700 mb-2">Transaction Details (Net Amounts After Fees)</h3>
               <div className="border rounded-md overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-100">
                     <tr>
                       <th className="p-2 text-left">ID</th>
                       <th className="p-2 text-left">Date</th>
-                      <th className="p-2 text-left">Amount</th>
+                      <th className="p-2 text-left">Net Amount</th>
+                      <th className="p-2 text-left">Fees</th>
                       <th className="p-2 text-left">Description</th>
                     </tr>
                   </thead>
@@ -80,6 +81,7 @@ const StripeDebugData: React.FC<StripeDebugDataProps> = ({ rawData }) => {
                         <td className="p-2">{tx.id.substring(0, 12)}...</td>
                         <td className="p-2">{tx.date}</td>
                         <td className="p-2">${Number(tx.amount).toFixed(2)}</td>
+                        <td className="p-2">${tx.fees ? Number(tx.fees).toFixed(2) : '0.00'}</td>
                         <td className="p-2">{tx.description}</td>
                       </tr>
                     ))}

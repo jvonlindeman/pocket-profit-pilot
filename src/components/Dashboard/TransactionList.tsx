@@ -23,7 +23,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import CacheStats from './CacheStats';
+import { Info } from 'lucide-react';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -120,7 +122,26 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefre
                     <TableCell>{formatDate(transaction.date)}</TableCell>
                     <TableCell>{transaction.description}</TableCell>
                     <TableCell>{transaction.category}</TableCell>
-                    <TableCell>{transaction.source}</TableCell>
+                    <TableCell>
+                      {transaction.source === 'Stripe' && transaction.fees ? (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger className="flex items-center">
+                              {transaction.source}
+                              <Info className="h-3.5 w-3.5 ml-1 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Comisión de Stripe: {formatCurrency(transaction.fees)}</p>
+                              {transaction.gross && (
+                                <p>Importe bruto: {formatCurrency(transaction.gross)}</p>
+                              )}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : (
+                        transaction.source
+                      )}
+                    </TableCell>
                     <TableCell className={`text-right font-medium ${transaction.type === 'income' ? 'income-text' : 'expense-text'}`}>
                       {transaction.type === 'income' ? '+' : '-'} {formatCurrency(transaction.amount)}
                     </TableCell>
