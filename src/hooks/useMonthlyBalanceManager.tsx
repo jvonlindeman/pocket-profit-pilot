@@ -34,7 +34,8 @@ export const useMonthlyBalanceManager = () => {
   }, []);
 
   // Update the starting balance
-  const updateStartingBalance = useCallback(async (balance: number, notes?: string, date: Date) => {
+  // Fix: Reordering parameters so required parameter 'date' comes before optional parameter 'notes'
+  const updateStartingBalance = useCallback(async (balance: number, date: Date, notes?: string) => {
     try {
       const monthYear = formatDate(date, 'yyyy-MM');
       
