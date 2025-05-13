@@ -119,6 +119,9 @@ serve(async (req) => {
     let totalFees = 0;
     let totalPayoutFees = 0;
     let totalTransactionFees = 0;
+    let totalStripeFees = 0;   // Additional Stripe fees (e.g. subscription fees)
+    let totalAdvances = 0;     // Track advances
+    let totalAdvanceFunding = 0; // Track advance funding
     let totalNet = 0;
     let formattedTransactions = [];
 
@@ -133,8 +136,9 @@ serve(async (req) => {
       'payout_cancel': 'payout_cancel',
       'stripe_fee': 'fee',
       'transfer': 'transfer',
+      'advance': 'advance',
+      'advance_funding': 'advance_funding',
       'adjustment': 'adjustment'
-      // Add other types as needed
     };
 
     // Process each transaction based on its type
@@ -145,6 +149,9 @@ serve(async (req) => {
       const type = transaction.type;
       
       const transactionCategory = transactionTypeMap[type] || 'other';
+      
+      // Log all transactions for debugging
+      console.log(`Processing transaction: Type=${type}, Category=${transactionCategory}, Amount=${amount}, Fee=${fee}, Net=${net}, Description=${transaction.description || 'No description'}`);
       
       // Process income transactions (charges and payments)
       if (transactionCategory === 'income') {
@@ -165,18 +172,16 @@ serve(async (req) => {
           source: 'Stripe',
           type: 'income'
         });
-      } 
+      }
       // Process payout transactions
       else if (transactionCategory === 'payout') {
         // For payouts, the fee is usually shown as a separate transaction
-        // but we'll track it anyway
         totalPayoutFees += fee;
         totalFees += fee;
         
         // We don't add payouts to formatted transactions since they represent
         // money moving from Stripe to bank, not actual income/expense
-
-        console.log(`Payout: ${amount}, Fee: ${fee}, Net: ${net}, Description: ${transaction.description}`);
+        console.log(`Payout: ${amount}, Fee: ${fee}, Net: ${net}, Description: ${transaction.description || 'No description'}`);
       }
       // Process refunds
       else if (transactionCategory === 'refund') {
@@ -196,29 +201,72 @@ serve(async (req) => {
           type: 'expense'
         });
       }
+      // Process Stripe fees (subscription fees, etc.)
+      else if (transactionCategory === 'fee') {
+        totalStripeFees += Math.abs(amount); // Use absolute value since they're negative
+        totalFees += Math.abs(amount);
+        totalNet += amount; // These directly affect the net balance
+        
+        // Add Stripe fees as expenses in formatted transactions
+        formattedTransactions.push({
+          id: `stripe-fee-${transaction.id}`,
+          date: new Date(transaction.created * 1000).toISOString().split('T')[0],
+          amount: amount, // Usually negative
+          fees: 0,
+          description: transaction.description || 'Stripe Fee',
+          category: 'Comisiones Stripe',
+          source: 'Stripe',
+          type: 'expense'
+        });
+      }
+      // Handle advance transactions
+      else if (transactionCategory === 'advance') {
+        totalAdvances += amount;
+        totalNet += amount; // These affect the net balance
+        
+        console.log(`Advance: ${amount}, Description: ${transaction.description || 'No description'}`);
+      } 
+      // Handle advance funding transactions
+      else if (transactionCategory === 'advance_funding') {
+        totalAdvanceFunding += amount;
+        totalNet += amount; // These affect the net balance
+        
+        console.log(`Advance Funding: ${amount}, Description: ${transaction.description || 'No description'}`);
+      }
       // Log all other transaction types for debugging
       else {
         console.log(`Other transaction type: ${type}, Amount: ${amount}, Fee: ${fee}, Net: ${net}, Description: ${transaction.description || 'No description'}`);
       }
     });
 
+    // Calculate the total balance change from all transactions for validation
+    const calculatedTotalNetChange = formattedTransactions.reduce((sum, t) => sum + t.amount, 0);
+    console.log(`Validated Net Change: ${calculatedTotalNetChange}, Direct Net: ${totalNet}`);
+
     // Return structured data
+    const response = {
+      transactions: formattedTransactions,
+      summary: {
+        gross: totalGross,
+        fees: totalFees,
+        transactionFees: totalTransactionFees,
+        payoutFees: totalPayoutFees,
+        stripeFees: totalStripeFees,
+        advances: totalAdvances,
+        advanceFunding: totalAdvanceFunding,
+        net: totalNet,
+        feePercentage: totalGross > 0 ? (totalFees / totalGross) * 100 : 0,
+        transactionCount: formattedTransactions.length,
+        totalTransactionCount: allTransactions.length,
+        transactionTypes: transactionTypes
+      },
+      status: 'success'
+    };
+    
+    console.log(`Final calculated totals:`, JSON.stringify(response.summary));
+    
     return new Response(
-      JSON.stringify({
-        transactions: formattedTransactions,
-        summary: {
-          gross: totalGross,
-          fees: totalFees,
-          transactionFees: totalTransactionFees,
-          payoutFees: totalPayoutFees,
-          net: totalNet,
-          feePercentage: totalGross > 0 ? (totalFees / totalGross) * 100 : 0,
-          transactionCount: formattedTransactions.length,
-          totalTransactionCount: allTransactions.length,
-          transactionTypes: transactionTypes
-        },
-        status: 'success'
-      }),
+      JSON.stringify(response),
       { 
         status: 200, 
         headers: { ...corsHeaders, "Content-Type": "application/json" } 

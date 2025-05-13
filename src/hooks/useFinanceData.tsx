@@ -28,7 +28,12 @@ export const useFinanceData = () => {
 
   // Import functionality from smaller hooks
   const { startingBalance, fetchMonthlyBalance, updateStartingBalance } = useMonthlyBalanceManager();
-  const { stripeIncome, stripeFees, stripeNet, stripeFeePercentage, regularIncome, processIncomeTypes } = useIncomeProcessor();
+  const { 
+    stripeIncome, stripeFees, 
+    stripeTransactionFees, stripePayoutFees, stripeAdditionalFees,
+    stripeNet, stripeFeePercentage, 
+    regularIncome, processIncomeTypes 
+  } = useIncomeProcessor();
   const { collaboratorExpenses, processCollaboratorData } = useCollaboratorProcessor();
   const { loading, error, rawResponse, usingCachedData, fetchFinancialData } = useFinancialDataFetcher();
 
@@ -101,6 +106,9 @@ export const useFinanceData = () => {
     rawResponse,
     stripeIncome,
     stripeFees,
+    stripeTransactionFees,
+    stripePayoutFees,
+    stripeAdditionalFees,
     stripeNet,
     stripeFeePercentage,
     regularIncome,

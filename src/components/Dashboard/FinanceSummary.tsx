@@ -7,11 +7,14 @@ import { Card, CardContent } from "@/components/ui/card";
 interface FinanceSummaryProps {
   summary: FinancialSummary;
   expenseCategories?: CategorySummary[];
-  stripeIncome?: number; // Parámetro para ingresos brutos de Stripe
-  stripeFees?: number; // Nuevo parámetro para comisiones de Stripe
-  stripeNet?: number; // Nuevo parámetro para ingresos netos de Stripe
-  stripeFeePercentage?: number; // Porcentaje de comisión
-  regularIncome?: number; // Parámetro para ingresos regulares de Zoho
+  stripeIncome?: number;
+  stripeFees?: number; 
+  stripeTransactionFees?: number;
+  stripePayoutFees?: number;
+  stripeAdditionalFees?: number;
+  stripeNet?: number;
+  stripeFeePercentage?: number;
+  regularIncome?: number;
 }
 
 const FinanceSummary: React.FC<FinanceSummaryProps> = ({ 
@@ -19,6 +22,9 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
   expenseCategories = [],
   stripeIncome = 0,
   stripeFees = 0,
+  stripeTransactionFees = 0,
+  stripePayoutFees = 0,
+  stripeAdditionalFees = 0,
   stripeNet = 0,
   stripeFeePercentage = 0,
   regularIncome = 0
@@ -71,11 +77,59 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
         </CardContent>
       </Card>
 
-      {/* Comisiones de Stripe */}
+      {/* Comisiones de Stripe (transacción) */}
       <Card className="finance-card">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Comisiones Stripe</h3>
+            <h3 className="text-sm font-medium text-gray-500">Comisiones (Transacción)</h3>
+            <div className="p-2 bg-amber-50 rounded-full">
+              <Scissors className="h-4 w-4 text-amber-500" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-amber-500 animate-value">
+            {formatCurrency(stripeTransactionFees)}
+          </div>
+        </CardContent>
+      </Card>
+      
+      {/* Comisiones Adicionales de Stripe */}
+      <Card className="finance-card">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-gray-500">Comisiones Adicionales</h3>
+            <div className="p-2 bg-amber-50 rounded-full">
+              <Scissors className="h-4 w-4 text-amber-500" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-amber-500 animate-value">
+            {formatCurrency(stripeAdditionalFees)}
+            <div className="text-sm mt-1 text-gray-500">
+              {stripeAdditionalFees > 0 && `${stripeFeePercentage.toFixed(1)}% del total`}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Comisiones de Stripe (payout) */}
+      <Card className="finance-card">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-gray-500">Comisiones (Payout)</h3>
+            <div className="p-2 bg-amber-50 rounded-full">
+              <Scissors className="h-4 w-4 text-amber-500" />
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-amber-500 animate-value">
+            {formatCurrency(stripePayoutFees)}
+          </div>
+        </CardContent>
+      </Card>
+      
+      {/* Total Comisiones de Stripe  */}
+      <Card className="finance-card">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-medium text-gray-500">Total Comisiones Stripe</h3>
             <div className="p-2 bg-amber-50 rounded-full">
               <Scissors className="h-4 w-4 text-amber-500" />
             </div>

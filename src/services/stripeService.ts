@@ -9,6 +9,9 @@ interface StripeTransactionResponse {
     fees: number;
     transactionFees: number;
     payoutFees: number;
+    stripeFees: number;
+    advances: number;
+    advanceFunding: number;
     net: number;
     feePercentage: number;
     transactionCount: number;
@@ -24,6 +27,9 @@ interface StripeData {
   fees: number;
   transactionFees: number;
   payoutFees: number;
+  stripeFees: number;
+  advances: number;
+  advanceFunding: number;
   net: number;
   feePercentage: number;
 }
@@ -65,6 +71,9 @@ const StripeService = {
           fees: 0,
           transactionFees: 0,
           payoutFees: 0,
+          stripeFees: 0,
+          advances: 0,
+          advanceFunding: 0,
           net: 0,
           feePercentage: 0
         };
@@ -83,6 +92,9 @@ const StripeService = {
         fees: response.summary.fees || 0,
         transactionFees: response.summary.transactionFees || 0,
         payoutFees: response.summary.payoutFees || 0,
+        stripeFees: response.summary.stripeFees || 0,
+        advances: response.summary.advances || 0,
+        advanceFunding: response.summary.advanceFunding || 0,
         net: response.summary.net || 0,
         feePercentage: response.summary.feePercentage || 0
       };
@@ -95,6 +107,9 @@ const StripeService = {
         fees: 0,
         transactionFees: 0,
         payoutFees: 0,
+        stripeFees: 0,
+        advances: 0,
+        advanceFunding: 0,
         net: 0,
         feePercentage: 0
       };
