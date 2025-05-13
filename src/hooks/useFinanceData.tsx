@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import ZohoService from '@/services/zohoService';
 import StripeService from '@/services/stripeService';
 import { Transaction } from '@/types/financial';
@@ -23,6 +23,8 @@ export const useFinanceData = () => {
   const [startingBalance, setStartingBalance] = useState<number | undefined>(undefined);
   const [usingCachedData, setUsingCachedData] = useState<boolean>(false);
   const [useStripeOverride, setUseStripeOverride] = useState<boolean>(false);
+  const [stripeOverrideValue, setStripeOverrideValue] = useState<number | null>(null);
+  const [lastFetchTimestamp, setLastFetchTimestamp] = useState<number>(0);
   
   // Estado del rango de fechas - configurado para mostrar desde el último día del mes anterior hasta el último día del mes actual
   const [dateRange, setDateRange] = useState(() => {
@@ -36,7 +38,9 @@ export const useFinanceData = () => {
   });
 
   // Datos financieros procesados
-  const financialData = processTransactionData(transactions, startingBalance);
+  const financialData = useMemo(() => {
+    return processTransactionData(transactions, startingBalance);
+  }, [transactions, startingBalance]);
 
   // Function to format date in YYYY-MM-DD format without timezone shifts
   const formatDateYYYYMMDD = (date: Date): string => {
@@ -96,12 +100,15 @@ export const useFinanceData = () => {
       if (data) {
         console.log("Fetched monthly balance:", data);
         setStartingBalance(data.balance);
-        // If stripe_override exists, set the flag to use it
-        setUseStripeOverride(!!data.stripe_override);
+        // If stripe_override exists, set the flag to use it and store the value
+        const hasStripeOverride = data.stripe_override !== null;
+        setUseStripeOverride(hasStripeOverride);
+        setStripeOverrideValue(data.stripe_override);
       } else {
         console.log("No monthly balance found for:", monthYear);
         setStartingBalance(undefined);
         setUseStripeOverride(false);
+        setStripeOverrideValue(null);
       }
     } catch (err) {
       console.error("Error in fetchMonthlyBalance:", err);
@@ -129,6 +136,7 @@ export const useFinanceData = () => {
       if (stripeOverride !== undefined) {
         updateData.stripe_override = stripeOverride;
         setUseStripeOverride(!!stripeOverride);
+        setStripeOverrideValue(stripeOverride || null);
       }
       
       if (existingData) {
@@ -161,8 +169,11 @@ export const useFinanceData = () => {
   // Toggle using stripe override
   const toggleStripeOverride = useCallback(async (useOverride: boolean) => {
     setUseStripeOverride(useOverride);
-    refreshData(false);
-  }, []);
+    // Only refresh if we're actually changing the state
+    if (useStripeOverride !== useOverride) {
+      refreshData(false);
+    }
+  }, [useStripeOverride]);
 
   // Función para procesar y separar ingresos
   const processIncomeTypes = useCallback((transactions: Transaction[], stripeData: any) => {
@@ -222,15 +233,20 @@ export const useFinanceData = () => {
 
   // Función para cargar los datos (ahora no se carga automáticamente)
   const fetchData = useCallback(async (forceRefresh = false) => {
+    // If we've fetched recently and not forcing a refresh, don't fetch again
+    const now = Date.now();
+    if (!forceRefresh && now - lastFetchTimestamp < 2000) {
+      console.log("Skipping fetch, too soon since last fetch");
+      return;
+    }
+    
+    setLastFetchTimestamp(now);
     console.log("Fetching financial data...");
     setLoading(true);
     setError(null);
     setUsingCachedData(false);
 
     try {
-      // Also fetch the monthly balance for the selected date range
-      await fetchMonthlyBalance(dateRange.startDate);
-      
       // Log exact date objects for debugging
       console.log("Original dateRange from datepicker:", {
         startDate: dateRange.startDate,
@@ -270,12 +286,12 @@ export const useFinanceData = () => {
       // Procesar datos de colaboradores
       processCollaboratorData(rawData);
 
-      // Obtener transacciones de Stripe - usando las fechas exactas sin modificaciones
+      // Obtener transacciones de Stripe - usando el valor de override directamente
       console.log("Fetching from Stripe:", dateRange.startDate, dateRange.endDate);
       const stripeData = await StripeService.getTransactions(
         dateRange.startDate,
         dateRange.endDate,
-        useStripeOverride
+        useStripeOverride ? stripeOverrideValue : null
       );
 
       // Combinar los datos
@@ -312,10 +328,24 @@ export const useFinanceData = () => {
     dateRange.endDate, 
     processIncomeTypes, 
     processCollaboratorData, 
-    fetchMonthlyBalance,
-    useStripeOverride
+    useStripeOverride,
+    stripeOverrideValue,
+    lastFetchTimestamp
   ]);
 
+  // When useStripeOverride or stripeOverrideValue changes, make sure we fetch the data again
+  useEffect(() => {
+    if (dataInitialized) {
+      console.log("Override settings changed, refreshing data");
+      fetchData(false);
+    }
+  }, [useStripeOverride, stripeOverrideValue]);
+
+  // When dateRange changes, make sure we fetch monthly balance
+  useEffect(() => {
+    fetchMonthlyBalance(dateRange.startDate);
+  }, [dateRange.startDate, fetchMonthlyBalance]);
+  
   // Función pública para refrescar datos (forzando o no)
   const refreshData = useCallback((force = false) => {
     fetchData(force);

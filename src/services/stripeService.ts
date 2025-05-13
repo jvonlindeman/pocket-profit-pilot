@@ -23,44 +23,39 @@ interface StripeData {
 
 const StripeService = {
   // Get transactions within a date range
-  getTransactions: async (startDate: Date, endDate: Date, useOverride = false): Promise<StripeData> => {
+  getTransactions: async (
+    startDate: Date, 
+    endDate: Date, 
+    stripeOverrideValue: number | null = null
+  ): Promise<StripeData> => {
     console.log("StripeService: Fetching transactions from", startDate, "to", endDate);
     
     try {
-      if (useOverride) {
-        // Get monthly balance for potential override
-        const monthYear = startDate.toISOString().substring(0, 7); // Format: YYYY-MM
-        const { data: balanceData } = await supabase
-          .from('monthly_balances')
-          .select('stripe_override')
-          .eq('month_year', monthYear)
-          .single();
+      // If there's an override value, return that without calling the API
+      if (stripeOverrideValue !== null) {
+        console.log("StripeService: Using manual override value:", stripeOverrideValue);
         
-        if (balanceData?.stripe_override) {
-          console.log("StripeService: Using manual override value:", balanceData.stripe_override);
-          
-          // Return manual override with a single transaction
-          const overrideAmount = Number(balanceData.stripe_override);
-          
-          // Create a transaction representing the manual override amount
-          const transaction: Transaction = {
-            id: `stripe-override-${monthYear}`,
-            date: startDate.toISOString().split('T')[0],
-            amount: overrideAmount,
-            description: 'Ingresos de Stripe (valor manual)',
-            category: 'Ingresos por plataforma',
-            source: 'Stripe',
-            type: 'income'
-          };
-          
-          return {
-            transactions: [transaction],
-            gross: overrideAmount,
-            fees: 0, // We don't know the fees for manual override
-            net: overrideAmount, // Net equals gross for manual override
-            feePercentage: 0 // We don't know the fee percentage for manual override
-          };
-        }
+        // Return manual override with a single transaction
+        const overrideAmount = Number(stripeOverrideValue);
+        
+        // Create a transaction representing the manual override amount
+        const transaction: Transaction = {
+          id: `stripe-override-${startDate.toISOString().substring(0, 7)}`,
+          date: startDate.toISOString().split('T')[0],
+          amount: overrideAmount,
+          description: 'Ingresos de Stripe (valor manual)',
+          category: 'Ingresos por plataforma',
+          source: 'Stripe',
+          type: 'income'
+        };
+        
+        return {
+          transactions: [transaction],
+          gross: overrideAmount,
+          fees: 0, // We don't know the fees for manual override
+          net: overrideAmount, // Net equals gross for manual override
+          feePercentage: 0 // We don't know the fee percentage for manual override
+        };
       }
       
       // Format dates for API call
