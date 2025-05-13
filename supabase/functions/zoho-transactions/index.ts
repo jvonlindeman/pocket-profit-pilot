@@ -216,36 +216,10 @@ serve(async (req: Request) => {
     // Process the data into transactions
     const transactions: Transaction[] = [];
     
-    // Process Stripe income if available
-    if (webhookData.stripe) {
-      try {
-        const stripeAmount = parseFloat(String(webhookData.stripe).replace(".", "").replace(",", "."));
-        if (!isNaN(stripeAmount) && stripeAmount > 0) {
-          const stripeTransaction = {
-            date: new Date().toISOString().split('T')[0],
-            amount: stripeAmount,
-            description: 'Ingresos de Stripe',
-            category: 'Ingresos por plataforma',
-            source: 'Stripe',
-            type: 'income'
-          };
-          
-          const externalId = `stripe-income-${stripeTransaction.date}-${stripeTransaction.amount}`;
-          const id = generateConsistentId(
-            { ...stripeTransaction, external_id: externalId }, 
-            0
-          );
-          
-          transactions.push({
-            ...stripeTransaction,
-            id,
-            external_id: externalId
-          } as Transaction);
-        }
-      } catch (e) {
-        console.error("Error processing Stripe income:", e);
-      }
-    }
+    // IMPORTANT: We no longer process Stripe income from make.com
+    // Stripe data now comes directly from the Stripe API via the stripe-balance edge function
+    // This comment is kept for clarity on the change made
+    console.log("No longer processing Stripe data from make.com webhook");
     
     // Process collaborator expenses - Ahora incluyendo fechas
     if (Array.isArray(webhookData.colaboradores)) {

@@ -46,17 +46,50 @@ serve(async (req) => {
     console.log(`Fetching Stripe balance transactions from ${startDate} to ${endDate}`);
 
     // Format date params for the Stripe API (Unix timestamps)
+    // Convert ISO date strings to Unix timestamps (seconds since epoch)
     const startTimestamp = Math.floor(new Date(startDate).getTime() / 1000);
     const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000) + 86400; // Add one day to include the end date fully
 
-    // Fetch balance transactions for the period
-    const transactions = await stripe.balanceTransactions.list({
-      limit: 100, // Adjust as needed
-      created: {
-        gte: startTimestamp,
-        lte: endTimestamp,
-      },
-    });
+    console.log(`Using timestamps: start=${startTimestamp}, end=${endTimestamp}`);
+
+    // Initialize variables for pagination
+    let hasMore = true;
+    let lastId = null;
+    const allTransactions = [];
+    
+    // Fetch all transactions with pagination
+    while (hasMore) {
+      // Setup pagination parameters
+      const paginationParams: any = {
+        limit: 100, // Maximum allowed by Stripe
+        created: {
+          gte: startTimestamp,
+          lte: endTimestamp,
+        }
+      };
+      
+      // Add starting_after for pagination if we have a last ID
+      if (lastId) {
+        paginationParams.starting_after = lastId;
+      }
+      
+      // Make the API call with pagination parameters
+      const transactionBatch = await stripe.balanceTransactions.list(paginationParams);
+      
+      // Add the batch to our collection
+      allTransactions.push(...transactionBatch.data);
+      
+      // Check if we need to paginate more
+      hasMore = transactionBatch.has_more;
+      if (hasMore && transactionBatch.data.length > 0) {
+        // Get the ID of the last item for pagination
+        lastId = transactionBatch.data[transactionBatch.data.length - 1].id;
+      }
+      
+      console.log(`Fetched ${transactionBatch.data.length} transactions, has more: ${hasMore}`);
+    }
+
+    console.log(`Total transactions fetched: ${allTransactions.length}`);
 
     // Process transactions to calculate totals and organize data
     let totalGross = 0;
@@ -65,7 +98,7 @@ serve(async (req) => {
     let formattedTransactions = [];
 
     // Map transaction types to our internal types
-    transactions.data.forEach(transaction => {
+    allTransactions.forEach(transaction => {
       const amount = transaction.amount / 100; // Convert from cents to dollars
       const fee = transaction.fee / 100; // Convert from cents to dollars
       const net = transaction.net / 100; // Convert from cents to dollars

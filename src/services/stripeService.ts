@@ -63,6 +63,9 @@ const StripeService = {
         return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
       };
       
+      console.log("StripeService: Calling Stripe edge function with dates:", 
+        formatDateYYYYMMDD(startDate), formatDateYYYYMMDD(endDate));
+      
       // Call Stripe edge function to get real data
       const { data, error } = await supabase.functions.invoke('stripe-balance', {
         body: {
@@ -83,6 +86,7 @@ const StripeService = {
       }
       
       const response = data as StripeTransactionResponse;
+      console.log("StripeService: API response with summary:", response.summary);
       
       return {
         transactions: response.transactions || [],
