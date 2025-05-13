@@ -68,11 +68,11 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
   const capitalizedMonth = formattedMonth.charAt(0).toUpperCase() + formattedMonth.slice(1);
 
   // Handle form submission
-  const onSubmit = (data: FormValues) => {
-    updateMonthlyBalance(data.balance, data.notes);
+  const onSubmit = async (data: FormValues) => {
+    const success = await updateMonthlyBalance(data.balance, data.notes);
     
-    // Notify parent component if needed
-    if (onBalanceChange) {
+    // Only notify parent component if update was successful
+    if (success && onBalanceChange) {
       onBalanceChange(data.balance);
     }
   };

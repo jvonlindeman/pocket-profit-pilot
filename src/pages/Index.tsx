@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
@@ -82,6 +81,13 @@ const Index = () => {
       description: 'Cargando datos financieros...',
     });
     refreshData(true);
+  };
+
+  // Handler for balance changes in the MonthlyBalanceEditor
+  const handleBalanceChange = (balance: number) => {
+    console.log("Balance changed in editor:", balance);
+    // We need to make sure the UI reflects the new balance
+    refreshData(false);
   };
 
   // Manejador para actualizar datos
@@ -195,6 +201,7 @@ const Index = () => {
             <div className="mb-6">
               <MonthlyBalanceEditor 
                 currentDate={dateRange.startDate}
+                onBalanceChange={handleBalanceChange}
               />
             </div>
 

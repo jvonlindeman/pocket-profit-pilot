@@ -51,15 +51,17 @@ export const useMonthlyBalanceManager = () => {
         notes: notes || (existingData?.notes || null),
       };
       
+      let result;
+      
       if (existingData) {
         // Update existing record
-        await supabase
+        result = await supabase
           .from('monthly_balances')
           .update(updateData)
           .eq('month_year', monthYear);
       } else {
         // Create new record
-        await supabase
+        result = await supabase
           .from('monthly_balances')
           .insert({
             month_year: monthYear,
@@ -67,9 +69,16 @@ export const useMonthlyBalanceManager = () => {
           });
       }
       
+      if (result.error) {
+        console.error("Error updating starting balance:", result.error);
+        return false;
+      }
+      
       setStartingBalance(balance);
+      return true;
     } catch (err) {
       console.error("Error updating starting balance:", err);
+      return false;
     }
   }, []);
 
