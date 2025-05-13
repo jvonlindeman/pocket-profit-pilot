@@ -8,6 +8,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableFooter,
 } from "@/components/ui/table";
 import {
   Card,
@@ -15,6 +16,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
 import {
   Select,
@@ -25,7 +27,7 @@ import {
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import CacheStats from './CacheStats';
-import { Info, Filter, DollarSign, MinusCircle, Users } from 'lucide-react';
+import { Info, Filter, DollarSign, MinusCircle, Users, Coins, Table as TableIcon } from 'lucide-react';
 import { toast } from "@/hooks/use-toast";
 
 interface TransactionListProps {
@@ -89,6 +91,36 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefre
     return result;
   }, [transactions, typeFilter, categoryFilter]);
 
+  // Calculate transaction sums by category
+  const categorySums = useMemo(() => {
+    const sums: Record<string, number> = {};
+    let totalIncome = 0;
+    let totalExpense = 0;
+    
+    // Calculate sums for each category in filtered transactions
+    filteredTransactions.forEach(tx => {
+      const category = tx.category;
+      if (!sums[category]) {
+        sums[category] = 0;
+      }
+      sums[category] += tx.amount;
+      
+      // Also track totals by type
+      if (tx.type === 'income') {
+        totalIncome += tx.amount;
+      } else if (tx.type === 'expense') {
+        totalExpense += tx.amount;
+      }
+    });
+    
+    // Add totals
+    sums['_totalIncome'] = totalIncome;
+    sums['_totalExpense'] = totalExpense;
+    sums['_netAmount'] = totalIncome - totalExpense;
+    
+    return sums;
+  }, [filteredTransactions]);
+
   // Reset category filter when transaction type changes
   useEffect(() => {
     setcategoryFilter('all');
@@ -129,6 +161,120 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefre
         description: "Obteniendo transacciones más recientes..."
       });
     }
+  };
+
+  // Generate summary rows for footer based on current filter
+  const getSummaryRows = () => {
+    const summaryRows = [];
+    
+    // Helper to decide which summaries to show based on filter type
+    const isRelevantCategory = (category: string) => {
+      // Skip internal total keys
+      if (category.startsWith('_')) return false;
+      
+      // For expense filters, only show relevant categories
+      if (typeFilter === 'expense' && categoryFilter !== 'all') {
+        return category === categoryFilter;
+      }
+      
+      // For collaborator filter, only show collaborator categories
+      if (typeFilter === 'collaborator') {
+        return category.toLowerCase().includes('colaborador');
+      }
+      
+      // For income filters, only show income categories
+      if (typeFilter === 'income' || typeFilter === 'zoho-income' || typeFilter === 'stripe-income') {
+        const isIncomeCategory = filteredTransactions
+          .filter(tx => tx.category === category)
+          .some(tx => tx.type === 'income');
+        return isIncomeCategory;
+      }
+      
+      return true;
+    };
+    
+    // Add category subtotals if there are transactions with those categories
+    Object.keys(categorySums)
+      .filter(isRelevantCategory)
+      .sort()
+      .forEach(category => {
+        const amount = categorySums[category];
+        if (amount > 0) {
+          summaryRows.push(
+            <TableRow key={`summary-${category}`}>
+              <TableCell colSpan={4} className="font-medium text-right">
+                Subtotal: {category}
+              </TableCell>
+              <TableCell className="text-right font-semibold">
+                {formatCurrency(amount)}
+              </TableCell>
+            </TableRow>
+          );
+        }
+      });
+    
+    // Add total row based on filter
+    if (filteredTransactions.length > 0) {
+      if (typeFilter === 'income' || typeFilter === 'zoho-income' || typeFilter === 'stripe-income') {
+        // Only show income total
+        summaryRows.push(
+          <TableRow key="total-income" className="bg-green-50">
+            <TableCell colSpan={4} className="font-bold text-right">
+              Total Ingresos
+            </TableCell>
+            <TableCell className="text-right font-bold text-green-600">
+              {formatCurrency(categorySums._totalIncome)}
+            </TableCell>
+          </TableRow>
+        );
+      } else if (typeFilter === 'expense' || typeFilter === 'collaborator') {
+        // Only show expense total
+        summaryRows.push(
+          <TableRow key="total-expense" className="bg-red-50">
+            <TableCell colSpan={4} className="font-bold text-right">
+              Total Gastos
+            </TableCell>
+            <TableCell className="text-right font-bold text-red-600">
+              {formatCurrency(categorySums._totalExpense)}
+            </TableCell>
+          </TableRow>
+        );
+      } else {
+        // Show both income and expense totals, and net amount
+        summaryRows.push(
+          <TableRow key="total-income" className="bg-green-50">
+            <TableCell colSpan={4} className="font-bold text-right">
+              Total Ingresos
+            </TableCell>
+            <TableCell className="text-right font-bold text-green-600">
+              {formatCurrency(categorySums._totalIncome)}
+            </TableCell>
+          </TableRow>
+        );
+        summaryRows.push(
+          <TableRow key="total-expense" className="bg-red-50">
+            <TableCell colSpan={4} className="font-bold text-right">
+              Total Gastos
+            </TableCell>
+            <TableCell className="text-right font-bold text-red-600">
+              {formatCurrency(categorySums._totalExpense)}
+            </TableCell>
+          </TableRow>
+        );
+        summaryRows.push(
+          <TableRow key="net-amount" className={categorySums._netAmount >= 0 ? "bg-blue-50" : "bg-amber-50"}>
+            <TableCell colSpan={4} className="font-bold text-right">
+              Saldo Neto
+            </TableCell>
+            <TableCell className={`text-right font-bold ${categorySums._netAmount >= 0 ? "text-blue-600" : "text-amber-600"}`}>
+              {formatCurrency(categorySums._netAmount)}
+            </TableCell>
+          </TableRow>
+        );
+      }
+    }
+    
+    return summaryRows;
   };
 
   return (
@@ -204,7 +350,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefre
                       <div className="flex items-center">
                         {transaction.type === 'expense' && <MinusCircle size={16} className="text-red-500 mr-2" />}
                         {transaction.type === 'income' && <DollarSign size={16} className="text-green-500 mr-2" />}
-                        {transaction.category === 'Colaboradores' && <Users size={16} className="text-blue-500 mr-2" />}
+                        {transaction.category === 'Pagos a colaboradores' && <Users size={16} className="text-blue-500 mr-2" />}
                         {transaction.category}
                       </div>
                     </TableCell>
@@ -235,8 +381,21 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefre
                 ))
               )}
             </TableBody>
+            {filteredTransactions.length > 0 && (
+              <TableFooter>
+                {getSummaryRows()}
+              </TableFooter>
+            )}
           </Table>
         </CardContent>
+        {filteredTransactions.length > 0 && (
+          <CardFooter className="flex justify-end bg-slate-50 pt-4 pb-2">
+            <div className="flex items-center text-sm text-muted-foreground">
+              <TableIcon size={16} className="mr-2" />
+              <span>Mostrando {filteredTransactions.length} transacciones</span>
+            </div>
+          </CardFooter>
+        )}
       </Card>
     </>
   );
