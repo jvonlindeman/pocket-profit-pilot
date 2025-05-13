@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
@@ -37,9 +38,7 @@ const Index = () => {
     collaboratorExpenses,
     startingBalance,
     updateStartingBalance,
-    usingCachedData,
-    useStripeOverride,
-    toggleStripeOverride
+    usingCachedData
   } = useFinanceData();
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
@@ -83,11 +82,6 @@ const Index = () => {
       description: 'Cargando datos financieros...',
     });
     refreshData(true);
-  };
-
-  // Handle stripe override change
-  const handleStripeOverrideChange = (override: number | null) => {
-    toggleStripeOverride(!!override);
   };
 
   // Manejador para actualizar datos
@@ -200,8 +194,7 @@ const Index = () => {
             {/* Balance Mensual Inicial */}
             <div className="mb-6">
               <MonthlyBalanceEditor 
-                currentDate={dateRange.startDate} 
-                onStripeOverrideChange={handleStripeOverrideChange}
+                currentDate={dateRange.startDate}
               />
             </div>
 

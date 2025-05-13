@@ -72,7 +72,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
   };
 
   // Set or update the monthly balance
-  const updateMonthlyBalance = async (balance: number, notes?: string, stripeOverride?: number | null) => {
+  const updateMonthlyBalance = async (balance: number, notes?: string) => {
     setLoading(true);
     setError(null);
 
@@ -81,11 +81,6 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
         balance,
         notes: notes || null,
       };
-      
-      // Only include stripe_override if provided
-      if (stripeOverride !== undefined) {
-        updateData.stripe_override = stripeOverride;
-      }
       
       // Check if we're updating or inserting
       if (monthlyBalance) {

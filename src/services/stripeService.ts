@@ -28,54 +28,11 @@ const StripeService = {
   // Get transactions within a date range
   getTransactions: async (
     startDate: Date, 
-    endDate: Date, 
-    stripeOverrideValue: number | null = null
+    endDate: Date
   ): Promise<StripeData> => {
     console.log("StripeService: Fetching transactions from", startDate, "to", endDate);
     
     try {
-      // If there's an override value, return that without calling the API
-      if (stripeOverrideValue !== null) {
-        console.log("StripeService: Using manual override value:", stripeOverrideValue);
-        
-        // Return manual override with a single transaction
-        const overrideAmount = Number(stripeOverrideValue);
-        
-        // Create a transaction representing the manual override amount
-        const transaction: Transaction = {
-          id: `stripe-override-${startDate.toISOString().substring(0, 7)}`,
-          date: startDate.toISOString().split('T')[0],
-          amount: overrideAmount,
-          description: 'Ingresos de Stripe (valor manual) - Neto',
-          category: 'Ingresos por plataforma',
-          source: 'Stripe',
-          type: 'income'
-        };
-        
-        // Create a simple response for override mode
-        const overrideResponse = {
-          transactions: [transaction],
-          summary: {
-            gross: overrideAmount,
-            fees: 0,
-            net: overrideAmount,
-            feePercentage: 0,
-          },
-          status: 'override'
-        };
-        
-        // Store the override response for debugging
-        lastRawResponse = overrideResponse;
-        
-        return {
-          transactions: [transaction],
-          gross: overrideAmount,
-          fees: 0, // We don't know the fees for manual override
-          net: overrideAmount, // Net equals gross for manual override
-          feePercentage: 0 // We don't know the fee percentage for manual override
-        };
-      }
-      
       // Format dates for API call
       const formatDateYYYYMMDD = (date: Date): string => {
         return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;

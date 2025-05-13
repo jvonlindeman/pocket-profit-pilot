@@ -22,8 +22,6 @@ export const useFinanceData = () => {
   const [collaboratorExpenses, setCollaboratorExpenses] = useState<any[]>([]);
   const [startingBalance, setStartingBalance] = useState<number | undefined>(undefined);
   const [usingCachedData, setUsingCachedData] = useState<boolean>(false);
-  const [useStripeOverride, setUseStripeOverride] = useState<boolean>(false);
-  const [stripeOverrideValue, setStripeOverrideValue] = useState<number | null>(null);
   const [lastFetchTimestamp, setLastFetchTimestamp] = useState<number>(0);
   
   // Estado del rango de fechas - configurado para mostrar desde el último día del mes anterior hasta el último día del mes actual
@@ -100,15 +98,9 @@ export const useFinanceData = () => {
       if (data) {
         console.log("Fetched monthly balance:", data);
         setStartingBalance(data.balance);
-        // If stripe_override exists, set the flag to use it and store the value
-        const hasStripeOverride = data.stripe_override !== null;
-        setUseStripeOverride(hasStripeOverride);
-        setStripeOverrideValue(data.stripe_override);
       } else {
         console.log("No monthly balance found for:", monthYear);
         setStartingBalance(undefined);
-        setUseStripeOverride(false);
-        setStripeOverrideValue(null);
       }
     } catch (err) {
       console.error("Error in fetchMonthlyBalance:", err);
@@ -116,7 +108,7 @@ export const useFinanceData = () => {
   }, []);
 
   // Update the starting balance
-  const updateStartingBalance = useCallback(async (balance: number, notes?: string, stripeOverride?: number) => {
+  const updateStartingBalance = useCallback(async (balance: number, notes?: string) => {
     try {
       const monthYear = formatDate(dateRange.startDate, 'yyyy-MM');
       
@@ -131,13 +123,6 @@ export const useFinanceData = () => {
         balance,
         notes: notes || (existingData?.notes || null),
       };
-      
-      // Only include stripe_override if it's provided
-      if (stripeOverride !== undefined) {
-        updateData.stripe_override = stripeOverride;
-        setUseStripeOverride(!!stripeOverride);
-        setStripeOverrideValue(stripeOverride || null);
-      }
       
       if (existingData) {
         // Update existing record
@@ -156,24 +141,10 @@ export const useFinanceData = () => {
       }
       
       setStartingBalance(balance);
-      
-      // Refresh data to reflect the change if using override
-      if (stripeOverride !== undefined) {
-        refreshData(false);
-      }
     } catch (err) {
       console.error("Error updating starting balance:", err);
     }
   }, [dateRange.startDate]);
-
-  // Toggle using stripe override
-  const toggleStripeOverride = useCallback(async (useOverride: boolean) => {
-    setUseStripeOverride(useOverride);
-    // Only refresh if we're actually changing the state
-    if (useStripeOverride !== useOverride) {
-      refreshData(false);
-    }
-  }, [useStripeOverride]);
 
   // Función para procesar y separar ingresos
   const processIncomeTypes = useCallback((transactions: Transaction[], stripeData: any) => {
@@ -286,12 +257,11 @@ export const useFinanceData = () => {
       // Procesar datos de colaboradores
       processCollaboratorData(rawData);
 
-      // Obtener transacciones de Stripe - usando el valor de override directamente
+      // Obtener transacciones de Stripe - siempre usando la API directamente
       console.log("Fetching from Stripe:", dateRange.startDate, dateRange.endDate);
       const stripeData = await StripeService.getTransactions(
         dateRange.startDate,
-        dateRange.endDate,
-        useStripeOverride ? stripeOverrideValue : null
+        dateRange.endDate
       );
 
       // Combinar los datos
@@ -327,19 +297,9 @@ export const useFinanceData = () => {
     dateRange.startDate, 
     dateRange.endDate, 
     processIncomeTypes, 
-    processCollaboratorData, 
-    useStripeOverride,
-    stripeOverrideValue,
+    processCollaboratorData,
     lastFetchTimestamp
   ]);
-
-  // When useStripeOverride or stripeOverrideValue changes, make sure we fetch the data again
-  useEffect(() => {
-    if (dataInitialized) {
-      console.log("Override settings changed, refreshing data");
-      fetchData(false);
-    }
-  }, [useStripeOverride, stripeOverrideValue]);
 
   // When dateRange changes, make sure we fetch monthly balance
   useEffect(() => {
@@ -369,8 +329,6 @@ export const useFinanceData = () => {
     collaboratorExpenses,
     startingBalance,
     updateStartingBalance,
-    usingCachedData,
-    useStripeOverride,
-    toggleStripeOverride
+    usingCachedData
   };
 };
