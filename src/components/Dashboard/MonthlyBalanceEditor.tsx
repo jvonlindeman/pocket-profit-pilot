@@ -48,7 +48,8 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
     currentMonthYear,
   } = useMonthlyBalance({ currentDate });
 
-  // Update form values when data is loaded
+  // Update form values when data is loaded, but DON'T call onBalanceChange
+  // to prevent infinite loop
   useEffect(() => {
     if (monthlyBalance) {
       form.reset({
@@ -56,12 +57,9 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
         notes: monthlyBalance.notes || ''
       });
       
-      // Notify parent component if needed
-      if (onBalanceChange) {
-        onBalanceChange(monthlyBalance.balance);
-      }
+      // Removed the onBalanceChange call here to prevent infinite loop
     }
-  }, [monthlyBalance, form, onBalanceChange]);
+  }, [monthlyBalance, form]);
 
   // Format month name in Spanish
   const formattedMonth = format(currentDate, 'MMMM yyyy', { locale: es });
