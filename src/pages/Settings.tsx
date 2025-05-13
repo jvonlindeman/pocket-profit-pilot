@@ -1,11 +1,20 @@
 
 import React from 'react';
 import ZohoDebug from '@/components/ZohoDebug';
+import WebhookDebug from '@/components/WebhookDebug/index';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Bug } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { endOfMonth, startOfMonth } from 'date-fns';
 
 const Settings = () => {
+  // Create a date range for the current month
+  const today = new Date();
+  const dateRange = {
+    startDate: startOfMonth(today),
+    endDate: endOfMonth(today),
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -37,6 +46,9 @@ const Settings = () => {
               Herramientas de Depuración
             </h2>
             <ZohoDebug />
+            <div className="mt-6">
+              <WebhookDebug dateRange={dateRange} />
+            </div>
           </section>
         </div>
       </main>

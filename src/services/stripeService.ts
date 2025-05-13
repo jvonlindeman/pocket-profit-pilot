@@ -21,6 +21,9 @@ interface StripeData {
   feePercentage: number;
 }
 
+// Variable to store the last raw response from the Stripe API
+let lastRawResponse: any = null;
+
 const StripeService = {
   // Get transactions within a date range
   getTransactions: async (
@@ -49,6 +52,21 @@ const StripeService = {
           type: 'income'
         };
         
+        // Create a simple response for override mode
+        const overrideResponse = {
+          transactions: [transaction],
+          summary: {
+            gross: overrideAmount,
+            fees: 0,
+            net: overrideAmount,
+            feePercentage: 0,
+          },
+          status: 'override'
+        };
+        
+        // Store the override response for debugging
+        lastRawResponse = overrideResponse;
+        
         return {
           transactions: [transaction],
           gross: overrideAmount,
@@ -76,6 +94,7 @@ const StripeService = {
       
       if (error) {
         console.error("StripeService: Error fetching from API:", error);
+        lastRawResponse = { error: error.message };
         return {
           transactions: [],
           gross: 0,
@@ -84,6 +103,10 @@ const StripeService = {
           feePercentage: 0
         };
       }
+      
+      // Store the raw response for debugging
+      lastRawResponse = data;
+      console.log("StripeService: Stored raw response for debugging:", data);
       
       const response = data as StripeTransactionResponse;
       console.log("StripeService: API response with summary:", response.summary);
@@ -97,6 +120,7 @@ const StripeService = {
       };
     } catch (err) {
       console.error("StripeService: Error:", err);
+      lastRawResponse = { error: err instanceof Error ? err.message : "Unknown error" };
       return {
         transactions: [],
         gross: 0,
@@ -105,6 +129,16 @@ const StripeService = {
         feePercentage: 0
       };
     }
+  },
+
+  // Get the last raw response for debugging purposes
+  getLastRawResponse: (): any => {
+    return lastRawResponse;
+  },
+  
+  // Set the raw response manually (useful for testing)
+  setLastRawResponse: (data: any): void => {
+    lastRawResponse = data;
   }
 };
 
