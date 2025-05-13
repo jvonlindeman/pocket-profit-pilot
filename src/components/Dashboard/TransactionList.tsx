@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction } from '@/types/financial';
 import {
   Table,
@@ -25,7 +25,8 @@ import {
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import CacheStats from './CacheStats';
-import { Info } from 'lucide-react';
+import { Info, Filter, DollarSign, MinusCircle, Users } from 'lucide-react';
+import { toast } from "@/hooks/use-toast";
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -33,15 +34,67 @@ interface TransactionListProps {
   isLoading?: boolean;
 }
 
-const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefresh, isLoading = false }) => {
-  const [filter, setFilter] = useState<'all' | 'income' | 'expense'>('all');
-  
-  // Aplicamos filtro
-  const filteredTransactions = filter === 'all' 
-    ? transactions 
-    : transactions.filter(tx => tx.type === filter);
+type TransactionFilter = 'all' | 'income' | 'expense' | 'collaborator' | 'zoho-income' | 'stripe-income';
 
-  // Formato de fecha
+const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefresh, isLoading = false }) => {
+  // Main transaction type filter
+  const [typeFilter, setTypeFilter] = useState<TransactionFilter>('all');
+  // Category filter for expenses
+  const [categoryFilter, setcategoryFilter] = useState<string>('all');
+
+  // Extract unique expense categories from transactions
+  const expenseCategories = useMemo(() => {
+    const categories = transactions
+      .filter(tx => tx.type === 'expense')
+      .map(tx => tx.category)
+      .filter((value, index, self) => self.indexOf(value) === index)
+      .sort();
+    
+    return ['all', ...categories];
+  }, [transactions]);
+
+  // Apply filters to transactions
+  const filteredTransactions = useMemo(() => {
+    let result = [...transactions];
+    
+    // Apply transaction type filter
+    switch (typeFilter) {
+      case 'all':
+        // No filtering needed
+        break;
+      case 'income':
+        result = result.filter(tx => tx.type === 'income');
+        break;
+      case 'expense':
+        result = result.filter(tx => tx.type === 'expense');
+        // Apply category filter if it's not 'all'
+        if (categoryFilter !== 'all') {
+          result = result.filter(tx => tx.category === categoryFilter);
+        }
+        break;
+      case 'collaborator':
+        // Filter for collaborator expenses specifically
+        result = result.filter(tx => tx.type === 'expense' && tx.category.toLowerCase().includes('colaborador'));
+        break;
+      case 'zoho-income':
+        result = result.filter(tx => tx.type === 'income' && tx.source === 'Zoho');
+        break;
+      case 'stripe-income':
+        result = result.filter(tx => tx.type === 'income' && tx.source === 'Stripe');
+        break;
+      default:
+        break;
+    }
+    
+    return result;
+  }, [transactions, typeFilter, categoryFilter]);
+
+  // Reset category filter when transaction type changes
+  useEffect(() => {
+    setcategoryFilter('all');
+  }, [typeFilter]);
+
+  // Format date
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
@@ -59,7 +112,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefre
     }
   };
 
-  // Formato de moneda (ahora mostramos en USD por defecto)
+  // Format currency (showing in USD by default)
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -71,6 +124,10 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefre
   const handleRefresh = () => {
     if (onRefresh) {
       onRefresh();
+      toast({
+        title: "Actualizando datos",
+        description: "Obteniendo transacciones más recientes..."
+      });
     }
   };
 
@@ -81,21 +138,43 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefre
       )}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <CardTitle>Transacciones</CardTitle>
               <CardDescription>Lista detallada de ingresos y gastos en USD</CardDescription>
             </div>
-            <Select value={filter} onValueChange={(value: any) => setFilter(value)}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filtrar por tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="income">Ingresos</SelectItem>
-                <SelectItem value="expense">Gastos</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex flex-col sm:flex-row gap-2">
+              {/* Transaction Type Filter */}
+              <Select value={typeFilter} onValueChange={(value: TransactionFilter) => setTypeFilter(value)}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Filtrar por tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="income">Ingresos</SelectItem>
+                  <SelectItem value="expense">Gastos</SelectItem>
+                  <SelectItem value="collaborator">Colaboradores</SelectItem>
+                  <SelectItem value="zoho-income">Zoho Ingresos</SelectItem>
+                  <SelectItem value="stripe-income">Stripe Ingresos</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {/* Category Filter - Only show when expense filter is active */}
+              {typeFilter === 'expense' && expenseCategories.length > 1 && (
+                <Select value={categoryFilter} onValueChange={setcategoryFilter}>
+                  <SelectTrigger className="w-full sm:w-[180px]">
+                    <SelectValue placeholder="Filtrar por categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {expenseCategories.map(category => (
+                      <SelectItem key={category} value={category}>
+                        {category === 'all' ? 'Todas las categorías' : category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -121,7 +200,14 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefre
                   <TableRow key={transaction.id}>
                     <TableCell>{formatDate(transaction.date)}</TableCell>
                     <TableCell>{transaction.description}</TableCell>
-                    <TableCell>{transaction.category}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center">
+                        {transaction.type === 'expense' && <MinusCircle size={16} className="text-red-500 mr-2" />}
+                        {transaction.type === 'income' && <DollarSign size={16} className="text-green-500 mr-2" />}
+                        {transaction.category === 'Colaboradores' && <Users size={16} className="text-blue-500 mr-2" />}
+                        {transaction.category}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       {transaction.source === 'Stripe' && transaction.fees ? (
                         <TooltipProvider>
