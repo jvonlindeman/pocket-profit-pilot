@@ -2,6 +2,7 @@
 import React from 'react';
 import ZohoDebug from '@/components/ZohoDebug';
 import WebhookDebug from '@/components/WebhookDebug/index';
+import StripeDebug from '@/components/StripeDebug';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Bug } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -46,6 +47,9 @@ const Settings = () => {
               Herramientas de Depuración
             </h2>
             <ZohoDebug />
+            <div className="mt-6">
+              <StripeDebug dateRange={dateRange} />
+            </div>
             <div className="mt-6">
               <WebhookDebug dateRange={dateRange} />
             </div>

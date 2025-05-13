@@ -16,6 +16,7 @@ import { Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import WebhookDebug from '@/components/WebhookDebug';
 import WebhookRequestDebug from '@/components/WebhookRequestDebug';
+import StripeDebug from '@/components/StripeDebug';
 
 const Index = () => {
   const {
@@ -244,24 +245,28 @@ const Index = () => {
           </>
         )}
 
-        {/* Sección de depuración del webhook - ahora con la respuesta cruda */}
-        <div className="mt-8">
+        {/* Sección de depuración */}
+        <div className="mt-8 grid grid-cols-1 gap-6">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center">
             <Bug className="h-5 w-5 mr-2 text-amber-500" />
-            Depuración del Webhook
+            Herramientas de depuración
           </h2>
-          <div className="mt-2">
-            <WebhookDebug 
-              dateRange={dateRange} 
-              refreshDataFunction={refreshData}
-              rawResponse={rawResponse}
-            />
-          </div>
           
-          {/* Movido aquí: Componente de depuración de solicitud al webhook */}
-          <div className="mt-6">
-            <WebhookRequestDebug dateRange={dateRange} />
-          </div>
+          {/* Nuevo componente de depuración de Stripe */}
+          <StripeDebug 
+            dateRange={dateRange} 
+            refreshDataFunction={refreshData}
+          />
+          
+          {/* Componente de depuración de Webhook Zoho */}
+          <WebhookDebug 
+            dateRange={dateRange} 
+            refreshDataFunction={refreshData}
+            rawResponse={rawResponse}
+          />
+          
+          {/* Componente de depuración de solicitud al webhook */}
+          <WebhookRequestDebug dateRange={dateRange} />
         </div>
       </main>
 
