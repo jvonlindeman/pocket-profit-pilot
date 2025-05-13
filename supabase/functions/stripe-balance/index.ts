@@ -107,24 +107,49 @@ serve(async (req) => {
       console.log(`Last transaction: ${maxDate}`);
     }
 
+    // Log transaction types for debugging
+    const transactionTypes = {};
+    allTransactions.forEach(t => {
+      transactionTypes[t.type] = (transactionTypes[t.type] || 0) + 1;
+    });
+    console.log("Transaction types distribution:", JSON.stringify(transactionTypes));
+
     // Process transactions to calculate totals and organize data
     let totalGross = 0;
     let totalFees = 0;
+    let totalPayoutFees = 0;
+    let totalTransactionFees = 0;
     let totalNet = 0;
     let formattedTransactions = [];
 
-    // Map transaction types to our internal types
+    // Create a map to categorize transactions
+    const transactionTypeMap = {
+      'charge': 'income',
+      'payment': 'income',
+      'payment_refund': 'refund',
+      'refund': 'refund',
+      'payout': 'payout',
+      'payout_failure': 'payout_failure',
+      'payout_cancel': 'payout_cancel',
+      'stripe_fee': 'fee',
+      'transfer': 'transfer',
+      'adjustment': 'adjustment'
+      // Add other types as needed
+    };
+
+    // Process each transaction based on its type
     allTransactions.forEach(transaction => {
       const amount = transaction.amount / 100; // Convert from cents to dollars
       const fee = transaction.fee / 100; // Convert from cents to dollars
       const net = transaction.net / 100; // Convert from cents to dollars
+      const type = transaction.type;
       
-      // Determine if this is income or expense (fees are considered part of income)
-      const isCharge = transaction.type === 'charge' || 
-                      transaction.type === 'payment';
+      const transactionCategory = transactionTypeMap[type] || 'other';
       
-      if (isCharge) {
+      // Process income transactions (charges and payments)
+      if (transactionCategory === 'income') {
         totalGross += amount;
+        totalTransactionFees += fee;
         totalFees += fee;
         totalNet += net;
 
@@ -140,6 +165,40 @@ serve(async (req) => {
           source: 'Stripe',
           type: 'income'
         });
+      } 
+      // Process payout transactions
+      else if (transactionCategory === 'payout') {
+        // For payouts, the fee is usually shown as a separate transaction
+        // but we'll track it anyway
+        totalPayoutFees += fee;
+        totalFees += fee;
+        
+        // We don't add payouts to formatted transactions since they represent
+        // money moving from Stripe to bank, not actual income/expense
+
+        console.log(`Payout: ${amount}, Fee: ${fee}, Net: ${net}, Description: ${transaction.description}`);
+      }
+      // Process refunds
+      else if (transactionCategory === 'refund') {
+        // For refunds, we adjust our gross and net totals
+        totalGross -= amount;
+        totalNet -= net;
+        
+        formattedTransactions.push({
+          id: `stripe-refund-${transaction.id}`,
+          date: new Date(transaction.created * 1000).toISOString().split('T')[0],
+          amount: -net, // Negative to represent money going out
+          fees: fee,
+          gross: -amount,
+          description: transaction.description || 'Stripe Refund',
+          category: 'Devoluciones',
+          source: 'Stripe',
+          type: 'expense'
+        });
+      }
+      // Log all other transaction types for debugging
+      else {
+        console.log(`Other transaction type: ${type}, Amount: ${amount}, Fee: ${fee}, Net: ${net}, Description: ${transaction.description || 'No description'}`);
       }
     });
 
@@ -150,8 +209,13 @@ serve(async (req) => {
         summary: {
           gross: totalGross,
           fees: totalFees,
+          transactionFees: totalTransactionFees,
+          payoutFees: totalPayoutFees,
           net: totalNet,
-          feePercentage: totalGross > 0 ? (totalFees / totalGross) * 100 : 0
+          feePercentage: totalGross > 0 ? (totalFees / totalGross) * 100 : 0,
+          transactionCount: formattedTransactions.length,
+          totalTransactionCount: allTransactions.length,
+          transactionTypes: transactionTypes
         },
         status: 'success'
       }),

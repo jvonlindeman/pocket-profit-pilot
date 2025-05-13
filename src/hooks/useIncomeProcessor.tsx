@@ -6,11 +6,13 @@ export const useIncomeProcessor = () => {
   // States for storing processed income data
   const [stripeIncome, setStripeIncome] = useState<number>(0);
   const [stripeFees, setStripeFees] = useState<number>(0);
+  const [stripeTransactionFees, setStripeTransactionFees] = useState<number>(0);
+  const [stripePayoutFees, setStripePayoutFees] = useState<number>(0);
   const [stripeNet, setStripeNet] = useState<number>(0);
   const [stripeFeePercentage, setStripeFeePercentage] = useState<number>(0);
   const [regularIncome, setRegularIncome] = useState<number>(0);
 
-  // Función para procesar y separar ingresos
+  // Function to process and separate income types
   const processIncomeTypes = useCallback((transactions: Transaction[], stripeData: any) => {
     let regularAmount = 0;
     
@@ -24,13 +26,17 @@ export const useIncomeProcessor = () => {
     // Set Stripe income from the API response
     setStripeIncome(stripeData.gross || 0);
     setStripeFees(stripeData.fees || 0);
+    setStripeTransactionFees(stripeData.transactionFees || 0);
+    setStripePayoutFees(stripeData.payoutFees || 0);
     setStripeNet(stripeData.net || 0);
     setStripeFeePercentage(stripeData.feePercentage || 0);
     setRegularIncome(regularAmount);
     
     return { 
       stripeGross: stripeData.gross || 0, 
-      stripeFees: stripeData.fees || 0, 
+      stripeFees: stripeData.fees || 0,
+      stripeTransactionFees: stripeData.transactionFees || 0,
+      stripePayoutFees: stripeData.payoutFees || 0, 
       stripeNet: stripeData.net || 0,
       regularAmount 
     };
@@ -39,6 +45,8 @@ export const useIncomeProcessor = () => {
   return {
     stripeIncome,
     stripeFees,
+    stripeTransactionFees,
+    stripePayoutFees,
     stripeNet,
     stripeFeePercentage,
     regularIncome,

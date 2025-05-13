@@ -38,49 +38,51 @@ export const useFinancialDataFetcher = () => {
       // Log exact date objects for debugging
       logDateInfo("Original dateRange from datepicker", dateRange);
       
-      // Obtener transacciones de Zoho Books - usando las fechas exactas sin modificaciones
+      // Get transactions from Zoho Books - using the exact dates without modifications
       const zohoData = await ZohoService.getTransactions(
         dateRange.startDate, 
         dateRange.endDate,
         forceRefresh
       );
 
-      // Detectar si estamos usando datos en caché basado en la respuesta
+      // Detect if we're using cached data based on the response
       const rawResponseData = ZohoService.getLastRawResponse();
       if (rawResponseData && rawResponseData.cached) {
         console.log("Using cached data from previous response");
         setUsingCachedData(true);
       }
 
-      // Obtener la respuesta cruda actual para depuración inmediatamente después
+      // Get the current raw response for debugging immediately after
       const rawData = ZohoService.getLastRawResponse();
       setRawResponse(rawData);
       console.log("Fetched raw response for debugging:", rawData);
 
-      // Procesar datos de colaboradores
+      // Process collaborator data
       callbacks.onCollaboratorData(rawData);
 
-      // Obtener transacciones de Stripe - siempre usando la API directamente
+      // Get transactions from Stripe - always using the API directly
       console.log("Fetching from Stripe:", dateRange.startDate, dateRange.endDate);
       const stripeData = await StripeService.getTransactions(
         dateRange.startDate,
         dateRange.endDate
       );
 
-      // Combinar los datos
+      // Combine the data
       const combinedData = [...zohoData, ...stripeData.transactions];
       console.log("Combined transactions:", combinedData.length);
       console.log("Stripe data summary:", {
         gross: stripeData.gross,
         fees: stripeData.fees,
+        transactionFees: stripeData.transactionFees,
+        payoutFees: stripeData.payoutFees,
         net: stripeData.net,
         feePercentage: stripeData.feePercentage
       });
       
-      // Procesar ingresos separados
+      // Process separated income
       callbacks.onIncomeTypes(combinedData, stripeData);
       
-      // Actualizar estado de transacciones
+      // Update transactions state
       callbacks.onTransactions(combinedData);
       
       setLoading(false);
@@ -89,7 +91,7 @@ export const useFinancialDataFetcher = () => {
       console.error("Error fetching financial data:", err);
       setError(err.message || "Error al cargar los datos financieros");
       
-      // Asegurarnos de obtener cualquier respuesta cruda para depuración incluso en caso de error
+      // Make sure to get any raw response for debugging even in case of error
       const rawData = ZohoService.getLastRawResponse();
       if (rawData) {
         setRawResponse(rawData);

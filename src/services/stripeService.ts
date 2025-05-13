@@ -7,8 +7,13 @@ interface StripeTransactionResponse {
   summary: {
     gross: number;
     fees: number;
+    transactionFees: number;
+    payoutFees: number;
     net: number;
     feePercentage: number;
+    transactionCount: number;
+    totalTransactionCount: number;
+    transactionTypes: Record<string, number>;
   };
   status: string;
 }
@@ -17,6 +22,8 @@ interface StripeData {
   transactions: Transaction[];
   gross: number;
   fees: number;
+  transactionFees: number;
+  payoutFees: number;
   net: number;
   feePercentage: number;
 }
@@ -56,6 +63,8 @@ const StripeService = {
           transactions: [],
           gross: 0,
           fees: 0,
+          transactionFees: 0,
+          payoutFees: 0,
           net: 0,
           feePercentage: 0
         };
@@ -72,6 +81,8 @@ const StripeService = {
         transactions: response.transactions || [],
         gross: response.summary.gross || 0,
         fees: response.summary.fees || 0,
+        transactionFees: response.summary.transactionFees || 0,
+        payoutFees: response.summary.payoutFees || 0,
         net: response.summary.net || 0,
         feePercentage: response.summary.feePercentage || 0
       };
@@ -82,6 +93,8 @@ const StripeService = {
         transactions: [],
         gross: 0,
         fees: 0,
+        transactionFees: 0,
+        payoutFees: 0,
         net: 0,
         feePercentage: 0
       };
