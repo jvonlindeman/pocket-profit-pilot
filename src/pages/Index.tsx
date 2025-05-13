@@ -121,7 +121,7 @@ const Index = () => {
         onBalanceSaved={handleBalanceSaved}
       />
       
-      {/* Cabecera del Dashboard */}
+      {/* Header section */}
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
@@ -148,7 +148,7 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Contenido principal */}
+      {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {!dataInitialized && (
           <div className="flex flex-col items-center justify-center py-16 bg-white rounded-lg shadow-sm mb-6">
@@ -179,7 +179,7 @@ const Index = () => {
         
         {dataInitialized && !loading && !error && (
           <>
-            {/* Periodo y botón de actualización */}
+            {/* Period and refresh button */}
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-semibold text-gray-700">
                 Periodo: <span className="text-gray-900">{periodTitle}</span>
@@ -189,7 +189,7 @@ const Index = () => {
               </Button>
             </div>
 
-            {/* Información de depuración */}
+            {/* Warning message when no transactions exist */}
             {financialData.transactions.length === 0 && (
               <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg p-4 mb-6">
                 <p className="font-medium">No hay transacciones para el periodo seleccionado.</p>
@@ -197,7 +197,7 @@ const Index = () => {
               </div>
             )}
 
-            {/* Balance Mensual Inicial */}
+            {/* Monthly Balance Editor moved up to be above FinanceSummary */}
             <div className="mb-6">
               <MonthlyBalanceEditor 
                 currentDate={dateRange.startDate}
@@ -205,12 +205,15 @@ const Index = () => {
               />
             </div>
 
-            {/* Resumen financiero */}
+            {/* Financial Summary with improved organization */}
             <FinanceSummary 
               summary={financialData.summary} 
               expenseCategories={financialData.expenseByCategory}
               stripeIncome={stripeIncome}
               stripeFees={stripeFees}
+              stripeTransactionFees={stripeTransactionFees}
+              stripePayoutFees={stripePayoutFees}
+              stripeAdditionalFees={stripeAdditionalFees}
               stripeNet={stripeNet}
               stripeFeePercentage={stripeFeePercentage}
               regularIncome={regularIncome}
@@ -270,7 +273,7 @@ const Index = () => {
         </div>
       </main>
 
-      {/* Pie de página */}
+      {/* Footer */}
       <footer className="bg-white border-t border-gray-200 py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <p className="text-sm text-center text-gray-500">

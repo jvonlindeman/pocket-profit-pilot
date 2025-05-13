@@ -3,6 +3,7 @@ import React from 'react';
 import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, BadgeDollarSign, Users, Scale, Scissors } from 'lucide-react';
 import { FinancialSummary, CategorySummary } from '@/types/financial';
 import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface FinanceSummaryProps {
   summary: FinancialSummary;
@@ -46,197 +47,277 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in">
-      {/* Balance Inicial */}
-      <Card className="finance-card">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Balance Inicial</h3>
-            <div className="p-2 bg-blue-50 rounded-full">
-              <Scale className="h-4 w-4 text-blue-500" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-blue-500 animate-value">
-            {summary.startingBalance !== undefined ? formatCurrency(summary.startingBalance) : "No establecido"}
-          </div>
-        </CardContent>
-      </Card>
+    <div className="space-y-8 animate-fade-in">
+      {/* Initial Balance Section */}
+      <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+        <h2 className="text-lg font-semibold text-blue-700 mb-4">Balance Inicial</h2>
+        <div className="grid grid-cols-1">
+          <Card className="finance-card bg-white">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-medium text-gray-500">Balance Inicial</h3>
+                <div className="p-2 bg-blue-50 rounded-full">
+                  <Scale className="h-4 w-4 text-blue-500" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-blue-500 animate-value">
+                {summary.startingBalance !== undefined ? formatCurrency(summary.startingBalance) : "No establecido"}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
-      {/* Ingresos Stripe Brutos */}
-      <Card className="finance-card">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Stripe (Bruto)</h3>
-            <div className="p-2 bg-green-50 rounded-full">
-              <BadgeDollarSign className="h-4 w-4 text-green-500" />
-            </div>
+      {/* Income Sources Section with Tabs */}
+      <div>
+        <Tabs defaultValue="stripe" className="w-full">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold text-gray-800">Fuentes de Ingresos</h2>
+            <TabsList>
+              <TabsTrigger value="stripe">Stripe</TabsTrigger>
+              <TabsTrigger value="zoho">Zoho</TabsTrigger>
+              <TabsTrigger value="combined">Combinado</TabsTrigger>
+            </TabsList>
           </div>
-          <div className="text-2xl font-bold text-green-500 animate-value">
-            {formatCurrency(stripeIncome)}
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Comisiones de Stripe (transacción) */}
-      <Card className="finance-card">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Comisiones (Transacción)</h3>
-            <div className="p-2 bg-amber-50 rounded-full">
-              <Scissors className="h-4 w-4 text-amber-500" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-amber-500 animate-value">
-            {formatCurrency(stripeTransactionFees)}
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* Comisiones Adicionales de Stripe */}
-      <Card className="finance-card">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Comisiones Adicionales</h3>
-            <div className="p-2 bg-amber-50 rounded-full">
-              <Scissors className="h-4 w-4 text-amber-500" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-amber-500 animate-value">
-            {formatCurrency(stripeAdditionalFees)}
-            <div className="text-sm mt-1 text-gray-500">
-              {stripeAdditionalFees > 0 && `${stripeFeePercentage.toFixed(1)}% del total`}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          {/* Stripe Income Tab */}
+          <TabsContent value="stripe" className="p-0">
+            <div className="bg-green-50 p-4 rounded-lg border border-green-100">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* Stripe Gross Income */}
+                <Card className="finance-card">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-medium text-gray-500">Stripe (Bruto)</h3>
+                      <div className="p-2 bg-green-50 rounded-full">
+                        <BadgeDollarSign className="h-4 w-4 text-green-500" />
+                      </div>
+                    </div>
+                    <div className="text-2xl font-bold text-green-500 animate-value">
+                      {formatCurrency(stripeIncome)}
+                    </div>
+                  </CardContent>
+                </Card>
 
-      {/* Comisiones de Stripe (payout) */}
-      <Card className="finance-card">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Comisiones (Payout)</h3>
-            <div className="p-2 bg-amber-50 rounded-full">
-              <Scissors className="h-4 w-4 text-amber-500" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-amber-500 animate-value">
-            {formatCurrency(stripePayoutFees)}
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* Total Comisiones de Stripe  */}
-      <Card className="finance-card">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Total Comisiones Stripe</h3>
-            <div className="p-2 bg-amber-50 rounded-full">
-              <Scissors className="h-4 w-4 text-amber-500" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-amber-500 animate-value">
-            {formatCurrency(stripeFees)}
-            <div className="text-sm mt-1 text-gray-500">
-              {stripeFeePercentage > 0 && formatPercentage(stripeFeePercentage)}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+                {/* Stripe Net */}
+                <Card className="finance-card">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-medium text-gray-500">Stripe (Neto)</h3>
+                      <div className="p-2 bg-green-50 rounded-full">
+                        <BadgeDollarSign className="h-4 w-4 text-green-500" />
+                      </div>
+                    </div>
+                    <div className="text-2xl font-bold text-green-500 animate-value">
+                      {formatCurrency(stripeNet)}
+                    </div>
+                  </CardContent>
+                </Card>
 
-      {/* Ingresos Stripe Neto */}
-      <Card className="finance-card">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Stripe (Neto)</h3>
-            <div className="p-2 bg-green-50 rounded-full">
-              <BadgeDollarSign className="h-4 w-4 text-green-500" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-green-500 animate-value">
-            {formatCurrency(stripeNet)}
-          </div>
-        </CardContent>
-      </Card>
+                {/* Total Stripe Fees */}
+                <Card className="finance-card">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-medium text-gray-500">Total Comisiones</h3>
+                      <div className="p-2 bg-amber-50 rounded-full">
+                        <Scissors className="h-4 w-4 text-amber-500" />
+                      </div>
+                    </div>
+                    <div className="text-2xl font-bold text-amber-500 animate-value">
+                      {formatCurrency(stripeFees)}
+                      <div className="text-sm mt-1 text-gray-500">
+                        {stripeFeePercentage > 0 && formatPercentage(stripeFeePercentage)}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
 
-      {/* Ingresos Zoho */}
-      <Card className="finance-card">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Ingresos Zoho</h3>
-            <div className="p-2 bg-green-50 rounded-full">
-              <ArrowUpIcon className="h-4 w-4 text-green-500" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-green-500 animate-value">
-            {formatCurrency(regularIncome)}
-          </div>
-        </CardContent>
-      </Card>
+              {/* Fee Breakdown Section */}
+              <h4 className="text-md font-medium text-gray-600 mt-6 mb-4">Desglose de Comisiones</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Transaction Fees */}
+                <Card className="finance-card">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-medium text-gray-500">Comisiones (Transacción)</h3>
+                      <div className="p-2 bg-amber-50 rounded-full">
+                        <Scissors className="h-4 w-4 text-amber-500" />
+                      </div>
+                    </div>
+                    <div className="text-2xl font-bold text-amber-500 animate-value">
+                      {formatCurrency(stripeTransactionFees)}
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {/* Additional Fees */}
+                <Card className="finance-card">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-medium text-gray-500">Comisiones Adicionales</h3>
+                      <div className="p-2 bg-amber-50 rounded-full">
+                        <Scissors className="h-4 w-4 text-amber-500" />
+                      </div>
+                    </div>
+                    <div className="text-2xl font-bold text-amber-500 animate-value">
+                      {formatCurrency(stripeAdditionalFees)}
+                      <div className="text-sm mt-1 text-gray-500">
+                        {stripeAdditionalFees > 0 && `${stripeFeePercentage.toFixed(1)}% del total`}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-      {/* Ingresos Totales */}
-      <Card className="finance-card">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Ingresos Totales</h3>
-            <div className="p-2 bg-green-50 rounded-full">
-              <ArrowUpIcon className="h-4 w-4 text-green-500" />
+                {/* Payout Fees */}
+                <Card className="finance-card">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-medium text-gray-500">Comisiones (Payout)</h3>
+                      <div className="p-2 bg-amber-50 rounded-full">
+                        <Scissors className="h-4 w-4 text-amber-500" />
+                      </div>
+                    </div>
+                    <div className="text-2xl font-bold text-amber-500 animate-value">
+                      {formatCurrency(stripePayoutFees)}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
-          </div>
-          <div className="text-2xl font-bold text-green-500 animate-value">
-            {formatCurrency(summary.totalIncome)}
-          </div>
-        </CardContent>
-      </Card>
+          </TabsContent>
 
-      {/* Gastos de Colaboradores */}
-      <Card className="finance-card">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Gastos Colaboradores</h3>
-            <div className="p-2 bg-amber-50 rounded-full">
-              <Users className="h-4 w-4 text-amber-500" />
+          {/* Zoho Income Tab */}
+          <TabsContent value="zoho" className="p-0">
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Zoho Income */}
+                <Card className="finance-card">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-medium text-gray-500">Ingresos Zoho</h3>
+                      <div className="p-2 bg-green-50 rounded-full">
+                        <ArrowUpIcon className="h-4 w-4 text-green-500" />
+                      </div>
+                    </div>
+                    <div className="text-2xl font-bold text-green-500 animate-value">
+                      {formatCurrency(regularIncome)}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
-          </div>
-          <div className="text-2xl font-bold text-amber-500 animate-value">
-            {formatCurrency(summary.collaboratorExpense || 0)}
-          </div>
-        </CardContent>
-      </Card>
+          </TabsContent>
 
-      {/* Gastos Totales */}
-      <Card className="finance-card">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Gastos Totales</h3>
-            <div className="p-2 bg-red-50 rounded-full">
-              <ArrowDownIcon className="h-4 w-4 text-red-500" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-red-500 animate-value">
-            {formatCurrency(summary.totalExpense)}
-          </div>
-        </CardContent>
-      </Card>
+          {/* Combined Financial Overview */}
+          <TabsContent value="combined" className="p-0">
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* Total Income */}
+                <Card className="finance-card">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-medium text-gray-500">Ingresos Totales</h3>
+                      <div className="p-2 bg-green-50 rounded-full">
+                        <ArrowUpIcon className="h-4 w-4 text-green-500" />
+                      </div>
+                    </div>
+                    <div className="text-2xl font-bold text-green-500 animate-value">
+                      {formatCurrency(summary.totalIncome)}
+                    </div>
+                  </CardContent>
+                </Card>
 
-      {/* Beneficio */}
-      <Card className="finance-card">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-500">Beneficio Neto</h3>
-            <div className="p-2 bg-blue-50 rounded-full">
-              <TrendingUpIcon className="h-4 w-4 text-blue-500" />
+                {/* Stripe Income */}
+                <Card className="finance-card">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-medium text-gray-500">Stripe (Neto)</h3>
+                      <div className="p-2 bg-green-50 rounded-full">
+                        <BadgeDollarSign className="h-4 w-4 text-green-500" />
+                      </div>
+                    </div>
+                    <div className="text-2xl font-bold text-green-500 animate-value">
+                      {formatCurrency(stripeNet)}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Zoho Income */}
+                <Card className="finance-card">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-medium text-gray-500">Zoho</h3>
+                      <div className="p-2 bg-green-50 rounded-full">
+                        <ArrowUpIcon className="h-4 w-4 text-green-500" />
+                      </div>
+                    </div>
+                    <div className="text-2xl font-bold text-green-500 animate-value">
+                      {formatCurrency(regularIncome)}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
-          </div>
-          <div className="flex items-end justify-between">
-            <div className="text-2xl font-bold text-blue-500 animate-value">
-              {formatCurrency(summary.profit)}
-            </div>
-            <div className={`text-sm font-medium ml-2 ${summary.profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              Margen: {formatPercentage(summary.profitMargin)}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Financial Summary Section */}
+      <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+        <h2 className="text-lg font-semibold text-gray-800 mb-4">Resumen Financiero</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Collaborator Expenses */}
+          <Card className="finance-card">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-medium text-gray-500">Gastos Colaboradores</h3>
+                <div className="p-2 bg-amber-50 rounded-full">
+                  <Users className="h-4 w-4 text-amber-500" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-amber-500 animate-value">
+                {formatCurrency(summary.collaboratorExpense || 0)}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Total Expenses */}
+          <Card className="finance-card">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-medium text-gray-500">Gastos Totales</h3>
+                <div className="p-2 bg-red-50 rounded-full">
+                  <ArrowDownIcon className="h-4 w-4 text-red-500" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-red-500 animate-value">
+                {formatCurrency(summary.totalExpense)}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Net Profit */}
+          <Card className="finance-card">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-medium text-gray-500">Beneficio Neto</h3>
+                <div className="p-2 bg-blue-50 rounded-full">
+                  <TrendingUpIcon className="h-4 w-4 text-blue-500" />
+                </div>
+              </div>
+              <div className="flex items-end justify-between">
+                <div className="text-2xl font-bold text-blue-500 animate-value">
+                  {formatCurrency(summary.profit)}
+                </div>
+                <div className={`text-sm font-medium ml-2 ${summary.profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  Margen: {formatPercentage(summary.profitMargin)}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 };
