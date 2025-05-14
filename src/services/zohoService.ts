@@ -214,12 +214,14 @@ const ZohoService = {
       if (hoursSinceRefresh > 6 || !cacheCheck.cached) {
         console.log("ZohoService: Cache is stale or missing, scheduling refresh");
         
-        // Use setTimeout to avoid blocking
+        // Use setTimeout to avoid blocking but make sure we're properly handling the Promise
         setTimeout(async () => {
-          console.log("ZohoService: Executing scheduled cache refresh");
-          await ZohoService.forceRefresh(startDate, endDate).catch(err => 
-            console.error("ZohoService: Error during scheduled refresh:", err)
-          );
+          try {
+            console.log("ZohoService: Executing scheduled cache refresh");
+            await ZohoService.forceRefresh(startDate, endDate);
+          } catch (err) {
+            console.error("ZohoService: Error during scheduled refresh:", err);
+          }
         }, 100);
       } else {
         console.log("ZohoService: Cache refresh not needed yet");
