@@ -14,7 +14,7 @@ export const formatDateYYYYMMDD = (date: Date): string => {
 export const getCurrentMonthRange = (): { startDate: Date; endDate: Date } => {
   const today = new Date();
   return {
-    startDate: new Date(today.getFullYear(), today.getMonth(), 1),
+    startDate: new Date(today.getFullYear(), today.getMonth(), 1), // First day of current month
     endDate: new Date(today.getFullYear(), today.getMonth() + 1, 0) // Last day of current month
   };
 };

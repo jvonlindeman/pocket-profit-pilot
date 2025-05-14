@@ -1,7 +1,8 @@
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Transaction } from '@/types/financial';
 import { processTransactionData } from '@/services/zoho/utils';
-import { endOfMonth, subMonths } from 'date-fns';
+import { endOfMonth, subMonths, startOfMonth } from 'date-fns';
 import ZohoService from '@/services/zohoService';
 import { useMonthlyBalanceManager } from './useMonthlyBalanceManager';
 import { useIncomeProcessor } from './useIncomeProcessor';
@@ -14,11 +15,11 @@ export const useFinanceData = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [dataInitialized, setDataInitialized] = useState<boolean>(false);
   
-  // Estado del rango de fechas - configurado para mostrar desde el último día del mes anterior hasta el último día del mes actual
+  // Estado del rango de fechas - configurado para mostrar el mes actual (desde el primer día hasta el último día)
   const [dateRange, setDateRange] = useState(() => {
     const today = new Date();
-    // Último día del mes anterior
-    const startDate = endOfMonth(subMonths(today, 1));
+    // Primer día del mes actual
+    const startDate = startOfMonth(today);
     // Último día del mes actual
     const endDate = endOfMonth(today);
     console.log("Initial date range:", startDate, "to", endDate);
