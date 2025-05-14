@@ -50,9 +50,14 @@ const Index = () => {
   } = useFinanceData();
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
+  
+  // Convert financial date range to compatible format for useMonthlyBalance
+  const currentMonthDate = dateRange.startDate || new Date();
+  
   const { checkBalanceExists, monthlyBalance } = useMonthlyBalance({ 
-    currentDate: dateRange.startDate
+    currentDate: currentMonthDate
   });
+  
   const { toast } = useToast();
 
   // Format dates for titles with safety check
@@ -155,7 +160,7 @@ const Index = () => {
       <InitialBalanceDialog 
         open={showBalanceDialog} 
         onOpenChange={setShowBalanceDialog} 
-        currentDate={dateRange.from}
+        currentDate={currentMonthDate}
         onBalanceSaved={handleBalanceSaved}
       />
       
@@ -176,7 +181,7 @@ const Index = () => {
               </Button>
               <div className="w-full md:w-64">
                 <DateRangePicker
-                  dateRange={dateRange}
+                  dateRange={toDayPickerDateRange(dateRange)}
                   onRangeChange={handleDateRangeChange}
                   getCurrentMonthRange={getDatePickerCurrentMonthRange}
                 />
@@ -246,7 +251,7 @@ const Index = () => {
             {/* Monthly Balance Editor moved up to be above FinanceSummary */}
             <div className="mb-6">
               <MonthlyBalanceEditor 
-                currentDate={dateRange.startDate}
+                currentDate={currentMonthDate}
                 onBalanceChange={handleBalanceChange}
               />
             </div>

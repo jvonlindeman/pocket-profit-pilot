@@ -39,7 +39,14 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
   currentDate,
   onBalanceSaved
 }) => {
-  const { updateMonthlyBalance, loading } = useMonthlyBalance({ currentDate });
+  // Ensure currentDate is a valid date object
+  const safeCurrentDate = currentDate && !isNaN(currentDate.getTime()) 
+    ? currentDate 
+    : new Date();
+    
+  const { updateMonthlyBalance, loading } = useMonthlyBalance({ 
+    currentDate: safeCurrentDate 
+  });
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -49,8 +56,22 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
     },
   });
 
-  // Format month name in Spanish
-  const formattedMonth = format(currentDate, 'MMMM yyyy', { locale: es });
+  // Safely format month name in Spanish with error handling
+  const formattedMonth = (() => {
+    try {
+      // Make sure we have a valid date
+      if (!safeCurrentDate || isNaN(safeCurrentDate.getTime())) {
+        console.error("Invalid date in InitialBalanceDialog:", safeCurrentDate);
+        return format(new Date(), 'MMMM yyyy', { locale: es });
+      }
+      
+      return format(safeCurrentDate, 'MMMM yyyy', { locale: es });
+    } catch (err) {
+      console.error("Error formatting month:", err);
+      return format(new Date(), 'MMMM yyyy', { locale: es });
+    }
+  })();
+  
   const capitalizedMonth = formattedMonth.charAt(0).toUpperCase() + formattedMonth.slice(1);
 
   const onSubmit = async (data: FormValues) => {

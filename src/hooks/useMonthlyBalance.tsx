@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { MonthlyBalance } from '@/types/financial';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { formatDateYYYYMMDD } from '@/utils/dateUtils';
 
 interface UseMonthlyBalanceProps {
   currentDate: Date;
@@ -17,7 +18,18 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
 
   // Format the month_year for database queries (YYYY-MM)
   const formatMonthYear = (date: Date) => {
-    return format(date, 'yyyy-MM');
+    try {
+      // Ensure we have a valid date
+      if (!date || isNaN(date.getTime())) {
+        console.error("Invalid date provided to formatMonthYear:", date);
+        // Return current month as fallback
+        return format(new Date(), 'yyyy-MM');
+      }
+      return format(date, 'yyyy-MM');
+    } catch (err) {
+      console.error("Error formatting month-year:", err);
+      return format(new Date(), 'yyyy-MM');
+    }
   };
 
   // Get the current month-year string
