@@ -1,7 +1,9 @@
+
 import { Transaction } from "../../types/financial";
 import { ensureValidDateFormat, handleApiError } from "./utils";
 import { getMockTransactions } from "./mockData";
 import { supabase } from "@/integrations/supabase/client";
+import { parseDate } from "@/lib/utils";
 
 // Format date in YYYY-MM-DD format without timezone shifts
 const formatDateYYYYMMDD = (date: Date): string => {
@@ -142,14 +144,33 @@ const processRawTransactions = (data: any): Transaction[] => {
     }
   }
   
-  // Process collaborator expenses (new format with proper array) - Ahora con fechas
+  // Process collaborator expenses (new format with proper array) - with improved date handling
   if (Array.isArray(data.colaboradores)) {
     data.colaboradores.forEach((item: any, index: number) => {
       if (item && typeof item.total !== 'undefined' && item.vendor_name) {
         const amount = Number(item.total);
         if (amount > 0) {
-          // Usar la fecha del colaborador si está disponible, o la fecha actual
-          const collaboratorDate = item.date || new Date().toISOString().split('T')[0];
+          // Enhanced date handling for collaborator transactions
+          let collaboratorDate: string;
+          
+          if (item.date) {
+            // Log raw date field from API
+            console.log(`Raw collaborator date for ${item.vendor_name}:`, item.date);
+            
+            // Ensure we have a valid YYYY-MM-DD format
+            try {
+              // Try to parse and format the date
+              const parsedDate = parseDate(item.date);
+              collaboratorDate = formatDateYYYYMMDD(parsedDate);
+              console.log(`Processed collaborator date for ${item.vendor_name}:`, collaboratorDate);
+            } catch (err) {
+              console.error(`Error parsing collaborator date for ${item.vendor_name}:`, err);
+              collaboratorDate = new Date().toISOString().split('T')[0];
+            }
+          } else {
+            console.log(`No date provided for collaborator ${item.vendor_name}, using current date`);
+            collaboratorDate = new Date().toISOString().split('T')[0];
+          }
           
           result.push({
             id: `colaborador-${item.vendor_name.replace(/\s/g, '-')}-${collaboratorDate}-${amount}`,

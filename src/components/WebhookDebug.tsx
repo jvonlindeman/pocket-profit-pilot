@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, RefreshCw, Bug } from 'lucide-react';
+import { Loader2, RefreshCw, Bug, Calendar } from 'lucide-react';
 import ZohoService from '@/services/zohoService';
+import { formatDateYYYYMMDD } from '@/utils/dateUtils';
 
 interface WebhookDebugProps {
   dateRange: {
@@ -20,7 +20,7 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
   const [rawData, setRawData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Cuando cambia rawResponse desde el componente principal, actualizamos nuestro estado local
+  // When rawResponse changes from the parent component, update our local state
   useEffect(() => {
     if (rawResponse) {
       setRawData(rawResponse);
@@ -28,26 +28,21 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
     }
   }, [rawResponse]);
 
-  // Función para obtener los datos crudos del API
+  // Function to fetch raw webhook data
   const fetchDebugData = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      // Primero actualizamos los datos usando la función de actualización global
-      // Esto asegura que ambos botones hagan el mismo proceso
+      // First update data using the global refresh function
       if (refreshDataFunction) {
-        console.log("Usando la función de actualización global para cargar datos");
+        console.log("Using global refresh function to load data");
         refreshDataFunction(true);
         
-        // Como refreshDataFunction ya actualiza rawResponse a través de useFinanceData,
-        // no necesitamos hacer una llamada adicional a ZohoService.getRawResponse
-        // La actualización sucederá a través del useEffect cuando se actualice el prop rawResponse
-        
-        // Esperamos un breve momento para que se complete la actualización
+        // Wait a brief moment for the update to complete
         await new Promise(resolve => setTimeout(resolve, 100));
         
-        // Verificamos si ya tenemos datos a través del prop rawResponse
+        // Check if we already have data via the rawResponse prop
         if (rawResponse) {
           setRawData(rawResponse);
           setLoading(false);
@@ -55,8 +50,7 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
         }
       }
       
-      // Luego obtenemos los datos crudos para mostrarlos en la UI de depuración
-      // Solo si no se actualizaron a través del prop rawResponse
+      // Otherwise, get raw data directly to show in the debug UI
       const data = await ZohoService.getRawResponse(dateRange.startDate, dateRange.endDate);
       setRawData(data);
       console.log("Debug data received:", data);
@@ -68,13 +62,36 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
     }
   };
 
-  // Helper para determinar si un item es un array de ingresos
+  // Helper to determine if an item is an array of income
   const isIncomeArray = (item: any): boolean => {
     return Array.isArray(item) && 
            item.length > 0 && 
            typeof item[0] === 'object' && 
            'customer_name' in item[0] && 
            'amount' in item[0];
+  };
+  
+  // Helper to check for collaborator data
+  const isCollaboratorArray = (item: any): boolean => {
+    return Array.isArray(item) && 
+           item.length > 0 && 
+           typeof item[0] === 'object' && 
+           'vendor_name' in item[0] && 
+           'total' in item[0];
+  };
+  
+  // Helper to format a date for display
+  const formatDateForDisplay = (dateString: string) => {
+    try {
+      // Use the safer date parsing method
+      const date = new Date(dateString);
+      if (!isNaN(date.getTime())) {
+        return new Intl.DateTimeFormat('es-ES').format(date);
+      } 
+      return dateString; // Return original if parsing fails
+    } catch (error) {
+      return dateString;
+    }
   };
 
   return (
@@ -121,10 +138,12 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
 
         {rawData && !loading && (
           <Tabs defaultValue="formatted" className="w-full">
-            <TabsList className="grid grid-cols-2 w-[200px]">
+            <TabsList className="grid grid-cols-3 w-[300px]">
               <TabsTrigger value="formatted">Formateado</TabsTrigger>
+              <TabsTrigger value="collaborators">Colaboradores</TabsTrigger>
               <TabsTrigger value="raw">JSON Crudo</TabsTrigger>
             </TabsList>
+            
             <TabsContent value="formatted" className="p-0">
               <div className="border rounded-md p-4 mt-2 bg-gray-50 max-h-[400px] overflow-auto">
                 <div className="mb-4 p-2 bg-blue-50 border border-blue-100 rounded">
@@ -234,6 +253,60 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
                 </table>
               </div>
             </TabsContent>
+            
+            <TabsContent value="collaborators" className="p-0">
+              <div className="border rounded-md p-4 mt-2 bg-gray-50 max-h-[400px] overflow-auto">
+                <div className="mb-4 p-2 bg-blue-50 border border-blue-100 rounded">
+                  <p className="text-sm text-blue-800 font-medium">Datos de Colaboradores</p>
+                  <p className="text-xs text-blue-700 mt-1 flex items-center">
+                    <Calendar className="h-3 w-3 mr-1" />
+                    Analizando fechas y datos de colaboradores
+                  </p>
+                </div>
+
+                {rawData && rawData.colaboradores && Array.isArray(rawData.colaboradores) ? (
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="p-2 text-left border-b">Colaborador</th>
+                        <th className="p-2 text-left border-b">Fecha (Raw)</th>
+                        <th className="p-2 text-left border-b">Fecha (Formateada)</th>
+                        <th className="p-2 text-right border-b">Importe</th>
+                        <th className="p-2 text-center border-b">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rawData.colaboradores.map((collab: any, index: number) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="p-2 border-b font-medium">{collab.vendor_name || 'Sin nombre'}</td>
+                          <td className="p-2 border-b text-gray-600">
+                            <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">
+                              {collab.date || 'Sin fecha'}
+                            </code>
+                          </td>
+                          <td className="p-2 border-b">
+                            {collab.date ? formatDateForDisplay(collab.date) : 'Sin fecha'}
+                          </td>
+                          <td className="p-2 border-b text-right">${collab.total?.toLocaleString() || '0'}</td>
+                          <td className="p-2 border-b text-center">
+                            <span className={`inline-block px-2 py-1 rounded text-xs ${
+                              collab.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {collab.status || 'Pendiente'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    No hay datos de colaboradores disponibles
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+            
             <TabsContent value="raw" className="p-0">
               <div className="border rounded-md p-4 mt-2 bg-gray-50 max-h-[400px] overflow-auto">
                 <pre className="text-xs whitespace-pre-wrap break-words">

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction } from '@/types/financial';
 import {
@@ -29,6 +28,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import CacheStats from './CacheStats';
 import { Info, Filter, DollarSign, MinusCircle, Users, Coins, Table as TableIcon } from 'lucide-react';
 import { toast } from "@/hooks/use-toast";
+import { parseDate, formatDisplayDate } from "@/lib/utils";
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -89,7 +89,12 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefre
     }
     
     // Sort by date, oldest first (ascending)
-    result.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // Enhanced date comparison with robust parsing using our parseDate utility
+    result.sort((a, b) => {
+      const dateA = parseDate(a.date);
+      const dateB = parseDate(b.date);
+      return dateA.getTime() - dateB.getTime();
+    });
     
     return result;
   }, [transactions, typeFilter, categoryFilter]);
@@ -129,22 +134,9 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefre
     setcategoryFilter('all');
   }, [typeFilter]);
 
-  // Format date
+  // Format date using our new utility function
   const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      
-      // Check if the date is valid
-      if (isNaN(date.getTime())) {
-        console.error(`Invalid date string: ${dateString}`);
-        return 'Invalid date';
-      }
-      
-      return new Intl.DateTimeFormat('es-ES').format(date);
-    } catch (error) {
-      console.error(`Error formatting date: ${dateString}`, error);
-      return 'Invalid date';
-    }
+    return formatDisplayDate(dateString);
   };
 
   // Format currency (showing in USD by default)
