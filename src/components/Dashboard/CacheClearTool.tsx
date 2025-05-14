@@ -24,7 +24,7 @@ const CacheClearTool: React.FC = () => {
   const today = new Date();
   const threeMonthsAgo = subMonths(today, 3);
   
-  // Create a properly typed DateRange object
+  // Create a properly typed DateRange object for our application
   const [dateRange, setDateRange] = useState<DateRange>({
     startDate: startOfMonth(threeMonthsAgo),
     endDate: endOfMonth(today)
@@ -171,23 +171,23 @@ const CacheClearTool: React.FC = () => {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <p className="text-xs text-muted-foreground">Transactions</p>
-                  {cacheStats.transactions.map((item: any) => (
+                  {cacheStats.transactions && cacheStats.transactions.map((item: any) => (
                     <p key={item.source} className="text-sm">
                       {item.source}: <span className="font-medium">{item.count}</span>
                     </p>
                   ))}
-                  {cacheStats.transactions.length === 0 && (
+                  {(!cacheStats.transactions || cacheStats.transactions.length === 0) && (
                     <p className="text-sm text-muted-foreground">No cached transactions</p>
                   )}
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Cache Segments</p>
-                  {cacheStats.segments.map((item: any) => (
+                  {cacheStats.segments && cacheStats.segments.map((item: any) => (
                     <p key={item.source} className="text-sm">
                       {item.source}: <span className="font-medium">{item.count}</span>
                     </p>
                   ))}
-                  {cacheStats.segments.length === 0 && (
+                  {(!cacheStats.segments || cacheStats.segments.length === 0) && (
                     <p className="text-sm text-muted-foreground">No cache segments</p>
                   )}
                 </div>
