@@ -315,22 +315,22 @@ const ZohoService = {
           console.log("ZohoService: Cache inconsistency detected. Found segments but only", 
             transactionCount, "transactions. Forcing refresh...");
           
-        // Force refresh to repair the cache
-        const transactions = await ZohoService.forceRefresh(startDate, endDate);
-        
-        // Notify user of the repair
-        toast({
-          title: "Cache Repaired",
-          description: `Repaired inconsistent cache for ${formatDateYYYYMMDD(startDate)} to ${formatDateYYYYMMDD(endDate)} with ${transactions.length} transactions.`,
-          variant: "success"
-        });
-        
-        return transactions.length > 0;
-      } else {
-        console.log("ZohoService: Cache appears consistent with", transactionCount, "transactions");
-        return true;
+          // Force refresh to repair the cache
+          const transactions = await ZohoService.forceRefresh(startDate, endDate);
+          
+          // Notify user of the repair
+          toast({
+            title: "Cache Repaired",
+            description: `Repaired inconsistent cache for ${formatDateYYYYMMDD(startDate)} to ${formatDateYYYYMMDD(endDate)} with ${transactions.length} transactions.`,
+            variant: "success"
+          });
+          
+          return transactions.length > 0;
+        } else {
+          console.log("ZohoService: Cache appears consistent with", transactionCount, "transactions");
+          return true;
+        }
       }
-    }
       
       // No cache segments found, nothing to repair
       return false;

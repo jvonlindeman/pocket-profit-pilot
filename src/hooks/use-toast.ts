@@ -1,8 +1,9 @@
 
 // Direct implementation to avoid circular dependencies
-import { toast as baseToast, useToast as baseUseToast, ToasterToast } from "@/components/ui/use-toast"
+import { toast as baseToast, useToast as baseUseToast } from "@/components/ui/use-toast.tsx"
+import type { ToasterToast } from "@/components/ui/use-toast.tsx"
 
-// Export the type with the same name as it's declared in use-toast.tsx
+// Export the type with the same name
 export type { ToasterToast };
 
 // Re-export the hook
