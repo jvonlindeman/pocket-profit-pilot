@@ -1,3 +1,4 @@
+
 import { Transaction } from "../types/financial";
 import { fetchTransactionsFromWebhook } from "./zoho/apiClient";
 import { getMockTransactions } from "./zoho/mockData";
@@ -214,9 +215,11 @@ const ZohoService = {
         console.log("ZohoService: Cache is stale or missing, scheduling refresh");
         
         // Use setTimeout to avoid blocking
-        setTimeout(() => {
+        setTimeout(async () => {
           console.log("ZohoService: Executing scheduled cache refresh");
-          this.forceRefresh(startDate, endDate).catch(console.error);
+          await ZohoService.forceRefresh(startDate, endDate).catch(err => 
+            console.error("ZohoService: Error during scheduled refresh:", err)
+          );
         }, 100);
       } else {
         console.log("ZohoService: Cache refresh not needed yet");
