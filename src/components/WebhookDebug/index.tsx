@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, RefreshCw, Bug } from 'lucide-react';
 import * as ZohoService from '@/services/zohoService';
 import { DateRange } from 'react-day-picker';
+import { toFinancialDateRange } from '@/utils/dateRangeAdapter';
 
 interface WebhookDebugProps {
   dateRange: DateRange;
@@ -31,10 +32,13 @@ export default function WebhookDebug({ dateRange, refreshDataFunction }: Webhook
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       
+      // Convert from DayPicker format to our Financial format
+      const financialDateRange = toFinancialDateRange(dateRange);
+      
       // Get raw data to show in the debug UI
       const data = await ZohoService.getRawResponse(
-        dateRange.from || new Date(), 
-        dateRange.to || new Date()
+        financialDateRange.startDate, 
+        financialDateRange.endDate
       );
       setRawData(data);
       console.log("Debug data received:", data);

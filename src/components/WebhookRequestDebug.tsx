@@ -2,6 +2,8 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Bug } from 'lucide-react';
+import { formatDateYYYYMMDD } from '@/utils/dateUtils';
+import { FinancialDateRange } from '@/utils/dateRangeAdapter';
 
 interface WebhookRequestDebugProps {
   dateRange: {
@@ -12,13 +14,13 @@ interface WebhookRequestDebugProps {
 
 export default function WebhookRequestDebug({ dateRange }: WebhookRequestDebugProps) {
   // Format dates using a locale-aware approach that avoids timezone shifts
-  const formatDateYYYYMMDD = (date: Date): string => {
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const formatDateYYYYMMDD_Local = (date: Date): string => {
+    return formatDateYYYYMMDD(date);
   };
   
   // Format dates exactly as they should be sent to the webhook
-  const startDateFormatted = formatDateYYYYMMDD(dateRange.startDate);
-  const endDateFormatted = formatDateYYYYMMDD(dateRange.endDate);
+  const startDateFormatted = formatDateYYYYMMDD_Local(dateRange.startDate);
+  const endDateFormatted = formatDateYYYYMMDD_Local(dateRange.endDate);
   
   // Additional formatting for debugging
   const startDateLocal = dateRange.startDate.toLocaleDateString();
