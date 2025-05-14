@@ -5,6 +5,7 @@ import { getMockTransactions } from "./zoho/mockData";
 import { supabase } from "@/integrations/supabase/client";
 import CacheService from "./cache";
 import { formatDateYYYYMMDD } from "@/utils/dateUtils";
+import { toast } from "@/components/ui/use-toast";
 
 // Variable para almacenar la última respuesta cruda del webhook
 let lastRawResponse: any = null;
@@ -89,7 +90,8 @@ const ZohoService = {
       // Store the transactions in cache if we have real data (not mock)
       if (transactions.length > 0 && !transactions[0].id.startsWith('mock')) {
         console.log("ZohoService: Storing", transactions.length, "transactions in cache");
-        await CacheService.storeTransactions('Zoho', startDate, endDate, transactions);
+        const cacheResult = await CacheService.storeTransactions('Zoho', startDate, endDate, transactions);
+        console.log("ZohoService: Cache storage result:", cacheResult ? "Success" : "Failed");
       }
       
       console.log(`ZohoService: Returning ${transactions.length} transactions`);
@@ -127,7 +129,8 @@ const ZohoService = {
       // Return processed transactions directly if available
       if (response && response.cached_transactions && Array.isArray(response.cached_transactions)) {
         // Store in cache for future use
-        await CacheService.storeTransactions('Zoho', startDate, endDate, response.cached_transactions);
+        const cacheResult = await CacheService.storeTransactions('Zoho', startDate, endDate, response.cached_transactions);
+        console.log("ZohoService: Cache storage result during force refresh:", cacheResult ? "Success" : "Failed");
         return response.cached_transactions;
       }
       
@@ -136,7 +139,8 @@ const ZohoService = {
       
       // Store in cache for future use if we have real data (not mock)
       if (transactions && transactions.length > 0 && !transactions[0].id.startsWith('mock')) {
-        await CacheService.storeTransactions('Zoho', startDate, endDate, transactions);
+        const cacheResult = await CacheService.storeTransactions('Zoho', startDate, endDate, transactions);
+        console.log("ZohoService: Cache storage result during force refresh:", cacheResult ? "Success" : "Failed");
       }
       
       return transactions;
@@ -214,28 +218,124 @@ const ZohoService = {
       if (hoursSinceRefresh > 6 || !cacheCheck.cached) {
         console.log("ZohoService: Cache is stale or missing, scheduling refresh");
         
-        // Use setTimeout to avoid blocking but make sure we're properly handling the Promise
+        // Use a proper Promise-based approach with setTimeout
         setTimeout(() => {
-          try {
-            console.log("ZohoService: Executing scheduled cache refresh");
-            // Fixed: Don't directly assign the Promise to a variable or try to use it as an array
-            // Instead, call the function and ignore its return value since we're not using it here
-            ZohoService.forceRefresh(startDate, endDate)
-              .then(() => {
-                console.log("ZohoService: Scheduled cache refresh completed successfully");
-              })
-              .catch((err) => {
-                console.error("ZohoService: Error during scheduled refresh:", err);
+          console.log("ZohoService: Executing scheduled cache refresh");
+          // Properly handle the Promise returned by forceRefresh
+          ZohoService.forceRefresh(startDate, endDate)
+            .then(transactions => {
+              console.log("ZohoService: Scheduled cache refresh completed successfully with", 
+                transactions.length, "transactions");
+              // Notify user of successful cache refresh
+              toast({
+                title: "Cache Refreshed",
+                description: `Successfully refreshed ${transactions.length} transactions for the selected period.`,
+                duration: 3000,
               });
-          } catch (err) {
-            console.error("ZohoService: Error starting scheduled refresh:", err);
-          }
+            })
+            .catch(err => {
+              console.error("ZohoService: Error during scheduled refresh:", err);
+              // Notify user of refresh failure
+              toast({
+                title: "Cache Refresh Failed",
+                description: "Failed to refresh the transaction cache. Please try again later.",
+                variant: "destructive",
+                duration: 5000,
+              });
+            });
         }, 100);
       } else {
         console.log("ZohoService: Cache refresh not needed yet");
       }
     } catch (error) {
       console.error("ZohoService: Error checking cache freshness:", error);
+    }
+  },
+  
+  // Verify API connectivity
+  checkApiConnectivity: async (): Promise<boolean> => {
+    try {
+      // Create a minimal date range to test connectivity
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      // Try to get raw response with minimal data
+      const response = await fetchTransactionsFromWebhook(yesterday, today, false, true);
+      
+      // If we get any response, the API is connected
+      return !!response;
+    } catch (error) {
+      console.error("ZohoService: API connectivity check failed:", error);
+      return false;
+    }
+  },
+  
+  // Repair cache inconsistencies
+  repairCache: async (startDate: Date, endDate: Date): Promise<boolean> => {
+    try {
+      console.log("ZohoService: Attempting to repair cache for", startDate, "to", endDate);
+      
+      // Check if the segment exists but no transactions
+      const segmentQuery = await supabase
+        .from('cache_segments')
+        .select('*')
+        .eq('source', 'Zoho')
+        .lte('start_date', formatDateYYYYMMDD(startDate))
+        .gte('end_date', formatDateYYYYMMDD(endDate))
+        .eq('status', 'complete');
+        
+      if (segmentQuery.error) {
+        console.error("ZohoService: Error checking cache segments:", segmentQuery.error);
+        return false;
+      }
+      
+      // If segments exist, check if transactions exist
+      if (segmentQuery.data && segmentQuery.data.length > 0) {
+        console.log("ZohoService: Found", segmentQuery.data.length, "cache segments that should contain data");
+        
+        // Count transactions for this period
+        const transactionQuery = await supabase
+          .from('cached_transactions')
+          .select('count', { count: 'exact' })
+          .eq('source', 'Zoho')
+          .gte('date', formatDateYYYYMMDD(startDate))
+          .lte('date', formatDateYYYYMMDD(endDate));
+          
+        if (transactionQuery.error) {
+          console.error("ZohoService: Error counting cached transactions:", transactionQuery.error);
+          return false;
+        }
+        
+        const transactionCount = transactionQuery.count || 0;
+        
+        // If we have segments but no or too few transactions, force a refresh
+        if (transactionCount < 10) {
+          console.log("ZohoService: Cache inconsistency detected. Found segments but only", 
+            transactionCount, "transactions. Forcing refresh...");
+            
+          // Force refresh to repair the cache
+          const transactions = await ZohoService.forceRefresh(startDate, endDate);
+          
+          // Notify user of the repair
+          toast({
+            title: "Cache Repaired",
+            description: `Repaired inconsistent cache for ${formatDateYYYYMMDD(startDate)} to ${formatDateYYYYMMDD(endDate)} with ${transactions.length} transactions.`,
+            duration: 5000,
+          });
+          
+          return transactions.length > 0;
+        } else {
+          console.log("ZohoService: Cache appears consistent with", transactionCount, "transactions");
+          return true;
+        }
+      }
+      
+      // No cache segments found, nothing to repair
+      return false;
+    } catch (error) {
+      console.error("ZohoService: Error repairing cache:", error);
+      return false;
     }
   }
 };

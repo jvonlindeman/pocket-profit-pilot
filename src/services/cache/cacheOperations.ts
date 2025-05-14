@@ -74,6 +74,11 @@ export const cacheOperations = {
     try {
       console.log(`CacheOperations: Storing ${transactions.length} ${source} transactions from ${startDate} to ${endDate}`);
       
+      if (transactions.length === 0) {
+        console.warn("CacheOperations: No transactions to store, skipping cache update");
+        return false;
+      }
+      
       const formattedStartDate = formatDateYYYYMMDD(startDate);
       const formattedEndDate = formatDateYYYYMMDD(endDate);
       
@@ -110,6 +115,9 @@ export const cacheOperations = {
       }));
       
       // Upsert the transactions (use external_id for conflict resolution)
+      let successCount = 0;
+      let errorCount = 0;
+      
       for (let i = 0; i < cacheTransactions.length; i += 100) {
         const batch = cacheTransactions.slice(i, i + 100);
         const { error: txError } = await supabase
@@ -117,13 +125,35 @@ export const cacheOperations = {
           .upsert(batch, { onConflict: 'external_id' });
         
         if (txError) {
-          console.error("CacheOperations: Error storing transactions:", txError);
-          throw new Error(`Transaction storage failed: ${txError.message}`);
+          console.error(`CacheOperations: Error storing batch ${i}-${i+batch.length}:`, txError);
+          errorCount++;
+        } else {
+          successCount++;
         }
       }
       
-      console.log(`CacheOperations: Successfully cached ${transactions.length} transactions`);
-      return true;
+      // Verify transactions were actually stored by checking count
+      const { count, error: countError } = await supabase
+        .from('cached_transactions')
+        .select('*', { count: 'exact' })
+        .eq('source', source)
+        .gte('date', formattedStartDate)
+        .lte('date', formattedEndDate);
+      
+      if (countError) {
+        console.error("CacheOperations: Error verifying stored transactions:", countError);
+      } else {
+        console.log(`CacheOperations: Verified ${count} transactions in cache after storage`);
+        
+        // If count is too low, there might be an issue with storage
+        if (count && count < transactions.length * 0.9) {
+          console.warn(`CacheOperations: Potentially incomplete storage. Expected ~${transactions.length}, found ${count}`);
+        }
+      }
+      
+      const success = errorCount === 0 && successCount > 0;
+      console.log(`CacheOperations: ${success ? 'Successfully' : 'Partially'} cached ${transactions.length} transactions. Success batches: ${successCount}, Failed batches: ${errorCount}`);
+      return success;
     } catch (err) {
       console.error("CacheOperations: Error in storeTransactions", err);
       return false;
@@ -135,5 +165,63 @@ export const cacheOperations = {
    */
   getLastCacheCheckResult: (): CacheResponse | null => {
     return lastCacheCheckResult;
+  },
+  
+  /**
+   * Verify cache integrity for a date range
+   */
+  verifyCacheIntegrity: async (
+    source: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<{ isConsistent: boolean, segmentCount: number, transactionCount: number }> => {
+    try {
+      const formattedStartDate = formatDateYYYYMMDD(startDate);
+      const formattedEndDate = formatDateYYYYMMDD(endDate);
+      
+      // Check if segments exist
+      const { data: segments, error: segmentError } = await supabase
+        .from('cache_segments')
+        .select('*')
+        .eq('source', source)
+        .lte('start_date', formattedStartDate)
+        .gte('end_date', formattedEndDate);
+      
+      if (segmentError) {
+        console.error("CacheOperations: Error verifying cache segments:", segmentError);
+        return { isConsistent: false, segmentCount: 0, transactionCount: 0 };
+      }
+      
+      if (!segments || segments.length === 0) {
+        console.log("CacheOperations: No cache segments found for verification");
+        return { isConsistent: false, segmentCount: 0, transactionCount: 0 };
+      }
+      
+      // Check if transactions exist
+      const { count, error: countError } = await supabase
+        .from('cached_transactions')
+        .select('*', { count: 'exact' })
+        .eq('source', source)
+        .gte('date', formattedStartDate)
+        .lte('date', formattedEndDate);
+      
+      if (countError) {
+        console.error("CacheOperations: Error counting cached transactions:", countError);
+        return { isConsistent: false, segmentCount: segments.length, transactionCount: 0 };
+      }
+      
+      const transactionCount = count || 0;
+      const segmentCount = segments.length;
+      
+      // Consistency check: we should have transactions if we have segments
+      const isConsistent = segmentCount > 0 && transactionCount > 0;
+      
+      console.log(`CacheOperations: Cache integrity check - Segments: ${segmentCount}, Transactions: ${transactionCount}, Consistent: ${isConsistent}`);
+      
+      return { isConsistent, segmentCount, transactionCount };
+    } catch (err) {
+      console.error("CacheOperations: Error in verifyCacheIntegrity", err);
+      return { isConsistent: false, segmentCount: 0, transactionCount: 0 };
+    }
   }
 };

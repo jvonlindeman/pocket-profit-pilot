@@ -1,8 +1,10 @@
+
 import { useState, useCallback } from 'react';
 import ZohoService from '@/services/zohoService';
 import StripeService from '@/services/stripeService';
 import { formatDateYYYYMMDD, logDateInfo } from '@/utils/dateUtils';
 import CacheService from '@/services/cache';
+import { toast } from '@/components/ui/use-toast';
 
 export const useFinancialDataFetcher = () => {
   const [loading, setLoading] = useState<boolean>(false);
@@ -17,6 +19,80 @@ export const useFinancialDataFetcher = () => {
     zoho: { hit: false, partial: false },
     stripe: { hit: false, partial: false }
   });
+  const [apiConnectivity, setApiConnectivity] = useState<{
+    zoho: boolean,
+    stripe: boolean
+  }>({
+    zoho: true,
+    stripe: true
+  });
+
+  // Check API connectivity
+  const checkApiConnectivity = useCallback(async () => {
+    const zohoConnected = await ZohoService.checkApiConnectivity();
+    const stripeConnected = await StripeService.checkApiConnectivity();
+    
+    setApiConnectivity({
+      zoho: zohoConnected,
+      stripe: stripeConnected
+    });
+    
+    return { zoho: zohoConnected, stripe: stripeConnected };
+  }, []);
+
+  // Verify cache integrity for a range
+  const verifyCacheIntegrity = useCallback(async (dateRange: { startDate: Date; endDate: Date }) => {
+    try {
+      // Verify Zoho cache
+      const zohoCache = await CacheService.checkCache(
+        'Zoho', 
+        dateRange.startDate, 
+        dateRange.endDate
+      );
+      
+      if (zohoCache.cached && zohoCache.status === 'complete') {
+        // Verify there are actually transactions
+        const { isConsistent, transactionCount } = await CacheService.verifyCacheIntegrity(
+          'Zoho',
+          dateRange.startDate,
+          dateRange.endDate
+        );
+        
+        if (!isConsistent && transactionCount < 10) {
+          console.log("Cache integrity issue detected. Attempting repair...");
+          
+          // Try to repair the cache
+          const repaired = await ZohoService.repairCache(dateRange.startDate, dateRange.endDate);
+          if (repaired) {
+            console.log("Cache successfully repaired");
+          } else {
+            console.warn("Cache repair failed or wasn't needed");
+          }
+        }
+      }
+      
+      // Verify Stripe cache (similar approach)
+      const stripeCache = await CacheService.checkCache(
+        'Stripe', 
+        dateRange.startDate, 
+        dateRange.endDate
+      );
+      
+      if (stripeCache.cached && stripeCache.status === 'complete') {
+        const { isConsistent, transactionCount } = await CacheService.verifyCacheIntegrity(
+          'Stripe',
+          dateRange.startDate,
+          dateRange.endDate
+        );
+        
+        if (!isConsistent && transactionCount < 5) {
+          console.log("Stripe cache integrity issue detected. Will force refresh during next data fetch.");
+        }
+      }
+    } catch (err) {
+      console.error("Error verifying cache integrity:", err);
+    }
+  }, []);
 
   // Fetch financial data from external services
   const fetchFinancialData = useCallback(async (
@@ -48,6 +124,35 @@ export const useFinancialDataFetcher = () => {
     });
 
     try {
+      // Check API connectivity first
+      const connectivity = await checkApiConnectivity();
+      
+      if (!connectivity.zoho && !connectivity.stripe) {
+        toast({
+          title: "API Connectivity Issue",
+          description: "Cannot connect to Zoho or Stripe APIs. Using cached data if available.",
+          variant: "destructive",
+          duration: 5000,
+        });
+      } else if (!connectivity.zoho) {
+        toast({
+          title: "Zoho API Connectivity Issue",
+          description: "Cannot connect to Zoho API. Using cached data if available.",
+          variant: "destructive",
+          duration: 5000,
+        });
+      } else if (!connectivity.stripe) {
+        toast({
+          title: "Stripe API Connectivity Issue",
+          description: "Cannot connect to Stripe API. Using cached data if available.",
+          variant: "destructive",
+          duration: 5000,
+        });
+      }
+      
+      // Verify cache integrity
+      await verifyCacheIntegrity(dateRange);
+
       // Log exact date objects for debugging
       logDateInfo("Original dateRange from datepicker", dateRange);
       
@@ -158,6 +263,11 @@ export const useFinancialDataFetcher = () => {
       // Update transactions state
       callbacks.onTransactions(combinedData);
       
+      // Schedule cache check for background refresh if needed
+      if (!forceRefresh) {
+        ZohoService.checkAndRefreshCache(dateRange.startDate, dateRange.endDate);
+      }
+      
       setLoading(false);
       return true;
     } catch (err: any) {
@@ -174,7 +284,7 @@ export const useFinancialDataFetcher = () => {
       setLoading(false);
       return false;
     }
-  }, [lastFetchTimestamp]);
+  }, [lastFetchTimestamp, checkApiConnectivity, verifyCacheIntegrity]);
 
   return {
     loading,
@@ -182,6 +292,8 @@ export const useFinancialDataFetcher = () => {
     rawResponse,
     usingCachedData,
     fetchFinancialData,
-    cacheStatus
+    cacheStatus,
+    apiConnectivity,
+    checkApiConnectivity
   };
 };

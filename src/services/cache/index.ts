@@ -44,6 +44,17 @@ const CacheService = {
    */
   getCacheStats: async (): Promise<any> => {
     return cacheMetrics.getCacheStats();
+  },
+  
+  /**
+   * Verify cache integrity for a date range
+   */
+  verifyCacheIntegrity: async (
+    source: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<{ isConsistent: boolean, segmentCount: number, transactionCount: number }> => {
+    return cacheOperations.verifyCacheIntegrity(source, startDate, endDate);
   }
 };
 

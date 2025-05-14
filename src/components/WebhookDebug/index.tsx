@@ -2,13 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Bug } from 'lucide-react';
+import { Loader2, Bug, RefreshCw, WifiOff } from 'lucide-react';
 import ZohoService from '@/services/zohoService';
 import WebhookDebugHeader from './WebhookDebugHeader';
 import WebhookErrorDisplay from './WebhookErrorDisplay';
 import WebhookDataSummary from './WebhookDataSummary';
 import WebhookDataTable from './WebhookDataTable';
 import WebhookRawData from './WebhookRawData';
+import { Button } from '@/components/ui/button';
 
 interface WebhookDebugProps {
   dateRange: {
@@ -23,6 +24,7 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
   const [loading, setLoading] = useState(false);
   const [rawData, setRawData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [apiConnected, setApiConnected] = useState(true);
 
   // Update local state when rawResponse from parent changes
   useEffect(() => {
@@ -32,12 +34,31 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
     }
   }, [rawResponse]);
 
+  // Check API connectivity on component mount
+  useEffect(() => {
+    async function checkConnectivity() {
+      const isConnected = await ZohoService.checkApiConnectivity();
+      setApiConnected(isConnected);
+    }
+    checkConnectivity();
+  }, []);
+
   // Fetch debug data from API
   const fetchDebugData = async () => {
     setLoading(true);
     setError(null);
     
     try {
+      // Check connectivity first
+      const isConnected = await ZohoService.checkApiConnectivity();
+      setApiConnected(isConnected);
+      
+      if (!isConnected) {
+        setError("Cannot connect to Zoho API. Please check your credentials and network connection.");
+        setLoading(false);
+        return;
+      }
+      
       // Use the global refresh function if available
       if (refreshDataFunction) {
         console.log("Usando la función de actualización global para cargar datos");
@@ -66,19 +87,64 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
     }
   };
 
+  // Attempt cache repair
+  const repairCache = async () => {
+    setLoading(true);
+    try {
+      const repaired = await ZohoService.repairCache(dateRange.startDate, dateRange.endDate);
+      if (repaired) {
+        setError(null);
+      } else {
+        setError("Cache repair attempt completed but no issues were found or repair failed.");
+      }
+    } catch (err: any) {
+      setError(err.message || "Error attempting to repair cache");
+      console.error("Failed to repair cache:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Bug className="h-5 w-5 text-amber-500" />
           Depuración de Webhook Zoho
+          {!apiConnected && (
+            <WifiOff className="h-5 w-5 ml-2 text-red-500" title="API Disconnected" />
+          )}
         </CardTitle>
         <CardDescription>
           Ver la respuesta cruda del webhook para detectar problemas
+          {!apiConnected && (
+            <span className="text-red-500 block mt-1">
+              No se puede conectar a la API de Zoho. Verificando estado de caché.
+            </span>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <WebhookDebugHeader loading={loading} onFetchData={fetchDebugData} />
+        <div className="flex justify-between items-center mb-4">
+          <WebhookDebugHeader loading={loading} onFetchData={fetchDebugData} />
+          
+          {!apiConnected && (
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={repairCache} 
+              disabled={loading}
+              className="ml-2"
+            >
+              {loading ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Reparando...</>
+              ) : (
+                <><RefreshCw className="h-4 w-4 mr-2" /> Intentar Reparar Caché</>
+              )}
+            </Button>
+          )}
+        </div>
+        
         <WebhookErrorDisplay error={error} />
 
         {loading && (
