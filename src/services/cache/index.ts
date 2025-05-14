@@ -55,6 +55,17 @@ const CacheService = {
     endDate: Date
   ): Promise<{ isConsistent: boolean, segmentCount: number, transactionCount: number }> => {
     return cacheOperations.verifyCacheIntegrity(source, startDate, endDate);
+  },
+  
+  /**
+   * Repair cache segments to match actual transaction counts
+   */
+  repairCacheSegments: async (
+    source: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<boolean> => {
+    return cacheOperations.repairCacheSegments(source, startDate, endDate);
   }
 };
 

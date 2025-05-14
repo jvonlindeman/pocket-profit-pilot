@@ -47,6 +47,112 @@ const generateConsistentId = (transaction: Partial<Transaction>, index: number):
   return `${source.toLowerCase()}-${type.toLowerCase()}-${date}-${identifier}`;
 };
 
+/**
+ * Store transactions directly in the Supabase database
+ */
+async function storeTransactionsInCache(transactions: Transaction[], source: string, startDate: string, endDate: string): Promise<boolean> {
+  if (!transactions || transactions.length === 0) {
+    console.log("No transactions to cache");
+    return false;
+  }
+
+  console.log(`Storing ${transactions.length} ${source} transactions in cache from ${startDate} to ${endDate}`);
+
+  try {
+    // Create a cache segment record
+    const { error: segmentError } = await supabase
+      .from('cache_segments')
+      .upsert({
+        source,
+        start_date: startDate,
+        end_date: endDate,
+        transaction_count: transactions.length,
+        last_refreshed_at: new Date().toISOString(),
+        status: 'processing'
+      }, { onConflict: 'source, start_date, end_date' });
+    
+    if (segmentError) {
+      console.error("Error creating cache segment:", segmentError);
+      return false;
+    }
+
+    // Store transactions in batches
+    const BATCH_SIZE = 50;
+    let successCount = 0;
+    let errorCount = 0;
+
+    // Format transactions for database
+    const cacheTransactions = transactions.map(tx => ({
+      external_id: tx.id,
+      date: tx.date,
+      amount: tx.amount,
+      description: tx.description || null,
+      category: tx.category || null,
+      source: tx.source,
+      type: tx.type,
+      fetched_at: new Date().toISOString()
+    }));
+
+    // Store transactions in batches
+    for (let i = 0; i < cacheTransactions.length; i += BATCH_SIZE) {
+      const batch = cacheTransactions.slice(i, i + BATCH_SIZE);
+      const { error: txError } = await supabase
+        .from('cached_transactions')
+        .upsert(batch, { onConflict: 'external_id' });
+      
+      if (txError) {
+        console.error(`Error storing transaction batch ${i}-${i+batch.length}:`, txError);
+        errorCount++;
+      } else {
+        successCount++;
+        console.log(`Successfully stored transaction batch ${i}-${i+batch.length}`);
+      }
+    }
+
+    // Update segment status to complete if all successful
+    if (errorCount === 0) {
+      const { error: finalSegmentError } = await supabase
+        .from('cache_segments')
+        .upsert({
+          source,
+          start_date: startDate,
+          end_date: endDate,
+          transaction_count: transactions.length,
+          last_refreshed_at: new Date().toISOString(),
+          status: 'complete'
+        }, { onConflict: 'source, start_date, end_date' });
+      
+      if (finalSegmentError) {
+        console.error("Error updating cache segment status:", finalSegmentError);
+      }
+    }
+
+    // Verify storage
+    const { count, error: countError } = await supabase
+      .from('cached_transactions')
+      .select('*', { count: 'exact' })
+      .eq('source', source)
+      .gte('date', startDate)
+      .lte('date', endDate);
+
+    if (countError) {
+      console.error("Error verifying transaction storage:", countError);
+    } else {
+      console.log(`Verified ${count} transactions in cache after storage`);
+      
+      if (count && count < transactions.length * 0.9) {
+        console.warn(`Potentially incomplete storage. Expected ~${transactions.length}, found ${count}`);
+        return false;
+      }
+    }
+
+    return errorCount === 0;
+  } catch (err) {
+    console.error("Error storing transactions in cache:", err);
+    return false;
+  }
+}
+
 serve(async (req: Request) => {
   console.log(`zoho-transactions function called with method: ${req.method}`);
   
@@ -337,6 +443,13 @@ serve(async (req: Request) => {
     }
     
     console.log(`Processed ${transactions.length} transactions`);
+    
+    // Store the transactions in cache directly from the edge function
+    if (transactions.length > 0) {
+      console.log(`Storing ${transactions.length} transactions in cache`);
+      const cacheResult = await storeTransactionsInCache(transactions, 'Zoho', startDate, endDate);
+      console.log(`Transaction caching result: ${cacheResult ? 'Success' : 'Failed'}`);
+    }
     
     // Add the original response to the data for debugging
     const responseData = {
