@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -55,7 +54,7 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
 
   const onSubmit = async (data: FormValues) => {
     // Ensure balance is a number and notes is a string
-    const success = await updateMonthlyBalance(Number(data.balance), data.notes || '');
+    const success = await updateMonthlyBalance(Number(data.balance), data.notes ?? '');
     if (success) {
       onOpenChange(false);
       onBalanceSaved();
