@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { InitialBalanceDialog } from '@/components/InitialBalanceDialog';
-import { FinanceSummary } from '@/components/Dashboard/FinanceSummary';
+import FinanceSummary from '@/components/Dashboard/FinanceSummary';
 import { useFinanceData } from '@/hooks/useFinanceData';
 
 export default function Index() {
@@ -8,8 +8,9 @@ export default function Index() {
   const { 
     dateRange, updateDateRange, financialData, loading, error,
     getCurrentMonthRange, refreshData, dataInitialized, rawResponse,
-    stripeIncome, stripeFees, stripeTransactionFees, stripePayoutFees, 
-    stripeAdditionalFees, stripeNet, stripeFeePercentage, regularIncome,
+    stripeIncome, stripeFees, 
+    stripeTransactionFees, stripePayoutFees, stripeAdditionalFees,
+    stripeNet, stripeFeePercentage, regularIncome,
     creditCardIncome, collaboratorExpenses, startingBalance, 
     updateStartingBalance, usingCachedData
   } = useFinanceData();
@@ -55,7 +56,7 @@ export default function Index() {
           {/* Financial Summary */}
           <FinanceSummary 
             summary={financialData.summary} 
-            expenseCategories={financialData.topExpenses}
+            expenseCategories={financialData.expenseByCategory}
             stripeIncome={stripeIncome}
             stripeFees={stripeFees}
             stripeTransactionFees={stripeTransactionFees}
