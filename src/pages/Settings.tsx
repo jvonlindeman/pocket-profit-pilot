@@ -1,4 +1,3 @@
-
 import React from 'react';
 import ZohoDebug from '@/components/ZohoDebug';
 import WebhookDebug from '@/components/WebhookDebug/index';
@@ -17,20 +16,6 @@ const Settings = () => {
   const dateRange = {
     startDate: startOfMonth(today),
     endDate: endOfMonth(today),
-  };
-
-  // Helper function to convert our date range to DayPicker format
-  const dateRangeForPicker = () => {
-    const today = new Date();
-    const lastMonth = new Date(today);
-    lastMonth.setMonth(today.getMonth() - 1);
-    
-    const dateRange = {
-      startDate: lastMonth,
-      endDate: today
-    };
-    
-    return toDayPickerDateRange(dateRange);
   };
 
   return (
