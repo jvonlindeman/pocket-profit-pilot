@@ -1,12 +1,12 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calculator } from 'lucide-react';
+import { Calculator, DollarSign } from 'lucide-react';
 
 interface SalaryCalculatorProps {
   zohoIncome: number;
   stripeIncome: number;
-  opexAmount: number; // Changed from opexPercentage to opexAmount
+  opexAmount: number;
   itbmAmount: number;
   profitPercentage: number;
 }
@@ -14,22 +14,23 @@ interface SalaryCalculatorProps {
 const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({ 
   zohoIncome,
   stripeIncome,
-  opexAmount, // Changed from opexPercentage
+  opexAmount,
   itbmAmount,
   profitPercentage
 }) => {
-  // No longer calculate OPEX as a percentage - use the direct amount
-  // const opexAmount = (zohoIncome * opexPercentage) / 100;
-  
   // Calculate Profit First amount (percentage of Zoho income)
   const profitFirstAmount = (zohoIncome * profitPercentage) / 100;
+  
+  // Calculate tax reserve amount (5% of Zoho income)
+  const taxReservePercentage = 5;
+  const taxReserveAmount = (zohoIncome * taxReservePercentage) / 100;
   
   // Calculate half of Stripe income
   const halfStripeIncome = stripeIncome / 2;
   
-  // Calculate salary using the formula from Google Sheets
-  // (Zoho income - OPEX - ITBM - Profit First + Stripe income/2) / 2
-  const availableForSalary = zohoIncome - opexAmount - itbmAmount - profitFirstAmount + halfStripeIncome;
+  // Calculate salary using the updated formula including tax reserve
+  // (Zoho income - OPEX - ITBM - Profit First - Tax Reserve + Stripe income/2) / 2
+  const availableForSalary = zohoIncome - opexAmount - itbmAmount - profitFirstAmount - taxReserveAmount + halfStripeIncome;
   const salary = availableForSalary / 2;
   
   // Format currency
@@ -70,6 +71,11 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
             <div className="bg-white p-3 rounded-lg shadow-sm">
               <h3 className="text-sm font-medium text-gray-500 mb-1">Profit First ({profitPercentage}%)</h3>
               <div className="text-lg font-bold text-amber-600">- {formatCurrency(profitFirstAmount)}</div>
+            </div>
+
+            <div className="bg-white p-3 rounded-lg shadow-sm">
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Reserva para Taxes ({taxReservePercentage}%)</h3>
+              <div className="text-lg font-bold text-amber-600">- {formatCurrency(taxReserveAmount)}</div>
             </div>
           </div>
           
