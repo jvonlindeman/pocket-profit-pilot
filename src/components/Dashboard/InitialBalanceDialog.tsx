@@ -54,7 +54,7 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
   const capitalizedMonth = formattedMonth.charAt(0).toUpperCase() + formattedMonth.slice(1);
 
   const onSubmit = async (data: FormValues) => {
-    const success = await updateMonthlyBalance(data.balance, data.notes);
+    const success = await updateMonthlyBalance(data.balance, data.notes || '');
     if (success) {
       onOpenChange(false);
       onBalanceSaved();

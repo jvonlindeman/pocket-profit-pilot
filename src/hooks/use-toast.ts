@@ -1,8 +1,8 @@
 
-import { Toast, useToast as useHookToast } from "@/components/ui/toast";
+import { type ToasterToast, toast as showToast, useToast as useToastHook } from "@/components/ui/use-toast";
 
-export type { Toast };
-export const useToast = useHookToast;
+export type Toast = ToasterToast;
+export const useToast = useToastHook;
 
 export const toast = ({
   title,
@@ -10,9 +10,7 @@ export const toast = ({
   variant,
   ...props
 }: Toast) => {
-  const { toast } = useHookToast();
-
-  return toast({
+  return showToast({
     title,
     description,
     variant: variant || "default",
