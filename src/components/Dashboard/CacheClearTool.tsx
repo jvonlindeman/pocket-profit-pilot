@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DateRange } from "react-day-picker";
 import { toast } from "@/components/ui/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { DateRangePicker } from "@/components/Dashboard/DateRangePicker";
+import DateRangePicker from "@/components/Dashboard/DateRangePicker";
 import { Trash } from 'lucide-react';
 import { formatDateYYYYMMDD } from "@/utils/dateUtils";
 import { endOfMonth, startOfMonth, subMonths } from 'date-fns';
