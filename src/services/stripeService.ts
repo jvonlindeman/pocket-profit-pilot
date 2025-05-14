@@ -1,6 +1,7 @@
 
 import { Transaction } from "../types/financial";
 import { supabase } from "@/integrations/supabase/client";
+import { formatDateYYYYMMDD_Panama, toPanamaTime, PANAMA_TIMEZONE } from "@/utils/timezoneUtils";
 
 interface StripeTransactionResponse {
   transactions: Transaction[];
@@ -46,19 +47,27 @@ const StripeService = {
     console.log("StripeService: Fetching transactions from", startDate, "to", endDate);
     
     try {
-      // Format dates for API call
-      const formatDateYYYYMMDD = (date: Date): string => {
-        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-      };
+      // Convert dates to Panama timezone before formatting
+      const panamaStartDate = toPanamaTime(startDate);
+      const panamaEndDate = toPanamaTime(endDate);
       
-      console.log("StripeService: Calling Stripe edge function with dates:", 
-        formatDateYYYYMMDD(startDate), formatDateYYYYMMDD(endDate));
+      // Format dates for API call using Panama timezone
+      const formattedStartDate = formatDateYYYYMMDD_Panama(panamaStartDate);
+      const formattedEndDate = formatDateYYYYMMDD_Panama(panamaEndDate);
+      
+      console.log("StripeService: Calling Stripe edge function with Panama dates:", {
+        formattedStartDate,
+        formattedEndDate,
+        timezone: PANAMA_TIMEZONE,
+        panamaStartDate: panamaStartDate.toString(),
+        panamaEndDate: panamaEndDate.toString()
+      });
       
       // Call Stripe edge function to get real data
       const { data, error } = await supabase.functions.invoke('stripe-balance', {
         body: {
-          startDate: formatDateYYYYMMDD(startDate),
-          endDate: formatDateYYYYMMDD(endDate)
+          startDate: formattedStartDate,
+          endDate: formattedEndDate
         }
       });
       
@@ -85,6 +94,20 @@ const StripeService = {
       
       const response = data as StripeTransactionResponse;
       console.log("StripeService: API response with summary:", response.summary);
+      
+      // Ensure all transaction dates are in Panama timezone format
+      if (response.transactions && Array.isArray(response.transactions)) {
+        response.transactions.forEach(tx => {
+          if (tx.date) {
+            try {
+              // Convert existing date to Panama timezone format
+              tx.date = formatDateYYYYMMDD_Panama(toPanamaTime(new Date(tx.date)));
+            } catch (e) {
+              console.error(`Error converting transaction date to Panama timezone: ${tx.date}`, e);
+            }
+          }
+        });
+      }
       
       return {
         transactions: response.transactions || [],

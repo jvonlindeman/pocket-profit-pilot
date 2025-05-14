@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction } from '@/types/financial';
 import {
@@ -29,7 +28,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import CacheStats from './CacheStats';
 import { Info, Filter, DollarSign, MinusCircle, Users, Coins, Table as TableIcon } from 'lucide-react';
 import { toast } from "@/hooks/use-toast";
-import { parseDate, formatDisplayDate } from "@/lib/utils";
+import { formatDateForPanamaDisplay, parseToPanamaTime } from "@/utils/timezoneUtils";
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -48,7 +47,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefre
   // Category filter for expenses
   const [categoryFilter, setcategoryFilter] = useState<string>('all');
 
-  // Filtrar transacciones para excluir a los proveedores especificados
+  // Filter transactions to exclude specific vendors
   const filteredTransactions = useMemo(() => {
     // First filter out transactions from excluded vendors
     const vendorFilteredTransactions = transactions.filter(tx => {
@@ -97,11 +96,10 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefre
         break;
     }
     
-    // Sort by date, oldest first (ascending)
-    // Enhanced date comparison with robust parsing using our parseDate utility
+    // Sort by date using Panama timezone comparison
     result.sort((a, b) => {
-      const dateA = parseDate(a.date);
-      const dateB = parseDate(b.date);
+      const dateA = parseToPanamaTime(a.date);
+      const dateB = parseToPanamaTime(b.date);
       return dateA.getTime() - dateB.getTime();
     });
     
@@ -154,9 +152,9 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefre
     setcategoryFilter('all');
   }, [typeFilter]);
 
-  // Format date using our new utility function
+  // Format date using Panama timezone
   const formatDate = (dateString: string) => {
-    return formatDisplayDate(dateString);
+    return formatDateForPanamaDisplay(dateString);
   };
 
   // Format currency (showing in USD by default)

@@ -1,15 +1,21 @@
+
 import { Transaction } from "../../types/financial";
 import { ensureValidDateFormat, handleApiError } from "./utils";
 import { getMockTransactions } from "./mockData";
 import { supabase } from "@/integrations/supabase/client";
-import { parseDate } from "@/lib/utils";
+import { 
+  parseToPanamaTime, 
+  formatDateYYYYMMDD_Panama,
+  toPanamaTime,
+  PANAMA_TIMEZONE
+} from "@/utils/timezoneUtils";
 
 // Lista de proveedores que deben ser excluidos
 const excludedVendors = ["Johan von Lindeman", "DFC Panama"];
 
-// Format date in YYYY-MM-DD format without timezone shifts
+// Format date in YYYY-MM-DD format in Panama timezone
 const formatDateYYYYMMDD = (date: Date): string => {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  return formatDateYYYYMMDD_Panama(date);
 };
 
 // Helper function to ensure source is either 'Zoho' or 'Stripe'
@@ -35,21 +41,27 @@ export const fetchTransactionsFromWebhook = async (
       startDateObj: startDate,
       startDateType: typeof startDate,
       endDateObj: endDate,
-      endDateType: typeof endDate
+      endDateType: typeof endDate,
+      timezone: PANAMA_TIMEZONE
     });
     
-    // Format dates using our custom formatter to avoid timezone shifts
-    const formattedStartDate = formatDateYYYYMMDD(startDate);
-    const formattedEndDate = formatDateYYYYMMDD(endDate);
+    // Ensure dates are interpreted in Panama timezone
+    const panamaStartDate = toPanamaTime(startDate);
+    const panamaEndDate = toPanamaTime(endDate);
     
-    console.log("ZohoService: Formatted dates for webhook request:", {
-      startDate: startDate,
+    // Format dates using Panama timezone formatter
+    const formattedStartDate = formatDateYYYYMMDD(panamaStartDate);
+    const formattedEndDate = formatDateYYYYMMDD(panamaEndDate);
+    
+    console.log("ZohoService: Formatted Panama dates for webhook request:", {
+      startDate: panamaStartDate.toString(),
       formattedStartDate,
-      endDate: endDate,
-      formattedEndDate
+      endDate: panamaEndDate.toString(),
+      formattedEndDate,
+      timezone: PANAMA_TIMEZONE
     });
     
-    console.log("ZohoService: Calling Supabase edge function with exact dates:", formattedStartDate, formattedEndDate);
+    console.log("ZohoService: Calling Supabase edge function with Panama timezone dates:", formattedStartDate, formattedEndDate);
     
     if (!forceRefresh) {
       console.log("ZohoService: No longer checking for cached data, feature removed");
@@ -72,12 +84,12 @@ export const fetchTransactionsFromWebhook = async (
       // If we get an error, use mock data
       const errorMessage = handleApiError({details: error.message}, 'Failed to fetch Zoho transactions from Supabase cache');
       console.warn('Falling back to mock data due to error');
-      return returnRawResponse ? { error: error.message, raw_response: null } : getMockTransactions(startDate, endDate);
+      return returnRawResponse ? { error: error.message, raw_response: null } : getMockTransactions(panamaStartDate, panamaEndDate);
     }
     
     if (!data) {
       console.log("No transactions returned from Supabase function, using mock data");
-      return returnRawResponse ? { message: "No data returned", data: null, raw_response: null } : getMockTransactions(startDate, endDate);
+      return returnRawResponse ? { message: "No data returned", data: null, raw_response: null } : getMockTransactions(panamaStartDate, panamaEndDate);
     }
     
     console.log("ZohoService: Received data from Supabase function");
@@ -152,7 +164,7 @@ const processRawTransactions = (data: any): Transaction[] => {
       // Parse the string to a number, handling comma as decimal separator
       const stripeAmount = parseFloat(String(data.stripe).replace(".", "").replace(",", "."));
       if (!isNaN(stripeAmount) && stripeAmount > 0) {
-        const today = new Date().toISOString().split('T')[0];
+        const today = formatDateYYYYMMDD_Panama(new Date());
         result.push({
           id: `stripe-income-${today}-${stripeAmount}`,
           date: today,
@@ -168,7 +180,7 @@ const processRawTransactions = (data: any): Transaction[] => {
     }
   }
   
-  // Process collaborator expenses (new format with proper array) - with improved date handling and vendor exclusion
+  // Process collaborator expenses with Panama timezone handling
   if (Array.isArray(data.colaboradores)) {
     data.colaboradores.forEach((item: any, index: number) => {
       if (item && typeof item.total !== 'undefined' && item.vendor_name) {
@@ -187,19 +199,19 @@ const processRawTransactions = (data: any): Transaction[] => {
             // Log raw date field from API
             console.log(`Raw collaborator date for ${item.vendor_name}:`, item.date);
             
-            // Ensure we have a valid YYYY-MM-DD format
+            // Ensure we have a valid YYYY-MM-DD format in Panama timezone
             try {
-              // Try to parse and format the date
-              const parsedDate = parseDate(item.date);
-              collaboratorDate = formatDateYYYYMMDD(parsedDate);
-              console.log(`Processed collaborator date for ${item.vendor_name}:`, collaboratorDate);
+              // Try to parse and format the date in Panama timezone
+              const parsedDate = parseToPanamaTime(item.date);
+              collaboratorDate = formatDateYYYYMMDD_Panama(parsedDate);
+              console.log(`Processed collaborator date for ${item.vendor_name} in Panama timezone:`, collaboratorDate);
             } catch (err) {
               console.error(`Error parsing collaborator date for ${item.vendor_name}:`, err);
-              collaboratorDate = new Date().toISOString().split('T')[0];
+              collaboratorDate = formatDateYYYYMMDD_Panama(new Date());
             }
           } else {
-            console.log(`No date provided for collaborator ${item.vendor_name}, using current date`);
-            collaboratorDate = new Date().toISOString().split('T')[0];
+            console.log(`No date provided for collaborator ${item.vendor_name}, using current date in Panama timezone`);
+            collaboratorDate = formatDateYYYYMMDD_Panama(new Date());
           }
           
           result.push({
@@ -216,20 +228,34 @@ const processRawTransactions = (data: any): Transaction[] => {
     });
   }
   
-  // Process regular expenses (new format with proper array)
-  // Filter out expenses with category "Impuestos"
+  // Process regular expenses with Panama timezone handling
   if (Array.isArray(data.expenses)) {
     data.expenses.forEach((item: any, index: number) => {
       // Skip expenses with account_name "Impuestos"
       if (item && typeof item.total !== 'undefined' && item.account_name !== "Impuestos") {
         const amount = Number(item.total);
         if (amount > 0) {
-          const expenseDate = item.date || new Date().toISOString().split('T')[0];
+          // Handle date in Panama timezone
+          let expenseDate: string;
+          try {
+            if (item.date) {
+              expenseDate = formatDateYYYYMMDD_Panama(parseToPanamaTime(item.date));
+            } else {
+              expenseDate = formatDateYYYYMMDD_Panama(new Date());
+            }
+          } catch (err) {
+            console.error(`Error processing expense date:`, err);
+            expenseDate = formatDateYYYYMMDD_Panama(new Date());
+          }
+          
           const vendorName = item.vendor_name || '';
           const accountName = item.account_name || 'Gastos generales';
           
+          // Create a unique ID to avoid duplication issues
+          const uniqueId = `zoho-expense-${expenseDate}-${vendorName ? vendorName.replace(/\s/g, '-') : 'unknown'}-${accountName.replace(/\s/g, '-')}-${expenseDate}-${amount}-${index}`;
+          
           result.push({
-            id: `expense-${(vendorName || accountName || '').replace(/\s/g, '-')}-${expenseDate}-${amount}`,
+            id: uniqueId,
             date: expenseDate,
             amount,
             description: vendorName 
@@ -244,18 +270,33 @@ const processRawTransactions = (data: any): Transaction[] => {
     });
   }
   
-  // Process payments (income) (new format with proper array)
+  // Process payments (income) with Panama timezone handling
   if (Array.isArray(data.payments)) {
     data.payments.forEach((item: any, index: number) => {
       if (item && typeof item.amount !== 'undefined' && item.customer_name) {
         const amount = Number(item.amount);
         if (amount > 0) {
-          const paymentDate = item.date || new Date().toISOString().split('T')[0];
+          // Process date in Panama timezone
+          let paymentDate: string;
+          try {
+            if (item.date) {
+              paymentDate = formatDateYYYYMMDD_Panama(parseToPanamaTime(item.date));
+            } else {
+              paymentDate = formatDateYYYYMMDD_Panama(new Date());
+            }
+          } catch (err) {
+            console.error(`Error processing payment date:`, err);
+            paymentDate = formatDateYYYYMMDD_Panama(new Date());
+          }
+          
           const customerName = item.customer_name;
           const invoiceId = item.invoice_id || '';
           
+          // Create a unique ID to avoid duplication issues
+          const uniqueId = `income-${customerName.replace(/\s/g, '-')}-${paymentDate}-${invoiceId || index}-${amount}`;
+          
           result.push({
-            id: `income-${customerName.replace(/\s/g, '-')}-${paymentDate}-${invoiceId || index}`,
+            id: uniqueId,
             date: paymentDate,
             amount,
             description: `Ingreso de ${customerName}`,
@@ -269,5 +310,5 @@ const processRawTransactions = (data: any): Transaction[] => {
   }
   
   // Sort by date (newer first)
-  return result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  return result.sort((a, b) => parseToPanamaTime(b.date).getTime() - parseToPanamaTime(a.date).getTime());
 };
