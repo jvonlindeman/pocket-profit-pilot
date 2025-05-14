@@ -1,9 +1,11 @@
-
 import { Transaction } from "../../types/financial";
 import { ensureValidDateFormat, handleApiError } from "./utils";
 import { getMockTransactions } from "./mockData";
 import { supabase } from "@/integrations/supabase/client";
 import { parseDate } from "@/lib/utils";
+
+// Lista de proveedores que deben ser excluidos
+const excludedVendors = ["Johan von Lindeman", "DFC Panama"];
 
 // Format date in YYYY-MM-DD format without timezone shifts
 const formatDateYYYYMMDD = (date: Date): string => {
@@ -88,13 +90,35 @@ export const fetchTransactionsFromWebhook = async (
     // If we received processed transactions directly, use those
     if (Array.isArray(data) && data.length > 0 && 'type' in data[0] && 'source' in data[0]) {
       console.log("Received processed transactions directly from Supabase");
-      return data;
+      // Filter out excluded vendors
+      const filteredData = data.filter(tx => {
+        if (tx.type === 'expense' && tx.category === 'Pagos a colaboradores' && tx.description) {
+          // Extract vendor name from description (format: "Pago a colaborador: Vendor Name")
+          const vendorNameMatch = tx.description.match(/Pago a colaborador: (.*)/);
+          if (vendorNameMatch && excludedVendors.includes(vendorNameMatch[1])) {
+            return false;
+          }
+        }
+        return true;
+      });
+      return filteredData;
     }
     
     // If we received the processed webhook response, use the cached_transactions field
     if (data.cached_transactions && Array.isArray(data.cached_transactions)) {
       console.log("Using processed transactions from response");
-      return data.cached_transactions;
+      // Filter out excluded vendors
+      const filteredData = data.cached_transactions.filter((tx: Transaction) => {
+        if (tx.type === 'expense' && tx.category === 'Pagos a colaboradores' && tx.description) {
+          // Extract vendor name from description (format: "Pago a colaborador: Vendor Name")
+          const vendorNameMatch = tx.description.match(/Pago a colaborador: (.*)/);
+          if (vendorNameMatch && excludedVendors.includes(vendorNameMatch[1])) {
+            return false;
+          }
+        }
+        return true;
+      });
+      return filteredData;
     }
     
     // Otherwise, process the raw webhook response
@@ -144,10 +168,16 @@ const processRawTransactions = (data: any): Transaction[] => {
     }
   }
   
-  // Process collaborator expenses (new format with proper array) - with improved date handling
+  // Process collaborator expenses (new format with proper array) - with improved date handling and vendor exclusion
   if (Array.isArray(data.colaboradores)) {
     data.colaboradores.forEach((item: any, index: number) => {
       if (item && typeof item.total !== 'undefined' && item.vendor_name) {
+        // Skip excluded vendors
+        if (excludedVendors.includes(item.vendor_name)) {
+          console.log(`Skipping excluded vendor: ${item.vendor_name}`);
+          return; // Skip this collaborator
+        }
+        
         const amount = Number(item.total);
         if (amount > 0) {
           // Enhanced date handling for collaborator transactions

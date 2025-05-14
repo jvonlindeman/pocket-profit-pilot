@@ -11,9 +11,17 @@ export const useCollaboratorProcessor = () => {
       return [];
     }
 
-    // Filtrar colaboradores con datos válidos
+    // Lista de proveedores que deben ser excluidos
+    const excludedVendors = ["Johan von Lindeman", "DFC Panama"];
+
+    // Filtrar colaboradores con datos válidos y excluir los proveedores especificados
     const validCollaborators = rawResponse.colaboradores
-      .filter((item: any) => item && typeof item.total !== 'undefined' && item.vendor_name)
+      .filter((item: any) => 
+        item && 
+        typeof item.total !== 'undefined' && 
+        item.vendor_name && 
+        !excludedVendors.includes(item.vendor_name)
+      )
       .map((item: any) => ({
         name: item.vendor_name,
         amount: Number(item.total)

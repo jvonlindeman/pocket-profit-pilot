@@ -19,8 +19,10 @@ const CollaboratorChart: React.FC<CollaboratorChartProps> = ({ collaboratorData 
   };
 
   // Filtrar colaboradores excluyendo a los dueños de la empresa
+  const excludedVendors = ["Johan von Lindeman", "DFC Panama"];
+  
   const filteredData = collaboratorData.filter((item) => 
-    item.category !== 'Johan von Lindeman' && item.category !== 'Daniel Chen'
+    !excludedVendors.includes(item.category)
   );
 
   // Recalcular porcentajes basados en el nuevo total (después de filtrar)

@@ -16,6 +16,9 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 // The make.com webhook URL
 const makeWebhookUrl = "https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihlmx22";
 
+// Lista de proveedores que deben ser excluidos
+const excludedVendors = ["Johan von Lindeman", "DFC Panama"];
+
 interface TransactionRequest {
   startDate: string;
   endDate: string;
@@ -221,10 +224,16 @@ serve(async (req: Request) => {
     // This comment is kept for clarity on the change made
     console.log("No longer processing Stripe data from make.com webhook");
     
-    // Process collaborator expenses - Ahora incluyendo fechas
+    // Process collaborator expenses - Ahora incluyendo fechas y excluyendo proveedores específicos
     if (Array.isArray(webhookData.colaboradores)) {
       webhookData.colaboradores.forEach((item: any, index: number) => {
         if (item && typeof item.total !== 'undefined' && item.vendor_name) {
+          // Excluir proveedores especificados
+          if (excludedVendors.includes(item.vendor_name)) {
+            console.log(`Skipping excluded vendor: ${item.vendor_name}`);
+            return; // Saltar este colaborador
+          }
+          
           const amount = Number(item.total);
           if (amount > 0) {
             // Usar la fecha del colaborador si está disponible, o la fecha actual

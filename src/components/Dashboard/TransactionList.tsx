@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Transaction } from '@/types/financial';
 import {
@@ -39,25 +40,33 @@ interface TransactionListProps {
 type TransactionFilter = 'all' | 'income' | 'expense' | 'collaborator' | 'zoho-income' | 'stripe-income';
 
 const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefresh, isLoading = false }) => {
+  // Lista de proveedores que deben ser excluidos
+  const excludedVendors = ["Johan von Lindeman", "DFC Panama"];
+  
   // Main transaction type filter
   const [typeFilter, setTypeFilter] = useState<TransactionFilter>('all');
   // Category filter for expenses
   const [categoryFilter, setcategoryFilter] = useState<string>('all');
 
-  // Extract unique expense categories from transactions
-  const expenseCategories = useMemo(() => {
-    const categories = transactions
-      .filter(tx => tx.type === 'expense')
-      .map(tx => tx.category)
-      .filter((value, index, self) => self.indexOf(value) === index)
-      .sort();
-    
-    return ['all', ...categories];
-  }, [transactions]);
-
-  // Apply filters to transactions and sort by date
+  // Filtrar transacciones para excluir a los proveedores especificados
   const filteredTransactions = useMemo(() => {
-    let result = [...transactions];
+    // First filter out transactions from excluded vendors
+    const vendorFilteredTransactions = transactions.filter(tx => {
+      // Check if it's a collaborator transaction with an excluded vendor name in description
+      if (tx.type === 'expense' && 
+          tx.category === 'Pagos a colaboradores' && 
+          tx.description) {
+        // Extract vendor name from description (format: "Pago a colaborador: Vendor Name")
+        const vendorNameMatch = tx.description.match(/Pago a colaborador: (.*)/);
+        if (vendorNameMatch && excludedVendors.includes(vendorNameMatch[1])) {
+          return false;
+        }
+      }
+      return true;
+    });
+    
+    // Then apply transaction type filter
+    let result = [...vendorFilteredTransactions];
     
     // Apply transaction type filter
     switch (typeFilter) {
@@ -98,6 +107,17 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefre
     
     return result;
   }, [transactions, typeFilter, categoryFilter]);
+
+  // Extract unique expense categories from transactions
+  const expenseCategories = useMemo(() => {
+    const categories = transactions
+      .filter(tx => tx.type === 'expense')
+      .map(tx => tx.category)
+      .filter((value, index, self) => self.indexOf(value) === index)
+      .sort();
+    
+    return ['all', ...categories];
+  }, [transactions]);
 
   // Calculate transaction sums by category
   const categorySums = useMemo(() => {
