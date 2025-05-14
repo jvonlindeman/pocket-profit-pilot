@@ -8,13 +8,13 @@ export type { ToasterToast };
 // Re-export the hook
 export const useToast = baseUseToast;
 
-// Export enhanced toast function
+// Export enhanced toast function that matches the signature of the original toast function
 export const toast = ({
   title,
   description,
   variant,
   ...props
-}: ToasterToast) => {
+}: Omit<ToasterToast, "id">) => {
   return baseToast({
     title,
     description,
