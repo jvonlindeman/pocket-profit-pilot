@@ -66,6 +66,31 @@ const CacheService = {
     endDate: Date
   ): Promise<boolean> => {
     return cacheOperations.repairCacheSegments(source, startDate, endDate);
+  },
+  
+  /**
+   * Clear cache data for testing
+   * @param options Clear cache options
+   * @returns Promise<boolean> Success status
+   */
+  clearCache: async (
+    options?: {
+      source?: 'Zoho' | 'Stripe' | 'all';
+      startDate?: Date;
+      endDate?: Date;
+    }
+  ): Promise<boolean> => {
+    return cacheOperations.clearCache(options);
+  },
+  
+  /**
+   * Get detailed cache statistics
+   */
+  getCacheDetailedStats: async (): Promise<{
+    transactions: { source: string; count: number }[];
+    segments: { source: string; count: number }[];
+  }> => {
+    return cacheOperations.getCacheStats();
   }
 };
 

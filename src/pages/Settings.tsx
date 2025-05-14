@@ -1,8 +1,8 @@
-
 import React from 'react';
 import ZohoDebug from '@/components/ZohoDebug';
 import WebhookDebug from '@/components/WebhookDebug/index';
 import StripeDebug from '@/components/StripeDebug';
+import CacheClearTool from '@/components/Dashboard/CacheClearTool';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Bug } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -46,6 +46,11 @@ const Settings = () => {
               <Bug className="h-5 w-5 mr-2" />
               Herramientas de Depuración
             </h2>
+            
+            {/* Cache Clear Tool */}
+            <CacheClearTool />
+            
+            {/* Existing Debug Tools */}
             <ZohoDebug />
             <div className="mt-6">
               <StripeDebug dateRange={dateRange} />

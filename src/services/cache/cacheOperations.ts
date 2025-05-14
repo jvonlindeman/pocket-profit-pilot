@@ -331,5 +331,178 @@ export const cacheOperations = {
       console.error("CacheOperations: Error in repairCacheSegments", err);
       return false;
     }
+  },
+  
+  /**
+   * Clear cache data
+   * @param options Clear cache options
+   * @returns Promise<boolean> Success status
+   */
+  clearCache: async (
+    options?: {
+      source?: 'Zoho' | 'Stripe' | 'all';
+      startDate?: Date;
+      endDate?: Date;
+    }
+  ): Promise<boolean> => {
+    try {
+      console.log("CacheOperations: Clearing cache with options:", options);
+      
+      // Prepare query builders for both tables
+      let transactionsQuery = supabase.from('cached_transactions').delete();
+      let segmentsQuery = supabase.from('cache_segments').delete();
+      
+      // Apply source filter if specified
+      if (options?.source && options.source !== 'all') {
+        transactionsQuery = transactionsQuery.eq('source', options.source);
+        segmentsQuery = segmentsQuery.eq('source', options.source);
+        console.log(`CacheOperations: Filtering by source: ${options.source}`);
+      }
+      
+      // Apply date range filter if specified
+      if (options?.startDate && options?.endDate) {
+        const formattedStartDate = formatDateYYYYMMDD(options.startDate);
+        const formattedEndDate = formatDateYYYYMMDD(options.endDate);
+        
+        transactionsQuery = transactionsQuery
+          .gte('date', formattedStartDate)
+          .lte('date', formattedEndDate);
+        
+        // For segments, consider any overlap with the specified date range
+        segmentsQuery = segmentsQuery
+          .or(`start_date.lte.${formattedEndDate},end_date.gte.${formattedStartDate}`);
+        
+        console.log(`CacheOperations: Filtering by date range: ${formattedStartDate} to ${formattedEndDate}`);
+      }
+      
+      // First count the data to be deleted for logging
+      const countTransactionsQuery = supabase
+        .from('cached_transactions')
+        .select('*', { count: 'exact' });
+        
+      const countSegmentsQuery = supabase
+        .from('cache_segments')
+        .select('*', { count: 'exact' });
+      
+      // Apply same filters to count queries
+      if (options?.source && options.source !== 'all') {
+        countTransactionsQuery.eq('source', options.source);
+        countSegmentsQuery.eq('source', options.source);
+      }
+      
+      if (options?.startDate && options?.endDate) {
+        const formattedStartDate = formatDateYYYYMMDD(options.startDate);
+        const formattedEndDate = formatDateYYYYMMDD(options.endDate);
+        
+        countTransactionsQuery
+          .gte('date', formattedStartDate)
+          .lte('date', formattedEndDate);
+          
+        countSegmentsQuery
+          .or(`start_date.lte.${formattedEndDate},end_date.gte.${formattedStartDate}`);
+      }
+      
+      // Execute count queries
+      const [transactionsCountResult, segmentsCountResult] = await Promise.all([
+        countTransactionsQuery,
+        countSegmentsQuery
+      ]);
+      
+      const transactionsCount = transactionsCountResult.count || 0;
+      const segmentsCount = segmentsCountResult.count || 0;
+      
+      console.log(`CacheOperations: About to delete ${transactionsCount} transactions and ${segmentsCount} segments`);
+      
+      // Delete records from cache_metrics first (no foreign key constrains)
+      let metricsQuery = supabase.from('cache_metrics').delete();
+      
+      if (options?.source && options.source !== 'all') {
+        metricsQuery = metricsQuery.eq('source', options.source);
+      }
+      
+      if (options?.startDate && options?.endDate) {
+        const formattedStartDate = formatDateYYYYMMDD(options.startDate);
+        const formattedEndDate = formatDateYYYYMMDD(options.endDate);
+        
+        metricsQuery = metricsQuery
+          .gte('start_date', formattedStartDate)
+          .lte('end_date', formattedEndDate);
+      }
+      
+      // Execute delete queries
+      const [transactionsResult, segmentsResult, metricsResult] = await Promise.all([
+        transactionsQuery,
+        segmentsQuery,
+        metricsQuery
+      ]);
+      
+      // Check for errors
+      if (transactionsResult.error) {
+        console.error("CacheOperations: Error deleting transactions:", transactionsResult.error);
+        return false;
+      }
+      
+      if (segmentsResult.error) {
+        console.error("CacheOperations: Error deleting segments:", segmentsResult.error);
+        return false;
+      }
+      
+      if (metricsResult.error) {
+        console.error("CacheOperations: Error deleting metrics:", metricsResult.error);
+        // Non-critical, continue
+      }
+      
+      // Reset the last cache check result
+      lastCacheCheckResult = null;
+      
+      console.log(`CacheOperations: Successfully cleared cache data. Removed ${transactionsCount} transactions and ${segmentsCount} segments.`);
+      return true;
+    } catch (err) {
+      console.error("CacheOperations: Error in clearCache", err);
+      return false;
+    }
+  },
+  
+  /**
+   * Get cache statistics
+   */
+  getCacheStats: async (): Promise<{
+    transactions: { source: string; count: number }[];
+    segments: { source: string; count: number }[];
+  }> => {
+    try {
+      // Get transaction counts by source
+      const { data: transactionData, error: txError } = await supabase
+        .from('cached_transactions')
+        .select('source, count(*)')
+        .group('source');
+      
+      if (txError) {
+        console.error("CacheOperations: Error getting transaction stats:", txError);
+        return { transactions: [], segments: [] };
+      }
+      
+      // Get segment counts by source
+      const { data: segmentData, error: segError } = await supabase
+        .from('cache_segments')
+        .select('source, count(*)')
+        .group('source');
+      
+      if (segError) {
+        console.error("CacheOperations: Error getting segment stats:", segError);
+        return { 
+          transactions: transactionData || [], 
+          segments: [] 
+        };
+      }
+      
+      return {
+        transactions: transactionData || [],
+        segments: segmentData || []
+      };
+    } catch (err) {
+      console.error("CacheOperations: Error in getCacheStats", err);
+      return { transactions: [], segments: [] };
+    }
   }
 };
