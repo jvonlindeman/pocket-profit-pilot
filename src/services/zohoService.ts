@@ -1,7 +1,7 @@
+
 import { Transaction } from "../types/financial";
 
-// Modify the function that's causing the error (this is a partial fix assuming the error is in a function that's returning a Promise<Transaction[]> but is expected to return Transaction[]
-
+// Export all functions as named exports
 export const getTransactions = async (
   startDate: Date,
   endDate: Date,
@@ -18,7 +18,7 @@ export const getTransactions = async (
 };
 
 // This is a stub - you'll need to implement the actual function
-async function fetchTransactionsFromSource(
+export async function fetchTransactionsFromSource(
   startDate: Date,
   endDate: Date,
   forceRefresh = false
@@ -27,3 +27,10 @@ async function fetchTransactionsFromSource(
   // For now, we'll return an empty array as a stub
   return [];
 }
+
+// Add other methods that might be needed (mock implementations)
+export const getLastRawResponse = (): any => null;
+export const checkApiConnectivity = async (): Promise<boolean> => true;
+export const repairCache = async (startDate: Date, endDate: Date): Promise<boolean> => true;
+export const checkAndRefreshCache = async (startDate: Date, endDate: Date): Promise<void> => {};
+export const getRawResponse = async (startDate: Date, endDate: Date): Promise<any> => null;

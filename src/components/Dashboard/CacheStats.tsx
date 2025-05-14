@@ -1,98 +1,98 @@
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
+import { Loader2, RefreshCw } from 'lucide-react';
+import * as ZohoService from '@/services/zohoService';
 
-import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { RefreshCcw, Database, AlertTriangle } from 'lucide-react';
-import ZohoService from '@/services/zohoService';
-
-interface CacheStatsProps {
+interface CacheInfoProps {
+  dateRange: {
+    startDate: Date;
+    endDate: Date;
+  };
+  cacheStatus: {
+    zoho: { hit: boolean; partial: boolean };
+    stripe: { hit: boolean; partial: boolean };
+  };
+  isUsingCache: boolean;
   onRefresh: () => void;
-  isLoading: boolean;
 }
 
-const CacheStats: React.FC<CacheStatsProps> = ({ onRefresh, isLoading }) => {
-  const [stats, setStats] = React.useState<any>({
-    hits: 0,
-    misses: 0,
-    errors: 0,
-    hitRate: 'N/A',
-    lastRefreshRelative: 'never'
-  });
+const CacheInfo: React.FC<CacheInfoProps> = ({ dateRange, cacheStatus, isUsingCache, onRefresh }) => {
+  const [loading, setLoading] = useState(false);
 
-  React.useEffect(() => {
-    // Update stats when component mounts
-    setStats(ZohoService.getCacheStats());
-    
-    // Update stats every 30 seconds
-    const interval = setInterval(() => {
-      setStats(ZohoService.getCacheStats());
-    }, 30000);
-    
-    return () => clearInterval(interval);
-  }, []);
+  useEffect(() => {
+    if (loading) {
+      const timer = setTimeout(() => {
+        setLoading(false);
+      }, 3000); // Stop loading after 3 seconds
+      return () => clearTimeout(timer);
+    }
+  }, [loading]);
+
+  const handleRefresh = () => {
+    setLoading(true);
+    onRefresh();
+  };
+
+  const totalCacheProgress = () => {
+    let progress = 0;
+    if (cacheStatus.zoho.hit) progress += 50;
+    if (cacheStatus.stripe.hit) progress += 50;
+    return progress;
+  };
+
+  const getCacheStatusMessage = () => {
+    if (isUsingCache) {
+      return "Datos cargados desde la caché";
+    } else if (cacheStatus.zoho.hit && cacheStatus.stripe.hit) {
+      return "Datos de Zoho y Stripe cargados desde la caché";
+    } else if (cacheStatus.zoho.hit) {
+      return "Datos de Zoho cargados desde la caché";
+    } else if (cacheStatus.stripe.hit) {
+      return "Datos de Stripe cargados desde la caché";
+    } else {
+      return "Cargando datos desde las APIs";
+    }
+  };
 
   return (
-    <Card className="mb-4">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Database className="h-5 w-5 text-blue-500" />
-            <CardTitle className="text-sm font-medium">Cache Status</CardTitle>
-          </div>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={onRefresh}
-            disabled={isLoading}
-            className="h-8 px-2"
-          >
-            <RefreshCcw className="h-3.5 w-3.5 mr-1" />
-            <span className="text-xs">Refresh</span>
-          </Button>
-        </div>
-        <CardDescription className="text-xs">
-          Using cached data reduces API calls and speeds up the dashboard
-        </CardDescription>
+    <Card>
+      <CardHeader>
+        <CardTitle>Estado de la Caché</CardTitle>
+        <CardDescription>Información sobre el uso de la caché de datos</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="bg-blue-50 p-2 rounded">
-            <div className="text-sm font-semibold">{stats.hits}</div>
-            <div className="text-xs text-gray-500">Cache Hits</div>
+        <div className="space-y-2">
+          <div className="space-y-1">
+            <p className="text-sm font-medium">Progreso de la caché:</p>
+            <Progress value={totalCacheProgress()} />
+            <p className="text-sm text-muted-foreground">
+              {getCacheStatusMessage()}
+            </p>
           </div>
-          <div className="bg-gray-50 p-2 rounded">
-            <div className="text-sm font-semibold">{stats.misses}</div>
-            <div className="text-xs text-gray-500">Cache Misses</div>
-          </div>
-          <div className="bg-red-50 p-2 rounded">
-            <div className="text-sm font-semibold">{stats.errors}</div>
-            <div className="text-xs text-gray-500">API Errors</div>
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-muted-foreground">
+              Última actualización: {isUsingCache ? 'Reciente' : 'En este momento'}
+            </p>
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Actualizando...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Actualizar caché
+                </>
+              )}
+            </Button>
           </div>
         </div>
-        
-        <div className="flex justify-between items-center mt-3 text-xs">
-          <div>
-            <span className="text-gray-500 mr-1">Cache hit rate:</span>
-            <Badge variant={stats.hitRate === 'N/A' || parseInt(stats.hitRate) < 50 ? "outline" : "default"} className="font-mono">
-              {stats.hitRate}
-            </Badge>
-          </div>
-          <div>
-            <span className="text-gray-500 mr-1">Last refresh:</span>
-            <span className="font-mono">{stats.lastRefreshRelative}</span>
-          </div>
-        </div>
-        
-        {stats.errors > 0 && (
-          <div className="flex items-center mt-3 text-amber-600 text-xs bg-amber-50 p-2 rounded">
-            <AlertTriangle className="h-3.5 w-3.5 mr-1" />
-            <span>API errors detected. Using cached data as fallback.</span>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
 };
 
-export default CacheStats;
+export default CacheInfo;

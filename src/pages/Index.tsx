@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
@@ -21,6 +20,7 @@ import WebhookDebug from '@/components/WebhookDebug';
 import WebhookRequestDebug from '@/components/WebhookRequestDebug';
 import StripeDebug from '@/components/StripeDebug';
 import { DateRange } from 'react-day-picker';
+import { toFinancialDateRange, toDayPickerDateRange } from '@/utils/dateRangeAdapter';
 
 const Index = () => {
   const {
@@ -50,7 +50,7 @@ const Index = () => {
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
   const { checkBalanceExists, monthlyBalance } = useMonthlyBalance({ 
-    currentDate: dateRange.from
+    currentDate: dateRange.from || new Date()
   });
   const { toast } = useToast();
 
@@ -126,6 +126,12 @@ const Index = () => {
     }
   };
 
+  // Map the current month range function to match DateRangePicker's expected format
+  const getDatePickerCurrentMonthRange = () => {
+    const financialDateRange = getCurrentMonthRange();
+    return toDayPickerDateRange(financialDateRange);
+  };
+
   // Prepare Stripe data for chart
   const getStripeDataForChart = () => {
     // Si solo hay un valor de Stripe para todo el período, distribúyelo a lo largo del gráfico
@@ -141,15 +147,6 @@ const Index = () => {
   const opexAmount = monthlyBalance?.opex_amount !== null ? monthlyBalance?.opex_amount || 35 : 35;
   const itbmAmount = monthlyBalance?.itbm_amount !== null ? monthlyBalance?.itbm_amount || 0 : 0;
   const profitPercentage = monthlyBalance?.profit_percentage !== null ? monthlyBalance?.profit_percentage || 1 : 1;
-
-  // Map the current month range function to match DateRangePicker's expected format
-  const getDatePickerCurrentMonthRange = () => {
-    const { startDate, endDate } = getCurrentMonthRange();
-    return {
-      from: startDate,
-      to: endDate
-    };
-  };
 
   return (
     <div className="min-h-screen bg-gray-50">

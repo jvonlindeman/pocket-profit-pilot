@@ -1,10 +1,9 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, RefreshCw, Bug } from 'lucide-react';
-import ZohoService from '@/services/zohoService';
+import * as ZohoService from '@/services/zohoService';
 
 export default function ZohoDebug() {
   const [loading, setLoading] = useState(false);

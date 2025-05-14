@@ -24,6 +24,7 @@ import {
   PANAMA_TIMEZONE,
   formatDateForPanamaDisplay
 } from '@/utils/timezoneUtils';
+import { FinancialDateRange } from '@/utils/dateRangeAdapter';
 
 // Define the props interface
 interface DateRangePickerProps {
@@ -38,7 +39,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
   getCurrentMonthRange
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [tempRange, setTempRange] = useState<DateRange>(dateRange || {});
+  const [tempRange, setTempRange] = useState<DateRange | undefined>(dateRange);
 
   // Format for displaying date range using Panama timezone with safety checks
   const formatDateRange = () => {
@@ -270,4 +271,5 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
   );
 };
 
+// Export the component with proper name
 export default DateRangePicker;

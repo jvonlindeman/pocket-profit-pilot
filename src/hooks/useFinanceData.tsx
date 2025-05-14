@@ -1,14 +1,12 @@
-
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Transaction } from '@/types/financial';
-import { processTransactionData } from '@/services/zoho/utils';
-import { endOfMonth, subMonths, startOfMonth } from 'date-fns';
-import ZohoService from '@/services/zohoService';
-import { useMonthlyBalanceManager } from './useMonthlyBalanceManager';
-import { useIncomeProcessor } from './useIncomeProcessor';
-import { useCollaboratorProcessor } from './useCollaboratorProcessor';
-import { useFinancialDataFetcher } from './useFinancialDataFetcher';
-import { getCurrentMonthRange } from '@/utils/dateUtils';
+import { useState, useEffect, useCallback } from 'react';
+import { useFinancialDataFetcher } from '@/hooks/useFinancialDataFetcher';
+import { useCollaboratorProcessor } from '@/hooks/useCollaboratorProcessor';
+import { useIncomeProcessor } from '@/hooks/useIncomeProcessor';
+import { useMonthlyBalanceManager } from '@/hooks/useMonthlyBalanceManager';
+import * as ZohoService from '@/services/zohoService';
+import { formatDateYYYYMMDD, getCurrentMonthRange } from '@/utils/dateUtils';
+import { toDayPickerDateRange } from '@/utils/dateRangeAdapter';
+import { DateRange } from 'react-day-picker';
 
 export const useFinanceData = () => {
   // States

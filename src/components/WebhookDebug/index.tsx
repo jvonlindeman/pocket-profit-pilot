@@ -1,105 +1,46 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Bug, RefreshCw, WifiOff } from 'lucide-react';
-import ZohoService from '@/services/zohoService';
-import WebhookDebugHeader from './WebhookDebugHeader';
-import WebhookErrorDisplay from './WebhookErrorDisplay';
-import WebhookDataSummary from './WebhookDataSummary';
-import WebhookDataTable from './WebhookDataTable';
-import WebhookRawData from './WebhookRawData';
-import { Button } from '@/components/ui/button';
+import { Loader2, RefreshCw, Bug } from 'lucide-react';
+import * as ZohoService from '@/services/zohoService';
+import { DateRange } from 'react-day-picker';
 
 interface WebhookDebugProps {
-  dateRange: {
-    startDate: Date;
-    endDate: Date;
-  };
+  dateRange: DateRange;
   refreshDataFunction?: (forceRefresh: boolean) => void;
-  rawResponse?: any;
 }
 
-export default function WebhookDebug({ dateRange, refreshDataFunction, rawResponse }: WebhookDebugProps) {
+export default function WebhookDebug({ dateRange, refreshDataFunction }: WebhookDebugProps) {
   const [loading, setLoading] = useState(false);
   const [rawData, setRawData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [apiConnected, setApiConnected] = useState(true);
 
-  // Update local state when rawResponse from parent changes
-  useEffect(() => {
-    if (rawResponse) {
-      setRawData(rawResponse);
-      console.log("WebhookDebug: Received rawResponse from parent:", rawResponse);
-    }
-  }, [rawResponse]);
-
-  // Check API connectivity on component mount
-  useEffect(() => {
-    async function checkConnectivity() {
-      const isConnected = await ZohoService.checkApiConnectivity();
-      setApiConnected(isConnected);
-    }
-    checkConnectivity();
-  }, []);
-
-  // Fetch debug data from API
+  // Function to fetch raw webhook data
   const fetchDebugData = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      // Check connectivity first
-      const isConnected = await ZohoService.checkApiConnectivity();
-      setApiConnected(isConnected);
-      
-      if (!isConnected) {
-        setError("Cannot connect to Zoho API. Please check your credentials and network connection.");
-        setLoading(false);
-        return;
-      }
-      
-      // Use the global refresh function if available
+      // First update data using the global refresh function
       if (refreshDataFunction) {
-        console.log("Usando la función de actualización global para cargar datos");
+        console.log("Using global refresh function to load data");
         refreshDataFunction(true);
         
-        // Wait briefly for the update to complete
+        // Wait a brief moment for the update to complete
         await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Check if we already have data through the rawResponse prop
-        if (rawResponse) {
-          setRawData(rawResponse);
-        }
       }
       
-      // Get raw data directly if not updated through the rawResponse prop
-      if (!rawResponse) {
-        const data = await ZohoService.getRawResponse(dateRange.startDate, dateRange.endDate);
-        setRawData(data);
-        console.log("Debug data received:", data);
-      }
+      // Get raw data to show in the debug UI
+      const data = await ZohoService.getRawResponse(
+        dateRange.from || new Date(), 
+        dateRange.to || new Date()
+      );
+      setRawData(data);
+      console.log("Debug data received:", data);
     } catch (err: any) {
       setError(err.message || "Error desconocido");
       console.error("Failed to fetch debug data:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Attempt cache repair
-  const repairCache = async () => {
-    setLoading(true);
-    try {
-      const repaired = await ZohoService.repairCache(dateRange.startDate, dateRange.endDate);
-      if (repaired) {
-        setError(null);
-      } else {
-        setError("Cache repair attempt completed but no issues were found or repair failed.");
-      }
-    } catch (err: any) {
-      setError(err.message || "Error attempting to repair cache");
-      console.error("Failed to repair cache:", err);
     } finally {
       setLoading(false);
     }
@@ -110,45 +51,36 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Bug className="h-5 w-5 text-amber-500" />
-          Depuración de Webhook Zoho
-          {!apiConnected && (
-            <WifiOff 
-              className="h-5 w-5 ml-2 text-red-500" 
-              aria-label="API Disconnected" 
-            />
-          )}
+          Depuración de Webhook
         </CardTitle>
         <CardDescription>
           Ver la respuesta cruda del webhook para detectar problemas
-          {!apiConnected && (
-            <span className="text-red-500 block mt-1">
-              No se puede conectar a la API de Zoho. Verificando estado de caché.
-            </span>
-          )}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex justify-between items-center mb-4">
-          <WebhookDebugHeader loading={loading} onFetchData={fetchDebugData} />
-          
-          {!apiConnected && (
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={repairCache} 
-              disabled={loading}
-              className="ml-2"
-            >
-              {loading ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Reparando...</>
-              ) : (
-                <><RefreshCw className="h-4 w-4 mr-2" /> Intentar Reparar Caché</>
-              )}
-            </Button>
-          )}
+          <p className="text-sm text-muted-foreground">
+            Esta herramienta te permite ver la respuesta sin procesar del webhook
+          </p>
+          <Button 
+            onClick={fetchDebugData} 
+            variant="outline" 
+            disabled={loading}
+          >
+            {loading ? (
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Cargando...</>
+            ) : (
+              <><RefreshCw className="h-4 w-4 mr-2" /> Cargar Datos</>
+            )}
+          </Button>
         </div>
-        
-        <WebhookErrorDisplay error={error} />
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-4 mb-4">
+            <p className="font-medium">Error</p>
+            <p className="text-sm">{error}</p>
+          </div>
+        )}
 
         {loading && (
           <div className="flex justify-center items-center py-8">
@@ -165,13 +97,52 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
             
             <TabsContent value="formatted" className="p-0">
               <div className="border rounded-md p-4 mt-2 bg-gray-50 max-h-[400px] overflow-auto">
-                <WebhookDataSummary rawData={rawData} />
-                <WebhookDataTable rawData={rawData} />
+                <div className="mb-4 p-2 bg-blue-50 border border-blue-100 rounded">
+                  <p className="text-sm text-blue-800 font-medium">Resumen de la Estructura</p>
+                  <p className="text-xs text-blue-700 mt-1">
+                    {Array.isArray(rawData) 
+                      ? `Array con ${rawData.length} elementos` 
+                      : 'Los datos no están en el formato esperado (array)'}
+                  </p>
+                </div>
+
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="p-2 text-left border-b">Clave</th>
+                      <th className="p-2 text-left border-b">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {typeof rawData === 'object' && rawData !== null ? (
+                      Object.entries(rawData).map(([key, value]) => (
+                        <tr key={key}>
+                          <td className="p-2 border-b font-medium">{key}</td>
+                          <td className="p-2 border-b">
+                            {typeof value === 'object' 
+                              ? JSON.stringify(value).substring(0, 100) + (JSON.stringify(value).length > 100 ? '...' : '')
+                              : String(value)}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={2} className="p-2 border-b">
+                          {String(rawData)}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </TabsContent>
             
             <TabsContent value="raw" className="p-0">
-              <WebhookRawData rawData={rawData} />
+              <div className="border rounded-md p-4 mt-2 bg-gray-50 max-h-[400px] overflow-auto">
+                <pre className="text-xs whitespace-pre-wrap break-words">
+                  {JSON.stringify(rawData, null, 2)}
+                </pre>
+              </div>
             </TabsContent>
           </Tabs>
         )}
