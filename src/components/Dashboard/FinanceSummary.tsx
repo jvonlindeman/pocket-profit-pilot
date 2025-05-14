@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, BadgeDollarSign, Users, Scale, Scissors } from 'lucide-react';
 import { FinancialSummary, CategorySummary } from '@/types/financial';
@@ -45,6 +44,9 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
       maximumFractionDigits: 1
     }).format(percentage / 100);
   };
+
+  // Calcular gastos no colaboradores
+  const otherExpenses = summary.totalExpense - (summary.collaboratorExpense || 0);
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -257,6 +259,21 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Total Expenses - NUEVA TARJETA */}
+                <Card className="finance-card">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-medium text-gray-500">Gastos Totales</h3>
+                      <div className="p-2 bg-red-50 rounded-full">
+                        <ArrowDownIcon className="h-4 w-4 text-red-500" />
+                      </div>
+                    </div>
+                    <div className="text-2xl font-bold text-red-500 animate-value">
+                      {formatCurrency(summary.totalExpense)}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </div>
           </TabsContent>
@@ -266,7 +283,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
       {/* Financial Summary Section */}
       <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
         <h2 className="text-lg font-semibold text-gray-800 mb-4">Resumen Financiero</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Collaborator Expenses */}
           <Card className="finance-card">
             <CardContent className="p-6">
@@ -278,6 +295,21 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
               </div>
               <div className="text-2xl font-bold text-amber-500 animate-value">
                 {formatCurrency(summary.collaboratorExpense || 0)}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Other Expenses - NUEVA TARJETA */}
+          <Card className="finance-card">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-medium text-gray-500">Otros Gastos</h3>
+                <div className="p-2 bg-red-50 rounded-full">
+                  <ArrowDownIcon className="h-4 w-4 text-red-500" />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-red-500 animate-value">
+                {formatCurrency(otherExpenses)}
               </div>
             </CardContent>
           </Card>
