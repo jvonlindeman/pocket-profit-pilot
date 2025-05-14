@@ -72,6 +72,8 @@ const CacheService = {
         throw new Error(`Cache check failed: ${error.message}`);
       }
       
+      console.log(`CacheService: Cache check result:`, data);
+      
       // Store last cache check result
       lastCacheCheckResult = data as CacheResponse;
       

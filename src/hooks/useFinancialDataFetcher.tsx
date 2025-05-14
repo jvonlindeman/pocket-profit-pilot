@@ -67,11 +67,15 @@ export const useFinancialDataFetcher = () => {
             ...prev,
             zoho: { hit: true, partial: false }
           }));
+          console.log("Using cached Zoho data with", zohoCache.data.length, "transactions");
         } else if (zohoCache.partial) {
           setCacheStatus(prev => ({
             ...prev,
             zoho: { hit: false, partial: true }
           }));
+          console.log("Partial Zoho cache hit, need to fetch more data");
+        } else {
+          console.log("No cached Zoho data available");
         }
       }
       
@@ -112,11 +116,15 @@ export const useFinancialDataFetcher = () => {
             ...prev,
             stripe: { hit: true, partial: false }
           }));
+          console.log("Using cached Stripe data with", stripeCache.data.length, "transactions");
         } else if (stripeCache.partial) {
           setCacheStatus(prev => ({
             ...prev,
             stripe: { hit: false, partial: true }
           }));
+          console.log("Partial Stripe cache hit, need to fetch more data");
+        } else {
+          console.log("No cached Stripe data available");
         }
       }
 
