@@ -1,20 +1,18 @@
 
-// This is a re-export file for better organization
-import { toast as showToast, useToast as useToastOriginal, type ToasterToast } from "@/components/ui/use-toast";
+// Direct implementation to avoid circular dependencies
+import { toast as baseToast, useToast as baseUseToast, type ToasterToast } from "@/components/ui/use-toast"
 
 export type Toast = ToasterToast;
 
-// Re-export the useToast hook directly
-export const useToast = useToastOriginal;
+export const useToast = baseUseToast;
 
-// Export a slightly enhanced version of toast
 export const toast = ({
   title,
   description,
   variant,
   ...props
 }: Toast) => {
-  return showToast({
+  return baseToast({
     title,
     description,
     variant: variant || "default",

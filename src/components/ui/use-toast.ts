@@ -1,6 +1,6 @@
 
-// This file simply re-exports from hooks/use-toast.ts to maintain compatibility
-import { useToast, toast, type Toast } from "@/hooks/use-toast";
+// This file simply re-exports from components/ui/use-toast.tsx to maintain compatibility
+import { useToast, toast, type ToasterToast } from "@/components/ui/use-toast.tsx";
 
 export { useToast, toast };
-export type { Toast };
+export type { ToasterToast as Toast };
