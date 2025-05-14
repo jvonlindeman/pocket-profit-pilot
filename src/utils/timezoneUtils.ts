@@ -1,5 +1,4 @@
-
-import { zonedTimeToUtc, utcToZonedTime, format as formatTZ } from 'date-fns-tz';
+import { toZonedTime, fromZonedTime, format as formatTZ } from 'date-fns-tz';
 import { format, parseISO } from 'date-fns';
 
 // Define Panama timezone
@@ -10,14 +9,14 @@ export const PANAMA_TIMEZONE = 'America/Panama';
  */
 export const toPanamaTime = (date: Date | string): Date => {
   const dateObj = typeof date === 'string' ? new Date(date) : date;
-  return utcToZonedTime(dateObj, PANAMA_TIMEZONE);
+  return toZonedTime(dateObj, PANAMA_TIMEZONE);
 };
 
 /**
  * Convert a Panama timezone date to UTC
  */
 export const fromPanamaTime = (date: Date): Date => {
-  return zonedTimeToUtc(date, PANAMA_TIMEZONE);
+  return fromZonedTime(date, PANAMA_TIMEZONE);
 };
 
 /**
