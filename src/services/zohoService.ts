@@ -221,29 +221,31 @@ const ZohoService = {
         // Use a proper Promise-based approach with setTimeout
         setTimeout(() => {
           console.log("ZohoService: Executing scheduled cache refresh");
-          // Properly handle the Promise returned by forceRefresh
+          
           ZohoService.forceRefresh(startDate, endDate)
             .then(transactions => {
               console.log("ZohoService: Scheduled cache refresh completed successfully with", 
                 transactions.length, "transactions");
+              
               // Notify user of successful cache refresh
               toast({
                 title: "Cache Refreshed",
                 description: `Successfully refreshed ${transactions.length} transactions for the selected period.`,
-                duration: 3000,
+                variant: "success"
               });
             })
             .catch(err => {
               console.error("ZohoService: Error during scheduled refresh:", err);
+              
               // Notify user of refresh failure
               toast({
                 title: "Cache Refresh Failed",
                 description: "Failed to refresh the transaction cache. Please try again later.",
-                variant: "destructive",
-                duration: 5000,
+                variant: "destructive"
               });
             });
         }, 100);
+        
       } else {
         console.log("ZohoService: Cache refresh not needed yet");
       }
@@ -321,7 +323,7 @@ const ZohoService = {
           toast({
             title: "Cache Repaired",
             description: `Repaired inconsistent cache for ${formatDateYYYYMMDD(startDate)} to ${formatDateYYYYMMDD(endDate)} with ${transactions.length} transactions.`,
-            duration: 5000,
+            variant: "success"
           });
           
           return transactions.length > 0;

@@ -112,7 +112,10 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
           <Bug className="h-5 w-5 text-amber-500" />
           Depuración de Webhook Zoho
           {!apiConnected && (
-            <WifiOff className="h-5 w-5 ml-2 text-red-500" title="API Disconnected" />
+            <WifiOff 
+              className="h-5 w-5 ml-2 text-red-500" 
+              aria-label="API Disconnected" 
+            />
           )}
         </CardTitle>
         <CardDescription>

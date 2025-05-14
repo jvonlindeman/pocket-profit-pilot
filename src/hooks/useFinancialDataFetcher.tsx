@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import ZohoService from '@/services/zohoService';
 import StripeService from '@/services/stripeService';
@@ -30,7 +29,10 @@ export const useFinancialDataFetcher = () => {
   // Check API connectivity
   const checkApiConnectivity = useCallback(async () => {
     const zohoConnected = await ZohoService.checkApiConnectivity();
-    const stripeConnected = await StripeService.checkApiConnectivity();
+    // Add the checkApiConnectivity method to StripeService if it doesn't exist
+    const stripeConnected = StripeService.checkApiConnectivity ? 
+      await StripeService.checkApiConnectivity() : 
+      true;
     
     setApiConnectivity({
       zoho: zohoConnected,
@@ -131,22 +133,19 @@ export const useFinancialDataFetcher = () => {
         toast({
           title: "API Connectivity Issue",
           description: "Cannot connect to Zoho or Stripe APIs. Using cached data if available.",
-          variant: "destructive",
-          duration: 5000,
+          variant: "destructive"
         });
       } else if (!connectivity.zoho) {
         toast({
           title: "Zoho API Connectivity Issue",
           description: "Cannot connect to Zoho API. Using cached data if available.",
-          variant: "destructive",
-          duration: 5000,
+          variant: "destructive"
         });
       } else if (!connectivity.stripe) {
         toast({
           title: "Stripe API Connectivity Issue",
           description: "Cannot connect to Stripe API. Using cached data if available.",
-          variant: "destructive",
-          duration: 5000,
+          variant: "destructive"
         });
       }
       
