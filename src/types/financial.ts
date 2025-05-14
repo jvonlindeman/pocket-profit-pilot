@@ -8,6 +8,7 @@ export interface Transaction {
   type: 'income' | 'expense';
   fees?: number; // Added optional fees field
   gross?: number; // Added optional gross amount field (before fees)
+  metadata?: any; // Added metadata field for additional properties
 }
 
 export interface FinancialSummary {

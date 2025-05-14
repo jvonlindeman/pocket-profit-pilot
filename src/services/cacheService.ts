@@ -173,12 +173,27 @@ const CacheService = {
       if (countError) throw countError;
       
       // Get cache segments stats  
-      const { data: segments, error: segmentsError } = await supabase
+      const { data: segmentsData, error: segmentsError } = await supabase
         .from('cache_segments')
-        .select('source, count, sum(transaction_count)')
-        .group('source');
+        .select('source, transaction_count');
       
       if (segmentsError) throw segmentsError;
+      
+      // Process segments data manually to group by source
+      const segments = segmentsData.reduce((acc: any, curr) => {
+        if (!acc[curr.source]) {
+          acc[curr.source] = { count: 0, total: 0 };
+        }
+        acc[curr.source].count++;
+        acc[curr.source].total += curr.transaction_count;
+        return acc;
+      }, {});
+      
+      const segmentsSummary = Object.entries(segments).map(([source, data]: [string, any]) => ({
+        source,
+        count: data.count,
+        total: data.total
+      }));
       
       // Get recent cache metrics
       const { data: metrics, error: metricsError } = await supabase
@@ -189,21 +204,29 @@ const CacheService = {
       
       if (metricsError) throw metricsError;
       
-      // Calculate hit rate
+      // Calculate hit rate manually
       const { data: hitRateData, error: hitRateError } = await supabase
         .from('cache_metrics')
-        .select('cache_hit, count')
-        .group('cache_hit');
+        .select('cache_hit');
       
       if (hitRateError) throw hitRateError;
       
-      const hits = hitRateData.find(d => d.cache_hit)?.count || 0;
-      const misses = hitRateData.find(d => !d.cache_hit)?.count || 0;
+      let hits = 0;
+      let misses = 0;
+      
+      hitRateData.forEach(item => {
+        if (item.cache_hit) {
+          hits++;
+        } else {
+          misses++;
+        }
+      });
+      
       const hitRate = hits + misses > 0 ? (hits / (hits + misses) * 100).toFixed(1) + '%' : 'N/A';
       
       return {
         transactionCount,
-        segments,
+        segments: segmentsSummary,
         recentMetrics: metrics,
         hitRate,
         hits,

@@ -88,7 +88,7 @@ const ZohoService = {
       // Store the transactions in cache if we have real data (not mock)
       if (transactions.length > 0 && !transactions[0].id.startsWith('mock')) {
         console.log("ZohoService: Storing", transactions.length, "transactions in cache");
-        CacheService.storeTransactions('Zoho', startDate, endDate, transactions);
+        await CacheService.storeTransactions('Zoho', startDate, endDate, transactions);
       }
       
       console.log(`ZohoService: Returning ${transactions.length} transactions`);
@@ -112,32 +112,37 @@ const ZohoService = {
   forceRefresh: async (startDate: Date, endDate: Date): Promise<Transaction[]> => {
     console.log("ZohoService: Force refreshing transactions from", startDate, "to", endDate);
     
-    // Single call with returnRawResponse = true to get both raw response and processed data
-    const response = await fetchTransactionsFromWebhook(startDate, endDate, true, true);
-    
-    // Store the raw response for debugging
-    if (response) {
-      lastRawResponse = response;
+    try {
+      // Single call with returnRawResponse = true to get both raw response and processed data
+      const response = await fetchTransactionsFromWebhook(startDate, endDate, true, true);
+      
+      // Store the raw response for debugging
+      if (response) {
+        lastRawResponse = response;
+      }
+      
+      cacheStats.lastRefresh = new Date();
+      
+      // Return processed transactions directly if available
+      if (response && response.cached_transactions && Array.isArray(response.cached_transactions)) {
+        // Store in cache for future use
+        await CacheService.storeTransactions('Zoho', startDate, endDate, response.cached_transactions);
+        return response.cached_transactions;
+      }
+      
+      // Otherwise use the standard method to process the transactions
+      const transactions = await fetchTransactionsFromWebhook(startDate, endDate, true);
+      
+      // Store in cache for future use if we have real data (not mock)
+      if (transactions && transactions.length > 0 && !transactions[0].id.startsWith('mock')) {
+        await CacheService.storeTransactions('Zoho', startDate, endDate, transactions);
+      }
+      
+      return transactions;
+    } catch (error) {
+      console.error("ZohoService: Error in forceRefresh", error);
+      return getMockTransactions(startDate, endDate);
     }
-    
-    cacheStats.lastRefresh = new Date();
-    
-    // Return processed transactions directly if available
-    if (response && response.cached_transactions && Array.isArray(response.cached_transactions)) {
-      // Store in cache for future use
-      CacheService.storeTransactions('Zoho', startDate, endDate, response.cached_transactions);
-      return response.cached_transactions;
-    }
-    
-    // Otherwise use the standard method to process the transactions
-    const transactions = await fetchTransactionsFromWebhook(startDate, endDate, true);
-    
-    // Store in cache for future use if we have real data (not mock)
-    if (transactions && transactions.length > 0 && !transactions[0].id.startsWith('mock')) {
-      CacheService.storeTransactions('Zoho', startDate, endDate, transactions);
-    }
-    
-    return transactions;
   },
   
   // Get raw webhook response data for debugging
