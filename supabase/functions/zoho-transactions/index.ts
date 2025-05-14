@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -31,6 +30,7 @@ interface Transaction {
   category: string;
   source: string;
   type: string;
+  payment_method?: string; // Added payment_method field
 }
 
 // Generate a consistent ID for a transaction based on its properties
@@ -293,14 +293,39 @@ serve(async (req: Request) => {
     }
     
     // Process payments (income)
+    // Added logging for payment details and detect credit card payments
     if (Array.isArray(webhookData.payments)) {
+      // First, log the first payment object to inspect its structure
+      if (webhookData.payments.length > 0) {
+        console.log("Inspecting first payment object structure:", JSON.stringify(webhookData.payments[0]));
+      }
+      
       webhookData.payments.forEach((item: any, index: number) => {
         if (item && typeof item.amount !== 'undefined' && item.customer_name) {
+          // Log each payment's full structure to investigate payment method fields
+          console.log(`Payment ${index} full data:`, JSON.stringify(item));
+          
           const amount = Number(item.amount);
           if (amount > 0) {
             const paymentDate = item.date || new Date().toISOString().split('T')[0];
             const customerName = item.customer_name;
             const invoiceId = item.invoice_id || '';
+            
+            // Check for payment_method field or other indicators of credit card payments
+            // The field names may vary based on Zoho's API structure
+            const paymentMethod = item.payment_method || 
+                                 item.payment_mode || 
+                                 item.payment_type || 
+                                 'unknown';
+            
+            // Determine if this is a credit card payment based on the payment method
+            const isCreditCardPayment = 
+              paymentMethod.toLowerCase().includes('credit') || 
+              paymentMethod.toLowerCase().includes('card') ||
+              paymentMethod.toLowerCase().includes('tarjeta') ||
+              paymentMethod.toLowerCase().includes('visa') ||
+              paymentMethod.toLowerCase().includes('mastercard') ||
+              paymentMethod.toLowerCase().includes('amex');
             
             const incomeTransaction = {
               date: paymentDate,
@@ -308,7 +333,9 @@ serve(async (req: Request) => {
               description: `Ingreso de ${customerName}`,
               category: 'Ingresos',
               source: 'Zoho',
-              type: 'income'
+              type: 'income',
+              payment_method: paymentMethod, // Add payment_method to transaction
+              is_credit_card: isCreditCardPayment // Add flag for credit card payments
             };
             
             const externalId = `income-${customerName.replace(/\s/g, '-')}-${paymentDate}-${invoiceId || index}`;
@@ -316,6 +343,9 @@ serve(async (req: Request) => {
               { ...incomeTransaction, external_id: externalId },
               index
             );
+            
+            // Log the payment type detection
+            console.log(`Processing payment ${id}: Amount=${amount}, Method=${paymentMethod}, IsCC=${isCreditCardPayment}`);
             
             transactions.push({
               ...incomeTransaction,

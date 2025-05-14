@@ -1,6 +1,7 @@
 
 import { useCallback, useState } from 'react';
 import { Transaction } from '@/types/financial';
+import { toast } from "@/components/ui/use-toast";
 
 export const useIncomeProcessor = () => {
   // States for storing processed income data
@@ -12,17 +13,36 @@ export const useIncomeProcessor = () => {
   const [stripeNet, setStripeNet] = useState<number>(0);
   const [stripeFeePercentage, setStripeFeePercentage] = useState<number>(0);
   const [regularIncome, setRegularIncome] = useState<number>(0);
+  const [creditCardIncome, setCreditCardIncome] = useState<number>(0);
   const [stripeAdvances, setStripeAdvances] = useState<number>(0);
   const [stripeAdvanceFunding, setStripeAdvanceFunding] = useState<number>(0);
 
   // Function to process and separate income types
   const processIncomeTypes = useCallback((transactions: Transaction[], stripeData: any) => {
     let regularAmount = 0;
+    let creditCardAmount = 0;
     
-    // Calculate regular income (excluding Stripe transactions)
+    // Calculate regular income and credit card income separately
     transactions.forEach(transaction => {
       if (transaction.type === 'income' && transaction.source !== 'Stripe') {
-        regularAmount += transaction.amount;
+        // Check if this is a credit card payment
+        const isCreditCard = 
+          transaction.payment_method?.toLowerCase().includes('credit') || 
+          transaction.payment_method?.toLowerCase().includes('card') || 
+          transaction.payment_method?.toLowerCase().includes('tarjeta') ||
+          transaction.payment_method?.toLowerCase().includes('visa') ||
+          transaction.payment_method?.toLowerCase().includes('mastercard') ||
+          transaction.payment_method?.toLowerCase().includes('amex') ||
+          (transaction as any).is_credit_card === true;
+        
+        if (isCreditCard) {
+          // Add to credit card income
+          creditCardAmount += transaction.amount;
+          console.log(`Credit card payment detected: ${transaction.amount} (${transaction.description})`);
+        } else {
+          // Add to regular income
+          regularAmount += transaction.amount;
+        }
       }
     });
     
@@ -37,6 +57,15 @@ export const useIncomeProcessor = () => {
     setStripeNet(stripeData.net || 0);
     setStripeFeePercentage(stripeData.feePercentage || 0);
     setRegularIncome(regularAmount);
+    setCreditCardIncome(creditCardAmount);
+    
+    // Show notification if credit card payments were found
+    if (creditCardAmount > 0) {
+      toast({
+        title: "Credit Card Payments Found",
+        description: `Detected ${creditCardAmount.toFixed(2)} in credit card payments from Zoho`,
+      });
+    }
     
     return { 
       stripeGross: stripeData.gross || 0, 
@@ -47,7 +76,8 @@ export const useIncomeProcessor = () => {
       stripeAdvances: stripeData.advances || 0,
       stripeAdvanceFunding: stripeData.advanceFunding || 0,
       stripeNet: stripeData.net || 0,
-      regularAmount 
+      regularAmount,
+      creditCardAmount
     };
   }, []);
 
@@ -62,6 +92,7 @@ export const useIncomeProcessor = () => {
     stripeNet,
     stripeFeePercentage,
     regularIncome,
+    creditCardIncome,
     processIncomeTypes
   };
 };
