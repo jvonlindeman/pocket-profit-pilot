@@ -1,0 +1,50 @@
+
+import { Transaction } from "../../types/financial";
+import { cacheOperations } from "./cacheOperations";
+import { cacheMetrics } from "./cacheMetrics";
+import { CacheResponse } from "./cacheTypes";
+
+/**
+ * CacheService provides a unified API for working with the transaction cache
+ */
+const CacheService = {
+  /**
+   * Check if data for a date range is in cache
+   */
+  checkCache: async (
+    source: string,
+    startDate: Date,
+    endDate: Date,
+    forceRefresh = false
+  ): Promise<CacheResponse> => {
+    return cacheOperations.checkCache(source, startDate, endDate, forceRefresh);
+  },
+  
+  /**
+   * Store transactions in cache
+   */
+  storeTransactions: async (
+    source: string,
+    startDate: Date,
+    endDate: Date,
+    transactions: Transaction[]
+  ): Promise<boolean> => {
+    return cacheOperations.storeTransactions(source, startDate, endDate, transactions);
+  },
+  
+  /**
+   * Get the last cache check result (useful for debugging)
+   */
+  getLastCacheCheckResult: (): CacheResponse | null => {
+    return cacheOperations.getLastCacheCheckResult();
+  },
+  
+  /**
+   * Get cache statistics for admin dashboard
+   */
+  getCacheStats: async (): Promise<any> => {
+    return cacheMetrics.getCacheStats();
+  }
+};
+
+export default CacheService;

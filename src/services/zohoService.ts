@@ -3,7 +3,7 @@ import { Transaction } from "../types/financial";
 import { fetchTransactionsFromWebhook } from "./zoho/apiClient";
 import { getMockTransactions } from "./zoho/mockData";
 import { supabase } from "@/integrations/supabase/client";
-import CacheService from "./cacheService";
+import CacheService from "./cache";
 import { formatDateYYYYMMDD } from "@/utils/dateUtils";
 
 // Variable para almacenar la última respuesta cruda del webhook

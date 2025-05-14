@@ -1,8 +1,7 @@
-
 import { Transaction } from "../types/financial";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateYYYYMMDD_Panama, toPanamaTime, PANAMA_TIMEZONE } from "@/utils/timezoneUtils";
-import CacheService from "./cacheService";
+import CacheService from "./cache";
 
 interface StripeTransactionResponse {
   transactions: Transaction[];
