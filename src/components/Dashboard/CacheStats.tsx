@@ -21,7 +21,16 @@ interface CacheStatsProps {
 
 const CacheStats: React.FC<CacheStatsProps> = ({ dateRange, cacheStatus, isUsingCache, onRefresh }) => {
   const [loading, setLoading] = useState(false);
+  const [localCacheStatus, setLocalCacheStatus] = useState(cacheStatus);
 
+  // Store the cacheStatus in local state to prevent losing it during data fetching
+  useEffect(() => {
+    if (cacheStatus.zoho.hit || cacheStatus.stripe.hit) {
+      setLocalCacheStatus(cacheStatus);
+    }
+  }, [cacheStatus]);
+
+  // Handle loading state
   useEffect(() => {
     if (loading) {
       const timer = setTimeout(() => {
@@ -38,19 +47,19 @@ const CacheStats: React.FC<CacheStatsProps> = ({ dateRange, cacheStatus, isUsing
 
   const totalCacheProgress = () => {
     let progress = 0;
-    if (cacheStatus.zoho.hit) progress += 50;
-    if (cacheStatus.stripe.hit) progress += 50;
+    if (localCacheStatus.zoho.hit) progress += 50;
+    if (localCacheStatus.stripe.hit) progress += 50;
     return progress;
   };
 
   const getCacheStatusMessage = () => {
     if (isUsingCache) {
       return "Datos cargados desde la caché";
-    } else if (cacheStatus.zoho.hit && cacheStatus.stripe.hit) {
+    } else if (localCacheStatus.zoho.hit && localCacheStatus.stripe.hit) {
       return "Datos de Zoho y Stripe cargados desde la caché";
-    } else if (cacheStatus.zoho.hit) {
+    } else if (localCacheStatus.zoho.hit) {
       return "Datos de Zoho cargados desde la caché";
-    } else if (cacheStatus.stripe.hit) {
+    } else if (localCacheStatus.stripe.hit) {
       return "Datos de Stripe cargados desde la caché";
     } else {
       return "Cargando datos desde las APIs";
