@@ -21,18 +21,28 @@ export const useCollaboratorProcessor = () => {
         typeof item.total !== 'undefined' && 
         item.vendor_name && 
         !excludedVendors.includes(item.vendor_name)
-      )
-      .map((item: any) => ({
-        name: item.vendor_name,
-        amount: Number(item.total)
+      );
+      
+    // Agrupar colaboradores por nombre y sumar sus montos
+    const collaboratorMap = validCollaborators.reduce((acc: Record<string, number>, item: any) => {
+      const vendorName = item.vendor_name;
+      acc[vendorName] = (acc[vendorName] || 0) + Number(item.total);
+      return acc;
+    }, {});
+    
+    // Convertir el mapa agrupado a un array de objetos
+    const groupedCollaborators = Object.entries(collaboratorMap)
+      .map(([name, amount]) => ({
+        name,
+        amount: Number(amount)
       }))
       .filter((item: any) => item.amount > 0);
-
+      
     // Calcular el total
-    const totalAmount = validCollaborators.reduce((sum: number, item: any) => sum + item.amount, 0);
+    const totalAmount = groupedCollaborators.reduce((sum: number, item: any) => sum + item.amount, 0);
     
     // Calcular porcentajes y formatear para el gráfico
-    const formattedData = validCollaborators.map((item: any) => ({
+    const formattedData = groupedCollaborators.map((item: any) => ({
       category: item.name,
       amount: item.amount,
       percentage: totalAmount > 0 ? (item.amount / totalAmount) * 100 : 0
