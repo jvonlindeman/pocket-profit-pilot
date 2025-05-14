@@ -55,7 +55,7 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefre
     return ['all', ...categories];
   }, [transactions]);
 
-  // Apply filters to transactions
+  // Apply filters to transactions and sort by date
   const filteredTransactions = useMemo(() => {
     let result = [...transactions];
     
@@ -87,6 +87,9 @@ const TransactionList: React.FC<TransactionListProps> = ({ transactions, onRefre
       default:
         break;
     }
+    
+    // Sort by date, oldest first (ascending)
+    result.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
     return result;
   }, [transactions, typeFilter, categoryFilter]);
