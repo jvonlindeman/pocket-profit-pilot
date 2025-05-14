@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Transaction } from "../../types/financial";
 import { formatDateYYYYMMDD } from "@/utils/dateUtils";
@@ -472,83 +471,59 @@ export const cacheOperations = {
   }> => {
     try {
       // Get transaction counts by source
-      const { data: transactionCounts, error: txError } = await supabase
+      const { data: txData, error: txError } = await supabase
         .from('cached_transactions')
-        .select('source, count')
-        .select('source, count(*)')
-        .then(response => {
-          // Process the raw response to get source and count
-          if (response.error) {
-            throw response.error;
-          }
-          
-          // Create a map to count transactions by source
-          const countsBySource = new Map<string, number>();
-          
-          // Count transactions by source
-          if (response.data) {
-            response.data.forEach(record => {
-              const source = record.source;
-              countsBySource.set(source, (countsBySource.get(source) || 0) + 1);
-            });
-          }
-          
-          // Convert map to array of objects
-          const result = Array.from(countsBySource.entries()).map(([source, count]) => ({
-            source,
-            count
-          }));
-          
-          return { data: result, error: null };
-        });
+        .select('source');
       
       if (txError) {
         console.error("CacheOperations: Error getting transaction stats:", txError);
         return { transactions: [], segments: [] };
       }
       
-      // Get segment counts by source using a similar approach
-      const { data: segmentCounts, error: segError } = await supabase
-        .from('cache_segments')
-        .select('source, count')
-        .select('source, count(*)')
-        .then(response => {
-          // Process the raw response to get source and count
-          if (response.error) {
-            throw response.error;
-          }
-          
-          // Create a map to count segments by source
-          const countsBySource = new Map<string, number>();
-          
-          // Count segments by source
-          if (response.data) {
-            response.data.forEach(record => {
-              const source = record.source;
-              countsBySource.set(source, (countsBySource.get(source) || 0) + 1);
-            });
-          }
-          
-          // Convert map to array of objects
-          const result = Array.from(countsBySource.entries()).map(([source, count]) => ({
-            source,
-            count
-          }));
-          
-          return { data: result, error: null };
+      // Manually count transactions by source
+      const txCountMap = new Map<string, number>();
+      if (txData) {
+        txData.forEach(record => {
+          const source = record.source;
+          txCountMap.set(source, (txCountMap.get(source) || 0) + 1);
         });
+      }
+      
+      const transactions = Array.from(txCountMap.entries()).map(([source, count]) => ({
+        source,
+        count
+      }));
+      
+      // Get segment counts by source using the same approach
+      const { data: segData, error: segError } = await supabase
+        .from('cache_segments')
+        .select('source');
       
       if (segError) {
         console.error("CacheOperations: Error getting segment stats:", segError);
         return { 
-          transactions: transactionCounts || [], 
+          transactions, 
           segments: [] 
         };
       }
       
+      // Manually count segments by source
+      const segCountMap = new Map<string, number>();
+      if (segData) {
+        segData.forEach(record => {
+          const source = record.source;
+          segCountMap.set(source, (segCountMap.get(source) || 0) + 1);
+        });
+      }
+      
+      const segments = Array.from(segCountMap.entries()).map(([source, count]) => ({
+        source,
+        count
+      }));
+      
       return {
-        transactions: transactionCounts || [],
-        segments: segmentCounts || []
+        transactions,
+        segments
       };
     } catch (err) {
       console.error("CacheOperations: Error in getCacheStats", err);

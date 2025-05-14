@@ -1,4 +1,3 @@
-
 import { Transaction } from "../types/financial";
 import { fetchTransactionsFromWebhook } from "./zoho/apiClient";
 import { getMockTransactions } from "./zoho/mockData";
@@ -90,7 +89,7 @@ const ZohoService = {
       // Store the transactions in cache if we have real data (not mock)
       if (transactions.length > 0 && !transactions[0].id.startsWith('mock')) {
         console.log("ZohoService: Storing", transactions.length, "transactions in cache");
-        // Fix: Await the cache storing operation
+        // Use async/await to properly handle the Promise
         await CacheService.storeTransactions('Zoho', startDate, endDate, transactions);
         console.log("ZohoService: Cache storage completed");
       }
@@ -129,8 +128,7 @@ const ZohoService = {
       
       // Return processed transactions directly if available
       if (response && response.cached_transactions && Array.isArray(response.cached_transactions)) {
-        // Store in cache for future use
-        // Fix: Await the cache storing operation
+        // Use async/await to properly handle the Promise
         await CacheService.storeTransactions('Zoho', startDate, endDate, response.cached_transactions);
         console.log("ZohoService: Cache storage result during force refresh completed");
         return response.cached_transactions;
@@ -141,7 +139,7 @@ const ZohoService = {
       
       // Store in cache for future use if we have real data (not mock)
       if (transactions && transactions.length > 0 && !transactions[0].id.startsWith('mock')) {
-        // Fix: Await the cache storing operation
+        // Use async/await to properly handle the Promise
         await CacheService.storeTransactions('Zoho', startDate, endDate, transactions);
         console.log("ZohoService: Cache storage result during force refresh completed");
       }
