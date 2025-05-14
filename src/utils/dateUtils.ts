@@ -12,7 +12,13 @@ import {
  * Format date in YYYY-MM-DD format without timezone shifts
  * Enhanced to use Panama timezone
  */
-export const formatDateYYYYMMDD = (date: Date | string): string => {
+export const formatDateYYYYMMDD = (date: Date | string | undefined | null): string => {
+  // If we're passed undefined or null, return empty string
+  if (date === undefined || date === null) {
+    console.warn('Undefined or null date passed to formatDateYYYYMMDD');
+    return '';
+  }
+  
   // If we're passed a string, try to convert it to a Date first
   if (typeof date === 'string') {
     try {
@@ -29,12 +35,10 @@ export const formatDateYYYYMMDD = (date: Date | string): string => {
       }
       
       console.error(`Invalid date string: ${date}`);
-      const today = new Date();
-      return formatDateYYYYMMDD_Panama(today);
+      return '';
     } catch (error) {
       console.error(`Error processing date string: ${date}`, error);
-      const today = new Date();
-      return formatDateYYYYMMDD_Panama(today);
+      return '';
     }
   }
   
@@ -42,15 +46,13 @@ export const formatDateYYYYMMDD = (date: Date | string): string => {
     // Normal case: input is already a Date object
     if (isNaN(date.getTime())) {
       console.error(`Invalid date object provided`);
-      const today = new Date();
-      return formatDateYYYYMMDD_Panama(today);
+      return '';
     }
     
     return formatDateYYYYMMDD_Panama(date);
   } catch (error) {
     console.error(`Error formatting date:`, error);
-    const today = new Date();
-    return formatDateYYYYMMDD_Panama(today);
+    return '';
   }
 };
 
@@ -102,9 +104,22 @@ export const safeParseDateString = (dateString: string): Date => {
 /**
  * Format a date for display in the UI with Panama timezone
  */
-export const formatDateForDisplay = (dateInput: Date | string): string => {
+export const formatDateForDisplay = (dateInput: Date | string | undefined | null): string => {
   try {
+    // Handle null/undefined cases
+    if (dateInput === null || dateInput === undefined) {
+      console.warn('Null or undefined date in formatDateForDisplay');
+      return 'Invalid date';
+    }
+    
     const date = typeof dateInput === 'string' ? safeParseDateString(dateInput) : toPanamaTime(dateInput);
+    
+    // Check if the date is valid
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid date in formatDateForDisplay');
+      return 'Invalid date';
+    }
+    
     return new Intl.DateTimeFormat('es-PA', {
       timeZone: PANAMA_TIMEZONE
     }).format(date);

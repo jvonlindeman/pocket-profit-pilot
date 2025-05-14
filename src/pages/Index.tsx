@@ -20,6 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import WebhookDebug from '@/components/WebhookDebug';
 import WebhookRequestDebug from '@/components/WebhookRequestDebug';
 import StripeDebug from '@/components/StripeDebug';
+import { DateRange } from 'react-day-picker';
 
 const Index = () => {
   const {
@@ -48,22 +49,33 @@ const Index = () => {
   } = useFinanceData();
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
-  const { checkBalanceExists, monthlyBalance } = useMonthlyBalance({ currentDate: dateRange.startDate });
+  const { checkBalanceExists, monthlyBalance } = useMonthlyBalance({ 
+    currentDate: dateRange.from
+  });
   const { toast } = useToast();
 
-  // Formateamos fechas para títulos
-  const formatDateForTitle = (date: Date) => {
-    return new Date(date).toLocaleDateString('es-ES', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    });
+  // Format dates for titles with safety check
+  const formatDateForTitle = (date: Date | undefined) => {
+    if (!date) return 'Fecha inválida';
+    
+    try {
+      return new Date(date).toLocaleDateString('es-ES', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+    } catch (error) {
+      console.error("Error formatting date for title:", error);
+      return 'Fecha inválida';
+    }
   };
 
-  // Título del periodo
-  const periodTitle = `${formatDateForTitle(dateRange.startDate)} - ${formatDateForTitle(dateRange.endDate)}`;
+  // Title of the period with safety checks
+  const periodTitle = dateRange.from && dateRange.to 
+    ? `${formatDateForTitle(dateRange.from)} - ${formatDateForTitle(dateRange.to)}`
+    : 'Periodo no seleccionado';
 
-  // Manejador para cargar datos iniciales
+  // Handler for loading initial data
   const handleInitialLoad = async () => {
     // Check if we need to set the initial balance first
     const balanceExists = await checkBalanceExists();
@@ -97,7 +109,7 @@ const Index = () => {
     refreshData(false);
   };
 
-  // Manejador para actualizar datos
+  // Handler for data refresh
   const handleRefresh = () => {
     console.log("Manual refresh requested");
     toast({
@@ -105,6 +117,13 @@ const Index = () => {
       description: 'Obteniendo datos más recientes...',
     });
     refreshData(true);
+  };
+
+  // Adapter function to convert between date range formats
+  const handleDateRangeChange = (newRange: DateRange) => {
+    if (newRange.from && newRange.to) {
+      updateDateRange(newRange);
+    }
   };
 
   // Prepare Stripe data for chart
@@ -123,13 +142,22 @@ const Index = () => {
   const itbmAmount = monthlyBalance?.itbm_amount !== null ? monthlyBalance?.itbm_amount || 0 : 0;
   const profitPercentage = monthlyBalance?.profit_percentage !== null ? monthlyBalance?.profit_percentage || 1 : 1;
 
+  // Map the current month range function to match DateRangePicker's expected format
+  const getDatePickerCurrentMonthRange = () => {
+    const { startDate, endDate } = getCurrentMonthRange();
+    return {
+      from: startDate,
+      to: endDate
+    };
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Dialog to set initial balance */}
       <InitialBalanceDialog 
         open={showBalanceDialog} 
         onOpenChange={setShowBalanceDialog} 
-        currentDate={dateRange.startDate}
+        currentDate={dateRange.from}
         onBalanceSaved={handleBalanceSaved}
       />
       
@@ -151,8 +179,8 @@ const Index = () => {
               <div className="w-full md:w-64">
                 <DateRangePicker
                   dateRange={dateRange}
-                  onRangeChange={updateDateRange}
-                  getCurrentMonthRange={getCurrentMonthRange}
+                  onRangeChange={handleDateRangeChange}
+                  getCurrentMonthRange={getDatePickerCurrentMonthRange}
                 />
               </div>
             </div>

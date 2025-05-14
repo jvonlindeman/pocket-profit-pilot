@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DateRange as DayPickerDateRange } from "react-day-picker";
+import { DateRange } from "react-day-picker";
 import { toast } from "@/components/ui/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import DateRangePicker from "@/components/Dashboard/DateRangePicker";
@@ -11,7 +11,7 @@ import { Trash } from 'lucide-react';
 import { formatDateYYYYMMDD } from "@/utils/dateUtils";
 import { endOfMonth, startOfMonth, subMonths } from 'date-fns';
 import CacheService from "@/services/cache";
-import type { DateRange } from '@/types/financial';
+import type { DateRange as AppDateRange } from '@/types/financial';
 
 const CacheClearTool: React.FC = () => {
   const [source, setSource] = useState<string>("all");
@@ -22,29 +22,19 @@ const CacheClearTool: React.FC = () => {
   
   // Set default date range to last 3 months
   const today = new Date();
+  today.setHours(12, 0, 0, 0); // Set to noon to avoid timezone issues
   const threeMonthsAgo = subMonths(today, 3);
   
-  // Create a properly typed DateRange object for our application
-  const [dateRange, setDateRange] = useState<DateRange>({
-    startDate: startOfMonth(threeMonthsAgo),
-    endDate: endOfMonth(today)
-  });
-  
   // Create a DayPicker compatible DateRange for the UI component
-  const [pickerDateRange, setPickerDateRange] = useState<DayPickerDateRange>({
-    from: dateRange.startDate,
-    to: dateRange.endDate
+  const [dateRange, setDateRange] = useState<DateRange>({
+    from: startOfMonth(threeMonthsAgo),
+    to: endOfMonth(today)
   });
   
   // Handle date range updates from the picker
-  const handleDateRangeUpdate = (range: DayPickerDateRange) => {
+  const handleDateRangeUpdate = (range: DateRange) => {
     if (range.from && range.to) {
-      // Update both the picker state and the actual date range
-      setPickerDateRange(range);
-      setDateRange({
-        startDate: range.from,
-        endDate: range.to
-      });
+      setDateRange(range);
     }
   };
   
@@ -81,9 +71,9 @@ const CacheClearTool: React.FC = () => {
       }
       
       // Add date range if selected
-      if (dateRange.startDate && dateRange.endDate) {
-        options.startDate = dateRange.startDate;
-        options.endDate = dateRange.endDate;
+      if (dateRange.from && dateRange.to) {
+        options.startDate = dateRange.from;
+        options.endDate = dateRange.to;
       }
       
       // Clear the cache
@@ -156,7 +146,7 @@ const CacheClearTool: React.FC = () => {
           <div>
             <label className="block text-sm font-medium mb-1">Date Range</label>
             <DateRangePicker 
-              dateRange={pickerDateRange} 
+              dateRange={dateRange} 
               onRangeChange={handleDateRangeUpdate}
               getCurrentMonthRange={() => ({
                 from: startOfMonth(new Date()),
@@ -226,8 +216,8 @@ const CacheClearTool: React.FC = () => {
             <AlertDialogDescription>
               This will permanently delete{' '}
               {source === 'all' ? 'all cached data' : `cached ${source} data`}
-              {dateRange.startDate && dateRange.endDate
-                ? ` from ${formatDateYYYYMMDD(dateRange.startDate)} to ${formatDateYYYYMMDD(dateRange.endDate)}`
+              {dateRange.from && dateRange.to
+                ? ` from ${formatDateYYYYMMDD(dateRange.from)} to ${formatDateYYYYMMDD(dateRange.to)}`
                 : ''}
               . This action cannot be undone.
             </AlertDialogDescription>

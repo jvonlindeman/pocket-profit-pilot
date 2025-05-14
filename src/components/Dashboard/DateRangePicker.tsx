@@ -1,8 +1,8 @@
+
 import React, { useState } from 'react';
 import { format, endOfMonth, subMonths, startOfMonth, subDays, startOfYear } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Calendar as CalendarIcon } from 'lucide-react';
-import { DateRange as AppDateRange } from '@/types/financial';
 import { DateRange } from 'react-day-picker';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -25,6 +25,7 @@ import {
   formatDateForPanamaDisplay
 } from '@/utils/timezoneUtils';
 
+// Define the props interface
 interface DateRangePickerProps {
   dateRange: DateRange;
   onRangeChange: (range: DateRange) => void;
@@ -37,19 +38,27 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
   getCurrentMonthRange
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [tempRange, setTempRange] = useState<DateRange>({
-    from: dateRange.from,
-    to: dateRange.to
-  });
+  const [tempRange, setTempRange] = useState<DateRange>(dateRange || {});
 
-  // Format for displaying date range using Panama timezone
+  // Format for displaying date range using Panama timezone with safety checks
   const formatDateRange = () => {
-    return `${formatDateForPanamaDisplay(dateRange.from)} - ${formatDateForPanamaDisplay(dateRange.to)}`;
+    if (!dateRange?.from || !dateRange?.to) {
+      return "Seleccionar rango de fechas";
+    }
+    
+    try {
+      const fromFormatted = formatDateForPanamaDisplay(dateRange.from);
+      const toFormatted = formatDateForPanamaDisplay(dateRange.to);
+      return `${fromFormatted} - ${toFormatted}`;
+    } catch (error) {
+      console.error("Error formatting date range:", error);
+      return "Rango de fechas inválido";
+    }
   };
 
   // Handler for applying date range changes
   const handleRangeChange = () => {
-    if (tempRange.from && tempRange.to) {
+    if (tempRange?.from && tempRange?.to) {
       // CRITICAL FIX: Ensure we preserve the exact dates in Panama timezone
       // Set time to noon to avoid any timezone shifts
       const startDate = new Date(tempRange.from);
@@ -87,17 +96,16 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
   // Reset to current month
   const resetToCurrentMonth = () => {
     const currentMonth = getCurrentMonthRange();
-    const stableDates = {
-      from: createStableDate(currentMonth.from),
-      to: createStableDate(currentMonth.to)
-    };
-    
-    onRangeChange(stableDates);
-    setTempRange({
-      from: stableDates.from,
-      to: stableDates.to
-    });
-    setIsOpen(false);
+    if (currentMonth?.from && currentMonth?.to) {
+      const stableDates = {
+        from: createStableDate(currentMonth.from),
+        to: createStableDate(currentMonth.to)
+      };
+      
+      onRangeChange(stableDates);
+      setTempRange(stableDates);
+      setIsOpen(false);
+    }
   };
 
   // Last month
@@ -115,10 +123,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
     };
     
     onRangeChange(newRange);
-    setTempRange({
-      from: firstDayLastMonth,
-      to: lastDayLastMonth
-    });
+    setTempRange(newRange);
     setIsOpen(false);
   };
 
@@ -133,10 +138,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
     };
     
     onRangeChange(newRange);
-    setTempRange({
-      from: thirtyDaysAgo,
-      to: today
-    });
+    setTempRange(newRange);
     setIsOpen(false);
   };
 
@@ -151,10 +153,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
     };
     
     onRangeChange(newRange);
-    setTempRange({
-      from: firstDayOfYear,
-      to: today
-    });
+    setTempRange(newRange);
     setIsOpen(false);
   };
 
@@ -170,10 +169,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
     };
     
     onRangeChange(newRange);
-    setTempRange({
-      from: lastDayPreviousMonth,
-      to: lastDayCurrMonth
-    });
+    setTempRange(newRange);
     setIsOpen(false);
   };
 
@@ -189,10 +185,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
     };
     
     onRangeChange(newRange);
-    setTempRange({
-      from: firstDayLastMonth,
-      to: lastDayCurrentMonth
-    });
+    setTempRange(newRange);
     setIsOpen(false);
   };
 
@@ -232,7 +225,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
               </div>
               <Calendar
                 mode="range"
-                defaultMonth={dateRange.from}
+                defaultMonth={dateRange?.from ? new Date(dateRange.from) : undefined}
                 selected={tempRange}
                 onSelect={(range) => {
                   if (range) {
