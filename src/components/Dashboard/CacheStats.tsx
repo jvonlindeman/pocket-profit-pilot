@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -5,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, RefreshCw } from 'lucide-react';
 import * as ZohoService from '@/services/zohoService';
 
-interface CacheInfoProps {
+interface CacheStatsProps {
   dateRange: {
     startDate: Date;
     endDate: Date;
@@ -18,7 +19,7 @@ interface CacheInfoProps {
   onRefresh: () => void;
 }
 
-const CacheInfo: React.FC<CacheInfoProps> = ({ dateRange, cacheStatus, isUsingCache, onRefresh }) => {
+const CacheStats: React.FC<CacheStatsProps> = ({ dateRange, cacheStatus, isUsingCache, onRefresh }) => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -95,4 +96,4 @@ const CacheInfo: React.FC<CacheInfoProps> = ({ dateRange, cacheStatus, isUsingCa
   );
 };
 
-export default CacheInfo;
+export default CacheStats;

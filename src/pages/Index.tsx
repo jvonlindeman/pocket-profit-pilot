@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
@@ -10,7 +9,7 @@ import TransactionList from '@/components/Dashboard/TransactionList';
 import MonthlyBalanceEditor from '@/components/Dashboard/MonthlyBalanceEditor';
 import InitialBalanceDialog from '@/components/Dashboard/InitialBalanceDialog';
 import SalaryCalculator from '@/components/Dashboard/SalaryCalculator';
-import CacheInfo from '@/components/Dashboard/CacheInfo';
+import CacheStats from '@/components/Dashboard/CacheStats';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 import { Button } from '@/components/ui/button';
@@ -232,8 +231,8 @@ const Index = () => {
               </Button>
             </div>
             
-            {/* Cache information */}
-            <CacheInfo 
+            {/* Cache information - Updated to use CacheStats instead of CacheInfo */}
+            <CacheStats 
               dateRange={dateRange}
               cacheStatus={cacheStatus}
               isUsingCache={usingCachedData}
