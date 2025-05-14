@@ -1,9 +1,9 @@
 
 // Direct implementation to avoid circular dependencies
-import { toast as baseToast, useToast as baseUseToast, type ToasterToast } from "@/components/ui/use-toast"
+import { toast as baseToast, useToast as baseUseToast, ToasterToast } from "@/components/ui/use-toast"
 
-// Export the type with our desired name
-export type Toast = ToasterToast;
+// Export the type with the same name as it's declared in use-toast.tsx
+export type { ToasterToast };
 
 // Re-export the hook
 export const useToast = baseUseToast;
@@ -14,7 +14,7 @@ export const toast = ({
   description,
   variant,
   ...props
-}: Toast) => {
+}: ToasterToast) => {
   return baseToast({
     title,
     description,
