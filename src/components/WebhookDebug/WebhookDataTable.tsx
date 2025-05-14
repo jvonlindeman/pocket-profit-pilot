@@ -1,14 +1,11 @@
-
 import React from 'react';
+import { excludedVendors } from '@/services/zoho/api/config';
 
 interface WebhookDataTableProps {
   rawData: any;
 }
 
 const WebhookDataTable: React.FC<WebhookDataTableProps> = ({ rawData }) => {
-  // Lista de proveedores que deben ser excluidos
-  const excludedVendors = ["Johan von Lindeman", "DFC Panama"];
-
   // Helper para determinar si un item es un array de ingresos
   const isIncomeArray = (item: any): boolean => {
     return Array.isArray(item) && 

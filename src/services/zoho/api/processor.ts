@@ -1,4 +1,3 @@
-
 import { Transaction } from "../../../types/financial";
 import { parseToPanamaTime, formatDateYYYYMMDD_Panama } from "@/utils/timezoneUtils";
 import { ZohoTransactionResponse } from "./types";

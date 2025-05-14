@@ -1,5 +1,6 @@
 
 import { useCallback, useState } from 'react';
+import { excludedVendors } from '@/services/zoho/api/config';
 
 export const useCollaboratorProcessor = () => {
   const [collaboratorExpenses, setCollaboratorExpenses] = useState<any[]>([]);
@@ -10,9 +11,6 @@ export const useCollaboratorProcessor = () => {
       setCollaboratorExpenses([]);
       return [];
     }
-
-    // Lista de proveedores que deben ser excluidos
-    const excludedVendors = ["Johan von Lindeman", "DFC Panama"];
 
     // Filtrar colaboradores con datos válidos y excluir los proveedores especificados
     const validCollaborators = rawResponse.colaboradores
@@ -57,3 +55,4 @@ export const useCollaboratorProcessor = () => {
     processCollaboratorData
   };
 };
+
