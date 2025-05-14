@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Bug } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { endOfMonth, startOfMonth } from 'date-fns';
+import ZohoConfig from '@/components/ZohoConfig';
+import { DateRange } from 'react-day-picker';
+import { toDayPickerDateRange, toFinancialDateRange } from '@/utils/dateRangeAdapter';
 
 const Settings = () => {
   // Create a date range for the current month
@@ -14,6 +17,20 @@ const Settings = () => {
   const dateRange = {
     startDate: startOfMonth(today),
     endDate: endOfMonth(today),
+  };
+
+  // Helper function to convert our date range to DayPicker format
+  const dateRangeForPicker = () => {
+    const today = new Date();
+    const lastMonth = new Date(today);
+    lastMonth.setMonth(today.getMonth() - 1);
+    
+    const dateRange = {
+      startDate: lastMonth,
+      endDate: today
+    };
+    
+    return toDayPickerDateRange(dateRange);
   };
 
   return (

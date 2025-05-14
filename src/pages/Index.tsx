@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
@@ -50,7 +51,7 @@ const Index = () => {
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
   const { checkBalanceExists, monthlyBalance } = useMonthlyBalance({ 
-    currentDate: dateRange.from || new Date()
+    currentDate: dateRange.startDate
   });
   const { toast } = useToast();
 
@@ -71,8 +72,8 @@ const Index = () => {
   };
 
   // Title of the period with safety checks
-  const periodTitle = dateRange.from && dateRange.to 
-    ? `${formatDateForTitle(dateRange.from)} - ${formatDateForTitle(dateRange.to)}`
+  const periodTitle = dateRange.startDate && dateRange.endDate 
+    ? `${formatDateForTitle(dateRange.startDate)} - ${formatDateForTitle(dateRange.endDate)}`
     : 'Periodo no seleccionado';
 
   // Handler for loading initial data
@@ -122,7 +123,7 @@ const Index = () => {
   // Adapter function to convert between date range formats
   const handleDateRangeChange = (newRange: DateRange) => {
     if (newRange.from && newRange.to) {
-      updateDateRange(newRange);
+      updateDateRange(toFinancialDateRange(newRange));
     }
   };
 

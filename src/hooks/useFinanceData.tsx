@@ -1,12 +1,54 @@
-import { useState, useEffect, useCallback } from 'react';
+
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { startOfMonth, endOfMonth } from 'date-fns';
 import { useFinancialDataFetcher } from '@/hooks/useFinancialDataFetcher';
 import { useCollaboratorProcessor } from '@/hooks/useCollaboratorProcessor';
 import { useIncomeProcessor } from '@/hooks/useIncomeProcessor';
 import { useMonthlyBalanceManager } from '@/hooks/useMonthlyBalanceManager';
 import * as ZohoService from '@/services/zohoService';
 import { formatDateYYYYMMDD, getCurrentMonthRange } from '@/utils/dateUtils';
-import { toDayPickerDateRange } from '@/utils/dateRangeAdapter';
-import { DateRange } from 'react-day-picker';
+import { toDayPickerDateRange, toFinancialDateRange } from '@/utils/dateRangeAdapter';
+import type { DateRange } from 'react-day-picker';
+import { Transaction, FinancialData } from '@/types/financial';
+
+// Simple transaction data processor
+const processTransactionData = (transactions: Transaction[], startingBalance: number = 0): FinancialData => {
+  // This is a simple implementation - you might want to implement a more sophisticated processor
+  const summary = {
+    totalIncome: transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0),
+    totalExpense: transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0),
+    collaboratorExpense: 0, // This would be calculated based on your business logic
+    otherExpense: 0, // This would be calculated based on your business logic
+    profit: 0,
+    profitMargin: 0,
+    grossProfit: 0,
+    grossProfitMargin: 0,
+    startingBalance: startingBalance,
+  };
+  
+  // Calculate profits
+  summary.profit = summary.totalIncome - summary.totalExpense;
+  summary.profitMargin = summary.totalIncome > 0 ? (summary.profit / summary.totalIncome) * 100 : 0;
+  summary.grossProfit = summary.totalIncome;
+  summary.grossProfitMargin = summary.totalIncome > 0 ? 100 : 0;
+  
+  // Return basic financial data structure
+  return {
+    summary,
+    transactions,
+    incomeBySource: [],
+    expenseByCategory: [],
+    dailyData: {
+      income: { labels: [], values: [] },
+      expense: { labels: [], values: [] }
+    },
+    monthlyData: {
+      income: { labels: [], values: [] },
+      expense: { labels: [], values: [] },
+      profit: { labels: [], values: [] }
+    }
+  };
+};
 
 export const useFinanceData = () => {
   // States
