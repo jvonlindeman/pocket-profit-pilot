@@ -218,7 +218,9 @@ const ZohoService = {
         setTimeout(async () => {
           try {
             console.log("ZohoService: Executing scheduled cache refresh");
+            // Properly await the forceRefresh call - don't try to use the returned Promise as an array
             await ZohoService.forceRefresh(startDate, endDate);
+            console.log("ZohoService: Scheduled cache refresh completed");
           } catch (err) {
             console.error("ZohoService: Error during scheduled refresh:", err);
           }
