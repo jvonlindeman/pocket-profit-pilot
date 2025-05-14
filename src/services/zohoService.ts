@@ -215,14 +215,20 @@ const ZohoService = {
         console.log("ZohoService: Cache is stale or missing, scheduling refresh");
         
         // Use setTimeout to avoid blocking but make sure we're properly handling the Promise
-        setTimeout(async () => {
+        setTimeout(() => {
           try {
             console.log("ZohoService: Executing scheduled cache refresh");
-            // Properly await the forceRefresh call - don't try to use the returned Promise as an array
-            await ZohoService.forceRefresh(startDate, endDate);
-            console.log("ZohoService: Scheduled cache refresh completed");
+            // Fixed: Don't directly assign the Promise to a variable or try to use it as an array
+            // Instead, call the function and ignore its return value since we're not using it here
+            ZohoService.forceRefresh(startDate, endDate)
+              .then(() => {
+                console.log("ZohoService: Scheduled cache refresh completed successfully");
+              })
+              .catch((err) => {
+                console.error("ZohoService: Error during scheduled refresh:", err);
+              });
           } catch (err) {
-            console.error("ZohoService: Error during scheduled refresh:", err);
+            console.error("ZohoService: Error starting scheduled refresh:", err);
           }
         }, 100);
       } else {
