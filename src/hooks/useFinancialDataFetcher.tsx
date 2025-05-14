@@ -29,10 +29,7 @@ export const useFinancialDataFetcher = () => {
   // Check API connectivity
   const checkApiConnectivity = useCallback(async () => {
     const zohoConnected = await ZohoService.checkApiConnectivity();
-    // Add the checkApiConnectivity method to StripeService if it doesn't exist
-    const stripeConnected = StripeService.checkApiConnectivity ? 
-      await StripeService.checkApiConnectivity() : 
-      true;
+    const stripeConnected = await StripeService.checkApiConnectivity();
     
     setApiConnectivity({
       zoho: zohoConnected,

@@ -1,3 +1,4 @@
+
 import { Transaction } from "../types/financial";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateYYYYMMDD_Panama, toPanamaTime, PANAMA_TIMEZONE } from "@/utils/timezoneUtils";
@@ -215,6 +216,30 @@ const StripeService = {
   // Set the raw response manually (useful for testing)
   setLastRawResponse: (data: any): void => {
     lastRawResponse = data;
+  },
+
+  // Verify API connectivity
+  checkApiConnectivity: async (): Promise<boolean> => {
+    try {
+      // Create a minimal date range to test connectivity
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      // Try to get raw response with minimal data
+      const response = await supabase.functions.invoke('stripe-balance', {
+        body: {
+          startDate: formatDateYYYYMMDD_Panama(toPanamaTime(yesterday)),
+          endDate: formatDateYYYYMMDD_Panama(toPanamaTime(today))
+        }
+      });
+      
+      // If we get any response, the API is connected
+      return !response.error;
+    } catch (error) {
+      console.error("StripeService: API connectivity check failed:", error);
+      return false;
+    }
   }
 };
 
