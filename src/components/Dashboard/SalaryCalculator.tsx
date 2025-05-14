@@ -25,12 +25,18 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
   const taxReservePercentage = 5;
   const taxReserveAmount = (zohoIncome * taxReservePercentage) / 100;
   
+  // Calculate total deductions from Zoho income
+  const totalZohoDeductions = opexAmount + itbmAmount + profitFirstAmount + taxReserveAmount;
+  
+  // Calculate remaining Zoho income after all deductions
+  const remainingZohoIncome = zohoIncome - totalZohoDeductions;
+  
   // Calculate half of Stripe income
   const halfStripeIncome = stripeIncome / 2;
   
   // Calculate salary using the updated formula including tax reserve
   // (Zoho income - OPEX - ITBM - Profit First - Tax Reserve + Stripe income/2) / 2
-  const availableForSalary = zohoIncome - opexAmount - itbmAmount - profitFirstAmount - taxReserveAmount + halfStripeIncome;
+  const availableForSalary = remainingZohoIncome + halfStripeIncome;
   const salary = availableForSalary / 2;
   
   // Format currency
@@ -76,6 +82,11 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
             <div className="bg-white p-3 rounded-lg shadow-sm">
               <h3 className="text-sm font-medium text-gray-500 mb-1">Reserva para Taxes ({taxReservePercentage}%)</h3>
               <div className="text-lg font-bold text-amber-600">- {formatCurrency(taxReserveAmount)}</div>
+            </div>
+            
+            <div className="bg-blue-100 p-3 rounded-lg border border-blue-200">
+              <h3 className="text-sm font-medium text-blue-800 mb-1">Zoho Restante</h3>
+              <div className="text-lg font-bold text-blue-700">{formatCurrency(remainingZohoIncome)}</div>
             </div>
           </div>
           
