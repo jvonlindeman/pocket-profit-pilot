@@ -37,7 +37,7 @@ export const useMonthlyBalanceManager = () => {
   const updateStartingBalance = useCallback(async (
     balance: number, 
     date: Date, 
-    opexPercentage: number = 35,
+    opexAmount: number = 35, // Changed from opexPercentage to opexAmount
     itbmAmount: number = 0,
     profitPercentage: number = 1,
     notes?: string
@@ -54,7 +54,7 @@ export const useMonthlyBalanceManager = () => {
       
       const updateData: any = {
         balance,
-        opex_amount: opexPercentage,
+        opex_amount: opexAmount, // Store as direct amount, not percentage
         itbm_amount: itbmAmount,
         profit_percentage: profitPercentage,
         notes: notes || (existingData?.notes || null),

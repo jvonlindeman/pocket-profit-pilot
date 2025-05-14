@@ -74,7 +74,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
   // Set or update the monthly balance
   const updateMonthlyBalance = async (
     balance: number, 
-    opexPercentage: number = 35, 
+    opexAmount: number = 35, // Changed from opexPercentage to opexAmount
     itbmAmount: number = 0, 
     profitPercentage: number = 1, 
     notes?: string
@@ -85,7 +85,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     try {
       const updateData: any = {
         balance,
-        opex_amount: opexPercentage,
+        opex_amount: opexAmount, // Store as direct amount, not percentage
         itbm_amount: itbmAmount,
         profit_percentage: profitPercentage,
         notes: notes || null,

@@ -116,7 +116,7 @@ const Index = () => {
   };
 
   // Get calculator values from the monthly balance
-  const opexPercentage = monthlyBalance?.opex_amount !== null ? monthlyBalance?.opex_amount || 35 : 35;
+  const opexAmount = monthlyBalance?.opex_amount !== null ? monthlyBalance?.opex_amount || 35 : 35;
   const itbmAmount = monthlyBalance?.itbm_amount !== null ? monthlyBalance?.itbm_amount || 0 : 0;
   const profitPercentage = monthlyBalance?.profit_percentage !== null ? monthlyBalance?.profit_percentage || 1 : 1;
 
@@ -214,12 +214,12 @@ const Index = () => {
               />
             </div>
 
-            {/* New Salary Calculator */}
+            {/* New Salary Calculator - Updated to use opexAmount instead of opexPercentage */}
             <div className="mb-6">
               <SalaryCalculator 
                 zohoIncome={regularIncome}
                 stripeIncome={stripeNet}
-                opexPercentage={opexPercentage}
+                opexAmount={opexAmount}
                 itbmAmount={itbmAmount}
                 profitPercentage={profitPercentage}
               />

@@ -55,9 +55,10 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
 
   const onSubmit = async (data: FormValues) => {
     // Pass parameters in the correct order according to the function signature
+    // Using direct amount for OPEX (35) instead of a percentage
     const success = await updateMonthlyBalance(
       Number(data.balance),
-      35, // default opexPercentage
+      35, // default opexAmount as direct value
       0,  // default itbmAmount
       1,  // default profitPercentage
       data.notes || ''

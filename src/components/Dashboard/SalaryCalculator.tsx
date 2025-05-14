@@ -6,7 +6,7 @@ import { Calculator } from 'lucide-react';
 interface SalaryCalculatorProps {
   zohoIncome: number;
   stripeIncome: number;
-  opexPercentage: number;
+  opexAmount: number; // Changed from opexPercentage to opexAmount
   itbmAmount: number;
   profitPercentage: number;
 }
@@ -14,12 +14,12 @@ interface SalaryCalculatorProps {
 const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({ 
   zohoIncome,
   stripeIncome,
-  opexPercentage,
+  opexAmount, // Changed from opexPercentage
   itbmAmount,
   profitPercentage
 }) => {
-  // Calculate OPEX amount (percentage of Zoho income)
-  const opexAmount = (zohoIncome * opexPercentage) / 100;
+  // No longer calculate OPEX as a percentage - use the direct amount
+  // const opexAmount = (zohoIncome * opexPercentage) / 100;
   
   // Calculate Profit First amount (percentage of Zoho income)
   const profitFirstAmount = (zohoIncome * profitPercentage) / 100;
@@ -58,7 +58,7 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
             </div>
             
             <div className="bg-white p-3 rounded-lg shadow-sm">
-              <h3 className="text-sm font-medium text-gray-500 mb-1">OPEX ({opexPercentage}%)</h3>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">OPEX</h3>
               <div className="text-lg font-bold text-amber-600">- {formatCurrency(opexAmount)}</div>
             </div>
             
