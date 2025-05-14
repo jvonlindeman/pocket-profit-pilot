@@ -1,9 +1,13 @@
 
-import { type ToasterToast, toast as showToast, useToast as useToastHook } from "@/components/ui/use-toast";
+// This is a re-export file for better organization
+import { toast as showToast, useToast as useToastOriginal, type ToasterToast } from "@/components/ui/use-toast";
 
 export type Toast = ToasterToast;
-export const useToast = useToastHook;
 
+// Re-export the useToast hook directly
+export const useToast = useToastOriginal;
+
+// Export a slightly enhanced version of toast
 export const toast = ({
   title,
   description,
