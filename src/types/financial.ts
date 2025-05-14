@@ -1,4 +1,3 @@
-
 export interface Transaction {
   id: string;
   date: string;
@@ -18,7 +17,9 @@ export interface FinancialSummary {
   otherExpense: number;
   profit: number;
   profitMargin: number;
-  startingBalance?: number; // Added starting balance field
+  grossProfit: number; // Added gross profit field 
+  grossProfitMargin: number; // Added gross profit margin field
+  startingBalance?: number;
 }
 
 export interface CategorySummary {

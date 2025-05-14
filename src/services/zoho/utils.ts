@@ -1,4 +1,3 @@
-
 import { Transaction, FinancialData, ChartData, CategorySummary, FinancialSummary } from '@/types/financial';
 import { format, parse, parseISO } from 'date-fns';
 
@@ -105,7 +104,7 @@ const calculateTotalByCategory = (transactions: Transaction[], type: 'income' | 
 
 // Main function to process and format transaction data into a FinancialData object
 export const processTransactionData = (transactions: Transaction[], startingBalance?: number): FinancialData => {
-  // Calcular income y expense total
+  // Calculate total income and expense
   let totalIncome = 0;
   let totalExpense = 0;
   let collaboratorExpense = 0;
@@ -117,7 +116,7 @@ export const processTransactionData = (transactions: Transaction[], startingBala
     } else {
       totalExpense += transaction.amount;
       
-      // Separar gastos de colaboradores del resto
+      // Separate collaborator expenses from other expenses
       if (transaction.category === 'Pagos a colaboradores') {
         collaboratorExpense += transaction.amount;
       } else {
@@ -126,30 +125,36 @@ export const processTransactionData = (transactions: Transaction[], startingBala
     }
   });
 
-  // Include starting balance in profit calculation if provided
+  // Calculate gross profit (income - expenses, without considering starting balance)
+  const grossProfit = totalIncome - totalExpense;
+  const grossProfitMargin = totalIncome > 0 ? (grossProfit / totalIncome) * 100 : 0;
+
+  // Include starting balance in net profit calculation if provided
   const profit = (startingBalance !== undefined ? startingBalance : 0) + totalIncome - totalExpense;
   const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0;
 
-  // Crear objeto de resumen
+  // Create summary object
   const summary: FinancialSummary = {
     totalIncome,
     totalExpense,
     collaboratorExpense,
     otherExpense,
+    grossProfit,
+    grossProfitMargin,
     profit,
     profitMargin,
     startingBalance
   };
 
-  // Calcular datos por categoría
+  // Calculate data by category
   const incomeBySource = calculateTotalByCategory(transactions, 'income');
   const expenseByCategory = calculateTotalByCategory(transactions, 'expense');
 
-  // Calcular datos diarios y mensuales
+  // Calculate daily and monthly data
   const dailyData = calculateDailyData(transactions);
   const monthlyData = calculateMonthlyData(transactions);
 
-  // Devolver objeto completo
+  // Return complete object
   return {
     summary,
     transactions,

@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, BadgeDollarSign, Users, Scale, Scissors } from 'lucide-react';
+import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, BadgeDollarSign, Users, Scale, Scissors, Calculator } from 'lucide-react';
 import { FinancialSummary, CategorySummary } from '@/types/financial';
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -45,7 +46,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
     }).format(percentage / 100);
   };
 
-  // Calcular gastos no colaboradores
+  // Calculate non-collaborator expenses
   const otherExpenses = summary.totalExpense - (summary.collaboratorExpense || 0);
 
   return (
@@ -329,11 +330,33 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
             </CardContent>
           </Card>
 
-          {/* Net Profit */}
+          {/* Gross Profit - NEW CARD */}
           <Card className="finance-card">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium text-gray-500">Beneficio Neto</h3>
+                <h3 className="text-sm font-medium text-gray-500">Beneficio Bruto</h3>
+                <div className="p-2 bg-green-50 rounded-full">
+                  <Calculator className="h-4 w-4 text-green-500" />
+                </div>
+              </div>
+              <div className="flex items-end justify-between">
+                <div className="text-2xl font-bold text-green-500 animate-value">
+                  {formatCurrency(summary.grossProfit)}
+                </div>
+                <div className={`text-sm font-medium ml-2 ${summary.grossProfitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  Margen: {formatPercentage(summary.grossProfitMargin)}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Net Profit - Separate Row */}
+        <div className="mt-6 grid grid-cols-1 gap-6">
+          <Card className="finance-card">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-medium text-gray-500">Beneficio Neto (incluye balance inicial)</h3>
                 <div className="p-2 bg-blue-50 rounded-full">
                   <TrendingUpIcon className="h-4 w-4 text-blue-500" />
                 </div>
@@ -345,6 +368,9 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
                 <div className={`text-sm font-medium ml-2 ${summary.profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   Margen: {formatPercentage(summary.profitMargin)}
                 </div>
+              </div>
+              <div className="mt-2 text-xs text-gray-500">
+                Balance Inicial + Ingresos Totales - Gastos Totales
               </div>
             </CardContent>
           </Card>
