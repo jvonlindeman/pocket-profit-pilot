@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, BadgeDollarSign, Users, Scale, Scissors, CreditCard } from 'lucide-react';
+import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, BadgeDollarSign, Users, Scale, Scissors } from 'lucide-react';
 import { FinancialSummary, CategorySummary } from '@/types/financial';
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,7 +16,6 @@ interface FinanceSummaryProps {
   stripeNet?: number;
   stripeFeePercentage?: number;
   regularIncome?: number;
-  creditCardIncome?: number;
 }
 
 const FinanceSummary: React.FC<FinanceSummaryProps> = ({ 
@@ -29,8 +28,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
   stripeAdditionalFees = 0,
   stripeNet = 0,
   stripeFeePercentage = 0,
-  regularIncome = 0,
-  creditCardIncome = 0
+  regularIncome = 0
 }) => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -197,7 +195,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
                 <Card className="finance-card">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-medium text-gray-500">Ingresos Zoho (Regular)</h3>
+                      <h3 className="text-sm font-medium text-gray-500">Ingresos Zoho</h3>
                       <div className="p-2 bg-green-50 rounded-full">
                         <ArrowUpIcon className="h-4 w-4 text-green-500" />
                       </div>
@@ -205,26 +203,6 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
                     <div className="text-2xl font-bold text-green-500 animate-value">
                       {formatCurrency(regularIncome)}
                     </div>
-                  </CardContent>
-                </Card>
-
-                {/* Credit Card Income - NEW */}
-                <Card className="finance-card">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-medium text-gray-500">Ingresos Tarjeta de Crédito</h3>
-                      <div className="p-2 bg-purple-50 rounded-full">
-                        <CreditCard className="h-4 w-4 text-purple-500" />
-                      </div>
-                    </div>
-                    <div className="text-2xl font-bold text-purple-500 animate-value">
-                      {formatCurrency(creditCardIncome)}
-                    </div>
-                    {creditCardIncome > 0 && (
-                      <div className="text-xs text-gray-500 mt-1">
-                        Excluidos del cálculo de ingresos regulares
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -265,32 +243,17 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
                   </CardContent>
                 </Card>
 
-                {/* Zoho Regular Income */}
+                {/* Zoho Income */}
                 <Card className="finance-card">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-medium text-gray-500">Zoho (Regular)</h3>
+                      <h3 className="text-sm font-medium text-gray-500">Zoho</h3>
                       <div className="p-2 bg-green-50 rounded-full">
                         <ArrowUpIcon className="h-4 w-4 text-green-500" />
                       </div>
                     </div>
                     <div className="text-2xl font-bold text-green-500 animate-value">
                       {formatCurrency(regularIncome)}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Credit Card Income - NEW */}
-                <Card className="finance-card">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-medium text-gray-500">Tarjeta Crédito</h3>
-                      <div className="p-2 bg-purple-50 rounded-full">
-                        <CreditCard className="h-4 w-4 text-purple-500" />
-                      </div>
-                    </div>
-                    <div className="text-2xl font-bold text-purple-500 animate-value">
-                      {formatCurrency(creditCardIncome)}
                     </div>
                   </CardContent>
                 </Card>

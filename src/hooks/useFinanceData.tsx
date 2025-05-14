@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Transaction } from '@/types/financial';
 import { processTransactionData } from '@/services/zoho/utils';
@@ -32,7 +31,7 @@ export const useFinanceData = () => {
     stripeIncome, stripeFees, 
     stripeTransactionFees, stripePayoutFees, stripeAdditionalFees,
     stripeNet, stripeFeePercentage, 
-    regularIncome, creditCardIncome, processIncomeTypes 
+    regularIncome, processIncomeTypes 
   } = useIncomeProcessor();
   const { collaboratorExpenses, processCollaboratorData } = useCollaboratorProcessor();
   const { loading, error, rawResponse, usingCachedData, fetchFinancialData } = useFinancialDataFetcher();
@@ -112,7 +111,6 @@ export const useFinanceData = () => {
     stripeNet,
     stripeFeePercentage,
     regularIncome,
-    creditCardIncome, // Added this export
     collaboratorExpenses,
     startingBalance,
     updateStartingBalance,

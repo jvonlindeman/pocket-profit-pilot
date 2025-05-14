@@ -1,3 +1,4 @@
+
 export interface Transaction {
   id: string;
   date: string;
@@ -8,8 +9,6 @@ export interface Transaction {
   type: 'income' | 'expense';
   fees?: number; // Added optional fees field
   gross?: number; // Added optional gross amount field (before fees)
-  payment_method?: string; // Added payment_method field
-  is_credit_card?: boolean; // Added is_credit_card flag
 }
 
 export interface FinancialSummary {
@@ -44,7 +43,6 @@ export interface FinancialData {
   transactions: Transaction[];
   incomeBySource: CategorySummary[];
   expenseByCategory: CategorySummary[];
-  topExpenses: CategorySummary[]; // Added topExpenses property
   dailyData: {
     income: ChartData;
     expense: ChartData;
