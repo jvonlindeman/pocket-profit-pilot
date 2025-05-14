@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
@@ -9,6 +10,7 @@ import TransactionList from '@/components/Dashboard/TransactionList';
 import MonthlyBalanceEditor from '@/components/Dashboard/MonthlyBalanceEditor';
 import InitialBalanceDialog from '@/components/Dashboard/InitialBalanceDialog';
 import SalaryCalculator from '@/components/Dashboard/SalaryCalculator';
+import CacheInfo from '@/components/Dashboard/CacheInfo';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 import { Button } from '@/components/ui/button';
@@ -41,7 +43,8 @@ const Index = () => {
     collaboratorExpenses,
     startingBalance,
     updateStartingBalance,
-    usingCachedData
+    usingCachedData,
+    cacheStatus
   } = useFinanceData();
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
@@ -197,6 +200,14 @@ const Index = () => {
                 <RefreshCw className="h-4 w-4 mr-2" /> Actualizar
               </Button>
             </div>
+            
+            {/* Cache information */}
+            <CacheInfo 
+              dateRange={dateRange}
+              cacheStatus={cacheStatus}
+              isUsingCache={usingCachedData}
+              onRefresh={() => refreshData(true)}
+            />
 
             {/* Warning message when no transactions exist */}
             {financialData.transactions.length === 0 && (
@@ -263,7 +274,11 @@ const Index = () => {
 
             {/* Listado de transacciones */}
             <div className="mt-6">
-              <TransactionList transactions={financialData.transactions} />
+              <TransactionList 
+                transactions={financialData.transactions} 
+                onRefresh={handleRefresh}
+                isLoading={loading}
+              />
             </div>
           </>
         )}

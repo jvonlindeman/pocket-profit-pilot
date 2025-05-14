@@ -2,6 +2,7 @@
 import { Transaction } from "../types/financial";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateYYYYMMDD_Panama, toPanamaTime, PANAMA_TIMEZONE } from "@/utils/timezoneUtils";
+import CacheService from "./cacheService";
 
 interface StripeTransactionResponse {
   transactions: Transaction[];
@@ -42,11 +43,68 @@ const StripeService = {
   // Get transactions within a date range
   getTransactions: async (
     startDate: Date, 
-    endDate: Date
+    endDate: Date,
+    forceRefresh: boolean = false
   ): Promise<StripeData> => {
     console.log("StripeService: Fetching transactions from", startDate, "to", endDate);
     
     try {
+      // Check cache first if not forcing a refresh
+      if (!forceRefresh) {
+        const cacheCheck = await CacheService.checkCache('Stripe', startDate, endDate);
+        
+        if (cacheCheck.cached && cacheCheck.data && cacheCheck.data.length > 0) {
+          console.log("StripeService: Using cached data, found", cacheCheck.data.length, "transactions");
+          
+          // We need to calculate the summary data for Stripe from cached transactions
+          const transactions = cacheCheck.data;
+          
+          // Calculate summary data
+          const gross = transactions.reduce((sum, tx) => sum + (tx.gross || tx.amount), 0);
+          const fees = transactions.reduce((sum, tx) => sum + (tx.fees || 0), 0);
+          const transactionFees = transactions
+            .filter(tx => tx.metadata?.feeType === 'transaction')
+            .reduce((sum, tx) => sum + (tx.fees || 0), 0);
+          const payoutFees = transactions
+            .filter(tx => tx.metadata?.feeType === 'payout')
+            .reduce((sum, tx) => sum + (tx.fees || 0), 0);
+          const stripeFees = transactions
+            .filter(tx => tx.metadata?.feeType === 'stripe')
+            .reduce((sum, tx) => sum + (tx.fees || 0), 0);
+          const net = gross - fees;
+          const feePercentage = gross > 0 ? (fees / gross) * 100 : 0;
+          
+          // Store the response for debugging
+          lastRawResponse = {
+            cached: true,
+            transactions,
+            summary: {
+              gross,
+              fees, 
+              transactionFees,
+              payoutFees,
+              stripeFees,
+              net,
+              feePercentage
+            },
+            metrics: cacheCheck.metrics
+          };
+          
+          return {
+            transactions,
+            gross,
+            fees,
+            transactionFees,
+            payoutFees,
+            stripeFees,
+            advances: 0,
+            advanceFunding: 0,
+            net,
+            feePercentage
+          };
+        }
+      }
+      
       // Convert dates to Panama timezone before formatting
       const panamaStartDate = toPanamaTime(startDate);
       const panamaEndDate = toPanamaTime(endDate);
@@ -106,7 +164,18 @@ const StripeService = {
               console.error(`Error converting transaction date to Panama timezone: ${tx.date}`, e);
             }
           }
+          
+          // Add metadata for fee types if not present
+          if (tx.fees && !tx.metadata) {
+            tx.metadata = { feeType: 'transaction' };
+          }
         });
+        
+        // Store transactions in cache
+        if (response.transactions.length > 0) {
+          console.log("StripeService: Storing", response.transactions.length, "transactions in cache");
+          CacheService.storeTransactions('Stripe', startDate, endDate, response.transactions);
+        }
       }
       
       return {

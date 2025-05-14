@@ -9,6 +9,132 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      cache_metrics: {
+        Row: {
+          cache_hit: boolean
+          end_date: string
+          fetch_duration_ms: number | null
+          id: string
+          partial_hit: boolean
+          refresh_triggered: boolean
+          request_id: string | null
+          source: string
+          start_date: string
+          timestamp: string | null
+          transaction_count: number | null
+          user_agent: string | null
+        }
+        Insert: {
+          cache_hit: boolean
+          end_date: string
+          fetch_duration_ms?: number | null
+          id?: string
+          partial_hit: boolean
+          refresh_triggered: boolean
+          request_id?: string | null
+          source: string
+          start_date: string
+          timestamp?: string | null
+          transaction_count?: number | null
+          user_agent?: string | null
+        }
+        Update: {
+          cache_hit?: boolean
+          end_date?: string
+          fetch_duration_ms?: number | null
+          id?: string
+          partial_hit?: boolean
+          refresh_triggered?: boolean
+          request_id?: string | null
+          source?: string
+          start_date?: string
+          timestamp?: string | null
+          transaction_count?: number | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
+      cache_segments: {
+        Row: {
+          end_date: string
+          id: string
+          last_refreshed_at: string | null
+          metadata: Json | null
+          source: string
+          start_date: string
+          status: string
+          transaction_count: number
+        }
+        Insert: {
+          end_date: string
+          id?: string
+          last_refreshed_at?: string | null
+          metadata?: Json | null
+          source: string
+          start_date: string
+          status?: string
+          transaction_count?: number
+        }
+        Update: {
+          end_date?: string
+          id?: string
+          last_refreshed_at?: string | null
+          metadata?: Json | null
+          source?: string
+          start_date?: string
+          status?: string
+          transaction_count?: number
+        }
+        Relationships: []
+      }
+      cached_transactions: {
+        Row: {
+          amount: number
+          category: string | null
+          created_at: string | null
+          date: string
+          description: string | null
+          external_id: string
+          fees: number | null
+          fetched_at: string | null
+          gross: number | null
+          id: string
+          metadata: Json | null
+          source: string
+          type: string
+        }
+        Insert: {
+          amount: number
+          category?: string | null
+          created_at?: string | null
+          date: string
+          description?: string | null
+          external_id: string
+          fees?: number | null
+          fetched_at?: string | null
+          gross?: number | null
+          id?: string
+          metadata?: Json | null
+          source: string
+          type: string
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          created_at?: string | null
+          date?: string
+          description?: string | null
+          external_id?: string
+          fees?: number | null
+          fetched_at?: string | null
+          gross?: number | null
+          id?: string
+          metadata?: Json | null
+          source?: string
+          type?: string
+        }
+        Relationships: []
+      }
       monthly_balances: {
         Row: {
           balance: number
@@ -89,7 +215,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_date_range_cached: {
+        Args: { p_source: string; p_start_date: string; p_end_date: string }
+        Returns: {
+          is_cached: boolean
+          is_partial: boolean
+          segments_found: number
+          missing_start_date: string
+          missing_end_date: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

@@ -2,6 +2,8 @@ import { Transaction } from "../types/financial";
 import { fetchTransactionsFromWebhook } from "./zoho/apiClient";
 import { getMockTransactions } from "./zoho/mockData";
 import { supabase } from "@/integrations/supabase/client";
+import CacheService from "./cacheService";
+import { formatDateYYYYMMDD } from "@/utils/dateUtils";
 
 // Variable para almacenar la última respuesta cruda del webhook
 let lastRawResponse: any = null;
@@ -32,6 +34,21 @@ const ZohoService = {
       console.log("ZohoService: Getting transactions for", startDate, "to", endDate, 
         forceRefresh ? "with force refresh" : "using cache if available");
       
+      if (!forceRefresh) {
+        // Try to get data from cache first
+        const cacheCheck = await CacheService.checkCache('Zoho', startDate, endDate);
+        
+        if (cacheCheck.cached && cacheCheck.data) {
+          console.log("ZohoService: Using cached data, found", cacheCheck.data.length, "transactions");
+          lastRawResponse = { cached: true, data: cacheCheck.data, ...cacheCheck.metrics };
+          cacheStats.hits++;
+          return cacheCheck.data;
+        } else {
+          console.log("ZohoService: Cache miss, fetching from source");
+          cacheStats.misses++;
+        }
+      }
+      
       // Call the API client with the returnRawResponse option only once
       const response = await fetchTransactionsFromWebhook(startDate, endDate, forceRefresh, true);
       
@@ -40,67 +57,43 @@ const ZohoService = {
         lastRawResponse = response;
       }
       
-      // Check if we got a cache hit
-      if (response && response.cached) {
-        // Update cache stats
-        cacheStats.hits++;
-        if (response.data && response.data.length > 0 && response.data[0].sync_date) {
-          const latestSync = new Date(Math.max(...response.data.map((tx: any) => new Date(tx.sync_date).getTime())));
-          cacheStats.lastRefresh = latestSync;
-        }
-        
-        console.log("ZohoService: Using cached data, processed", 
-          response.data ? response.data.length : 0, "transactions");
-        
-        // If raw response contains data directly, transform and return it
-        if (response.data && Array.isArray(response.data)) {
-          const normalizedTransactions: Transaction[] = response.data.map((tx: any) => ({
-            id: tx.id,
-            date: tx.date,
-            amount: Number(tx.amount),
-            description: tx.description || '',
-            category: tx.category,
-            source: normalizeSource(tx.source),
-            type: normalizeType(tx.type)
-          }));
-          
-          return normalizedTransactions;
-        }
+      // Process the response to get transactions
+      let transactions: Transaction[] = [];
+      
+      // If raw response contains data directly, transform it
+      if (response && response.cached_transactions && Array.isArray(response.cached_transactions)) {
+        transactions = response.cached_transactions;
+      } else if (response && response.data && Array.isArray(response.data)) {
+        transactions = response.data.map((tx: any) => ({
+          id: tx.id,
+          date: tx.date,
+          amount: Number(tx.amount),
+          description: tx.description || '',
+          category: tx.category,
+          source: normalizeSource(tx.source),
+          type: normalizeType(tx.type)
+        }));
       } else {
-        // No cache hit, it's a fresh response
-        cacheStats.misses++;
-        cacheStats.lastRefresh = new Date();
+        // If no processed transactions, try to extract them or fall back to mock data
+        const apiTransactions = await fetchTransactionsFromWebhook(startDate, endDate, forceRefresh);
         
-        // If response contains cached_transactions, use those
-        if (response && response.cached_transactions && Array.isArray(response.cached_transactions)) {
-          console.log("ZohoService: Using freshly fetched and processed data,", 
-            response.cached_transactions.length, "transactions");
-            
-          const normalizedTransactions: Transaction[] = response.cached_transactions.map((tx: any) => ({
-            id: tx.id,
-            date: tx.date,
-            amount: Number(tx.amount),
-            description: tx.description || '',
-            category: tx.category,
-            source: normalizeSource(tx.source),
-            type: normalizeType(tx.type)
-          }));
-          
-          return normalizedTransactions;
-        }
-        
-        // If no processed transactions, try to extract them from the response or fall back to mock data
-        const transactions = await fetchTransactionsFromWebhook(startDate, endDate, forceRefresh);
-        
-        if (transactions && transactions.length > 0) {
-          console.log(`ZohoService: Successfully processed ${transactions.length} transactions`);
-          return transactions;
+        if (apiTransactions && apiTransactions.length > 0) {
+          transactions = apiTransactions;
+        } else {
+          console.warn("ZohoService: No transactions returned, using mock data");
+          transactions = getMockTransactions(startDate, endDate);
         }
       }
       
-      // If all else fails, use mock data
-      console.warn("ZohoService: No transactions returned, using mock data");
-      return getMockTransactions(startDate, endDate);
+      // Store the transactions in cache if we have real data (not mock)
+      if (transactions.length > 0 && !transactions[0].id.startsWith('mock')) {
+        console.log("ZohoService: Storing", transactions.length, "transactions in cache");
+        CacheService.storeTransactions('Zoho', startDate, endDate, transactions);
+      }
+      
+      console.log(`ZohoService: Returning ${transactions.length} transactions`);
+      cacheStats.lastRefresh = new Date();
+      return transactions;
     } catch (error) {
       console.error("ZohoService: Error in getTransactions", error);
       cacheStats.errors++;
@@ -131,11 +124,19 @@ const ZohoService = {
     
     // Return processed transactions directly if available
     if (response && response.cached_transactions && Array.isArray(response.cached_transactions)) {
+      // Store in cache for future use
+      CacheService.storeTransactions('Zoho', startDate, endDate, response.cached_transactions);
       return response.cached_transactions;
     }
     
     // Otherwise use the standard method to process the transactions
     const transactions = await fetchTransactionsFromWebhook(startDate, endDate, true);
+    
+    // Store in cache for future use if we have real data (not mock)
+    if (transactions && transactions.length > 0 && !transactions[0].id.startsWith('mock')) {
+      CacheService.storeTransactions('Zoho', startDate, endDate, transactions);
+    }
+    
     return transactions;
   },
   
@@ -186,7 +187,38 @@ const ZohoService = {
   
   // Check for stale cache and refresh if needed
   checkAndRefreshCache: async (startDate: Date, endDate: Date): Promise<void> => {
-    console.log("ZohoService: checkAndRefreshCache - Cache handling removed");
+    try {
+      console.log("ZohoService: Checking if cache needs refresh for", startDate, "to", endDate);
+      
+      // Get cache status without forcing refresh
+      const cacheCheck = await CacheService.checkCache('Zoho', startDate, endDate, false);
+      
+      // If data is cached, no need to refresh
+      if (cacheCheck.cached && cacheCheck.status === 'complete') {
+        console.log("ZohoService: Cache is fresh, no refresh needed");
+        return;
+      }
+      
+      // If cache is missing or partial, consider refreshing
+      const lastRefreshTime = new Date(cacheStats.lastRefresh).getTime();
+      const now = Date.now();
+      const hoursSinceRefresh = (now - lastRefreshTime) / (1000 * 60 * 60);
+      
+      // Refresh if more than 6 hours since last refresh or if cache is missing
+      if (hoursSinceRefresh > 6 || !cacheCheck.cached) {
+        console.log("ZohoService: Cache is stale or missing, scheduling refresh");
+        
+        // Use setTimeout to avoid blocking
+        setTimeout(() => {
+          console.log("ZohoService: Executing scheduled cache refresh");
+          this.forceRefresh(startDate, endDate).catch(console.error);
+        }, 100);
+      } else {
+        console.log("ZohoService: Cache refresh not needed yet");
+      }
+    } catch (error) {
+      console.error("ZohoService: Error checking cache freshness:", error);
+    }
   }
 };
 

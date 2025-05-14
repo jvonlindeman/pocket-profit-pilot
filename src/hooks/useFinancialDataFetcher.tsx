@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 import ZohoService from '@/services/zohoService';
 import StripeService from '@/services/stripeService';
 import { formatDateYYYYMMDD, logDateInfo } from '@/utils/dateUtils';
+import CacheService from '@/services/cacheService';
 
 export const useFinancialDataFetcher = () => {
   const [loading, setLoading] = useState<boolean>(false);
@@ -10,6 +11,13 @@ export const useFinancialDataFetcher = () => {
   const [rawResponse, setRawResponse] = useState<any>(null);
   const [usingCachedData, setUsingCachedData] = useState<boolean>(false);
   const [lastFetchTimestamp, setLastFetchTimestamp] = useState<number>(0);
+  const [cacheStatus, setCacheStatus] = useState<{
+    zoho: { hit: boolean, partial: boolean },
+    stripe: { hit: boolean, partial: boolean }
+  }>({
+    zoho: { hit: false, partial: false },
+    stripe: { hit: false, partial: false }
+  });
 
   // Fetch financial data from external services
   const fetchFinancialData = useCallback(async (
@@ -33,12 +41,41 @@ export const useFinancialDataFetcher = () => {
     setLoading(true);
     setError(null);
     setUsingCachedData(false);
+    
+    // Reset cache status
+    setCacheStatus({
+      zoho: { hit: false, partial: false },
+      stripe: { hit: false, partial: false }
+    });
 
     try {
       // Log exact date objects for debugging
       logDateInfo("Original dateRange from datepicker", dateRange);
       
-      // Get transactions from Zoho Books - using the exact dates without modifications
+      // Check Zoho cache first if not forcing refresh
+      let zohoFromCache = false;
+      if (!forceRefresh) {
+        const zohoCache = await CacheService.checkCache(
+          'Zoho', 
+          dateRange.startDate, 
+          dateRange.endDate
+        );
+        
+        if (zohoCache.cached && zohoCache.data) {
+          zohoFromCache = true;
+          setCacheStatus(prev => ({
+            ...prev,
+            zoho: { hit: true, partial: false }
+          }));
+        } else if (zohoCache.partial) {
+          setCacheStatus(prev => ({
+            ...prev,
+            zoho: { hit: false, partial: true }
+          }));
+        }
+      }
+      
+      // Get transactions from Zoho Books - either from cache or API
       const zohoData = await ZohoService.getTransactions(
         dateRange.startDate, 
         dateRange.endDate,
@@ -47,7 +84,7 @@ export const useFinancialDataFetcher = () => {
 
       // Detect if we're using cached data based on the response
       const rawResponseData = ZohoService.getLastRawResponse();
-      if (rawResponseData && rawResponseData.cached) {
+      if (rawResponseData && (rawResponseData.cached || zohoFromCache)) {
         console.log("Using cached data from previous response");
         setUsingCachedData(true);
       }
@@ -60,12 +97,41 @@ export const useFinancialDataFetcher = () => {
       // Process collaborator data
       callbacks.onCollaboratorData(rawData);
 
-      // Get transactions from Stripe - always using the API directly
+      // Check Stripe cache if not forcing refresh
+      let stripeFromCache = false;
+      if (!forceRefresh) {
+        const stripeCache = await CacheService.checkCache(
+          'Stripe', 
+          dateRange.startDate, 
+          dateRange.endDate
+        );
+        
+        if (stripeCache.cached && stripeCache.data) {
+          stripeFromCache = true;
+          setCacheStatus(prev => ({
+            ...prev,
+            stripe: { hit: true, partial: false }
+          }));
+        } else if (stripeCache.partial) {
+          setCacheStatus(prev => ({
+            ...prev,
+            stripe: { hit: false, partial: true }
+          }));
+        }
+      }
+
+      // Get transactions from Stripe
       console.log("Fetching from Stripe:", dateRange.startDate, dateRange.endDate);
       const stripeData = await StripeService.getTransactions(
         dateRange.startDate,
-        dateRange.endDate
+        dateRange.endDate,
+        forceRefresh
       );
+      
+      // If both data sources are from cache, mark as using cached data
+      if (zohoFromCache && stripeFromCache) {
+        setUsingCachedData(true);
+      }
 
       // Combine the data
       const combinedData = [...zohoData, ...stripeData.transactions];
@@ -109,5 +175,6 @@ export const useFinancialDataFetcher = () => {
     rawResponse,
     usingCachedData,
     fetchFinancialData,
+    cacheStatus
   };
 };

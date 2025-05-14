@@ -35,7 +35,14 @@ export const useFinanceData = () => {
     regularIncome, processIncomeTypes 
   } = useIncomeProcessor();
   const { collaboratorExpenses, processCollaboratorData } = useCollaboratorProcessor();
-  const { loading, error, rawResponse, usingCachedData, fetchFinancialData } = useFinancialDataFetcher();
+  const { 
+    loading, 
+    error, 
+    rawResponse, 
+    usingCachedData, 
+    fetchFinancialData,
+    cacheStatus  // Add cacheStatus from the fetcher hook
+  } = useFinancialDataFetcher();
 
   // Datos financieros procesados
   const financialData = useMemo(() => {
@@ -115,6 +122,7 @@ export const useFinanceData = () => {
     collaboratorExpenses,
     startingBalance,
     updateStartingBalance,
-    usingCachedData
+    usingCachedData,
+    cacheStatus  // Add cacheStatus to returned values
   };
 };
