@@ -31,13 +31,13 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
   // Calculate remaining Zoho income after all deductions
   const remainingZohoIncome = zohoIncome - totalZohoDeductions;
   
-  // Calculate half of Stripe income
+  // Calculate half of Stripe income and half of remaining Zoho income
   const halfStripeIncome = stripeIncome / 2;
+  const halfRemainingZoho = remainingZohoIncome / 2;
   
-  // Calculate salary using the updated formula including tax reserve
-  // (Zoho income - OPEX - ITBM - Profit First - Tax Reserve + Stripe income/2) / 2
-  const availableForSalary = remainingZohoIncome + halfStripeIncome;
-  const salary = availableForSalary / 2;
+  // Calculate salary using the corrected formula: 50% of Stripe income + 50% of remaining Zoho income
+  // Instead of (remainingZohoIncome + halfStripeIncome) / 2
+  const salary = halfStripeIncome + halfRemainingZoho;
   
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -88,21 +88,26 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
               <h3 className="text-sm font-medium text-blue-800 mb-1">Zoho Restante</h3>
               <div className="text-lg font-bold text-blue-700">{formatCurrency(remainingZohoIncome)}</div>
             </div>
+
+            <div className="bg-white p-3 rounded-lg shadow-sm">
+              <h3 className="text-sm font-medium text-gray-500 mb-1">50% de Zoho Restante</h3>
+              <div className="text-lg font-bold text-blue-600">{formatCurrency(halfRemainingZoho)}</div>
+            </div>
           </div>
           
           <div className="space-y-4">
             <div className="bg-white p-3 rounded-lg shadow-sm">
-              <h3 className="text-sm font-medium text-gray-500 mb-1">Stripe (50%)</h3>
-              <div className="text-lg font-bold text-green-600">{formatCurrency(halfStripeIncome)}</div>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Stripe (Total)</h3>
+              <div className="text-lg font-bold text-green-600">{formatCurrency(stripeIncome)}</div>
             </div>
             
             <div className="bg-white p-3 rounded-lg shadow-sm">
-              <h3 className="text-sm font-medium text-gray-500 mb-1">Disponible para Salario</h3>
-              <div className="text-lg font-bold text-blue-600">{formatCurrency(availableForSalary)}</div>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">50% de Stripe</h3>
+              <div className="text-lg font-bold text-blue-600">{formatCurrency(halfStripeIncome)}</div>
             </div>
             
             <div className="bg-blue-100 p-4 rounded-lg border border-blue-200">
-              <h3 className="text-sm font-medium text-blue-800 mb-1">Salario (50% del disponible)</h3>
+              <h3 className="text-sm font-medium text-blue-800 mb-1">Salario (50% Stripe + 50% Zoho Restante)</h3>
               <div className="text-xl font-bold text-blue-800">{formatCurrency(salary)}</div>
             </div>
           </div>
