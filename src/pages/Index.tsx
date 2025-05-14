@@ -8,6 +8,7 @@ import ProfitAnalysis from '@/components/Dashboard/ProfitAnalysis';
 import TransactionList from '@/components/Dashboard/TransactionList';
 import MonthlyBalanceEditor from '@/components/Dashboard/MonthlyBalanceEditor';
 import InitialBalanceDialog from '@/components/Dashboard/InitialBalanceDialog';
+import SalaryCalculator from '@/components/Dashboard/SalaryCalculator';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 import { Button } from '@/components/ui/button';
@@ -44,7 +45,7 @@ const Index = () => {
   } = useFinanceData();
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
-  const { checkBalanceExists } = useMonthlyBalance({ currentDate: dateRange.startDate });
+  const { checkBalanceExists, monthlyBalance } = useMonthlyBalance({ currentDate: dateRange.startDate });
   const { toast } = useToast();
 
   // Formateamos fechas para títulos
@@ -113,6 +114,11 @@ const Index = () => {
     }
     return { labels: [], values: [] };
   };
+
+  // Get calculator values from the monthly balance
+  const opexPercentage = monthlyBalance?.opex_amount !== null ? monthlyBalance?.opex_amount || 35 : 35;
+  const itbmAmount = monthlyBalance?.itbm_amount !== null ? monthlyBalance?.itbm_amount || 0 : 0;
+  const profitPercentage = monthlyBalance?.profit_percentage !== null ? monthlyBalance?.profit_percentage || 1 : 1;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -205,6 +211,17 @@ const Index = () => {
               <MonthlyBalanceEditor 
                 currentDate={dateRange.startDate}
                 onBalanceChange={handleBalanceChange}
+              />
+            </div>
+
+            {/* New Salary Calculator */}
+            <div className="mb-6">
+              <SalaryCalculator 
+                zohoIncome={regularIncome}
+                stripeIncome={stripeNet}
+                opexPercentage={opexPercentage}
+                itbmAmount={itbmAmount}
+                profitPercentage={profitPercentage}
               />
             </div>
 

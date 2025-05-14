@@ -69,4 +69,7 @@ export interface MonthlyBalance {
   created_at: string;
   updated_at: string;
   stripe_override: number | null; // Added to match the database schema
+  opex_amount: number | null; // Added for OPEX percentage
+  itbm_amount: number | null; // Added for ITBM amount
+  profit_percentage: number | null; // Added for Profit First percentage
 }

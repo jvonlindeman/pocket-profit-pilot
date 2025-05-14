@@ -21,6 +21,9 @@ interface MonthlyBalanceEditorProps {
 // Define form schema
 const formSchema = z.object({
   balance: z.coerce.number().min(0, "El saldo debe ser mayor o igual a 0"),
+  opexPercentage: z.coerce.number().min(0, "El OPEX debe ser mayor o igual a 0").default(35),
+  itbmAmount: z.coerce.number().min(0, "El ITBM debe ser mayor o igual a 0").default(0),
+  profitPercentage: z.coerce.number().min(0, "El Profit First debe ser mayor o igual a 0").default(1),
   notes: z.string().optional()
 });
 
@@ -35,6 +38,9 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
     resolver: zodResolver(formSchema),
     defaultValues: {
       balance: 0,
+      opexPercentage: 35, // Default 35%
+      itbmAmount: 0,
+      profitPercentage: 1, // Default 1%
       notes: ''
     },
   });
@@ -54,6 +60,9 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
     if (monthlyBalance) {
       form.reset({
         balance: monthlyBalance.balance,
+        opexPercentage: monthlyBalance.opex_amount !== null ? monthlyBalance.opex_amount : 35,
+        itbmAmount: monthlyBalance.itbm_amount !== null ? monthlyBalance.itbm_amount : 0,
+        profitPercentage: monthlyBalance.profit_percentage !== null ? monthlyBalance.profit_percentage : 1,
         notes: monthlyBalance.notes || ''
       });
       
@@ -67,7 +76,13 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
 
   // Handle form submission
   const onSubmit = async (data: FormValues) => {
-    const success = await updateMonthlyBalance(data.balance, data.notes);
+    const success = await updateMonthlyBalance(
+      data.balance, 
+      data.opexPercentage, 
+      data.itbmAmount, 
+      data.profitPercentage, 
+      data.notes
+    );
     
     // Only notify parent component if update was successful
     if (success && onBalanceChange) {
@@ -104,6 +119,65 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
                 </FormItem>
               )}
             />
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="opexPercentage"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>OPEX (%)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.1" 
+                        placeholder="35.0" 
+                        {...field} 
+                        disabled={loading}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="itbmAmount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>ITBM ($)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="0.00" 
+                        {...field} 
+                        disabled={loading}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="profitPercentage"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Profit First (%)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.1" 
+                        placeholder="1.0" 
+                        {...field} 
+                        disabled={loading}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
             
             <FormField
               control={form.control}

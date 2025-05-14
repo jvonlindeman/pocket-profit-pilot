@@ -33,9 +33,15 @@ export const useMonthlyBalanceManager = () => {
     }
   }, []);
 
-  // Update the starting balance
-  // Fix: Reordering parameters so required parameter 'date' comes before optional parameter 'notes'
-  const updateStartingBalance = useCallback(async (balance: number, date: Date, notes?: string) => {
+  // Update the starting balance with additional calculator fields
+  const updateStartingBalance = useCallback(async (
+    balance: number, 
+    date: Date, 
+    opexPercentage: number = 35,
+    itbmAmount: number = 0,
+    profitPercentage: number = 1,
+    notes?: string
+  ) => {
     try {
       const monthYear = formatDate(date, 'yyyy-MM');
       
@@ -48,6 +54,9 @@ export const useMonthlyBalanceManager = () => {
       
       const updateData: any = {
         balance,
+        opex_amount: opexPercentage,
+        itbm_amount: itbmAmount,
+        profit_percentage: profitPercentage,
         notes: notes || (existingData?.notes || null),
       };
       
