@@ -46,8 +46,9 @@ export const useFinanceData = () => {
 
   // Datos financieros procesados
   const financialData = useMemo(() => {
-    return financialService.processTransactionData(transactions, startingBalance);
-  }, [transactions, startingBalance]);
+    // Make sure to pass collaboratorExpenses to ensure they're included in the summary
+    return financialService.processTransactionData(transactions, startingBalance, collaboratorExpenses);
+  }, [transactions, startingBalance, collaboratorExpenses]);
 
   // Función para actualizar el rango de fechas
   const updateDateRange = useCallback((newRange: { startDate: Date; endDate: Date }) => {

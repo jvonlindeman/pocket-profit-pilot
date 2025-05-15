@@ -118,26 +118,31 @@ const TransactionList: React.FC<TransactionListProps> = ({
                 ))
               ) : filteredTransactions.length > 0 ? (
                 // Mostrar datos si hay transacciones
-                filteredTransactions.map((transaction) => (
-                  <TableRow key={transaction.id}>
-                    <TableCell>{formatDateForDisplay(transaction.date)}</TableCell>
-                    <TableCell>{transaction.description}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        {transaction.type === 'expense' && (
-                          <span className="mr-2 text-red-500 rounded-full">⬤</span>
-                        )}
-                        <span className="px-2 py-1 text-gray-700 rounded text-sm">
-                          {transaction.category}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{transaction.source}</TableCell>
-                    <TableCell className={`text-right ${transaction.type === 'expense' ? 'text-red-600' : 'text-green-600'} font-medium`}>
-                      {transaction.type === 'expense' ? '-' : ''}${transaction.amount.toFixed(2)}
-                    </TableCell>
-                  </TableRow>
-                ))
+                filteredTransactions.map((transaction) => {
+                  // Create a unique key using multiple properties to avoid duplicate keys
+                  const transactionKey = `${transaction.id}-${transaction.date}-${transaction.amount}-${transaction.description?.substring(0, 10) || ''}`;
+                  
+                  return (
+                    <TableRow key={transactionKey}>
+                      <TableCell>{formatDateForDisplay(transaction.date)}</TableCell>
+                      <TableCell>{transaction.description}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center">
+                          {transaction.type === 'expense' && (
+                            <span className={`mr-2 ${transaction.category?.toLowerCase().includes('colaborador') ? 'text-amber-500' : 'text-red-500'} rounded-full`}>⬤</span>
+                          )}
+                          <span className="px-2 py-1 text-gray-700 rounded text-sm">
+                            {transaction.category}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{transaction.source}</TableCell>
+                      <TableCell className={`text-right ${transaction.type === 'expense' ? transaction.category?.toLowerCase().includes('colaborador') ? 'text-amber-600' : 'text-red-600' : 'text-green-600'} font-medium`}>
+                        {transaction.type === 'expense' ? '-' : ''}${transaction.amount.toFixed(2)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               ) : (
                 // Mostrar mensaje si no hay transacciones
                 <TableRow>
