@@ -5,7 +5,6 @@ import { useCollaboratorProcessor } from '@/hooks/useCollaboratorProcessor';
 import { useIncomeProcessor } from '@/hooks/useIncomeProcessor';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 import { useTransactionData } from '@/hooks/useTransactionData';
-import { toDayPickerDateRange, toFinancialDateRange } from '@/utils/dateRangeAdapter';
 
 /**
  * Hook principal que integra todos los hooks financieros
@@ -59,8 +58,6 @@ export const useFinanceData = () => {
 
   // Función pública para refrescar datos (forzando o no)
   const refreshData = useCallback((force = false) => {
-    // El problema está aquí: necesitamos adaptar las firmas de las funciones
-    // para que coincidan con lo que espera useTransactionData
     return refreshTransactionData(force, {
       // Adaptamos la función processCollaboratorData para que acepte un solo argumento
       onCollaboratorData: (data: any) => processCollaboratorData(data),

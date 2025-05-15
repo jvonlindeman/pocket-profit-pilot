@@ -17,37 +17,23 @@ import CacheStats from './CacheStats';
 import TransactionFilters, { FilterOptions } from './TransactionFilters';
 import TransactionCategorySummary from './TransactionCategorySummary';
 import CacheMonitor from './CacheMonitor';
+import { useCacheContext } from '@/contexts/CacheContext';
 
 interface TransactionListProps {
   transactions: Transaction[];
   onRefresh: () => void;
   isLoading: boolean;
   dateRange?: { startDate: Date; endDate: Date };
-  cacheStatus?: {
-    zoho: { hit: boolean, partial: boolean },
-    stripe: { hit: boolean, partial: boolean }
-  };
-  isUsingCache?: boolean;
 }
 
 const TransactionList: React.FC<TransactionListProps> = ({
   transactions,
   onRefresh,
   isLoading,
-  dateRange,
-  cacheStatus,
-  isUsingCache
+  dateRange
 }) => {
-  // Add default values for optional props
-  const cacheProps = {
-    dateRange: dateRange || { startDate: new Date(), endDate: new Date() },
-    cacheStatus: cacheStatus || {
-      zoho: { hit: false, partial: false },
-      stripe: { hit: false, partial: false }
-    },
-    isUsingCache: isUsingCache || false,
-    onRefresh
-  };
+  // Use the cache context
+  const { status: cacheStatus, isUsingCache } = useCacheContext();
 
   // State for filtered transactions
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>(transactions);
@@ -64,14 +50,6 @@ const TransactionList: React.FC<TransactionListProps> = ({
     setFilteredTransactions(transactions);
   }, [transactions]);
   
-  // Improved cache status debugging with more detailed information
-  console.log("TransactionList render - Cache Status:", cacheStatus, 
-    "Using Cache:", isUsingCache, 
-    "Has cached transactions:", transactions.some(tx => tx.fromCache === true),
-    "Has isCached flag:", transactions.some(tx => tx.isCached === true),
-    "Has cache_hit flag:", transactions.some(tx => tx.cache_hit === true)
-  );
-  
   // Generate a unique key for each transaction to avoid duplicate key warnings
   const getTransactionKey = (transaction: Transaction, index: number) => {
     return transaction.id ? 
@@ -84,9 +62,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
       {/* Cache information */}
       {dateRange && (
         <CacheStats 
-          dateRange={cacheProps.dateRange}
-          cacheStatus={cacheProps.cacheStatus}
-          isUsingCache={cacheProps.isUsingCache}
+          dateRange={dateRange}
           onRefresh={onRefresh}
         />
       )}

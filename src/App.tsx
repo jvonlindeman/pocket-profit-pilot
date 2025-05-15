@@ -1,32 +1,47 @@
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
-import ZohoCallback from "./pages/ZohoCallback";
-import Settings from "./pages/Settings";
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from '@/components/ui/toaster';
+import { CacheProvider } from '@/contexts/CacheContext';
 
-const queryClient = new QueryClient();
+// Import your components
+import ZohoDebug from './components/ZohoDebug';
+import ZohoConfig from './components/ZohoConfig';
+import StripeDebug from './components/StripeDebug';
+import WebhookRequestDebug from './components/WebhookRequestDebug';
+import WebhookDebug from './components/WebhookDebug';
+import FinanceDashboard from './components/Dashboard/FinanceDashboard';
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/zoho/callback" element={<ZohoCallback />} />
-          <Route path="/settings" element={<Settings />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+import './App.css';
+
+// Create a client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: 1,
+    },
+  },
+});
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <CacheProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<FinanceDashboard />} />
+            <Route path="/zoho" element={<ZohoDebug />} />
+            <Route path="/zoho/config" element={<ZohoConfig />} />
+            <Route path="/stripe" element={<StripeDebug />} />
+            <Route path="/webhook-request" element={<WebhookRequestDebug />} />
+            <Route path="/webhook" element={<WebhookDebug />} />
+          </Routes>
+          <Toaster />
+        </Router>
+      </CacheProvider>
+    </QueryClientProvider>
+  );
+}
 
 export default App;

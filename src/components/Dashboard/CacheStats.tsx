@@ -3,30 +3,23 @@ import React, { useState } from 'react';
 import { AlertTriangle, CheckCircle, RefreshCw, Database } from 'lucide-react';
 import { Button } from '../ui/button';
 import CacheMonitor from './CacheMonitor';
+import { useCacheContext } from '@/contexts/CacheContext';
 
 interface CacheStatsProps {
   dateRange: { startDate: Date; endDate: Date };
-  cacheStatus?: { 
-    zoho: { hit: boolean, partial: boolean },
-    stripe: { hit: boolean, partial: boolean }
-  };
-  isUsingCache?: boolean;
   onRefresh: () => void;
 }
 
 const CacheStats: React.FC<CacheStatsProps> = ({ 
   dateRange, 
-  cacheStatus, 
-  isUsingCache, 
   onRefresh 
 }) => {
   const [showDebug, setShowDebug] = useState<boolean>(false);
-  
-  // Default values if props not provided
-  const hasZohoCache = cacheStatus?.zoho?.hit || false;
-  const hasStripeCache = cacheStatus?.stripe?.hit || false;
+  const { status: cacheStatus, isUsingCache } = useCacheContext();
   
   // Check if using cache from either source
+  const hasZohoCache = cacheStatus?.zoho?.hit || false;
+  const hasStripeCache = cacheStatus?.stripe?.hit || false;
   const usingCache = isUsingCache || hasZohoCache || hasStripeCache;
   
   // Check partial cache usage
