@@ -1,17 +1,22 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import DateRangePicker from '@/components/Dashboard/DateRangePicker';
+import FinanceSummary from '@/components/Dashboard/FinanceSummary';
+import TransactionList from '@/components/Dashboard/TransactionList';
+import MonthlyBalanceEditor from '@/components/Dashboard/MonthlyBalanceEditor';
+import InitialBalanceDialog from '@/components/Dashboard/InitialBalanceDialog';
+import SalaryCalculator from '@/components/Dashboard/SalaryCalculator';
+import CacheStats from '@/components/Dashboard/CacheStats';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
-import InitialBalanceDialog from '@/components/Dashboard/InitialBalanceDialog';
+import { Button } from '@/components/ui/button';
+import { RefreshCw, Settings, Bug, Play } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-import { toFinancialDateRange, toDayPickerDateRange } from '@/utils/dateRangeAdapter';
-import FinanceHeader from '@/components/Dashboard/FinanceHeader';
-import FinanceWelcome from '@/components/Dashboard/FinanceWelcome';
-import FinanceLoading from '@/components/Dashboard/FinanceLoading';
-import FinanceError from '@/components/Dashboard/FinanceError';
-import FinanceDashboard from '@/components/Dashboard/FinanceDashboard';
-import DebugTools from '@/components/Dashboard/DebugTools';
+import WebhookDebug from '@/components/WebhookDebug';
+import WebhookRequestDebug from '@/components/WebhookRequestDebug';
+import StripeDebug from '@/components/StripeDebug';
 import { DateRange } from 'react-day-picker';
+import { toFinancialDateRange, toDayPickerDateRange } from '@/utils/dateRangeAdapter';
 
 const Index = () => {
   const {
@@ -33,24 +38,18 @@ const Index = () => {
     stripeFeePercentage,
     regularIncome,
     collaboratorExpenses,
+    startingBalance,
     updateStartingBalance,
     usingCachedData,
     cacheStatus
   } = useFinanceData();
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
-  const [calculatorRefreshKey, setCalculatorRefreshKey] = useState(0);
   
   // Convert financial date range to compatible format for useMonthlyBalance
   const currentMonthDate = dateRange.startDate || new Date();
   
-  // Use the consolidated hook for monthly balance management
-  const { 
-    checkBalanceExists, 
-    monthlyBalance, 
-    fetchMonthlyBalance, 
-    startingBalance 
-  } = useMonthlyBalance({ 
+  const { checkBalanceExists, monthlyBalance } = useMonthlyBalance({ 
     currentDate: currentMonthDate
   });
   
@@ -95,24 +94,20 @@ const Index = () => {
     }
   };
 
-  // Handle balance saved in dialog - now triggers calculator refresh
+  // Handle balance saved in dialog
   const handleBalanceSaved = () => {
     toast({
       title: 'Balance inicial guardado',
       description: 'Cargando datos financieros...',
     });
     refreshData(true);
-    // Force calculator refresh
-    setCalculatorRefreshKey(prev => prev + 1);
   };
 
-  // Handler for balance changes in the MonthlyBalanceEditor - improved to trigger calculator refresh
+  // Handler for balance changes in the MonthlyBalanceEditor
   const handleBalanceChange = (balance: number) => {
     console.log("Balance changed in editor:", balance);
     // We need to make sure the UI reflects the new balance
     refreshData(false);
-    // Force calculator refresh
-    setCalculatorRefreshKey(prev => prev + 1);
   };
 
   // Handler for data refresh
@@ -123,8 +118,6 @@ const Index = () => {
       description: 'Obteniendo datos más recientes...',
     });
     refreshData(true);
-    // Force calculator refresh
-    setCalculatorRefreshKey(prev => prev + 1);
   };
 
   // Adapter function to convert between date range formats
@@ -140,12 +133,15 @@ const Index = () => {
     return toDayPickerDateRange(financialDateRange);
   };
 
-  // Ensure we fetch the monthly balance when date range changes
-  useEffect(() => {
-    if (currentMonthDate) {
-      fetchMonthlyBalance();
-    }
-  }, [currentMonthDate, fetchMonthlyBalance]);
+  // Get calculator values from the monthly balance
+  const opexAmount = monthlyBalance?.opex_amount !== null ? monthlyBalance?.opex_amount || 35 : 35;
+  const itbmAmount = monthlyBalance?.itbm_amount !== null ? monthlyBalance?.itbm_amount || 0 : 0;
+  const profitPercentage = monthlyBalance?.profit_percentage !== null ? monthlyBalance?.profit_percentage || 1 : 1;
+
+  // Calculate total Zoho expenses - all expenses except those from Stripe
+  const totalZohoExpenses = financialData.transactions
+    .filter(tx => tx.type === 'expense' && tx.source !== 'Stripe')
+    .reduce((sum, tx) => sum + tx.amount, 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -158,54 +154,158 @@ const Index = () => {
       />
       
       {/* Header section */}
-      <FinanceHeader
-        dateRange={toDayPickerDateRange(dateRange)}
-        onRangeChange={handleDateRangeChange}
-        getCurrentMonthRange={getDatePickerCurrentMonthRange}
-      />
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Analizador Financiero</h1>
+              <p className="mt-1 text-sm text-gray-500">Análisis de ingresos y gastos para tu agencia</p>
+            </div>
+            <div className="mt-4 md:mt-0 flex items-center space-x-3">
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/settings">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Configuración
+                </Link>
+              </Button>
+              <div className="w-full md:w-64">
+                <DateRangePicker
+                  dateRange={toDayPickerDateRange(dateRange)}
+                  onRangeChange={handleDateRangeChange}
+                  getCurrentMonthRange={getDatePickerCurrentMonthRange}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {!dataInitialized && (
-          <FinanceWelcome onLoadData={handleInitialLoad} />
+          <div className="flex flex-col items-center justify-center py-16 bg-white rounded-lg shadow-sm mb-6">
+            <h2 className="text-xl font-semibold text-gray-700 mb-4">Bienvenido al Analizador Financiero</h2>
+            <p className="text-gray-500 mb-6 text-center max-w-md">
+              Haz clic en el botón para cargar los datos financieros del periodo seleccionado.
+            </p>
+            <Button onClick={handleInitialLoad} className="gap-2">
+              <Play className="h-4 w-4" /> Cargar Datos Financieros
+            </Button>
+          </div>
         )}
         
-        {loading && <FinanceLoading />}
+        {loading && (
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-finance-profit"></div>
+          </div>
+        )}
         
         {error && (
-          <FinanceError error={error} onRetry={handleRefresh} />
+          <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-4 mb-6">
+            <p>{error}</p>
+            <Button variant="outline" className="mt-2" onClick={handleRefresh}>
+              <RefreshCw className="h-4 w-4 mr-2" /> Reintentar
+            </Button>
+          </div>
         )}
         
         {dataInitialized && !loading && !error && (
-          <FinanceDashboard
-            periodTitle={periodTitle}
-            financialData={financialData}
-            dateRange={dateRange}
-            cacheStatus={cacheStatus}
-            usingCachedData={usingCachedData}
-            stripeIncome={stripeIncome}
-            stripeFees={stripeFees}
-            stripeTransactionFees={stripeTransactionFees}
-            stripePayoutFees={stripePayoutFees}
-            stripeAdditionalFees={stripeAdditionalFees}
-            stripeNet={stripeNet}
-            stripeFeePercentage={stripeFeePercentage}
-            regularIncome={regularIncome}
-            startingBalance={startingBalance || 0}
-            monthlyBalance={monthlyBalance}
-            calculatorRefreshKey={calculatorRefreshKey}
-            onRefresh={handleRefresh}
-            onBalanceChange={handleBalanceChange}
-            currentMonthDate={currentMonthDate}
-          />
+          <>
+            {/* Period and refresh button */}
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-700">
+                Periodo: <span className="text-gray-900">{periodTitle}</span>
+              </h2>
+              <Button variant="outline" size="sm" onClick={handleRefresh}>
+                <RefreshCw className="h-4 w-4 mr-2" /> Actualizar
+              </Button>
+            </div>
+            
+            {/* Cache information - Updated to use CacheStats instead of CacheInfo */}
+            <CacheStats 
+              dateRange={dateRange}
+              cacheStatus={cacheStatus}
+              isUsingCache={usingCachedData}
+              onRefresh={() => refreshData(true)}
+            />
+
+            {/* Warning message when no transactions exist */}
+            {financialData.transactions.length === 0 && (
+              <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg p-4 mb-6">
+                <p className="font-medium">No hay transacciones para el periodo seleccionado.</p>
+                <p className="mt-1 text-sm">Intenta seleccionar un periodo diferente o verificar la configuración de Zoho Books.</p>
+              </div>
+            )}
+
+            {/* Monthly Balance Editor moved up to be above FinanceSummary */}
+            <div className="mb-6">
+              <MonthlyBalanceEditor 
+                currentDate={currentMonthDate}
+                onBalanceChange={handleBalanceChange}
+              />
+            </div>
+
+            {/* New Salary Calculator - Updated with additional props */}
+            <div className="mb-6">
+              <SalaryCalculator 
+                zohoIncome={regularIncome}
+                stripeIncome={stripeNet}
+                opexAmount={opexAmount}
+                itbmAmount={itbmAmount}
+                profitPercentage={profitPercentage}
+                startingBalance={startingBalance}
+                totalZohoExpenses={totalZohoExpenses}
+              />
+            </div>
+
+            {/* Financial Summary with improved organization */}
+            <FinanceSummary 
+              summary={financialData.summary} 
+              expenseCategories={financialData.expenseByCategory}
+              stripeIncome={stripeIncome}
+              stripeFees={stripeFees}
+              stripeTransactionFees={stripeTransactionFees}
+              stripePayoutFees={stripePayoutFees}
+              stripeAdditionalFees={stripeAdditionalFees}
+              stripeNet={stripeNet}
+              stripeFeePercentage={stripeFeePercentage}
+              regularIncome={regularIncome}
+            />
+
+            {/* Listado de transacciones */}
+            <div className="mt-6">
+              <TransactionList 
+                transactions={financialData.transactions} 
+                onRefresh={handleRefresh}
+                isLoading={loading}
+              />
+            </div>
+          </>
         )}
 
         {/* Sección de depuración */}
-        <DebugTools
-          dateRange={dateRange}
-          refreshData={refreshData}
-          rawResponse={rawResponse}
-        />
+        <div className="mt-8 grid grid-cols-1 gap-6">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+            <Bug className="h-5 w-5 mr-2 text-amber-500" />
+            Herramientas de depuración
+          </h2>
+          
+          {/* Nuevo componente de depuración de Stripe */}
+          <StripeDebug 
+            dateRange={dateRange} 
+            refreshDataFunction={refreshData}
+          />
+          
+          {/* Componente de depuración de Webhook Zoho */}
+          <WebhookDebug 
+            dateRange={dateRange} 
+            refreshDataFunction={refreshData}
+            rawResponse={rawResponse}
+          />
+          
+          {/* Componente de depuración de solicitud al webhook */}
+          <WebhookRequestDebug dateRange={dateRange} />
+        </div>
       </main>
 
       {/* Footer */}

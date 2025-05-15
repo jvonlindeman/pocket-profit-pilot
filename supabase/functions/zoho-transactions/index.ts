@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -35,9 +36,6 @@ interface Transaction {
   type: string;
 }
 
-// Request counter for debugging (resets on cold starts)
-let requestCounter = 0;
-
 // Generate a consistent ID for a transaction based on its properties
 const generateConsistentId = (transaction: Partial<Transaction>, index: number): string => {
   const source = transaction.source || 'unknown';
@@ -49,125 +47,74 @@ const generateConsistentId = (transaction: Partial<Transaction>, index: number):
   return `${source.toLowerCase()}-${type.toLowerCase()}-${date}-${identifier}`;
 };
 
-// Inside the fetchTransactionsFromWebhook function, modify the cache handling:
+/**
+ * Check if data for a given date range is already in cache
+ */
 async function checkCache(source: string, startDate: string, endDate: string): Promise<{
   cached: boolean;
   data?: Transaction[];
   partial: boolean;
-  isCached?: boolean;
-  cache_hit?: boolean;
 }> {
   try {
-    console.log(`[Cache Check #${++requestCounter}] Checking cache for ${source} from ${startDate} to ${endDate}`);
-    
-    // Call the cache-manager edge function instead of direct RPC
-    const { data: cacheResult, error: cacheError } = await supabase.functions.invoke(
-      'cache-manager',
-      {
-        body: {
-          source,
-          startDate,
-          endDate,
-          forceRefresh: false
-        }
-      }
+    // Call the RPC function to check if date range is cached
+    const { data: cacheCheck, error: cacheError } = await supabase.rpc(
+      'is_date_range_cached',
+      { p_source: source, p_start_date: startDate, p_end_date: endDate }
     );
     
-    if (cacheError || !cacheResult) {
+    if (cacheError || !cacheCheck || cacheCheck.length === 0) {
       console.log(`Cache check failed or returned no data: ${cacheError?.message || 'No data'}`);
       return { cached: false, partial: false };
     }
     
-    console.log(`Cache check result for ${source} from ${startDate} to ${endDate}:`, cacheResult);
+    const { is_cached, is_partial } = cacheCheck[0];
+    
+    console.log(`Cache check result for ${source} from ${startDate} to ${endDate}: Cached: ${is_cached}, Partial: ${is_partial}`);
     
     // If not cached, return early
-    if (!cacheResult.cached) {
-      return { 
-        cached: false, 
-        partial: false,
-        isCached: false,
-        cache_hit: false
-      };
+    if (!is_cached) {
+      return { cached: false, partial: is_partial };
     }
     
-    // If cached but no data was included, fetch it
-    if (cacheResult.cached && !cacheResult.data) {
-      console.log(`Cache hit indicated but no data provided, fetching from cached_transactions table`);
-      
-      const { data: transactions, error: txError } = await supabase
-        .from('cached_transactions')
-        .select('*')
-        .eq('source', source)
-        .gte('date', startDate)
-        .lte('date', endDate);
-      
-      if (txError || !transactions || transactions.length === 0) {
-        console.log(`Error fetching cached transactions or none found: ${txError?.message || 'No transactions'}`);
-        return { 
-          cached: false, 
-          partial: cacheResult.partial || false,
-          isCached: false,
-          cache_hit: false
-        };
-      }
-      
-      // Mark transactions as coming from cache
-      const markedTransactions = transactions.map(tx => ({
-        ...tx, 
-        fromCache: true,
-        isCached: true
-      }));
-      
-      console.log(`Retrieved ${markedTransactions.length} cached transactions`);
-      
-      return { 
-        cached: true, 
-        data: markedTransactions as Transaction[], 
-        partial: cacheResult.partial || false,
-        isCached: true,
-        cache_hit: true
-      };
+    // If cached, fetch the transactions from cache
+    const { data: transactions, error: txError } = await supabase
+      .from('cached_transactions')
+      .select('*')
+      .eq('source', source)
+      .gte('date', startDate)
+      .lte('date', endDate);
+    
+    if (txError) {
+      console.error(`Error fetching cached transactions: ${txError.message}`);
+      return { cached: false, partial: is_partial };
     }
     
-    // If data was included directly
-    if (cacheResult.data) {
-      // Ensure all transactions have the fromCache flag
-      const markedTransactions = cacheResult.data.map(tx => ({
-        ...tx, 
-        fromCache: true,
-        isCached: true
-      }));
-      
-      console.log(`Using ${markedTransactions.length} transactions directly from cache manager`);
-      
-      return { 
-        cached: true, 
-        data: markedTransactions as Transaction[], 
-        partial: cacheResult.partial || false,
-        isCached: true,
-        cache_hit: true
-      };
+    if (!transactions || transactions.length === 0) {
+      console.log(`Cache indicated data exists but no transactions found for ${source} from ${startDate} to ${endDate}`);
+      return { cached: false, partial: is_partial };
     }
     
-    // Fallback case (shouldn't happen with improved implementation)
-    return { 
-      cached: false, 
-      partial: false,
-      isCached: false,
-      cache_hit: false 
-    };
+    console.log(`Successfully retrieved ${transactions.length} cached transactions for ${source} from ${startDate} to ${endDate}`);
+    return { cached: true, data: transactions as Transaction[], partial: is_partial };
   } catch (err) {
     console.error(`Error checking cache: ${err instanceof Error ? err.message : 'Unknown error'}`);
     return { cached: false, partial: false };
   }
 }
 
-// Enhance storeTransactionsInCache to also store empty results
+/**
+ * Store transactions directly in the Supabase database
+ */
 async function storeTransactionsInCache(transactions: Transaction[], source: string, startDate: string, endDate: string): Promise<boolean> {
+  if (!transactions || transactions.length === 0) {
+    console.log("No transactions to cache");
+    return false;
+  }
+
   console.log(`Storing ${transactions.length} ${source} transactions in cache from ${startDate} to ${endDate}`);
-  
+
   try {
-    // Create a cache segment record even if no transactions (to mark it as checked)
+    // Create a cache segment record
     const { error: segmentError } = await supabase
       .from('cache_segments')
       .upsert({
@@ -176,34 +123,14 @@ async function storeTransactionsInCache(transactions: Transaction[], source: str
         end_date: endDate,
         transaction_count: transactions.length,
         last_refreshed_at: new Date().toISOString(),
-        status: transactions.length === 0 ? 'empty' : 'processing'
+        status: 'processing'
       }, { onConflict: 'source, start_date, end_date' });
     
     if (segmentError) {
       console.error("Error creating cache segment:", segmentError);
       return false;
     }
-    
-    // If no transactions, we're done - mark as complete empty segment
-    if (transactions.length === 0) {
-      const { error: emptySegmentError } = await supabase
-        .from('cache_segments')
-        .upsert({
-          source,
-          start_date: startDate,
-          end_date: endDate,
-          transaction_count: 0,
-          last_refreshed_at: new Date().toISOString(),
-          status: 'complete' 
-        }, { onConflict: 'source, start_date, end_date' });
-      
-      if (emptySegmentError) {
-        console.error("Error updating empty cache segment:", emptySegmentError);
-      }
-      
-      return true;
-    }
-    
+
     // Store transactions in batches
     const BATCH_SIZE = 50;
     let successCount = 0;
@@ -258,7 +185,7 @@ async function storeTransactionsInCache(transactions: Transaction[], source: str
     // Verify storage
     const { count, error: countError } = await supabase
       .from('cached_transactions')
-      .select('*', { count: 'exact', head: true })
+      .select('*', { count: 'exact' })
       .eq('source', source)
       .gte('date', startDate)
       .lte('date', endDate);
@@ -281,10 +208,8 @@ async function storeTransactionsInCache(transactions: Transaction[], source: str
   }
 }
 
-// Main function for handling requests
 serve(async (req: Request) => {
-  const requestId = `req_${requestCounter++}_${Date.now()}`;
-  console.log(`[${requestId}] zoho-transactions function called with method: ${req.method}`);
+  console.log(`zoho-transactions function called with method: ${req.method}`);
   
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -298,7 +223,7 @@ serve(async (req: Request) => {
     try {
       const text = await req.text();
       if (!text) {
-        console.error(`[${requestId}] Empty request body`);
+        console.error("Empty request body");
         return new Response(
           JSON.stringify({ error: "Empty request body" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -306,9 +231,9 @@ serve(async (req: Request) => {
       }
       
       requestBody = JSON.parse(text);
-      console.log(`[${requestId}] Edge function received request body:`, requestBody);
+      console.log("Edge function received request body:", requestBody);
     } catch (parseError) {
-      console.error(`[${requestId}] Error parsing request body:`, parseError);
+      console.error("Error parsing request body:", parseError);
       return new Response(
         JSON.stringify({ error: "Invalid JSON in request body" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -317,26 +242,24 @@ serve(async (req: Request) => {
     
     const { startDate, endDate, forceRefresh = false } = requestBody;
     
-    console.log(`[${requestId}] Edge function parsed dates:`, { startDate, endDate, forceRefresh });
+    console.log("Edge function parsed dates:", { startDate, endDate, forceRefresh });
     
     if (!startDate || !endDate) {
-      console.error(`[${requestId}] Missing start or end date`);
+      console.error("Missing start or end date");
       return new Response(
         JSON.stringify({ error: "Start date and end date are required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const startTime = Date.now();
-    
     // Check if data is already in cache and we're not forcing a refresh
     if (!forceRefresh) {
-      console.log(`[${requestId}] Checking cache for Zoho transactions`);
+      console.log("Checking cache for Zoho transactions");
       const cacheResult = await checkCache('Zoho', startDate, endDate);
 
       // If we have complete cached data, return it immediately
       if (cacheResult.cached && cacheResult.data) {
-        console.log(`[${requestId}] Using ${cacheResult.data.length} cached transactions instead of calling webhook`);
+        console.log(`Using ${cacheResult.data.length} cached transactions instead of calling webhook`);
         
         // Format response to match expected structure
         const responseData = {
@@ -344,33 +267,9 @@ serve(async (req: Request) => {
           expenses: [],
           payments: [],
           cached: true,
-          isCached: true,
-          cache_hit: true,
           cached_transactions: cacheResult.data,
-          metadata: {
-            cache_hit: true,
-            source: 'edge_function_cache',
-            from_cache: true
-          }
+          cache_hit: true
         };
-        
-        // Log cache metrics
-        const cacheDuration = Date.now() - startTime;
-        try {
-          await supabase.from('cache_metrics').insert({
-            source: 'Zoho',
-            start_date: startDate,
-            end_date: endDate,
-            cache_hit: true,
-            partial_hit: cacheResult.partial,
-            transaction_count: cacheResult.data.length,
-            fetch_duration_ms: cacheDuration,
-            refresh_triggered: false,
-            request_id: requestId
-          });
-        } catch (err) {
-          console.error(`[${requestId}] Error logging cache metrics:`, err);
-        }
         
         return new Response(
           JSON.stringify(responseData),
@@ -378,13 +277,13 @@ serve(async (req: Request) => {
         );
       }
       
-      console.log(`[${requestId}] No complete cache hit found, proceeding to call webhook`);
+      console.log("No complete cache hit found, proceeding to call webhook");
     } else {
-      console.log(`[${requestId}] Force refresh requested, skipping cache check`);
+      console.log("Force refresh requested, skipping cache check");
     }
     
     // Call the make.com webhook directly
-    console.log(`[${requestId}] Edge function calling make.com webhook:`, makeWebhookUrl);
+    console.log("Edge function calling make.com webhook:", makeWebhookUrl);
     const webhookResponse = await fetch(makeWebhookUrl, {
       method: "POST",
       headers: {
@@ -397,28 +296,11 @@ serve(async (req: Request) => {
       })
     });
     
-    console.log(`[${requestId}] Edge function: make.com webhook response status: ${webhookResponse.status}`);
+    console.log(`Edge function: make.com webhook response status: ${webhookResponse.status}`);
     
     if (!webhookResponse.ok) {
       const errorText = await webhookResponse.text();
-      console.error(`[${requestId}] Failed to fetch data from make.com webhook:`, errorText);
-      
-      // Log cache miss with error
-      try {
-        await supabase.from('cache_metrics').insert({
-          source: 'Zoho',
-          start_date: startDate,
-          end_date: endDate,
-          cache_hit: false,
-          partial_hit: false,
-          fetch_duration_ms: Date.now() - startTime,
-          refresh_triggered: true,
-          request_id: requestId
-        });
-      } catch (err) {
-        console.error(`[${requestId}] Error logging cache metrics:`, err);
-      }
-      
+      console.error("Failed to fetch data from make.com webhook:", errorText);
       return new Response(
         JSON.stringify({ 
           error: "Failed to fetch data from make.com webhook", 
@@ -431,7 +313,7 @@ serve(async (req: Request) => {
     
     // Get the raw response text
     const responseText = await webhookResponse.text();
-    console.log(`[${requestId}] Edge function: make.com webhook raw response received, length:`, responseText.length);
+    console.log(`Edge function: make.com webhook raw response: ${responseText}`);
     
     // Parse the webhook response
     let webhookData;
@@ -440,9 +322,9 @@ serve(async (req: Request) => {
     try {
       // First try direct parsing
       webhookData = JSON.parse(responseText);
-      console.log(`[${requestId}] Successfully parsed JSON directly`);
+      console.log("Successfully parsed JSON directly");
     } catch (parseError) {
-      console.log(`[${requestId}] Initial JSON parse failed, attempting to fix format`);
+      console.log("Initial JSON parse failed, attempting to fix format");
       
       try {
         // Create a properly formatted JSON structure
@@ -454,11 +336,11 @@ serve(async (req: Request) => {
             // It might be a JSON string inside a string, try to parse the inner string
             const unescapedJson = JSON.parse(fixedJson);
             if (typeof unescapedJson === 'string') {
-              console.log(`[${requestId}] Detected JSON string inside string, attempting to parse inner content`);
+              console.log("Detected JSON string inside string, attempting to parse inner content");
               fixedJson = unescapedJson;
             }
           } catch (e) {
-            console.error(`[${requestId}] Error unescaping JSON string:`, e);
+            console.error("Error unescaping JSON string:", e);
           }
         }
         
@@ -479,13 +361,13 @@ serve(async (req: Request) => {
                       const parsed = JSON.parse(cleanedItem);
                       return parsed.value;
                     } catch (e) {
-                      console.error(`[${requestId}] Error parsing ${field} item:`, cleanedItem, e);
+                      console.error(`Error parsing ${field} item:`, cleanedItem, e);
                       return null;
                     }
                   }).filter(Boolean);
                   return `"${field}": ${JSON.stringify(properArray)}`;
                 } catch (e) {
-                  console.error(`[${requestId}] Error converting ${field} to array:`, e);
+                  console.error(`Error converting ${field} to array:`, e);
                   return `"${field}": []`;
                 }
               }
@@ -496,9 +378,9 @@ serve(async (req: Request) => {
         // Try to parse the fixed JSON
         try {
           webhookData = JSON.parse(fixedJson);
-          console.log(`[${requestId}] Successfully parsed fixed JSON`);
+          console.log("Successfully parsed fixed JSON");
         } catch (secondParseError) {
-          console.error(`[${requestId}] Failed to parse fixed JSON:`, secondParseError);
+          console.error("Failed to parse fixed JSON:", secondParseError);
           
           // As a fallback, return a structured response with the raw text
           return new Response(
@@ -511,7 +393,7 @@ serve(async (req: Request) => {
           );
         }
       } catch (fixError) {
-        console.error(`[${requestId}] Error during fix attempt:`, fixError);
+        console.error("Error during fix attempt:", fixError);
         
         // As a fallback, return a structured response with the raw text
         return new Response(
@@ -531,7 +413,7 @@ serve(async (req: Request) => {
     // IMPORTANT: We no longer process Stripe income from make.com
     // Stripe data now comes directly from the Stripe API via the stripe-balance edge function
     // This comment is kept for clarity on the change made
-    console.log(`[${requestId}] No longer processing Stripe data from make.com webhook`);
+    console.log("No longer processing Stripe data from make.com webhook");
     
     // Process collaborator expenses - Ahora incluyendo fechas y excluyendo proveedores específicos
     if (Array.isArray(webhookData.colaboradores)) {
@@ -539,7 +421,7 @@ serve(async (req: Request) => {
         if (item && typeof item.total !== 'undefined' && item.vendor_name) {
           // Excluir proveedores especificados
           if (excludedVendors.includes(item.vendor_name)) {
-            console.log(`[${requestId}] Skipping excluded vendor: ${item.vendor_name}`);
+            console.log(`Skipping excluded vendor: ${item.vendor_name}`);
             return; // Saltar este colaborador
           }
           
@@ -645,31 +527,13 @@ serve(async (req: Request) => {
       });
     }
     
-    console.log(`[${requestId}] Processed ${transactions.length} transactions`);
-    
-    // Record fetch metrics
-    const fetchDuration = Date.now() - startTime;
-    try {
-      await supabase.from('cache_metrics').insert({
-        source: 'Zoho',
-        start_date: startDate,
-        end_date: endDate,
-        cache_hit: false,
-        partial_hit: false,
-        transaction_count: transactions.length,
-        fetch_duration_ms: fetchDuration,
-        refresh_triggered: true,
-        request_id: requestId
-      });
-    } catch (err) {
-      console.error(`[${requestId}] Error logging cache metrics:`, err);
-    }
+    console.log(`Processed ${transactions.length} transactions`);
     
     // Store the transactions in cache directly from the edge function
     if (transactions.length > 0) {
-      console.log(`[${requestId}] Storing ${transactions.length} transactions in cache`);
+      console.log(`Storing ${transactions.length} transactions in cache`);
       const cacheResult = await storeTransactionsInCache(transactions, 'Zoho', startDate, endDate);
-      console.log(`[${requestId}] Transaction caching result: ${cacheResult ? 'Success' : 'Failed'}`);
+      console.log(`Transaction caching result: ${cacheResult ? 'Success' : 'Failed'}`);
     }
     
     // Add the original response to the data for debugging
@@ -679,14 +543,14 @@ serve(async (req: Request) => {
       cached_transactions: transactions,
     };
     
-    console.log(`[${requestId}] Successfully fetched and processed data`);
+    console.log("Successfully fetched and processed data");
     return new Response(
       JSON.stringify(responseData),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
     
   } catch (err) {
-    console.error(`[${requestId}] Error in zoho-transactions function:`, err);
+    console.error("Error in zoho-transactions function:", err);
     return new Response(
       JSON.stringify({ 
         error: "Internal server error", 

@@ -13,32 +13,44 @@ import { RefreshCw } from 'lucide-react';
 import { formatDateForDisplay } from '@/utils/dateUtils';
 import { Transaction } from '@/types/financial';
 import { Skeleton } from '@/components/ui/skeleton';
-import CacheStats from './CacheStats';
+import CacheInfo from './CacheInfo';
 import TransactionFilters, { FilterOptions } from './TransactionFilters';
 import TransactionCategorySummary from './TransactionCategorySummary';
-import CacheMonitor from './CacheMonitor';
-import { useCacheContext } from '@/contexts/CacheContext';
 
 interface TransactionListProps {
   transactions: Transaction[];
   onRefresh: () => void;
   isLoading: boolean;
   dateRange?: { startDate: Date; endDate: Date };
+  cacheStatus?: {
+    zoho: { hit: boolean, partial: boolean },
+    stripe: { hit: boolean, partial: boolean }
+  };
+  isUsingCache?: boolean;
 }
 
 const TransactionList: React.FC<TransactionListProps> = ({
   transactions,
   onRefresh,
   isLoading,
-  dateRange
+  dateRange,
+  cacheStatus,
+  isUsingCache
 }) => {
-  // Use the cache context
-  const { status: cacheStatus, isUsingCache } = useCacheContext();
+  // Add default values for optional props
+  const cacheProps = {
+    dateRange: dateRange || { startDate: new Date(), endDate: new Date() },
+    cacheStatus: cacheStatus || {
+      zoho: { hit: false, partial: false },
+      stripe: { hit: false, partial: false }
+    },
+    isUsingCache: isUsingCache || false,
+    onRefresh
+  };
 
   // State for filtered transactions
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>(transactions);
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
-  const [showCacheMonitor, setShowCacheMonitor] = useState<boolean>(false);
   
   // Handle filter change
   const handleFilterChange = (filtered: Transaction[]) => {
@@ -50,37 +62,16 @@ const TransactionList: React.FC<TransactionListProps> = ({
     setFilteredTransactions(transactions);
   }, [transactions]);
   
-  // Generate a unique key for each transaction to avoid duplicate key warnings
-  const getTransactionKey = (transaction: Transaction, index: number) => {
-    return transaction.id ? 
-      `${transaction.id}-${index}` : 
-      `${transaction.source}-${transaction.type}-${transaction.date}-${index}`;
-  };
-  
   return (
     <div className="space-y-4">
       {/* Cache information */}
-      {dateRange && (
-        <CacheStats 
+      {dateRange && cacheStatus && (
+        <CacheInfo 
           dateRange={dateRange}
+          cacheStatus={cacheStatus}
+          isUsingCache={isUsingCache || false}
           onRefresh={onRefresh}
         />
-      )}
-      
-      {/* Cache Monitor Toggle Button */}
-      <div className="flex justify-end">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => setShowCacheMonitor(!showCacheMonitor)}
-        >
-          {showCacheMonitor ? 'Hide Cache Monitor' : 'Show Cache Monitor'}
-        </Button>
-      </div>
-
-      {/* Cache Monitor (conditionally shown) */}
-      {showCacheMonitor && (
-        <CacheMonitor />
       )}
       
       <div className="flex justify-between items-center mb-4">
@@ -101,7 +92,6 @@ const TransactionList: React.FC<TransactionListProps> = ({
         </div>
       </div>
       
-      {/* Transaction List Table */}
       <div className="bg-white border rounded-lg shadow-sm">
         <div className="overflow-x-auto">
           <Table>
@@ -116,7 +106,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                // Show skeletons when loading
+                // Mostrar skeletons al cargar
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
                     <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
@@ -127,9 +117,9 @@ const TransactionList: React.FC<TransactionListProps> = ({
                   </TableRow>
                 ))
               ) : filteredTransactions.length > 0 ? (
-                // Show data if there are transactions with unique keys to avoid warnings
-                filteredTransactions.map((transaction, index) => (
-                  <TableRow key={getTransactionKey(transaction, index)}>
+                // Mostrar datos si hay transacciones
+                filteredTransactions.map((transaction) => (
+                  <TableRow key={transaction.id}>
                     <TableCell>{formatDateForDisplay(transaction.date)}</TableCell>
                     <TableCell>{transaction.description}</TableCell>
                     <TableCell>
@@ -142,21 +132,14 @@ const TransactionList: React.FC<TransactionListProps> = ({
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        {transaction.source}
-                        {(transaction.fromCache || transaction.isCached || transaction.cache_hit) && (
-                          <span className="ml-1 text-xs text-green-600 bg-green-50 px-1 rounded">cached</span>
-                        )}
-                      </div>
-                    </TableCell>
+                    <TableCell>{transaction.source}</TableCell>
                     <TableCell className={`text-right ${transaction.type === 'expense' ? 'text-red-600' : 'text-green-600'} font-medium`}>
                       {transaction.type === 'expense' ? '-' : ''}${transaction.amount.toFixed(2)}
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
-                // Show message if no transactions
+                // Mostrar mensaje si no hay transacciones
                 <TableRow>
                   <TableCell colSpan={5} className="text-center">No hay transacciones disponibles con los filtros seleccionados.</TableCell>
                 </TableRow>

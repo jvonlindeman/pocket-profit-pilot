@@ -1,9 +1,8 @@
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { BadgeDollarSign, Scissors } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
 import SummaryCard from '../SummaryCard';
-import { toast } from '@/hooks/use-toast';
 
 interface StripeIncomeTabProps {
   stripeIncome: number;
@@ -23,64 +22,17 @@ const StripeIncomeTab: React.FC<StripeIncomeTabProps> = ({
   stripeFees,
   stripeFeePercentage,
   stripeTransactionFees,
-  stripePayoutFees,
   stripeAdditionalFees,
+  stripePayoutFees,
   formatCurrency,
   formatPercentage
 }) => {
-  // Enhanced logging with JSON stringification for deep inspection
-  useEffect(() => {
-    console.log("StripeIncomeTab rendering with values:", JSON.stringify({
-      stripeIncome,
-      stripeNet,
-      stripeFees,
-      stripeFeePercentage,
-      stripeTransactionFees,
-      stripePayoutFees,
-      stripeAdditionalFees
-    }, null, 2));
-    
-    // Log data type checking
-    console.log("StripeIncomeTab data types:", {
-      stripeIncome: typeof stripeIncome,
-      stripeNet: typeof stripeNet,
-      stripeFees: typeof stripeFees,
-      stripeFeePercentage: typeof stripeFeePercentage
-    });
-    
-    // Notify with a toast if the values are suspiciously low
-    if (stripeIncome === 0 && stripeNet === 0 && stripeFees === 0) {
-      toast({
-        title: "Warning: Stripe Data",
-        description: "All Stripe values are zero. Check if data is being passed correctly.",
-        variant: "destructive" // Changed from "warning" to "destructive"
-      });
-    }
-  }, [
-    stripeIncome, 
-    stripeNet, 
-    stripeFees, 
-    stripeFeePercentage, 
-    stripeTransactionFees, 
-    stripeAdditionalFees, 
-    stripePayoutFees
-  ]);
-  
-  // Helper function to safely format possibly undefined values
-  const safeFormat = (formatter: Function, value: any, defaultVal: string = '0') => {
-    if (value === undefined || value === null || isNaN(Number(value))) {
-      console.warn(`StripeIncomeTab: Invalid value for formatting: ${value}`);
-      return defaultVal;
-    }
-    return formatter(Number(value));
-  };
-  
   return (
     <div className="bg-green-50 p-4 rounded-lg border border-green-100">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <SummaryCard
           title="Stripe (Bruto)"
-          value={safeFormat(formatCurrency, stripeIncome)}
+          value={formatCurrency(stripeIncome)}
           icon={BadgeDollarSign}
           iconColor="text-green-500"
           iconBgColor="bg-green-50"
@@ -88,7 +40,7 @@ const StripeIncomeTab: React.FC<StripeIncomeTabProps> = ({
 
         <SummaryCard
           title="Stripe (Neto)"
-          value={safeFormat(formatCurrency, stripeNet)}
+          value={formatCurrency(stripeNet)}
           icon={BadgeDollarSign}
           iconColor="text-green-500"
           iconBgColor="bg-green-50"
@@ -96,8 +48,8 @@ const StripeIncomeTab: React.FC<StripeIncomeTabProps> = ({
 
         <SummaryCard
           title="Total Comisiones"
-          value={safeFormat(formatCurrency, stripeFees)}
-          subtitle={stripeFeePercentage > 0 ? safeFormat(formatPercentage, stripeFeePercentage) : undefined}
+          value={formatCurrency(stripeFees)}
+          subtitle={stripeFeePercentage > 0 ? formatPercentage(stripeFeePercentage) : undefined}
           icon={Scissors}
           iconColor="text-amber-500"
           iconBgColor="bg-amber-50"
@@ -108,7 +60,7 @@ const StripeIncomeTab: React.FC<StripeIncomeTabProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <SummaryCard
           title="Comisiones (Transacción)"
-          value={safeFormat(formatCurrency, stripeTransactionFees)}
+          value={formatCurrency(stripeTransactionFees)}
           icon={Scissors}
           iconColor="text-amber-500"
           iconBgColor="bg-amber-50"
@@ -116,8 +68,8 @@ const StripeIncomeTab: React.FC<StripeIncomeTabProps> = ({
         
         <SummaryCard
           title="Comisiones Adicionales"
-          value={safeFormat(formatCurrency, stripeAdditionalFees)}
-          subtitle={stripeAdditionalFees > 0 ? `${stripeFeePercentage > 0 ? stripeFeePercentage.toFixed(1) : '0.0'}% del total` : undefined}
+          value={formatCurrency(stripeAdditionalFees)}
+          subtitle={stripeAdditionalFees > 0 ? `${stripeFeePercentage.toFixed(1)}% del total` : undefined}
           icon={Scissors}
           iconColor="text-amber-500"
           iconBgColor="bg-amber-50"
@@ -125,7 +77,7 @@ const StripeIncomeTab: React.FC<StripeIncomeTabProps> = ({
 
         <SummaryCard
           title="Comisiones (Payout)"
-          value={safeFormat(formatCurrency, stripePayoutFees)}
+          value={formatCurrency(stripePayoutFees)}
           icon={Scissors}
           iconColor="text-amber-500"
           iconBgColor="bg-amber-50"

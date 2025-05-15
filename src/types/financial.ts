@@ -2,48 +2,37 @@ export interface Transaction {
   id: string;
   date: string;
   amount: number;
-  description?: string;
-  category?: string;
-  source: string;
+  description: string;
+  category: string;
+  source: 'Zoho' | 'Stripe';
   type: 'income' | 'expense';
-  fees?: number;
-  gross?: number;
-  metadata?: Record<string, any>;
-  // Cache-related flags - all serve the same purpose but may be set by different parts of the code
-  fromCache?: boolean;
-  isCached?: boolean;
-  cache_hit?: boolean;
+  fees?: number; // Added optional fees field
+  gross?: number; // Added optional gross amount field (before fees)
+  metadata?: any; // Added metadata field for additional properties
 }
 
 export interface FinancialSummary {
   totalIncome: number;
-  totalExpenses: number;
-  totalExpense?: number; // Alias for backward compatibility
-  netProfit: number;
-  transactionCount: number;
-  incomeCount: number;
-  expenseCount: number;
-  avgTransactionSize: number;
-  // Add missing properties
-  collaboratorExpense?: number;
-  otherExpense?: number;
-  grossProfit?: number;
-  grossProfitMargin?: number;
-  profit?: number;
-  profitMargin?: number;
+  totalExpense: number;
+  collaboratorExpense: number;
+  otherExpense: number;
+  profit: number;
+  profitMargin: number;
+  grossProfit: number; // Added gross profit field 
+  grossProfitMargin: number; // Added gross profit margin field
   startingBalance?: number;
-}
-
-// Add missing interfaces
-export interface DateRange {
-  startDate: Date;
-  endDate: Date;
 }
 
 export interface CategorySummary {
   category: string;
   amount: number;
   percentage: number;
+  date?: string; // Fecha opcional para los colaboradores
+}
+
+export interface DateRange {
+  startDate: Date;
+  endDate: Date;
 }
 
 export interface ChartData {
@@ -67,26 +56,22 @@ export interface FinancialData {
   };
 }
 
+export interface CollaboratorData {
+  name: string;
+  amount: number;
+  percentage: number;
+  date?: string; // Fecha opcional para los colaboradores
+}
+
 export interface MonthlyBalance {
   id: number;
   month_year: string;
   balance: number;
-  opex_amount: number;
-  itbm_amount: number;
-  profit_percentage: number;
-  notes?: string;
+  notes: string | null;
   created_at: string;
   updated_at: string;
-  stripe_override?: number;
+  stripe_override: number | null; // Added to match the database schema
+  opex_amount: number | null; // Added for OPEX percentage
+  itbm_amount: number | null; // Added for ITBM amount
+  profit_percentage: number | null; // Added for Profit First percentage
 }
-
-// Function to fix totalExpense vs totalExpenses naming issue
-export const normalizeSummary = (summary: FinancialSummary): FinancialSummary => {
-  // Ensure both properties exist for backward compatibility
-  if (summary.totalExpenses !== undefined && summary.totalExpense === undefined) {
-    summary.totalExpense = summary.totalExpenses;
-  } else if (summary.totalExpense !== undefined && summary.totalExpenses === undefined) {
-    summary.totalExpenses = summary.totalExpense;
-  }
-  return summary;
-};

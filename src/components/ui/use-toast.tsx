@@ -1,4 +1,3 @@
-
 import * as React from "react"
 
 const TOAST_LIMIT = 5
@@ -9,7 +8,7 @@ type ToasterToast = {
   title?: React.ReactNode
   description?: React.ReactNode
   action?: React.ReactNode
-  variant?: "default" | "destructive" | "success" | "warning"
+  variant?: "default" | "destructive" | "success"
   onOpenChange?: (open: boolean) => void
 }
 
@@ -128,17 +127,10 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">
 
-function toast(props: Toast) {
+function toast({ ...props }: Omit<ToasterToast, "id">) {
   const id = genId()
 
-  // Validate toast variant to ensure it exists
-  const validVariants = ["default", "destructive", "success", "warning"];
-  if (props.variant && !validVariants.includes(props.variant)) {
-    console.warn(`Toast variant "${props.variant}" is not valid. Using "default" instead.`);
-    props.variant = "default";
-  }
-
-  const update = (props: Toast) =>
+  const update = (props: Omit<ToasterToast, "id">) =>
     dispatch({
       type: actionTypes.UPDATE_TOAST,
       id,

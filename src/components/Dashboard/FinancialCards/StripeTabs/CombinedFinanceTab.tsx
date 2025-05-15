@@ -46,7 +46,7 @@ const CombinedFinanceTab: React.FC<CombinedFinanceTabProps> = ({
 
         <SummaryCard
           title="Gastos Totales"
-          value={formatCurrency(summary.totalExpenses)}
+          value={formatCurrency(summary.totalExpense)}
           icon={ArrowDownIcon}
           iconColor="text-red-500"
           iconBgColor="bg-red-50"

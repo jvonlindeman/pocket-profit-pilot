@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { MonthlyBalance } from '@/types/financial';
 import { format } from 'date-fns';
@@ -41,22 +41,18 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     setError(null);
 
     try {
-      console.log("Fetching monthly balance for:", currentMonthYear);
-      
       const { data, error } = await supabase
         .from('monthly_balances')
         .select('*')
         .eq('month_year', currentMonthYear)
-        .maybeSingle();
+        .single();
 
-      if (error) {
-        console.error("Error fetching monthly balance:", error);
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
         throw error;
       }
 
-      console.log("Fetched monthly balance:", data);
-      setMonthlyBalance(data);
-      return data;
+      setMonthlyBalance(data || null);
+      return data || null;
     } catch (err: any) {
       console.error("Error fetching monthly balance:", err);
       setError(err.message || "Error al cargar el balance mensual");
@@ -90,7 +86,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
   // Set or update the monthly balance
   const updateMonthlyBalance = async (
     balance: number, 
-    opexAmount: number = 35,
+    opexAmount: number = 35, // Changed from opexPercentage to opexAmount
     itbmAmount: number = 0, 
     profitPercentage: number = 1, 
     notes?: string
@@ -99,79 +95,48 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     setError(null);
 
     try {
-      const exists = await checkBalanceExists();
-      
-      const updateData = {
+      const updateData: any = {
         balance,
-        opex_amount: opexAmount,
+        opex_amount: opexAmount, // Store as direct amount, not percentage
         itbm_amount: itbmAmount,
         profit_percentage: profitPercentage,
         notes: notes || null,
       };
       
-      let result;
-      
-      if (exists) {
+      // Check if we're updating or inserting
+      if (monthlyBalance) {
         // Update existing record
-        console.log("Updating existing monthly balance for:", currentMonthYear);
-        result = await supabase
+        const { data, error } = await supabase
           .from('monthly_balances')
           .update(updateData)
           .eq('month_year', currentMonthYear)
           .select();
+
+        if (error) throw error;
+        setMonthlyBalance(data[0] || null);
+        
+        toast({
+          title: "Balance actualizado",
+          description: `Se actualizó el balance inicial de ${format(currentDate, 'MMMM yyyy')}`,
+        });
       } else {
         // Create new record
-        console.log("Creating new monthly balance for:", currentMonthYear);
-        result = await supabase
+        const { data, error } = await supabase
           .from('monthly_balances')
           .insert({
             month_year: currentMonthYear,
-            ...updateData
+            ...updateData,
           })
           .select();
-      }
-      
-      if (result.error) {
-        console.error("Error updating monthly balance:", result.error);
+
+        if (error) throw error;
+        setMonthlyBalance(data[0] || null);
         
-        // Handle specific error codes
-        if (result.error.code === '23505') { // Duplicate key error
-          toast({
-            title: "Error",
-            description: "Ya existe un balance para este mes. Actualizando datos...",
-            variant: "destructive",
-          });
-          
-          // Try again with update instead
-          const retryResult = await supabase
-            .from('monthly_balances')
-            .update(updateData)
-            .eq('month_year', currentMonthYear)
-            .select();
-            
-          if (retryResult.error) {
-            throw retryResult.error;
-          }
-          
-          setMonthlyBalance(retryResult.data[0] || null);
-          
-          toast({
-            title: "Balance actualizado",
-            description: `Se actualizó el balance de ${format(currentDate, 'MMMM yyyy')}`,
-          });
-          
-          return true;
-        }
-        
-        throw result.error;
+        toast({
+          title: "Balance creado",
+          description: `Se creó el balance inicial de ${format(currentDate, 'MMMM yyyy')}`,
+        });
       }
-      
-      setMonthlyBalance(result.data[0] || null);
-      
-      toast({
-        title: exists ? "Balance actualizado" : "Balance creado",
-        description: `Se ${exists ? 'actualizó' : 'creó'} el balance de ${format(currentDate, 'MMMM yyyy')}`,
-      });
       
       return true;
     } catch (err: any) {
@@ -203,20 +168,5 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     fetchMonthlyBalance,
     checkBalanceExists,
     currentMonthYear,
-    // Add this for backward compatibility
-    startingBalance: monthlyBalance?.balance,
-    setStartingBalance: (balance: number) => {
-      if (monthlyBalance) {
-        updateMonthlyBalance(
-          balance,
-          monthlyBalance.opex_amount,
-          monthlyBalance.itbm_amount,
-          monthlyBalance.profit_percentage,
-          monthlyBalance.notes || undefined
-        );
-      } else {
-        updateMonthlyBalance(balance);
-      }
-    }
   };
 };

@@ -1,64 +1,32 @@
 
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from '@/components/ui/toaster';
-import { CacheProvider } from '@/contexts/CacheContext';
-import { useFinancialDateRange } from './hooks/useFinancialDateRange';
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Index from "./pages/Index";
+import NotFound from "./pages/NotFound";
+import ZohoCallback from "./pages/ZohoCallback";
+import Settings from "./pages/Settings";
 
-// Import your components
-import ZohoDebug from './components/ZohoDebug';
-import ZohoConfig from './components/ZohoConfig';
-import StripeDebug from './components/StripeDebug';
-import WebhookRequestDebug from './components/WebhookRequestDebug';
-import WebhookDebug from './components/WebhookDebug';
-import Index from './pages/Index';
+const queryClient = new QueryClient();
 
-import './App.css';
-
-// Create a client
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      retry: 1,
-    },
-  },
-});
-
-// Wrapper components to provide the required props
-const StripeDebugWrapper = () => {
-  const { dateRange } = useFinancialDateRange();
-  return <StripeDebug dateRange={dateRange} />;
-};
-
-const WebhookRequestDebugWrapper = () => {
-  const { dateRange } = useFinancialDateRange();
-  return <WebhookRequestDebug dateRange={dateRange} />;
-};
-
-const WebhookDebugWrapper = () => {
-  const { dateRange } = useFinancialDateRange();
-  return <WebhookDebug dateRange={dateRange} />;
-};
-
-function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <Router>
-        <CacheProvider>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/zoho" element={<ZohoDebug />} />
-            <Route path="/zoho/config" element={<ZohoConfig />} />
-            <Route path="/stripe" element={<StripeDebugWrapper />} />
-            <Route path="/webhook-request" element={<WebhookRequestDebugWrapper />} />
-            <Route path="/webhook" element={<WebhookDebugWrapper />} />
-          </Routes>
-          <Toaster />
-        </CacheProvider>
-      </Router>
-    </QueryClientProvider>
-  );
-}
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/zoho/callback" element={<ZohoCallback />} />
+          <Route path="/settings" element={<Settings />} />
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
 
 export default App;
