@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { FinancialSummary } from '@/types/financial';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StripeIncomeTab from './StripeTabs/StripeIncomeTab';
@@ -33,6 +33,27 @@ const IncomeTabs: React.FC<IncomeTabsProps> = ({
   formatCurrency,
   formatPercentage
 }) => {
+  // Add logging to debug Stripe data
+  useEffect(() => {
+    console.log("IncomeTabs received Stripe data:", {
+      stripeIncome,
+      stripeFees,
+      stripeTransactionFees,
+      stripePayoutFees,
+      stripeAdditionalFees,
+      stripeNet,
+      stripeFeePercentage
+    });
+  }, [
+    stripeIncome,
+    stripeFees,
+    stripeTransactionFees,
+    stripePayoutFees,
+    stripeAdditionalFees,
+    stripeNet,
+    stripeFeePercentage
+  ]);
+
   return (
     <div>
       <Tabs defaultValue="stripe" className="w-full">

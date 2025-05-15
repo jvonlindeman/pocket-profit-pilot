@@ -27,6 +27,16 @@ const StripeIncomeTab: React.FC<StripeIncomeTabProps> = ({
   formatCurrency,
   formatPercentage
 }) => {
+  console.log("StripeIncomeTab rendering with values:", {
+    stripeIncome,
+    stripeNet,
+    stripeFees,
+    stripeFeePercentage,
+    stripeTransactionFees,
+    stripeAdditionalFees,
+    stripePayoutFees
+  });
+  
   return (
     <div className="bg-green-50 p-4 rounded-lg border border-green-100">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

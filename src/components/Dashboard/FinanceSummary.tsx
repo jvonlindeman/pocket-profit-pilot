@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { FinancialSummary, CategorySummary } from '@/types/financial';
 import InitialBalanceSection from './FinancialCards/InitialBalanceSection';
 import IncomeTabs from './FinancialCards/IncomeTabs';
@@ -30,6 +30,27 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
   stripeFeePercentage = 0,
   regularIncome = 0
 }) => {
+  // Add logging to debug Stripe data
+  useEffect(() => {
+    console.log("FinanceSummary received Stripe data:", {
+      stripeIncome,
+      stripeFees,
+      stripeTransactionFees,
+      stripePayoutFees,
+      stripeAdditionalFees,
+      stripeNet,
+      stripeFeePercentage
+    });
+  }, [
+    stripeIncome,
+    stripeFees,
+    stripeTransactionFees,
+    stripePayoutFees,
+    stripeAdditionalFees,
+    stripeNet,
+    stripeFeePercentage
+  ]);
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',

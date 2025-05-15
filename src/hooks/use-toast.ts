@@ -1,26 +1,24 @@
 
-// Import directly from the main implementation
+// Import directly from the primary implementation file
 import { 
   toast as originalToast, 
   useToast as originalUseToast,
   type ToasterToast 
 } from "@/components/ui/use-toast.tsx";
 
-// Create a wrapper for the toast function that handles variant conversion
-const toast = (props: Omit<ToasterToast, "id">) => {
+// Create a wrapper for the toast function that handles variant validation
+export function toast(props: Omit<ToasterToast, "id">) {
+  // Create a copy of the props to avoid modifying the original
   const validProps = { ...props };
   
-  // Convert any invalid variants to valid ones
-  // Check if the variant is not one of the valid options
-  if (validProps.variant && !["default", "destructive", "success"].includes(validProps.variant as string)) {
+  // Validate the variant and set a default if it's not a valid value
+  if (validProps.variant && !["default", "destructive", "success"].includes(validProps.variant)) {
     validProps.variant = "default";
   }
   
   return originalToast(validProps);
-};
+}
 
-// Use the original useToast hook
-const useToast = originalUseToast;
-
-export { useToast, toast };
+// Export the original useToast hook
+export { originalUseToast as useToast };
 export type { ToasterToast };
