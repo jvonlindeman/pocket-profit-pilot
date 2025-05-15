@@ -6,4 +6,3 @@ export const excludedVendors = [
   "Bottom Consulting",
   "Mr. Analytics LLC"
 ];
-

@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -45,6 +46,61 @@ const generateConsistentId = (transaction: Partial<Transaction>, index: number):
   
   return `${source.toLowerCase()}-${type.toLowerCase()}-${date}-${identifier}`;
 };
+
+/**
+ * Check if data for a given date range is already in cache
+ */
+async function checkCache(source: string, startDate: string, endDate: string): Promise<{
+  cached: boolean;
+  data?: Transaction[];
+  partial: boolean;
+}> {
+  try {
+    // Call the RPC function to check if date range is cached
+    const { data: cacheCheck, error: cacheError } = await supabase.rpc(
+      'is_date_range_cached',
+      { p_source: source, p_start_date: startDate, p_end_date: endDate }
+    );
+    
+    if (cacheError || !cacheCheck || cacheCheck.length === 0) {
+      console.log(`Cache check failed or returned no data: ${cacheError?.message || 'No data'}`);
+      return { cached: false, partial: false };
+    }
+    
+    const { is_cached, is_partial } = cacheCheck[0];
+    
+    console.log(`Cache check result for ${source} from ${startDate} to ${endDate}: Cached: ${is_cached}, Partial: ${is_partial}`);
+    
+    // If not cached, return early
+    if (!is_cached) {
+      return { cached: false, partial: is_partial };
+    }
+    
+    // If cached, fetch the transactions from cache
+    const { data: transactions, error: txError } = await supabase
+      .from('cached_transactions')
+      .select('*')
+      .eq('source', source)
+      .gte('date', startDate)
+      .lte('date', endDate);
+    
+    if (txError) {
+      console.error(`Error fetching cached transactions: ${txError.message}`);
+      return { cached: false, partial: is_partial };
+    }
+    
+    if (!transactions || transactions.length === 0) {
+      console.log(`Cache indicated data exists but no transactions found for ${source} from ${startDate} to ${endDate}`);
+      return { cached: false, partial: is_partial };
+    }
+    
+    console.log(`Successfully retrieved ${transactions.length} cached transactions for ${source} from ${startDate} to ${endDate}`);
+    return { cached: true, data: transactions as Transaction[], partial: is_partial };
+  } catch (err) {
+    console.error(`Error checking cache: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    return { cached: false, partial: false };
+  }
+}
 
 /**
  * Store transactions directly in the Supabase database
@@ -186,7 +242,7 @@ serve(async (req: Request) => {
     
     const { startDate, endDate, forceRefresh = false } = requestBody;
     
-    console.log("Edge function parsed dates:", { startDate, endDate });
+    console.log("Edge function parsed dates:", { startDate, endDate, forceRefresh });
     
     if (!startDate || !endDate) {
       console.error("Missing start or end date");
@@ -194,6 +250,36 @@ serve(async (req: Request) => {
         JSON.stringify({ error: "Start date and end date are required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Check if data is already in cache and we're not forcing a refresh
+    if (!forceRefresh) {
+      console.log("Checking cache for Zoho transactions");
+      const cacheResult = await checkCache('Zoho', startDate, endDate);
+
+      // If we have complete cached data, return it immediately
+      if (cacheResult.cached && cacheResult.data) {
+        console.log(`Using ${cacheResult.data.length} cached transactions instead of calling webhook`);
+        
+        // Format response to match expected structure
+        const responseData = {
+          colaboradores: [],  // Empty placeholders since we're using cached data
+          expenses: [],
+          payments: [],
+          cached: true,
+          cached_transactions: cacheResult.data,
+          cache_hit: true
+        };
+        
+        return new Response(
+          JSON.stringify(responseData),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      console.log("No complete cache hit found, proceeding to call webhook");
+    } else {
+      console.log("Force refresh requested, skipping cache check");
     }
     
     // Call the make.com webhook directly
