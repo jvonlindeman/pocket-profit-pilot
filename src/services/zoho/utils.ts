@@ -1,4 +1,4 @@
-import { Transaction, FinancialData, ChartData, CategorySummary, FinancialSummary } from '@/types/financial';
+import { Transaction, FinancialData, ChartData, CategorySummary, FinancialSummary, normalizeSummary } from '@/types/financial';
 import { format, parse, parseISO } from 'date-fns';
 
 // Function to get the current year
@@ -106,7 +106,7 @@ const calculateTotalByCategory = (transactions: Transaction[], type: 'income' | 
 export const processTransactionData = (transactions: Transaction[], startingBalance?: number): FinancialData => {
   // Calculate total income and expense
   let totalIncome = 0;
-  let totalExpense = 0;
+  let totalExpenses = 0;
   let collaboratorExpense = 0;
   let otherExpense = 0;
 
@@ -114,7 +114,7 @@ export const processTransactionData = (transactions: Transaction[], startingBala
     if (transaction.type === 'income') {
       totalIncome += transaction.amount;
     } else {
-      totalExpense += transaction.amount;
+      totalExpenses += transaction.amount;
       
       // Separate collaborator expenses from other expenses
       if (transaction.category === 'Pagos a colaboradores') {
@@ -126,17 +126,24 @@ export const processTransactionData = (transactions: Transaction[], startingBala
   });
 
   // Calculate gross profit (income - expenses, without considering starting balance)
-  const grossProfit = totalIncome - totalExpense;
+  const grossProfit = totalIncome - totalExpenses;
   const grossProfitMargin = totalIncome > 0 ? (grossProfit / totalIncome) * 100 : 0;
 
   // Include starting balance in net profit calculation if provided
-  const profit = (startingBalance !== undefined ? startingBalance : 0) + totalIncome - totalExpense;
+  const profit = (startingBalance !== undefined ? startingBalance : 0) + totalIncome - totalExpenses;
   const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0;
 
   // Create summary object
   const summary: FinancialSummary = {
     totalIncome,
-    totalExpense,
+    totalExpenses,
+    totalExpense: totalExpenses, // Add alias for backward compatibility
+    netProfit: totalIncome - totalExpenses,
+    transactionCount: transactions.length,
+    incomeCount: transactions.filter(t => t.type === 'income').length,
+    expenseCount: transactions.filter(t => t.type === 'expense').length,
+    avgTransactionSize: transactions.length > 0 ? 
+      transactions.reduce((sum, t) => sum + t.amount, 0) / transactions.length : 0,
     collaboratorExpense,
     otherExpense,
     grossProfit,
@@ -156,7 +163,7 @@ export const processTransactionData = (transactions: Transaction[], startingBala
 
   // Return complete object
   return {
-    summary,
+    summary: normalizeSummary(summary),
     transactions,
     incomeBySource,
     expenseByCategory,
