@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { useFinancialDataFetcher } from '@/hooks/useFinancialDataFetcher';
@@ -9,17 +8,30 @@ import * as ZohoService from '@/services/zohoService';
 import { formatDateYYYYMMDD, getCurrentMonthRange } from '@/utils/dateUtils';
 import { toDayPickerDateRange, toFinancialDateRange } from '@/utils/dateRangeAdapter';
 import type { DateRange } from 'react-day-picker';
-import { Transaction, FinancialData, normalizeSummary } from '@/types/financial';
+import { Transaction, FinancialData, normalizeSummary, CategorySummary } from '@/types/financial';
 
-// Simple transaction data processor
-const processTransactionData = (transactions: Transaction[], startingBalance: number = 0): FinancialData => {
-  // This is a simple implementation - you might want to implement a more sophisticated processor
+// Enhanced transaction data processor that accepts collaborator expenses
+const processTransactionData = (
+  transactions: Transaction[], 
+  startingBalance: number = 0,
+  collaboratorExpenses: CategorySummary[] = []
+): FinancialData => {
+  // Calculate total collaborator expense
+  const totalCollaboratorExpense = collaboratorExpenses.reduce((sum, item) => sum + item.amount, 0);
+  
+  console.log("Processing transactions with collaborator expenses:", {
+    transactionCount: transactions.length,
+    totalCollaboratorExpense,
+    collaboratorExpensesCount: collaboratorExpenses.length
+  });
+  
+  // Process transactions as before
   const summary = {
     totalIncome: transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0),
     totalExpenses: transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0),
     totalExpense: transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0),
-    collaboratorExpense: 0, // This would be calculated based on your business logic
-    otherExpense: 0, // This would be calculated based on your business logic
+    collaboratorExpense: totalCollaboratorExpense, // Set from calculated value
+    otherExpense: 0, // This will be calculated below
     profit: 0,
     profitMargin: 0,
     grossProfit: 0,
@@ -33,19 +45,68 @@ const processTransactionData = (transactions: Transaction[], startingBalance: nu
       transactions.reduce((sum, t) => sum + t.amount, 0) / transactions.length : 0,
   };
   
+  // Calculate other expense (total expense minus collaborator expense)
+  summary.otherExpense = summary.totalExpenses - totalCollaboratorExpense;
+  
   // Calculate profits
   summary.netProfit = summary.totalIncome - summary.totalExpenses;
-  summary.profit = summary.totalIncome - summary.totalExpenses;
+  summary.profit = summary.startingBalance + summary.totalIncome - summary.totalExpenses;
   summary.profitMargin = summary.totalIncome > 0 ? (summary.profit / summary.totalIncome) * 100 : 0;
   summary.grossProfit = summary.totalIncome;
   summary.grossProfitMargin = summary.totalIncome > 0 ? 100 : 0;
   
-  // Return basic financial data structure
+  // Group expenses by category
+  const expensesByCategory = transactions
+    .filter(t => t.type === 'expense')
+    .reduce((acc, transaction) => {
+      const category = transaction.category || 'Sin categoría';
+      if (!acc[category]) {
+        acc[category] = {
+          category,
+          amount: 0,
+          percentage: 0
+        };
+      }
+      acc[category].amount += transaction.amount;
+      return acc;
+    }, {} as Record<string, CategorySummary>);
+
+  // Calculate percentages for each category
+  const totalExpenses = Object.values(expensesByCategory).reduce((sum, cat) => sum + cat.amount, 0);
+  const expenseByCategory = Object.values(expensesByCategory).map(cat => {
+    cat.percentage = totalExpenses > 0 ? (cat.amount / totalExpenses) * 100 : 0;
+    return cat;
+  }).sort((a, b) => b.amount - a.amount);
+  
+  // Group income by source
+  const incomeBySource = transactions
+    .filter(t => t.type === 'income')
+    .reduce((acc, transaction) => {
+      const source = transaction.source || 'Sin fuente';
+      if (!acc[source]) {
+        acc[source] = {
+          category: source,
+          amount: 0,
+          percentage: 0
+        };
+      }
+      acc[source].amount += transaction.amount;
+      return acc;
+    }, {} as Record<string, CategorySummary>);
+
+  // Calculate percentages for each source
+  const totalIncome = Object.values(incomeBySource).reduce((sum, src) => sum + src.amount, 0);
+  const incomeBySourceArray = Object.values(incomeBySource).map(src => {
+    src.percentage = totalIncome > 0 ? (src.amount / totalIncome) * 100 : 0;
+    return src;
+  }).sort((a, b) => b.amount - a.amount);
+
+  // Return enhanced financial data structure
   return {
     summary: normalizeSummary(summary),
     transactions,
-    incomeBySource: [],
-    expenseByCategory: [],
+    incomeBySource: incomeBySourceArray,
+    expenseByCategory,
     dailyData: {
       income: { labels: [], values: [] },
       expense: { labels: [], values: [] }
@@ -94,8 +155,9 @@ export const useFinanceData = () => {
 
   // Datos financieros procesados
   const financialData = useMemo(() => {
-    return processTransactionData(transactions, startingBalance);
-  }, [transactions, startingBalance]);
+    console.log("Calculating financial data with collaborator expenses:", collaboratorExpenses);
+    return processTransactionData(transactions, startingBalance, collaboratorExpenses);
+  }, [transactions, startingBalance, collaboratorExpenses]);
 
   // Función para actualizar el rango de fechas
   const updateDateRange = useCallback((newRange: { startDate: Date; endDate: Date }) => {

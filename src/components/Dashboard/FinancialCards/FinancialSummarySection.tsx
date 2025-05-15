@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useEffect } from 'react';
 import { FinancialSummary } from '@/types/financial';
 import { ArrowDownIcon, Users, Calculator, TrendingUpIcon } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,6 +18,15 @@ const FinancialSummarySection: React.FC<FinancialSummarySectionProps> = ({
   formatCurrency,
   formatPercentage
 }) => {
+  // Add debug logging for collaborator expenses
+  useEffect(() => {
+    console.log("FinancialSummarySection receiving data:", {
+      collaboratorExpense: summary.collaboratorExpense || 0,
+      otherExpenses,
+      totalExpense: summary.totalExpense
+    });
+  }, [summary, otherExpenses]);
+
   return (
     <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
       <h2 className="text-lg font-semibold text-gray-800 mb-4">Resumen Financiero</h2>

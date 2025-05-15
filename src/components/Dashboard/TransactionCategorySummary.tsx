@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Transaction } from '@/types/financial';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from '@/components/ui/separator';
@@ -15,6 +15,19 @@ interface CategorySummaryProps {
 }
 
 const TransactionCategorySummary: React.FC<CategorySummaryProps> = ({ transactions }) => {
+  // Debug logging to inspect transactions
+  useEffect(() => {
+    console.log("Transaction Category Summary - transaction count:", transactions?.length);
+    
+    // Extract all unique categories for debugging
+    const allCategories = transactions
+      ?.filter(t => t.type === 'expense')
+      ?.map(t => t.category || 'Sin categoría') || [];
+      
+    const uniqueCategories = [...new Set(allCategories)];
+    console.log("Unique expense categories:", uniqueCategories);
+  }, [transactions]);
+  
   // No transactions, don't show anything
   if (!transactions || transactions.length === 0) {
     return null;

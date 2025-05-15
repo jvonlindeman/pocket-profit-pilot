@@ -30,25 +30,20 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
   stripeFeePercentage = 0,
   regularIncome = 0
 }) => {
-  // Add logging to debug Stripe data
+  // Add logging to debug Stripe data and collaborator expenses
   useEffect(() => {
-    console.log("FinanceSummary received Stripe data:", {
+    console.log("FinanceSummary received data:", {
+      summary,
+      collaboratorExpense: summary.collaboratorExpense,
       stripeIncome,
       stripeFees,
-      stripeTransactionFees,
-      stripePayoutFees,
-      stripeAdditionalFees,
-      stripeNet,
-      stripeFeePercentage
+      expenseCategoriesCount: expenseCategories.length,
     });
   }, [
+    summary, 
     stripeIncome,
     stripeFees,
-    stripeTransactionFees,
-    stripePayoutFees,
-    stripeAdditionalFees,
-    stripeNet,
-    stripeFeePercentage
+    expenseCategories
   ]);
 
   const formatCurrency = (amount: number) => {
