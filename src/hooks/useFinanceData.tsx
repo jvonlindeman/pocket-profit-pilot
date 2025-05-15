@@ -163,6 +163,6 @@ export const useFinanceData = () => {
     startingBalance,
     updateStartingBalance,
     usingCachedData,
-    cacheStatus  // Add cacheStatus to returned values
+    cacheStatus
   };
 };

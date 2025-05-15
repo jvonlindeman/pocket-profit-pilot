@@ -1,10 +1,7 @@
+
 import React, { useState } from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
-import RevenueChart from '@/components/Dashboard/RevenueChart';
-import ExpenseChart from '@/components/Dashboard/ExpenseChart';
-import CollaboratorChart from '@/components/Dashboard/CollaboratorChart';
-import ProfitAnalysis from '@/components/Dashboard/ProfitAnalysis';
 import TransactionList from '@/components/Dashboard/TransactionList';
 import MonthlyBalanceEditor from '@/components/Dashboard/MonthlyBalanceEditor';
 import InitialBalanceDialog from '@/components/Dashboard/InitialBalanceDialog';
@@ -135,17 +132,6 @@ const Index = () => {
   const getDatePickerCurrentMonthRange = () => {
     const financialDateRange = getCurrentMonthRange();
     return toDayPickerDateRange(financialDateRange);
-  };
-
-  // Prepare Stripe data for chart
-  const getStripeDataForChart = () => {
-    // Si solo hay un valor de Stripe para todo el período, distribúyelo a lo largo del gráfico
-    if (stripeIncome > 0) {
-      const labels = financialData.dailyData.income.labels;
-      const values = new Array(labels.length).fill(stripeIncome / labels.length);
-      return { labels, values };
-    }
-    return { labels: [], values: [] };
   };
 
   // Get calculator values from the monthly balance
@@ -279,28 +265,6 @@ const Index = () => {
               stripeFeePercentage={stripeFeePercentage}
               regularIncome={regularIncome}
             />
-
-            {/* Gráficos */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-              <RevenueChart 
-                incomeData={financialData.dailyData.income} 
-                expenseData={financialData.dailyData.expense}
-                stripeData={getStripeDataForChart()}
-              />
-              <ExpenseChart expenseData={financialData.expenseByCategory} />
-            </div>
-
-            {/* Nuevo gráfico de colaboradores */}
-            {collaboratorExpenses && collaboratorExpenses.length > 0 && (
-              <div className="mt-6">
-                <CollaboratorChart collaboratorData={collaboratorExpenses} />
-              </div>
-            )}
-
-            {/* Análisis de rentabilidad */}
-            <div className="mt-6">
-              <ProfitAnalysis monthlyData={financialData.monthlyData} />
-            </div>
 
             {/* Listado de transacciones */}
             <div className="mt-6">
