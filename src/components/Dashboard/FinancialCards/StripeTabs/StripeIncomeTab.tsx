@@ -23,21 +23,29 @@ const StripeIncomeTab: React.FC<StripeIncomeTabProps> = ({
   stripeFees,
   stripeFeePercentage,
   stripeTransactionFees,
-  stripeAdditionalFees,
   stripePayoutFees,
+  stripeAdditionalFees,
   formatCurrency,
   formatPercentage
 }) => {
-  // Log values when the component renders or props change
+  // Enhanced logging with JSON stringification for deep inspection
   useEffect(() => {
-    console.log("StripeIncomeTab rendering with values:", {
+    console.log("StripeIncomeTab rendering with values:", JSON.stringify({
       stripeIncome,
       stripeNet,
       stripeFees,
       stripeFeePercentage,
       stripeTransactionFees,
-      stripeAdditionalFees,
-      stripePayoutFees
+      stripePayoutFees,
+      stripeAdditionalFees
+    }, null, 2));
+    
+    // Log data type checking
+    console.log("StripeIncomeTab data types:", {
+      stripeIncome: typeof stripeIncome,
+      stripeNet: typeof stripeNet,
+      stripeFees: typeof stripeFees,
+      stripeFeePercentage: typeof stripeFeePercentage
     });
     
     // Notify with a toast if the values are suspiciously low
@@ -58,12 +66,21 @@ const StripeIncomeTab: React.FC<StripeIncomeTabProps> = ({
     stripePayoutFees
   ]);
   
+  // Helper function to safely format possibly undefined values
+  const safeFormat = (formatter: Function, value: any, defaultVal: string = '0') => {
+    if (value === undefined || value === null || isNaN(Number(value))) {
+      console.warn(`StripeIncomeTab: Invalid value for formatting: ${value}`);
+      return defaultVal;
+    }
+    return formatter(Number(value));
+  };
+  
   return (
     <div className="bg-green-50 p-4 rounded-lg border border-green-100">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <SummaryCard
           title="Stripe (Bruto)"
-          value={formatCurrency(stripeIncome)}
+          value={safeFormat(formatCurrency, stripeIncome)}
           icon={BadgeDollarSign}
           iconColor="text-green-500"
           iconBgColor="bg-green-50"
@@ -71,7 +88,7 @@ const StripeIncomeTab: React.FC<StripeIncomeTabProps> = ({
 
         <SummaryCard
           title="Stripe (Neto)"
-          value={formatCurrency(stripeNet)}
+          value={safeFormat(formatCurrency, stripeNet)}
           icon={BadgeDollarSign}
           iconColor="text-green-500"
           iconBgColor="bg-green-50"
@@ -79,8 +96,8 @@ const StripeIncomeTab: React.FC<StripeIncomeTabProps> = ({
 
         <SummaryCard
           title="Total Comisiones"
-          value={formatCurrency(stripeFees)}
-          subtitle={stripeFeePercentage > 0 ? formatPercentage(stripeFeePercentage) : undefined}
+          value={safeFormat(formatCurrency, stripeFees)}
+          subtitle={stripeFeePercentage > 0 ? safeFormat(formatPercentage, stripeFeePercentage) : undefined}
           icon={Scissors}
           iconColor="text-amber-500"
           iconBgColor="bg-amber-50"
@@ -91,7 +108,7 @@ const StripeIncomeTab: React.FC<StripeIncomeTabProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <SummaryCard
           title="Comisiones (Transacción)"
-          value={formatCurrency(stripeTransactionFees)}
+          value={safeFormat(formatCurrency, stripeTransactionFees)}
           icon={Scissors}
           iconColor="text-amber-500"
           iconBgColor="bg-amber-50"
@@ -99,8 +116,8 @@ const StripeIncomeTab: React.FC<StripeIncomeTabProps> = ({
         
         <SummaryCard
           title="Comisiones Adicionales"
-          value={formatCurrency(stripeAdditionalFees)}
-          subtitle={stripeAdditionalFees > 0 ? `${stripeFeePercentage.toFixed(1)}% del total` : undefined}
+          value={safeFormat(formatCurrency, stripeAdditionalFees)}
+          subtitle={stripeAdditionalFees > 0 ? `${stripeFeePercentage > 0 ? stripeFeePercentage.toFixed(1) : '0.0'}% del total` : undefined}
           icon={Scissors}
           iconColor="text-amber-500"
           iconBgColor="bg-amber-50"
@@ -108,7 +125,7 @@ const StripeIncomeTab: React.FC<StripeIncomeTabProps> = ({
 
         <SummaryCard
           title="Comisiones (Payout)"
-          value={formatCurrency(stripePayoutFees)}
+          value={safeFormat(formatCurrency, stripePayoutFees)}
           icon={Scissors}
           iconColor="text-amber-500"
           iconBgColor="bg-amber-50"

@@ -118,18 +118,32 @@ const StripeService = {
         return getMockTransactions(startDate, endDate);
       }
 
-      console.log("StripeService: Received data:", {
-        transactions: data.transactions?.length || 0,
-        gross: data.gross,
-        fees: data.fees,
-        net: data.net,
-        transactionFees: data.transactionFees,
-        payoutFees: data.payoutFees,
-        stripeFees: data.stripeFees,
-        feePercentage: data.feePercentage,
-        cached: !!data.cached,
-        isCached: !!data.isCached,
-        cache_hit: !!data.cache_hit
+      // NEW: Enhanced logging of received data structure
+      console.log("StripeService: Raw data structure:", JSON.stringify(data, null, 2).substring(0, 500) + "...");
+      
+      // NEW: Extract data from either direct properties or summary object
+      const extractedData = {
+        transactions: data.transactions || [],
+        gross: data.gross || (data.summary?.gross) || 0,
+        fees: data.fees || (data.summary?.fees) || 0,
+        net: data.net || (data.summary?.net) || 0,
+        transactionFees: data.transactionFees || (data.summary?.transactionFees) || 0,
+        payoutFees: data.payoutFees || (data.summary?.payoutFees) || 0,
+        stripeFees: data.stripeFees || (data.summary?.stripeFees) || 0,
+        feePercentage: data.feePercentage || (data.summary?.feePercentage) || 0,
+        cached: !!data.cached || !!data.cache_hit || !!data.isCached
+      };
+
+      console.log("StripeService: Extracted data:", {
+        transactions: extractedData.transactions?.length || 0,
+        gross: extractedData.gross,
+        fees: extractedData.fees,
+        net: extractedData.net,
+        transactionFees: extractedData.transactionFees,
+        payoutFees: extractedData.payoutFees,
+        stripeFees: extractedData.stripeFees,
+        feePercentage: extractedData.feePercentage,
+        cached: extractedData.cached
       });
 
       // Check for cache indicators in the response
@@ -139,14 +153,14 @@ const StripeService = {
       lastApiResponse = {
         dateRange: dateRangeKey,
         timestamp: now,
-        data,
+        data: extractedData,  // Store processed data for consistent structure
         isCached
       };
 
       // Log appropriate cache event
       if (isCached) {
         logCacheEvent('hit', 'Stripe', { 
-          transactionCount: data.transactions?.length,
+          transactionCount: extractedData.transactions?.length,
           responseFlags: {
             cached: !!data.cached,
             cache_hit: !!data.cache_hit,
@@ -155,8 +169,8 @@ const StripeService = {
         }, { startDate, endDate }, durationMs);
         
         // Mark transactions as cached
-        if (data.transactions && Array.isArray(data.transactions)) {
-          data.transactions.forEach(tx => {
+        if (extractedData.transactions && Array.isArray(extractedData.transactions)) {
+          extractedData.transactions.forEach(tx => {
             tx.fromCache = true;
             tx.isCached = true;
             tx.cache_hit = true;
@@ -164,12 +178,12 @@ const StripeService = {
         }
       } else {
         logCacheEvent('api_call', 'Stripe', { 
-          transactionCount: data.transactions?.length
+          transactionCount: extractedData.transactions?.length
         }, { startDate, endDate }, durationMs);
       }
 
-      // Return the data with cache status
-      return { ...data, cached: isCached };
+      // Return the processed data
+      return extractedData;
     } catch (err) {
       console.error("StripeService: Unhandled error:", err);
       logCacheEvent('miss', 'Stripe', { error: err instanceof Error ? err.message : 'Unknown error' }, { startDate, endDate });

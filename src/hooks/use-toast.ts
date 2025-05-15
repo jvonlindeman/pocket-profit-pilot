@@ -1,18 +1,16 @@
-import * as React from "react"
 
-import type {
-  ToastActionElement,
-  ToastProps,
-} from "@/components/ui/toast"
+import * as React from "react"
 
 const TOAST_LIMIT = 5
 const TOAST_REMOVE_DELAY = 1000000
 
-export type ToasterToast = ToastProps & {
+type ToasterToast = {
   id: string
   title?: React.ReactNode
   description?: React.ReactNode
-  action?: ToastActionElement
+  action?: React.ReactNode
+  variant?: "default" | "destructive" | "success" | "warning"
+  onOpenChange?: (open: boolean) => void
 }
 
 const actionTypes = {
@@ -25,7 +23,7 @@ const actionTypes = {
 let count = 0
 
 function genId() {
-  count = (count + 1) % Number.MAX_VALUE
+  count = (count + 1) % Number.MAX_SAFE_INTEGER
   return count.toString()
 }
 
@@ -39,14 +37,15 @@ type Action =
   | {
       type: ActionType["UPDATE_TOAST"]
       toast: Partial<ToasterToast>
+      id: string
     }
   | {
       type: ActionType["DISMISS_TOAST"]
-      toastId?: string
+      id: string
     }
   | {
       type: ActionType["REMOVE_TOAST"]
-      toastId?: string
+      id: string
     }
 
 interface State {
@@ -67,50 +66,52 @@ const reducer = (state: State, action: Action): State => {
       return {
         ...state,
         toasts: state.toasts.map((t) =>
-          t.id === action.toast.id ? { ...t, ...action.toast } : t
+          t.id === action.id ? { ...t, ...action.toast } : t
         ),
       }
 
     case actionTypes.DISMISS_TOAST: {
-      const { toastId } = action
+      const { id } = action
 
-      // ! Side effects ! - This could be extracted into a dismissToast() action,
-      // but I'll keep it here for simplicity
-      if (toastId) {
-        if (toastTimeouts.has(toastId)) {
-          clearTimeout(toastTimeouts.get(toastId))
-          toastTimeouts.delete(toastId)
-        }
-      } else {
-        for (const [id, timeout] of toastTimeouts.entries()) {
-          clearTimeout(timeout)
-          toastTimeouts.delete(id)
-        }
+      // Cancel any existing timeout
+      if (toastTimeouts.has(id)) {
+        clearTimeout(toastTimeouts.get(id))
+        toastTimeouts.delete(id)
       }
+
+      // Set timeout to remove the toast
+      toastTimeouts.set(
+        id,
+        setTimeout(() => {
+          toastTimeouts.delete(id)
+          dispatch({
+            type: actionTypes.REMOVE_TOAST,
+            id,
+          })
+        }, TOAST_REMOVE_DELAY)
+      )
 
       return {
         ...state,
         toasts: state.toasts.map((t) =>
-          t.id === toastId || toastId === undefined
-            ? {
-                ...t,
-                open: false,
-              }
-            : t
+          t.id === action.id ? { ...t } : t
         ),
       }
     }
+
     case actionTypes.REMOVE_TOAST:
-      if (action.toastId === undefined) {
-        return {
-          ...state,
-          toasts: [],
-        }
+      if (toastTimeouts.has(action.id)) {
+        clearTimeout(toastTimeouts.get(action.id))
+        toastTimeouts.delete(action.id)
       }
+
       return {
         ...state,
-        toasts: state.toasts.filter((t) => t.id !== action.toastId),
+        toasts: state.toasts.filter((t) => t.id !== action.id),
       }
+
+    default:
+      return state
   }
 }
 
@@ -127,7 +128,7 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">
 
-function toast({ ...props }: Toast) {
+function toast(props: Toast) {
   const id = genId()
 
   // Validate toast variant to ensure it exists
@@ -137,19 +138,20 @@ function toast({ ...props }: Toast) {
     props.variant = "default";
   }
 
-  const update = (props: ToasterToast) =>
+  const update = (props: Toast) =>
     dispatch({
       type: actionTypes.UPDATE_TOAST,
-      toast: { ...props, id },
+      id,
+      toast: { ...props },
     })
-  const dismiss = () => dispatch({ type: actionTypes.DISMISS_TOAST, toastId: id })
+
+  const dismiss = () => dispatch({ type: actionTypes.DISMISS_TOAST, id })
 
   dispatch({
     type: actionTypes.ADD_TOAST,
     toast: {
       ...props,
       id,
-      open: true,
       onOpenChange: (open) => {
         if (!open) dismiss()
       },
@@ -174,13 +176,14 @@ function useToast() {
         listeners.splice(index, 1)
       }
     }
-  }, [state])
+  }, [])
 
   return {
     ...state,
     toast,
-    dismiss: (toastId?: string) => dispatch({ type: actionTypes.DISMISS_TOAST, toastId }),
+    dismiss: (id: string) => dispatch({ type: actionTypes.DISMISS_TOAST, id }),
   }
 }
 
 export { useToast, toast }
+export type { ToasterToast }

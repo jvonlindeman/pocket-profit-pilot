@@ -48,8 +48,9 @@ export const useIncomeProcessor = () => {
       }
     });
     
-    // Log the Stripe data received for debugging
+    // Enhanced debug logging for Stripe data
     console.log("useIncomeProcessor: Processing Stripe data:", stripeData);
+    console.log("useIncomeProcessor: Stripe data type:", typeof stripeData);
     
     if (!stripeData) {
       console.error("useIncomeProcessor: No Stripe data received");
@@ -72,18 +73,29 @@ export const useIncomeProcessor = () => {
       };
     }
     
-    // Extract values with proper fallbacks and debugging
-    const gross = typeof stripeData.gross === 'number' ? stripeData.gross : 0;
-    const fees = typeof stripeData.fees === 'number' ? stripeData.fees : 0;
-    const transactionFees = typeof stripeData.transactionFees === 'number' ? stripeData.transactionFees : 0;
-    const payoutFees = typeof stripeData.payoutFees === 'number' ? stripeData.payoutFees : 0;
-    const stripeFees = typeof stripeData.stripeFees === 'number' ? stripeData.stripeFees : 0;
-    const advances = typeof stripeData.advances === 'number' ? stripeData.advances : 0;
-    const advanceFunding = typeof stripeData.advanceFunding === 'number' ? stripeData.advanceFunding : 0;
-    const net = typeof stripeData.net === 'number' ? stripeData.net : 0;
-    const feePercentage = typeof stripeData.feePercentage === 'number' ? stripeData.feePercentage : 0;
+    // NEW: Helper function to safely extract numeric values
+    const safeNumber = (value: any): number => {
+      if (typeof value === 'number' && !isNaN(value)) return value;
+      if (typeof value === 'string') {
+        const parsed = parseFloat(value);
+        return isNaN(parsed) ? 0 : parsed;
+      }
+      return 0;
+    };
     
-    console.log("useIncomeProcessor: Extracted values:", {
+    // Extract values with proper fallbacks and debugging
+    const gross = safeNumber(stripeData.gross);
+    const fees = safeNumber(stripeData.fees);
+    const transactionFees = safeNumber(stripeData.transactionFees);
+    const payoutFees = safeNumber(stripeData.payoutFees);
+    const stripeFees = safeNumber(stripeData.stripeFees);
+    const advances = safeNumber(stripeData.advances);
+    const advanceFunding = safeNumber(stripeData.advanceFunding);
+    const net = safeNumber(stripeData.net);
+    const feePercentage = safeNumber(stripeData.feePercentage);
+    
+    // NEW: Enhanced debug logging of extracted values
+    console.log("useIncomeProcessor: Extracted numeric values:", {
       gross, fees, transactionFees, payoutFees, stripeFees, advances, advanceFunding, net, feePercentage
     });
     
