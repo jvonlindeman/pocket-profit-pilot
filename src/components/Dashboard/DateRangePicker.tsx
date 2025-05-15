@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { format, endOfMonth, subMonths, startOfMonth, subDays, startOfYear } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -24,7 +23,7 @@ import {
   PANAMA_TIMEZONE,
   formatDateForPanamaDisplay
 } from '@/utils/timezoneUtils';
-import { FinancialDateRange } from '@/utils/dateRangeAdapter';
+import { DateRange as FinancialDateRange } from '@/types/financial';
 
 // Define the props interface
 interface DateRangePickerProps {

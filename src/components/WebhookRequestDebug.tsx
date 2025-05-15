@@ -1,9 +1,8 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Bug } from 'lucide-react';
 import { formatDateYYYYMMDD } from '@/utils/dateUtils';
-import { FinancialDateRange } from '@/utils/dateRangeAdapter';
+import { DateRange as FinancialDateRange } from '@/types/financial';
 
 interface WebhookRequestDebugProps {
   dateRange: {

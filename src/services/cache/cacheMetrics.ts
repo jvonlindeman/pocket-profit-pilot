@@ -81,8 +81,14 @@ export const cacheMetrics = {
       };
     } catch (err) {
       console.error("CacheMetrics: Error getting cache stats:", err);
+      // Fixed: Return type that matches the expected return type
       return {
-        error: err.message,
+        transactionCount: 0,
+        segments: [],
+        recentMetrics: [],
+        hitRate: 'N/A',
+        hits: 0,
+        misses: 0,
         lastUpdated: new Date().toISOString()
       };
     }
