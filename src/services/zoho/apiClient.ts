@@ -1,5 +1,13 @@
-// Re-export from new modular structure
-export { fetchTransactionsFromWebhook } from "./api/client";
+// Import necessary types and helpers
+import { Transaction } from "../../types/financial";
+import { handleApiError } from "./utils";
+import { getMockTransactions } from "./mockData";
+import { supabase } from "@/integrations/supabase/client";
+import { PANAMA_TIMEZONE } from "@/utils/timezoneUtils";
+import { processRawTransactions, filterExcludedVendors } from "./api/processor";
+import { preparePanamaDates } from "./api/formatter";
+
+// Re-export required functions from the modular structure
 export { processRawTransactions, filterExcludedVendors } from "./api/processor";
 export { formatDateYYYYMMDD, normalizeSource, normalizeType, preparePanamaDates } from "./api/formatter";
 export { excludedVendors } from "./api/config";
