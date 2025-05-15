@@ -1,3 +1,4 @@
+
 // Import necessary types and helpers
 import { Transaction } from "../../types/financial";
 import { handleApiError } from "./utils";
@@ -6,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PANAMA_TIMEZONE } from "@/utils/timezoneUtils";
 import { processRawTransactions, filterExcludedVendors } from "./api/processor";
 import { preparePanamaDates } from "./api/formatter";
+import { logCacheEvent } from "@/components/Dashboard/CacheMonitor";
 
 // Re-export required functions from the modular structure
 export { processRawTransactions, filterExcludedVendors } from "./api/processor";
@@ -32,6 +34,9 @@ export const fetchTransactionsFromWebhook = async (
     console.log("ZohoService: Fetching transactions from", startDate, "to", endDate);
     console.log("ZohoService: Force refresh?", forceRefresh);
 
+    // Log cache check event
+    logCacheEvent('check', 'Zoho', { forceRefresh }, { startDate, endDate });
+
     // Prepare dates in Panama timezone
     const { 
       panamaStartDate, 
@@ -51,6 +56,7 @@ export const fetchTransactionsFromWebhook = async (
         now - lastApiRequest.timestamp < 60000) { // 1 minute cache
       
       console.log("ZohoService: Using cached API response from memory (last minute)");
+      logCacheEvent('hit', 'memory', { source: 'Zoho', age: now - lastApiRequest.timestamp }, { startDate, endDate });
       
       if (returnRawResponse) {
         console.log("ZohoService: Returning raw cached response with isCached=true");
@@ -105,10 +111,13 @@ export const fetchTransactionsFromWebhook = async (
       console.log("ZohoService: Checking for cached data in Supabase");
     } else {
       console.log("ZohoService: Force refresh requested, will bypass cache");
+      logCacheEvent('force_refresh', 'Zoho', {}, { startDate, endDate });
     }
     
     // Call the Supabase edge function instead of make.com webhook directly
     console.log("ZohoService: Calling Supabase zoho-transactions edge function");
+    
+    const startTime = Date.now();
     const { data, error } = await supabase.functions.invoke("zoho-transactions", {
       body: {
         startDate: formattedStartDate,
@@ -116,9 +125,12 @@ export const fetchTransactionsFromWebhook = async (
         forceRefresh
       }
     });
+    const endTime = Date.now();
+    const durationMs = endTime - startTime;
     
     if (error) {
       console.error("Failed to fetch data from Supabase function:", error);
+      logCacheEvent('miss', 'Zoho', { error: error.message }, { startDate, endDate }, durationMs);
       
       // If we get an error, use mock data
       const errorMessage = handleApiError({details: error.message}, 'Failed to fetch Zoho transactions from Supabase cache');
@@ -128,6 +140,7 @@ export const fetchTransactionsFromWebhook = async (
     
     if (!data) {
       console.log("No transactions returned from Supabase function, using mock data");
+      logCacheEvent('miss', 'Zoho', { reason: 'No data returned' }, { startDate, endDate }, durationMs);
       return returnRawResponse ? { message: "No data returned", data: null, raw_response: null } : getMockTransactions(panamaStartDate, panamaEndDate);
     }
     
@@ -155,6 +168,22 @@ export const fetchTransactionsFromWebhook = async (
       response: data,
       isCached
     };
+    
+    // Log appropriate cache event
+    if (isCached) {
+      logCacheEvent('hit', 'Zoho', { 
+        transactionCount: data.cached_transactions?.length,
+        responseFlags: {
+          cached: !!data.cached,
+          cache_hit: !!data.cache_hit,
+          isCached: !!data.isCached
+        }
+      }, { startDate, endDate }, durationMs);
+    } else {
+      logCacheEvent('api_call', 'Zoho', { 
+        transactionCount: data.cached_transactions?.length
+      }, { startDate, endDate }, durationMs);
+    }
     
     // Return raw response for debugging if requested
     if (returnRawResponse) {
@@ -206,6 +235,8 @@ export const fetchTransactionsFromWebhook = async (
     return transactions;
   } catch (err) {
     handleApiError(err, 'Failed to connect to Supabase function');
+    logCacheEvent('miss', 'Zoho', { error: err instanceof Error ? err.message : 'Unknown error' }, { startDate, endDate });
+    
     // Fall back to mock data
     console.warn('Falling back to mock data due to exception');
     return returnRawResponse ? { error: err instanceof Error ? err.message : 'Unknown error', raw_response: null } : getMockTransactions(startDate, endDate);

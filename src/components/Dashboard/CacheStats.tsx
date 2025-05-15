@@ -1,7 +1,8 @@
 
-import React from 'react';
-import { AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+import { AlertTriangle, CheckCircle, RefreshCw, Database } from 'lucide-react';
 import { Button } from '../ui/button';
+import CacheMonitor from './CacheMonitor';
 
 interface CacheStatsProps {
   dateRange: { startDate: Date; endDate: Date };
@@ -19,6 +20,8 @@ const CacheStats: React.FC<CacheStatsProps> = ({
   isUsingCache, 
   onRefresh 
 }) => {
+  const [showDebug, setShowDebug] = useState<boolean>(false);
+  
   // Default values if props not provided
   const hasZohoCache = cacheStatus?.zoho?.hit || false;
   const hasStripeCache = cacheStatus?.stripe?.hit || false;
@@ -83,27 +86,40 @@ const CacheStats: React.FC<CacheStatsProps> = ({
   };
   
   return (
-    <div className="flex justify-between items-center px-4 py-2 bg-gray-50 rounded-lg border">
-      <div className="flex items-center space-x-2">
-        <span className="text-sm font-medium text-gray-700">Rango:</span>
-        <span className="text-sm text-gray-500">{formattedRange}</span>
+    <div className="space-y-3">
+      <div className="flex justify-between items-center px-4 py-2 bg-gray-50 rounded-lg border">
+        <div className="flex items-center space-x-2">
+          <span className="text-sm font-medium text-gray-700">Rango:</span>
+          <span className="text-sm text-gray-500">{formattedRange}</span>
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          {getCacheStatusIcon()}
+          <span className={`text-sm ${getCacheStatusColor()}`}>{getCacheStatusText()}</span>
+          {usingCache && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-6 px-2 text-xs" 
+              onClick={onRefresh}
+            >
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Refrescar
+            </Button>
+          )}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-6 px-2 text-xs ml-2 flex items-center"
+            onClick={() => setShowDebug(!showDebug)}
+          >
+            <Database className="h-3 w-3 mr-1" />
+            {showDebug ? 'Hide Debug' : 'Debug'}
+          </Button>
+        </div>
       </div>
       
-      <div className="flex items-center space-x-2">
-        {getCacheStatusIcon()}
-        <span className={`text-sm ${getCacheStatusColor()}`}>{getCacheStatusText()}</span>
-        {usingCache && (
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="h-6 px-2 text-xs" 
-            onClick={onRefresh}
-          >
-            <RefreshCw className="h-3 w-3 mr-1" />
-            Refrescar
-          </Button>
-        )}
-      </div>
+      {showDebug && <CacheMonitor />}
     </div>
   );
 };

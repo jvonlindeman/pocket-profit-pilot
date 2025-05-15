@@ -16,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import CacheStats from './CacheStats';
 import TransactionFilters, { FilterOptions } from './TransactionFilters';
 import TransactionCategorySummary from './TransactionCategorySummary';
+import CacheMonitor from './CacheMonitor';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -51,6 +52,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
   // State for filtered transactions
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>(transactions);
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
+  const [showCacheMonitor, setShowCacheMonitor] = useState<boolean>(false);
   
   // Handle filter change
   const handleFilterChange = (filtered: Transaction[]) => {
@@ -87,6 +89,22 @@ const TransactionList: React.FC<TransactionListProps> = ({
           isUsingCache={cacheProps.isUsingCache}
           onRefresh={onRefresh}
         />
+      )}
+      
+      {/* Cache Monitor Toggle Button */}
+      <div className="flex justify-end">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => setShowCacheMonitor(!showCacheMonitor)}
+        >
+          {showCacheMonitor ? 'Hide Cache Monitor' : 'Show Cache Monitor'}
+        </Button>
+      </div>
+
+      {/* Cache Monitor (conditionally shown) */}
+      {showCacheMonitor && (
+        <CacheMonitor />
       )}
       
       <div className="flex justify-between items-center mb-4">
@@ -148,7 +166,14 @@ const TransactionList: React.FC<TransactionListProps> = ({
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell>{transaction.source}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center">
+                        {transaction.source}
+                        {(transaction.fromCache || transaction.isCached || transaction.cache_hit) && (
+                          <span className="ml-1 text-xs text-green-600 bg-green-50 px-1 rounded">cached</span>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className={`text-right ${transaction.type === 'expense' ? 'text-red-600' : 'text-green-600'} font-medium`}>
                       {transaction.type === 'expense' ? '-' : ''}${transaction.amount.toFixed(2)}
                     </TableCell>

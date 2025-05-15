@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Transaction } from "../../types/financial";
 import { formatDateYYYYMMDD } from "@/utils/dateUtils";
 import { CacheResponse } from "./cacheTypes";
+import { logCacheEvent } from "@/components/Dashboard/CacheMonitor";
 
 // Store last cache check result
 let lastCacheCheckResult: CacheResponse | null = null;
@@ -22,10 +23,29 @@ export const cacheOperations = {
     try {
       console.log(`CacheOperations: Checking cache for ${source} data from ${startDate} to ${endDate}`);
       
+      // Log cache check event
+      logCacheEvent('check', source as any, { forceRefresh }, { startDate, endDate });
+      
       const formattedStartDate = formatDateYYYYMMDD(startDate);
       const formattedEndDate = formatDateYYYYMMDD(endDate);
       
+      // If force refresh is requested, skip cache check
+      if (forceRefresh) {
+        logCacheEvent('force_refresh', source as any, {}, { startDate, endDate });
+        return { 
+          cached: false, 
+          status: "bypassed",
+          metrics: {
+            source,
+            startDate: formattedStartDate,
+            endDate: formattedEndDate,
+            cacheHit: false
+          }
+        };
+      }
+      
       // Call cache-manager edge function
+      const startTime = Date.now();
       const { data, error } = await supabase.functions.invoke('cache-manager', {
         body: {
           source,
@@ -34,9 +54,12 @@ export const cacheOperations = {
           forceRefresh
         }
       });
+      const endTime = Date.now();
+      const durationMs = endTime - startTime;
       
       if (error) {
         console.error("CacheOperations: Error checking cache:", error);
+        logCacheEvent('miss', source as any, { error: error.message }, { startDate, endDate }, durationMs);
         throw new Error(`Cache check failed: ${error.message}`);
       }
       
@@ -57,11 +80,25 @@ export const cacheOperations = {
             tx.isCached = true;
           });
         }
+        
+        // Log cache hit
+        logCacheEvent('hit', source as any, { 
+          status: data.status,
+          transaction_count: data.data?.length || 0
+        }, { startDate, endDate }, durationMs);
+      } else {
+        // Log cache miss
+        logCacheEvent('miss', source as any, { 
+          status: data.status,
+          reason: 'Not in cache'
+        }, { startDate, endDate }, durationMs);
       }
       
       return data as CacheResponse;
     } catch (err) {
       console.error("CacheOperations: Error in checkCache", err);
+      logCacheEvent('miss', source as any, { error: err instanceof Error ? err.message : 'Unknown error' }, { startDate, endDate });
+      
       return { 
         cached: false, 
         status: "error",
@@ -87,8 +124,11 @@ export const cacheOperations = {
     try {
       console.log(`CacheOperations: Storing ${transactions.length} ${source} transactions from ${startDate} to ${endDate}`);
       
+      const startTime = Date.now();
+      
       if (transactions.length === 0) {
         console.warn("CacheOperations: No transactions to store, skipping cache update");
+        logCacheEvent('store', source as any, { status: 'skipped', reason: 'No transactions' }, { startDate, endDate }, 0);
         return false;
       }
       
@@ -201,10 +241,26 @@ export const cacheOperations = {
       }
       
       const success = errorCount === 0 && successCount > 0;
+      const endTime = Date.now();
+      const durationMs = endTime - startTime;
+      
+      // Log cache store event
+      logCacheEvent('store', source as any, { 
+        success, 
+        expectedCount: transactions.length, 
+        actualCount: count || 0,
+        successBatches: successCount,
+        errorBatches: errorCount
+      }, { startDate, endDate }, durationMs);
+      
       console.log(`CacheOperations: ${success ? 'Successfully' : 'Partially'} cached ${transactions.length} transactions. Success batches: ${successCount}, Failed batches: ${errorCount}`);
       return success;
     } catch (err) {
       console.error("CacheOperations: Error in storeTransactions", err);
+      logCacheEvent('store', source as any, { 
+        success: false, 
+        error: err instanceof Error ? err.message : 'Unknown error' 
+      }, { startDate, endDate });
       return false;
     }
   },
