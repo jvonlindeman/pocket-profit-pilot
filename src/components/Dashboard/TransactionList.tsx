@@ -13,7 +13,7 @@ import { RefreshCw } from 'lucide-react';
 import { formatDateForDisplay } from '@/utils/dateUtils';
 import { Transaction } from '@/types/financial';
 import { Skeleton } from '@/components/ui/skeleton';
-import CacheInfo from './CacheInfo';
+import CacheStats from './CacheStats';
 import TransactionFilters, { FilterOptions } from './TransactionFilters';
 import TransactionCategorySummary from './TransactionCategorySummary';
 
@@ -62,14 +62,17 @@ const TransactionList: React.FC<TransactionListProps> = ({
     setFilteredTransactions(transactions);
   }, [transactions]);
   
+  // Debug cache status
+  console.log("TransactionList render - Cache Status:", cacheStatus, "Using Cache:", isUsingCache);
+  
   return (
     <div className="space-y-4">
       {/* Cache information */}
-      {dateRange && cacheStatus && (
-        <CacheInfo 
-          dateRange={dateRange}
-          cacheStatus={cacheStatus}
-          isUsingCache={isUsingCache || false}
+      {dateRange && (
+        <CacheStats 
+          dateRange={cacheProps.dateRange}
+          cacheStatus={cacheProps.cacheStatus}
+          isUsingCache={cacheProps.isUsingCache}
           onRefresh={onRefresh}
         />
       )}
@@ -92,6 +95,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
         </div>
       </div>
       
+      {/* Transaction List Table */}
       <div className="bg-white border rounded-lg shadow-sm">
         <div className="overflow-x-auto">
           <Table>
@@ -106,7 +110,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                // Mostrar skeletons al cargar
+                // Show skeletons when loading
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
                     <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
@@ -117,7 +121,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                   </TableRow>
                 ))
               ) : filteredTransactions.length > 0 ? (
-                // Mostrar datos si hay transacciones
+                // Show data if there are transactions
                 filteredTransactions.map((transaction) => (
                   <TableRow key={transaction.id}>
                     <TableCell>{formatDateForDisplay(transaction.date)}</TableCell>
@@ -139,7 +143,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                   </TableRow>
                 ))
               ) : (
-                // Mostrar mensaje si no hay transacciones
+                // Show message if no transactions
                 <TableRow>
                   <TableCell colSpan={5} className="text-center">No hay transacciones disponibles con los filtros seleccionados.</TableCell>
                 </TableRow>

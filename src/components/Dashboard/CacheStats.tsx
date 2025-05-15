@@ -5,6 +5,7 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Loader2, RefreshCw } from 'lucide-react';
 import * as ZohoService from '@/services/zohoService';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface CacheStatsProps {
   dateRange: {
@@ -25,9 +26,8 @@ const CacheStats: React.FC<CacheStatsProps> = ({ dateRange, cacheStatus, isUsing
 
   // Store the cacheStatus in local state to prevent losing it during data fetching
   useEffect(() => {
-    if (cacheStatus.zoho.hit || cacheStatus.stripe.hit) {
-      setLocalCacheStatus(cacheStatus);
-    }
+    // Update local state whenever the prop changes
+    setLocalCacheStatus(cacheStatus);
   }, [cacheStatus]);
 
   // Handle loading state

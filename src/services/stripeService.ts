@@ -34,50 +34,149 @@ interface StripeData {
   advanceFunding: number;
   net: number;
   feePercentage: number;
+  cached?: boolean;
 }
 
 // Variable to store the last raw response from the Stripe API
 let lastRawResponse: any = null;
 
+// Memory cache for Stripe data
+const memoryCache: Record<string, {
+  data: StripeData,
+  timestamp: number,
+  expiresAt: number
+}> = {};
+
+const MEMORY_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 const StripeService = {
+  // Check if data is in memory cache
+  checkMemoryCache: (startDate: Date, endDate: Date): { hit: boolean, data?: StripeData } => {
+    const cacheKey = `${formatDateYYYYMMDD_Panama(toPanamaTime(startDate))}-${formatDateYYYYMMDD_Panama(toPanamaTime(endDate))}`;
+    const now = Date.now();
+    
+    // Clean expired entries
+    Object.keys(memoryCache).forEach(key => {
+      if (memoryCache[key].expiresAt < now) {
+        delete memoryCache[key];
+      }
+    });
+    
+    if (memoryCache[cacheKey] && memoryCache[cacheKey].expiresAt > now) {
+      console.log("StripeService: Found data in memory cache for range:", cacheKey);
+      return { hit: true, data: memoryCache[cacheKey].data };
+    }
+    
+    return { hit: false };
+  },
+  
+  // Store data in memory cache
+  storeInMemoryCache: (startDate: Date, endDate: Date, data: StripeData) => {
+    const cacheKey = `${formatDateYYYYMMDD_Panama(toPanamaTime(startDate))}-${formatDateYYYYMMDD_Panama(toPanamaTime(endDate))}`;
+    const now = Date.now();
+    
+    memoryCache[cacheKey] = {
+      data: { ...data, cached: true },
+      timestamp: now,
+      expiresAt: now + MEMORY_CACHE_TTL
+    };
+    
+    console.log("StripeService: Stored data in memory cache for range:", cacheKey);
+    
+    // Limit cache size to 10 entries
+    const keys = Object.keys(memoryCache);
+    if (keys.length > 10) {
+      const oldestKey = keys.sort((a, b) => memoryCache[a].timestamp - memoryCache[b].timestamp)[0];
+      delete memoryCache[oldestKey];
+    }
+  },
+
   // Get transactions within a date range
   getTransactions: async (
     startDate: Date, 
     endDate: Date,
     forceRefresh: boolean = false
   ): Promise<StripeData> => {
-    console.log("StripeService: Fetching transactions from", startDate, "to", endDate);
+    console.log("StripeService: Fetching transactions from", startDate, "to", endDate, "Force refresh:", forceRefresh);
     
     try {
-      // Check cache first if not forcing a refresh
+      // First check memory cache if not forcing a refresh
       if (!forceRefresh) {
+        const memoryCacheResult = StripeService.checkMemoryCache(startDate, endDate);
+        if (memoryCacheResult.hit && memoryCacheResult.data) {
+          console.log("StripeService: Using data from memory cache");
+          
+          // Set last raw response for debugging
+          lastRawResponse = {
+            cached: true,
+            fromMemoryCache: true,
+            transactions: memoryCacheResult.data.transactions,
+            summary: {
+              gross: memoryCacheResult.data.gross,
+              fees: memoryCacheResult.data.fees, 
+              transactionFees: memoryCacheResult.data.transactionFees,
+              payoutFees: memoryCacheResult.data.payoutFees,
+              stripeFees: memoryCacheResult.data.stripeFees,
+              net: memoryCacheResult.data.net,
+              feePercentage: memoryCacheResult.data.feePercentage
+            }
+          };
+          
+          return memoryCacheResult.data;
+        }
+      }
+    
+      // Check server-side cache if not forcing a refresh
+      if (!forceRefresh) {
+        console.log("StripeService: Checking server-side cache");
         const cacheCheck = await CacheService.checkCache('Stripe', startDate, endDate);
         
         if (cacheCheck.cached && cacheCheck.data && cacheCheck.data.length > 0) {
-          console.log("StripeService: Using cached data, found", cacheCheck.data.length, "transactions");
+          console.log("StripeService: Using cached data from server, found", cacheCheck.data.length, "transactions");
           
-          // We need to calculate the summary data for Stripe from cached transactions
-          const transactions = cacheCheck.data;
+          // Mark transactions as coming from cache
+          const cachedTransactions = cacheCheck.data.map(tx => ({
+            ...tx,
+            fromCache: true
+          }));
           
           // Calculate summary data
-          const gross = transactions.reduce((sum, tx) => sum + (tx.gross || tx.amount), 0);
-          const fees = transactions.reduce((sum, tx) => sum + (tx.fees || 0), 0);
-          const transactionFees = transactions
+          const gross = cachedTransactions.reduce((sum, tx) => sum + (tx.gross || tx.amount), 0);
+          const fees = cachedTransactions.reduce((sum, tx) => sum + (tx.fees || 0), 0);
+          const transactionFees = cachedTransactions
             .filter(tx => tx.metadata?.feeType === 'transaction')
             .reduce((sum, tx) => sum + (tx.fees || 0), 0);
-          const payoutFees = transactions
+          const payoutFees = cachedTransactions
             .filter(tx => tx.metadata?.feeType === 'payout')
             .reduce((sum, tx) => sum + (tx.fees || 0), 0);
-          const stripeFees = transactions
+          const stripeFees = cachedTransactions
             .filter(tx => tx.metadata?.feeType === 'stripe')
             .reduce((sum, tx) => sum + (tx.fees || 0), 0);
           const net = gross - fees;
           const feePercentage = gross > 0 ? (fees / gross) * 100 : 0;
           
+          // Create response object
+          const cachedData: StripeData = {
+            transactions: cachedTransactions,
+            gross,
+            fees,
+            transactionFees,
+            payoutFees,
+            stripeFees,
+            advances: 0,
+            advanceFunding: 0,
+            net,
+            feePercentage,
+            cached: true
+          };
+          
+          // Store in memory cache for future use
+          StripeService.storeInMemoryCache(startDate, endDate, cachedData);
+          
           // Store the response for debugging
           lastRawResponse = {
             cached: true,
-            transactions,
+            transactions: cachedTransactions,
             summary: {
               gross,
               fees, 
@@ -90,18 +189,7 @@ const StripeService = {
             metrics: cacheCheck.metrics
           };
           
-          return {
-            transactions,
-            gross,
-            fees,
-            transactionFees,
-            payoutFees,
-            stripeFees,
-            advances: 0,
-            advanceFunding: 0,
-            net,
-            feePercentage
-          };
+          return cachedData;
         }
       }
       
@@ -122,10 +210,12 @@ const StripeService = {
       });
       
       // Call Stripe edge function to get real data
+      console.log("StripeService: No cache hit, calling Stripe API");
       const { data, error } = await supabase.functions.invoke('stripe-balance', {
         body: {
           startDate: formattedStartDate,
-          endDate: formattedEndDate
+          endDate: formattedEndDate,
+          forceRefresh: forceRefresh
         }
       });
       
@@ -142,7 +232,8 @@ const StripeService = {
           advances: 0,
           advanceFunding: 0,
           net: 0,
-          feePercentage: 0
+          feePercentage: 0,
+          cached: false
         };
       }
       
@@ -178,7 +269,7 @@ const StripeService = {
         }
       }
       
-      return {
+      const stripeData: StripeData = {
         transactions: response.transactions || [],
         gross: response.summary.gross || 0,
         fees: response.summary.fees || 0,
@@ -188,8 +279,16 @@ const StripeService = {
         advances: response.summary.advances || 0,
         advanceFunding: response.summary.advanceFunding || 0,
         net: response.summary.net || 0,
-        feePercentage: response.summary.feePercentage || 0
+        feePercentage: response.summary.feePercentage || 0,
+        cached: false
       };
+      
+      // Store in memory cache for future use if not forcing refresh
+      if (!forceRefresh) {
+        StripeService.storeInMemoryCache(startDate, endDate, stripeData);
+      }
+      
+      return stripeData;
     } catch (err) {
       console.error("StripeService: Error:", err);
       lastRawResponse = { error: err instanceof Error ? err.message : "Unknown error" };
@@ -203,7 +302,8 @@ const StripeService = {
         advances: 0,
         advanceFunding: 0,
         net: 0,
-        feePercentage: 0
+        feePercentage: 0,
+        cached: false
       };
     }
   },
@@ -226,11 +326,20 @@ const StripeService = {
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
       
+      // Check memory cache first
+      const memoryCacheResult = StripeService.checkMemoryCache(yesterday, today);
+      if (memoryCacheResult.hit) {
+        console.log("StripeService: API connectivity check - using memory cache");
+        return true;
+      }
+      
       // Try to get raw response with minimal data
+      console.log("StripeService: Testing API connectivity");
       const response = await supabase.functions.invoke('stripe-balance', {
         body: {
           startDate: formatDateYYYYMMDD_Panama(toPanamaTime(yesterday)),
-          endDate: formatDateYYYYMMDD_Panama(toPanamaTime(today))
+          endDate: formatDateYYYYMMDD_Panama(toPanamaTime(today)),
+          testConnection: true
         }
       });
       

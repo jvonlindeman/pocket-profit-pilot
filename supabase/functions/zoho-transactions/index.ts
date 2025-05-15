@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -295,8 +294,12 @@ serve(async (req: Request) => {
           expenses: [],
           payments: [],
           cached: true,
+          cache_hit: true,
           cached_transactions: cacheResult.data,
-          cache_hit: true
+          metadata: {
+            cache_hit: true,
+            source: 'edge_function_cache'
+          }
         };
         
         // Log cache metrics
