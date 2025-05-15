@@ -1,199 +1,235 @@
+import React, { 
+  createContext, 
+  useState, 
+  useContext, 
+  useCallback,
+  useEffect,
+  useRef
+} from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useToast } from "@/hooks/use-toast";
+import * as ZohoService from '@/services/zohoService';
+import * as StripeService from '@/services/stripeService';
+import { CacheEvent } from '@/types/cache';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { CacheResponse, CacheStats } from '@/services/cache/cacheTypes';
-import cacheService from '@/services/cache';
-import { logCacheEvent } from '@/components/Dashboard/CacheMonitor';
-
-// Define the context state type
-interface CacheContextState {
-  // Cache status
-  status: {
-    zoho: { hit: boolean; partial: boolean };
-    stripe: { hit: boolean; partial: boolean };
+// Define the shape of the cache status
+export interface CacheStatus {
+  zoho: {
+    hit: boolean;
+    miss: boolean;
+    partial: boolean;
   };
-  isUsingCache: boolean;
-  lastCheckResult: CacheResponse | null;
-  
-  // Cache stats
-  stats: CacheStats | null;
-  
-  // Cache operations
-  checkCache: (source: string, startDate: Date, endDate: Date, forceRefresh?: boolean) => Promise<CacheResponse>;
-  storeTransactions: (source: string, startDate: Date, endDate: Date, transactions: any[]) => Promise<boolean>;
-  refreshStats: () => Promise<void>;
-  clearCache: (options?: { source?: 'Zoho' | 'Stripe' | 'all'; startDate?: Date; endDate?: Date }) => Promise<boolean>;
-  verifyCacheIntegrity: (source: string, startDate: Date, endDate: Date) => Promise<{ isConsistent: boolean, segmentCount: number, transactionCount: number }>;
+  stripe: {
+    hit: boolean;
+    miss: boolean;
+    partial: boolean;
+  };
 }
 
-// Create the context with default values
-export const CacheContext = createContext<CacheContextState>({
+// Define the context type
+interface CacheContextType {
+  status: CacheStatus;
+  isUsingCache: boolean;
+  logCacheEvent: (event: CacheEvent, source: string, details?: any) => void;
+  clearCache: (options?: CacheClearOptions) => boolean;
+  refreshStats: () => void;
+}
+
+// Options for clearing the cache
+interface CacheClearOptions {
+  source?: 'zoho' | 'stripe' | 'all';
+  startDate?: Date;
+  endDate?: Date;
+}
+
+// Create the context with a default value
+const CacheContext = createContext<CacheContextType>({
   status: {
-    zoho: { hit: false, partial: false },
-    stripe: { hit: false, partial: false }
+    zoho: { hit: false, miss: false, partial: false },
+    stripe: { hit: false, miss: false, partial: false }
   },
   isUsingCache: false,
-  lastCheckResult: null,
-  stats: null,
-  
-  // Default implementations that will be overridden by the provider
-  checkCache: async () => ({ cached: false, status: 'not_initialized' }),
-  storeTransactions: async () => false,
-  refreshStats: async () => {},
-  clearCache: async () => false,
-  verifyCacheIntegrity: async () => ({ isConsistent: false, segmentCount: 0, transactionCount: 0 })
+  logCacheEvent: () => {},
+  clearCache: () => true,
+  refreshStats: () => {},
 });
 
 // Provider component
-export const CacheProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // State for cache status
-  const [cacheStatus, setCacheStatus] = useState<CacheContextState['status']>({
-    zoho: { hit: false, partial: false },
-    stripe: { hit: false, partial: false }
+interface CacheProviderProps {
+  children: React.ReactNode;
+}
+
+export const CacheProvider: React.FC<CacheProviderProps> = ({ children }) => {
+  const [searchParams] = useSearchParams();
+  const [isUsingCache, setIsUsingCache] = useState(true);
+  const [cacheStatus, setCacheStatus] = useState<CacheStatus>({
+    zoho: { hit: false, miss: false, partial: false },
+    stripe: { hit: false, miss: false, partial: false }
   });
-  const [isUsingCache, setIsUsingCache] = useState(false);
-  const [lastCheckResult, setLastCheckResult] = useState<CacheResponse | null>(null);
-  const [stats, setStats] = useState<CacheStats | null>(null);
+  const { toast } = useToast();
   
-  // Load initial cache stats
-  useEffect(() => {
-    refreshStats();
-  }, []);
+  // Use useRef to hold the previous values
+  const previousCacheStatus = useRef<CacheStatus>({
+    zoho: { hit: false, miss: false, partial: false },
+    stripe: { hit: false, miss: false, partial: false }
+  });
   
   // Function to refresh cache stats
-  const refreshStats = async () => {
-    try {
-      const cacheStats = await cacheService.getCacheStats();
-      setStats(cacheStats);
-    } catch (error) {
-      console.error("Error fetching cache stats:", error);
-    }
-  };
+  const refreshStats = useCallback(() => {
+    const zohoCache = ZohoService.getCacheStatus();
+    const stripeCache = StripeService.getCacheStatus();
+    
+    const newCacheStatus: CacheStatus = {
+      zoho: {
+        hit: zohoCache.hit,
+        miss: zohoCache.miss,
+        partial: zohoCache.partial || false,
+      },
+      stripe: {
+        hit: stripeCache.hit,
+        miss: stripeCache.miss,
+        partial: stripeCache.partial || false,
+      },
+    };
+    
+    setCacheStatus(newCacheStatus);
+  }, []);
   
-  // Enhanced check cache function
-  const checkCache = async (
-    source: string,
-    startDate: Date,
-    endDate: Date,
-    forceRefresh = false
-  ): Promise<CacheResponse> => {
-    try {
-      const result = await cacheService.checkCache(source, startDate, endDate, forceRefresh);
-      setLastCheckResult(result);
+  // Effect to run refreshStats on mount
+  useEffect(() => {
+    refreshStats();
+  }, [refreshStats]);
+  
+  // Effect to compare current and previous cache status
+  useEffect(() => {
+    // Function to compare two cache statuses
+    const hasStatusChanged = (prev: CacheStatus, current: CacheStatus): boolean => {
+      return (
+        prev.zoho.hit !== current.zoho.hit ||
+        prev.zoho.miss !== current.zoho.miss ||
+        prev.zoho.partial !== current.zoho.partial ||
+        prev.stripe.hit !== current.stripe.hit ||
+        prev.stripe.miss !== current.stripe.miss ||
+        prev.stripe.partial !== current.stripe.partial
+      );
+    };
+    
+    // Check if the cache status has changed
+    if (hasStatusChanged(previousCacheStatus.current, cacheStatus)) {
+      console.log('Cache status changed:', {
+        previous: previousCacheStatus.current,
+        current: cacheStatus,
+      });
       
-      // Update cache status based on source
-      if (source === 'Zoho') {
-        setCacheStatus(prev => ({
-          ...prev,
-          zoho: { hit: result.cached, partial: result.partial || false }
-        }));
-      } else if (source === 'Stripe') {
-        setCacheStatus(prev => ({
-          ...prev,
-          stripe: { hit: result.cached, partial: result.partial || false }
-        }));
+      // Show toast notifications based on cache status
+      if (cacheStatus.zoho.hit && !previousCacheStatus.current.zoho.hit) {
+        toast({
+          title: "Zoho Cache Hit",
+          description: "Data retrieved from Zoho cache.",
+        });
+      }
+      if (cacheStatus.zoho.miss && !previousCacheStatus.current.zoho.miss) {
+        toast({
+          title: "Zoho Cache Miss",
+          description: "Data retrieved from Zoho API.",
+        });
+      }
+      if (cacheStatus.stripe.hit && !previousCacheStatus.current.stripe.hit) {
+        toast({
+          title: "Stripe Cache Hit",
+          description: "Data retrieved from Stripe cache.",
+        });
+      }
+      if (cacheStatus.stripe.miss && !previousCacheStatus.current.stripe.miss) {
+        toast({
+          title: "Stripe Cache Miss",
+          description: "Data retrieved from Stripe API.",
+        });
       }
       
-      // Update global cache usage status
-      const newIsUsingCache = result.cached || cacheStatus.zoho.hit || cacheStatus.stripe.hit;
-      setIsUsingCache(newIsUsingCache);
+      // Update the previousCacheStatus ref
+      previousCacheStatus.current = cacheStatus;
+    }
+  }, [cacheStatus, toast]);
+  
+  // Function to log cache events
+  const logCacheEvent = useCallback((event: CacheEvent, source: string, details?: any) => {
+    console.log(`Cache event: ${event} from ${source}`, details || '');
+  }, []);
+  
+  // Function to clear Zoho cache
+  const clearZohoCache = useCallback(() => {
+    ZohoService.clearCache();
+    console.log('Zoho cache cleared');
+  }, []);
+  
+  // Function to clear Stripe cache
+  const clearStripeCache = useCallback(() => {
+    StripeService.clearCache();
+    console.log('Stripe cache cleared');
+  }, []);
+  
+  // Function to clear all cache
+  const clearAllCache = useCallback(() => {
+    clearZohoCache();
+    clearStripeCache();
+    console.log('All cache cleared');
+  }, [clearZohoCache, clearStripeCache]);
+  
+  // Function to clear cache with options
+  const clearCache = (options?: CacheClearOptions) => {
+    try {
+      console.log('Clearing cache with options:', options);
       
-      return result;
-    } catch (error) {
-      console.error(`Error checking ${source} cache:`, error);
-      return { cached: false, status: 'error' };
-    }
-  };
-  
-  // Store transactions function
-  const storeTransactions = async (
-    source: string,
-    startDate: Date,
-    endDate: Date,
-    transactions: any[]
-  ): Promise<boolean> => {
-    const result = await cacheService.storeTransactions(source, startDate, endDate, transactions);
-    
-    // Refresh stats after storing new transactions
-    if (result) {
-      refreshStats();
-    }
-    
-    return result;
-  };
-  
-  // Clear cache function
-  const clearCache = async (
-    options?: { source?: 'Zoho' | 'Stripe' | 'all'; startDate?: Date; endDate?: Date }
-  ): Promise<boolean> => {
-    const result = await cacheService.clearCache(options);
-    
-    // Reset cache status if cleared successfully
-    if (result) {
-      if (!options?.source || options.source === 'all') {
-        setCacheStatus({
-          zoho: { hit: false, partial: false },
-          stripe: { hit: false, partial: false }
-        });
-      } else if (options.source === 'Zoho') {
-        setCacheStatus(prev => ({
-          ...prev,
-          zoho: { hit: false, partial: false }
-        }));
-      } else if (options.source === 'Stripe') {
-        setCacheStatus(prev => ({
-          ...prev,
-          stripe: { hit: false, partial: false }
-        }));
+      // Clear the cache based on options
+      if (options?.source === 'zoho') {
+        clearZohoCache();
+      } else if (options?.source === 'stripe') {
+        clearStripeCache();
+      } else {
+        clearAllCache();
       }
       
       setIsUsingCache(false);
       refreshStats();
       
-      // Fix: Update the logCacheEvent call to handle 'clear' type
-      // @ts-ignore - We will update the type definitions in the next step
+      // Log cache clear event with the correct type
       logCacheEvent('clear', (options?.source || 'all'), {
         startDate: options?.startDate,
         endDate: options?.endDate
       });
+      
+      return true;
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+      return false;
     }
-    
-    return result;
   };
   
-  // Verify cache integrity function
-  const verifyCacheIntegrity = async (
-    source: string,
-    startDate: Date,
-    endDate: Date
-  ) => {
-    return await cacheService.verifyCacheIntegrity(source, startDate, endDate);
-  };
+  // Check if "cache=false" is in the URL, disable cache
+  useEffect(() => {
+    if (searchParams.get("cache") === "false") {
+      console.warn("Cache has been disabled via URL parameter.");
+      setIsUsingCache(false);
+    } else {
+      setIsUsingCache(true);
+    }
+  }, [searchParams, setIsUsingCache]);
   
-  // Prepare context value
-  const contextValue: CacheContextState = {
+  const value: CacheContextType = {
     status: cacheStatus,
     isUsingCache,
-    lastCheckResult,
-    stats,
-    checkCache,
-    storeTransactions,
-    refreshStats,
+    logCacheEvent,
     clearCache,
-    verifyCacheIntegrity
+    refreshStats,
   };
   
   return (
-    <CacheContext.Provider value={contextValue}>
+    <CacheContext.Provider value={value}>
       {children}
     </CacheContext.Provider>
   );
 };
 
-// Hook for using cache context
-export const useCacheContext = () => {
-  const context = useContext(CacheContext);
-  if (!context) {
-    throw new Error('useCacheContext must be used within a CacheProvider');
-  }
-  return context;
-};
+// Hook to consume the context
+export const useCacheContext = () => useContext(CacheContext);
