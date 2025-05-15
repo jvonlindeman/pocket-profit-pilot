@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { 
   Table, 
@@ -61,8 +62,20 @@ const TransactionList: React.FC<TransactionListProps> = ({
     setFilteredTransactions(transactions);
   }, [transactions]);
   
-  // Debug cache status with more detailed information
-  console.log("TransactionList render - Cache Status:", cacheStatus, "Using Cache:", isUsingCache, "Has cached transactions:", transactions.some(tx => tx.fromCache === true));
+  // Improved cache status debugging with more detailed information
+  console.log("TransactionList render - Cache Status:", cacheStatus, 
+    "Using Cache:", isUsingCache, 
+    "Has cached transactions:", transactions.some(tx => tx.fromCache === true),
+    "Has isCached flag:", transactions.some(tx => tx.isCached === true),
+    "Has cache_hit flag:", transactions.some(tx => tx.cache_hit === true)
+  );
+  
+  // Generate a unique key for each transaction to avoid duplicate key warnings
+  const getTransactionKey = (transaction: Transaction, index: number) => {
+    return transaction.id ? 
+      `${transaction.id}-${index}` : 
+      `${transaction.source}-${transaction.type}-${transaction.date}-${index}`;
+  };
   
   return (
     <div className="space-y-4">
@@ -120,9 +133,9 @@ const TransactionList: React.FC<TransactionListProps> = ({
                   </TableRow>
                 ))
               ) : filteredTransactions.length > 0 ? (
-                // Show data if there are transactions
-                filteredTransactions.map((transaction) => (
-                  <TableRow key={transaction.id}>
+                // Show data if there are transactions with unique keys to avoid warnings
+                filteredTransactions.map((transaction, index) => (
+                  <TableRow key={getTransactionKey(transaction, index)}>
                     <TableCell>{formatDateForDisplay(transaction.date)}</TableCell>
                     <TableCell>{transaction.description}</TableCell>
                     <TableCell>

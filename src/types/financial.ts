@@ -1,19 +1,18 @@
-
 export interface Transaction {
   id: string;
   date: string;
   amount: number;
-  description: string;
-  category: string;
-  type: 'income' | 'expense';
+  description?: string;
+  category?: string;
   source: string;
-  fromCache?: boolean;
+  type: 'income' | 'expense';
   fees?: number;
   gross?: number;
-  metadata?: {
-    feeType?: 'transaction' | 'payout' | 'stripe';
-    [key: string]: any;
-  };
+  metadata?: Record<string, any>;
+  // Cache-related flags - all serve the same purpose but may be set by different parts of the code
+  fromCache?: boolean;
+  isCached?: boolean;
+  cache_hit?: boolean;
 }
 
 export interface FinancialSummary {

@@ -49,95 +49,125 @@ const generateConsistentId = (transaction: Partial<Transaction>, index: number):
   return `${source.toLowerCase()}-${type.toLowerCase()}-${date}-${identifier}`;
 };
 
-/**
- * Check if data for a given date range is already in cache
- */
+// Inside the fetchTransactionsFromWebhook function, modify the cache handling:
 async function checkCache(source: string, startDate: string, endDate: string): Promise<{
   cached: boolean;
   data?: Transaction[];
   partial: boolean;
+  isCached?: boolean;
+  cache_hit?: boolean;
 }> {
   try {
     console.log(`[Cache Check #${++requestCounter}] Checking cache for ${source} from ${startDate} to ${endDate}`);
     
-    // Call the RPC function to check if date range is cached
-    const { data: cacheCheck, error: cacheError } = await supabase.rpc(
-      'is_date_range_cached',
-      { p_source: source, p_start_date: startDate, p_end_date: endDate }
+    // Call the cache-manager edge function instead of direct RPC
+    const { data: cacheResult, error: cacheError } = await supabase.functions.invoke(
+      'cache-manager',
+      {
+        body: {
+          source,
+          startDate,
+          endDate,
+          forceRefresh: false
+        }
+      }
     );
     
-    if (cacheError || !cacheCheck || cacheCheck.length === 0) {
+    if (cacheError || !cacheResult) {
       console.log(`Cache check failed or returned no data: ${cacheError?.message || 'No data'}`);
       return { cached: false, partial: false };
     }
     
-    const { is_cached, is_partial } = cacheCheck[0];
-    
-    console.log(`Cache check result for ${source} from ${startDate} to ${endDate}: Cached: ${is_cached}, Partial: ${is_partial}`);
+    console.log(`Cache check result for ${source} from ${startDate} to ${endDate}:`, cacheResult);
     
     // If not cached, return early
-    if (!is_cached) {
-      return { cached: false, partial: is_partial };
+    if (!cacheResult.cached) {
+      return { 
+        cached: false, 
+        partial: false,
+        isCached: false,
+        cache_hit: false
+      };
     }
     
-    // If cached, fetch the transactions from cache
-    console.log(`Cache hit! Fetching ${source} transactions from ${startDate} to ${endDate} from cache`);
-    
-    const { data: transactions, error: txError } = await supabase
-      .from('cached_transactions')
-      .select('*')
-      .eq('source', source)
-      .gte('date', startDate)
-      .lte('date', endDate);
-    
-    if (txError) {
-      console.error(`Error fetching cached transactions: ${txError.message}`);
-      return { cached: false, partial: is_partial };
+    // If cached but no data was included, fetch it
+    if (cacheResult.cached && !cacheResult.data) {
+      console.log(`Cache hit indicated but no data provided, fetching from cached_transactions table`);
+      
+      const { data: transactions, error: txError } = await supabase
+        .from('cached_transactions')
+        .select('*')
+        .eq('source', source)
+        .gte('date', startDate)
+        .lte('date', endDate);
+      
+      if (txError || !transactions || transactions.length === 0) {
+        console.log(`Error fetching cached transactions or none found: ${txError?.message || 'No transactions'}`);
+        return { 
+          cached: false, 
+          partial: cacheResult.partial || false,
+          isCached: false,
+          cache_hit: false
+        };
+      }
+      
+      // Mark transactions as coming from cache
+      const markedTransactions = transactions.map(tx => ({
+        ...tx, 
+        fromCache: true,
+        isCached: true
+      }));
+      
+      console.log(`Retrieved ${markedTransactions.length} cached transactions`);
+      
+      return { 
+        cached: true, 
+        data: markedTransactions as Transaction[], 
+        partial: cacheResult.partial || false,
+        isCached: true,
+        cache_hit: true
+      };
     }
     
-    if (!transactions || transactions.length === 0) {
-      console.log(`Cache indicated data exists but no transactions found for ${source} from ${startDate} to ${endDate}`);
-      return { cached: false, partial: is_partial };
+    // If data was included directly
+    if (cacheResult.data) {
+      // Ensure all transactions have the fromCache flag
+      const markedTransactions = cacheResult.data.map(tx => ({
+        ...tx, 
+        fromCache: true,
+        isCached: true
+      }));
+      
+      console.log(`Using ${markedTransactions.length} transactions directly from cache manager`);
+      
+      return { 
+        cached: true, 
+        data: markedTransactions as Transaction[], 
+        partial: cacheResult.partial || false,
+        isCached: true,
+        cache_hit: true
+      };
     }
     
-    console.log(`Successfully retrieved ${transactions.length} cached transactions for ${source} from ${startDate} to ${endDate}`);
-    
-    // Log cache hit metrics
-    try {
-      await supabase.from('cache_metrics').insert({
-        source,
-        start_date: startDate,
-        end_date: endDate,
-        cache_hit: true,
-        partial_hit: is_partial,
-        transaction_count: transactions.length,
-        fetch_duration_ms: 0, // Cache hit has no fetch duration
-        refresh_triggered: false
-      });
-    } catch (metricsError) {
-      console.error("Error logging cache metrics:", metricsError);
-    }
-    
-    return { cached: true, data: transactions as Transaction[], partial: is_partial };
+    // Fallback case (shouldn't happen with improved implementation)
+    return { 
+      cached: false, 
+      partial: false,
+      isCached: false,
+      cache_hit: false 
+    };
   } catch (err) {
     console.error(`Error checking cache: ${err instanceof Error ? err.message : 'Unknown error'}`);
     return { cached: false, partial: false };
   }
 }
 
-/**
- * Store transactions directly in the Supabase database
- */
+// Enhance storeTransactionsInCache to also store empty results
 async function storeTransactionsInCache(transactions: Transaction[], source: string, startDate: string, endDate: string): Promise<boolean> {
-  if (!transactions || transactions.length === 0) {
-    console.log("No transactions to cache");
-    return false;
-  }
-
   console.log(`Storing ${transactions.length} ${source} transactions in cache from ${startDate} to ${endDate}`);
-
+  
   try {
-    // Create a cache segment record
+    // Create a cache segment record even if no transactions (to mark it as checked)
     const { error: segmentError } = await supabase
       .from('cache_segments')
       .upsert({
@@ -146,14 +176,34 @@ async function storeTransactionsInCache(transactions: Transaction[], source: str
         end_date: endDate,
         transaction_count: transactions.length,
         last_refreshed_at: new Date().toISOString(),
-        status: 'processing'
+        status: transactions.length === 0 ? 'empty' : 'processing'
       }, { onConflict: 'source, start_date, end_date' });
     
     if (segmentError) {
       console.error("Error creating cache segment:", segmentError);
       return false;
     }
-
+    
+    // If no transactions, we're done - mark as complete empty segment
+    if (transactions.length === 0) {
+      const { error: emptySegmentError } = await supabase
+        .from('cache_segments')
+        .upsert({
+          source,
+          start_date: startDate,
+          end_date: endDate,
+          transaction_count: 0,
+          last_refreshed_at: new Date().toISOString(),
+          status: 'complete' 
+        }, { onConflict: 'source, start_date, end_date' });
+      
+      if (emptySegmentError) {
+        console.error("Error updating empty cache segment:", emptySegmentError);
+      }
+      
+      return true;
+    }
+    
     // Store transactions in batches
     const BATCH_SIZE = 50;
     let successCount = 0;
@@ -294,11 +344,13 @@ serve(async (req: Request) => {
           expenses: [],
           payments: [],
           cached: true,
+          isCached: true,
           cache_hit: true,
           cached_transactions: cacheResult.data,
           metadata: {
             cache_hit: true,
-            source: 'edge_function_cache'
+            source: 'edge_function_cache',
+            from_cache: true
           }
         };
         

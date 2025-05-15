@@ -45,6 +45,20 @@ export const cacheOperations = {
       // Store last cache check result
       lastCacheCheckResult = data as CacheResponse;
       
+      // Add additional cache flags for better detection
+      if (data.cached || data.cache_hit || data.isCached) {
+        data.cached = true;
+        data.cache_hit = true;
+        data.isCached = true;
+        
+        if (data.data && Array.isArray(data.data)) {
+          data.data.forEach(tx => {
+            tx.fromCache = true;
+            tx.isCached = true;
+          });
+        }
+      }
+      
       return data as CacheResponse;
     } catch (err) {
       console.error("CacheOperations: Error in checkCache", err);

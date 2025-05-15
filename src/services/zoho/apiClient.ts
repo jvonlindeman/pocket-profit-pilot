@@ -1,4 +1,3 @@
-
 // Import necessary types and helpers
 import { Transaction } from "../../types/financial";
 import { handleApiError } from "./utils";
@@ -45,7 +44,7 @@ export const fetchTransactionsFromWebhook = async (
     const requestKey = `${formattedStartDate}-${formattedEndDate}-${forceRefresh}`;
     const now = Date.now();
     
-    // Check memory cache
+    // Check memory cache with improved logging
     if (!forceRefresh && 
         lastApiRequest.startDate === formattedStartDate && 
         lastApiRequest.endDate === formattedEndDate && 
@@ -56,12 +55,13 @@ export const fetchTransactionsFromWebhook = async (
       if (returnRawResponse) {
         console.log("ZohoService: Returning raw cached response with isCached=true");
         
-        // Make sure to mark it as cached
+        // Make sure to mark it as cached with multiple flags for consistent identification
         const cachedResponse = {
           ...lastApiRequest.response,
           cached: true,
           isCached: true,
-          cache_hit: true
+          cache_hit: true,
+          from_cache: true
         };
         
         return cachedResponse;
@@ -71,11 +71,12 @@ export const fetchTransactionsFromWebhook = async (
       if (lastApiRequest.response?.cached_transactions && Array.isArray(lastApiRequest.response.cached_transactions)) {
         console.log(`ZohoService: Returning ${lastApiRequest.response.cached_transactions.length} filtered cached transactions from memory`);
         
-        // Add cached flag to the response
+        // Add multiple cache flags to the response for reliable detection
         const transactions = filterExcludedVendors(lastApiRequest.response.cached_transactions);
         // Mark the transactions as coming from cache
         transactions.forEach(tx => {
           tx.fromCache = true;
+          tx.isCached = true;
         });
         
         return transactions;
@@ -85,6 +86,7 @@ export const fetchTransactionsFromWebhook = async (
       const transactions = processRawTransactions(lastApiRequest.response);
       transactions.forEach(tx => {
         tx.fromCache = true;
+        tx.isCached = true;
       });
       
       console.log(`ZohoService: Returning ${transactions.length} processed transactions from memory cache`);
@@ -129,15 +131,23 @@ export const fetchTransactionsFromWebhook = async (
       return returnRawResponse ? { message: "No data returned", data: null, raw_response: null } : getMockTransactions(panamaStartDate, panamaEndDate);
     }
     
+    // Detect cache status with improved logging
     console.log("ZohoService: Received data from Supabase function:", {
       hasData: !!data,
-      isCached: !!data.cached || !!data.cache_hit,
+      isCached: !!data.cached || !!data.cache_hit || !!data.isCached,
       transactionCount: data.cached_transactions?.length || 'unknown',
-      dataType: typeof data
+      dataType: typeof data,
+      cacheFlags: {
+        cached: !!data.cached,
+        cache_hit: !!data.cache_hit,
+        isCached: !!data.isCached,
+        from_cache: !!data.from_cache,
+        metadata_cache_hit: !!data.metadata?.cache_hit
+      }
     });
     
-    // Cache this response to avoid redundant calls
-    const isCached = !!data.cached || !!data.cache_hit;
+    // Cache this response to avoid redundant calls - use multiple flags to detect cache status
+    const isCached = !!data.cached || !!data.cache_hit || !!data.isCached || !!data.from_cache || !!data.metadata?.cache_hit;
     lastApiRequest = {
       startDate: formattedStartDate,
       endDate: formattedEndDate,
@@ -153,7 +163,8 @@ export const fetchTransactionsFromWebhook = async (
         ...data,
         cached: isCached,
         cache_hit: isCached,
-        isCached: isCached
+        isCached: isCached,
+        from_cache: isCached
       };
       return enhancedData;
     }
@@ -165,6 +176,7 @@ export const fetchTransactionsFromWebhook = async (
       if (isCached) {
         transactions.forEach(tx => {
           tx.fromCache = true;
+          tx.isCached = true;
         });
       }
       return transactions;
@@ -177,6 +189,7 @@ export const fetchTransactionsFromWebhook = async (
       if (isCached) {
         transactions.forEach(tx => {
           tx.fromCache = true;
+          tx.isCached = true;
         });
       }
       return transactions;
@@ -187,6 +200,7 @@ export const fetchTransactionsFromWebhook = async (
     if (isCached) {
       transactions.forEach(tx => {
         tx.fromCache = true;
+        tx.isCached = true;
       });
     }
     return transactions;
