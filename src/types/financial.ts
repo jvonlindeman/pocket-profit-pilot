@@ -9,6 +9,7 @@ export interface Transaction {
   fees?: number; // Added optional fees field
   gross?: number; // Added optional gross amount field (before fees)
   metadata?: any; // Added metadata field for additional properties
+  fromCache?: boolean; // Added property to track if the transaction is from cache
 }
 
 export interface FinancialSummary {
