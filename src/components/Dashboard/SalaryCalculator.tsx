@@ -9,6 +9,8 @@ interface SalaryCalculatorProps {
   opexAmount: number;
   itbmAmount: number;
   profitPercentage: number;
+  startingBalance?: number; // Added starting balance
+  totalZohoExpenses?: number; // Added total Zoho expenses
 }
 
 const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({ 
@@ -16,27 +18,31 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
   stripeIncome,
   opexAmount,
   itbmAmount,
-  profitPercentage
+  profitPercentage,
+  startingBalance = 0, // Default to 0 if not provided
+  totalZohoExpenses = 0 // Default to 0 if not provided
 }) => {
-  // Calculate Profit First amount (percentage of Zoho income)
-  const profitFirstAmount = (zohoIncome * profitPercentage) / 100;
+  // Calculate adjusted Zoho income (initial balance + Zoho income - total Zoho expenses)
+  const adjustedZohoIncome = (startingBalance || 0) + zohoIncome - totalZohoExpenses;
   
-  // Calculate tax reserve amount (5% of Zoho income)
+  // Calculate Profit First amount (percentage of adjusted Zoho income)
+  const profitFirstAmount = (adjustedZohoIncome * profitPercentage) / 100;
+  
+  // Calculate tax reserve amount (5% of adjusted Zoho income)
   const taxReservePercentage = 5;
-  const taxReserveAmount = (zohoIncome * taxReservePercentage) / 100;
+  const taxReserveAmount = (adjustedZohoIncome * taxReservePercentage) / 100;
   
   // Calculate total deductions from Zoho income
   const totalZohoDeductions = opexAmount + itbmAmount + profitFirstAmount + taxReserveAmount;
   
   // Calculate remaining Zoho income after all deductions
-  const remainingZohoIncome = zohoIncome - totalZohoDeductions;
+  const remainingZohoIncome = adjustedZohoIncome - totalZohoDeductions;
   
   // Calculate half of Stripe income and half of remaining Zoho income
   const halfStripeIncome = stripeIncome / 2;
   const halfRemainingZoho = remainingZohoIncome / 2;
   
   // Calculate salary using the corrected formula: 50% of Stripe income + 50% of remaining Zoho income
-  // Instead of (remainingZohoIncome + halfStripeIncome) / 2
   const salary = halfStripeIncome + halfRemainingZoho;
   
   // Format currency
@@ -60,8 +66,24 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-4">
             <div className="bg-white p-3 rounded-lg shadow-sm">
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Balance Inicial</h3>
+              <div className="text-lg font-bold text-green-600">{formatCurrency(startingBalance)}</div>
+            </div>
+            
+            <div className="bg-white p-3 rounded-lg shadow-sm">
               <h3 className="text-sm font-medium text-gray-500 mb-1">Ingresos Zoho</h3>
               <div className="text-lg font-bold text-green-600">{formatCurrency(zohoIncome)}</div>
+            </div>
+            
+            <div className="bg-white p-3 rounded-lg shadow-sm">
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Gastos Totales Zoho</h3>
+              <div className="text-lg font-bold text-amber-600">- {formatCurrency(totalZohoExpenses)}</div>
+            </div>
+            
+            <div className="bg-blue-100 p-3 rounded-lg border border-blue-200">
+              <h3 className="text-sm font-medium text-blue-800 mb-1">Ajuste Ingresos Zoho</h3>
+              <div className="text-lg font-bold text-blue-700">{formatCurrency(adjustedZohoIncome)}</div>
+              <div className="text-xs text-blue-600 mt-1">Balance Inicial + Ingresos Zoho - Gastos Totales Zoho</div>
             </div>
             
             <div className="bg-white p-3 rounded-lg shadow-sm">

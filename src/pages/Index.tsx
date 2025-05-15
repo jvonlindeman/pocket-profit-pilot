@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
@@ -139,6 +138,11 @@ const Index = () => {
   const itbmAmount = monthlyBalance?.itbm_amount !== null ? monthlyBalance?.itbm_amount || 0 : 0;
   const profitPercentage = monthlyBalance?.profit_percentage !== null ? monthlyBalance?.profit_percentage || 1 : 1;
 
+  // Calculate total Zoho expenses - all expenses except those from Stripe
+  const totalZohoExpenses = financialData.transactions
+    .filter(tx => tx.type === 'expense' && tx.source !== 'Stripe')
+    .reduce((sum, tx) => sum + tx.amount, 0);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Dialog to set initial balance */}
@@ -241,7 +245,7 @@ const Index = () => {
               />
             </div>
 
-            {/* New Salary Calculator - Updated to use opexAmount instead of opexPercentage */}
+            {/* New Salary Calculator - Updated with additional props */}
             <div className="mb-6">
               <SalaryCalculator 
                 zohoIncome={regularIncome}
@@ -249,6 +253,8 @@ const Index = () => {
                 opexAmount={opexAmount}
                 itbmAmount={itbmAmount}
                 profitPercentage={profitPercentage}
+                startingBalance={startingBalance}
+                totalZohoExpenses={totalZohoExpenses}
               />
             </div>
 
