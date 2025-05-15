@@ -28,11 +28,11 @@ export class FinancialService {
   /**
    * Process transaction data to calculate financial metrics
    */
-  processTransactionData(transactions: Transaction[], startingBalance: number = 0): FinancialData {
+  processTransactionData(transactions: Transaction[], startingBalance: number = 0, collaboratorExpenses: any[] = []): FinancialData {
     const summary = {
       totalIncome: transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0),
       totalExpense: transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0),
-      collaboratorExpense: 0,
+      collaboratorExpense: collaboratorExpenses.reduce((sum, item) => sum + item.amount, 0),
       otherExpense: 0,
       profit: 0,
       profitMargin: 0,
@@ -40,6 +40,9 @@ export class FinancialService {
       grossProfitMargin: 0,
       startingBalance: startingBalance,
     };
+    
+    // Calculate other expenses (total expense minus collaborator expenses)
+    summary.otherExpense = summary.totalExpense - summary.collaboratorExpense;
     
     summary.profit = summary.totalIncome - summary.totalExpense;
     summary.profitMargin = summary.totalIncome > 0 ? (summary.profit / summary.totalIncome) * 100 : 0;

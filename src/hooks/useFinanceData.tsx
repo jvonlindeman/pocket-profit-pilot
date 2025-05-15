@@ -41,7 +41,9 @@ export const useFinanceData = () => {
     rawResponse, 
     usingCachedData, 
     fetchFinancialData,
-    cacheStatus
+    cacheStatus,
+    apiConnectivity,
+    checkApiConnectivity
   } = useFinancialDataFetcher();
 
   // Datos financieros procesados
@@ -124,6 +126,8 @@ export const useFinanceData = () => {
     startingBalance,
     updateStartingBalance,
     usingCachedData,
-    cacheStatus
+    cacheStatus,
+    apiConnectivity,
+    checkApiConnectivity
   };
 };
