@@ -77,8 +77,6 @@ const FinanceDashboard: React.FC<FinanceDashboardProps> = ({
       {/* Cache information */}
       <CacheStats 
         dateRange={dateRange}
-        cacheStatus={cacheStatus}
-        isUsingCache={usingCachedData}
         onRefresh={onRefresh}
       />
 

@@ -10,7 +10,7 @@ import ZohoConfig from './components/ZohoConfig';
 import StripeDebug from './components/StripeDebug';
 import WebhookRequestDebug from './components/WebhookRequestDebug';
 import WebhookDebug from './components/WebhookDebug';
-import FinanceDashboard from './components/Dashboard/FinanceDashboard';
+import Index from './pages/Index';
 
 import './App.css';
 
@@ -30,7 +30,7 @@ function App() {
       <CacheProvider>
         <Router>
           <Routes>
-            <Route path="/" element={<FinanceDashboard />} />
+            <Route path="/" element={<Index />} />
             <Route path="/zoho" element={<ZohoDebug />} />
             <Route path="/zoho/config" element={<ZohoConfig />} />
             <Route path="/stripe" element={<StripeDebug />} />

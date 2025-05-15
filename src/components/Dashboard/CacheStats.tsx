@@ -8,6 +8,8 @@ import { useCacheContext } from '@/contexts/CacheContext';
 interface CacheStatsProps {
   dateRange: { startDate: Date; endDate: Date };
   onRefresh: () => void;
+  cacheStatus?: any; // Make cacheStatus optional to fix TypeScript error
+  isUsingCache?: boolean; // Make isUsingCache optional
 }
 
 const CacheStats: React.FC<CacheStatsProps> = ({ 
