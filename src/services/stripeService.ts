@@ -154,6 +154,48 @@ const StripeService = {
   },
 
   /**
+   * Get the last raw response - needed for debugging
+   */
+  getLastRawResponse: () => {
+    return lastApiResponse.data;
+  },
+  
+  /**
+   * Get raw response data directly (for debugging purposes)
+   */
+  getRawResponse: async (startDate: Date, endDate: Date, forceRefresh = false): Promise<any> => {
+    try {
+      // Format dates for the request
+      const formattedStartDate = startDate.toISOString().split("T")[0];
+      const formattedEndDate = endDate.toISOString().split("T")[0];
+      
+      console.log("StripeService: Fetching raw response from", formattedStartDate, "to", formattedEndDate);
+      
+      const { data, error } = await supabase.functions.invoke("stripe-balance", {
+        body: {
+          startDate: formattedStartDate,
+          endDate: formattedEndDate,
+          forceRefresh: forceRefresh,
+          rawResponse: true
+        }
+      });
+      
+      if (error) {
+        console.error("StripeService: Error fetching raw response:", error);
+        return { error: error.message };
+      }
+      
+      // Store the response
+      lastApiResponse.data = data;
+      
+      return data;
+    } catch (err) {
+      console.error("StripeService: Error in getRawResponse:", err);
+      return { error: err instanceof Error ? err.message : 'Unknown error' };
+    }
+  },
+
+  /**
    * Check if the Stripe API is accessible
    */
   checkApiConnectivity: async (): Promise<boolean> => {

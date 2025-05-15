@@ -61,7 +61,7 @@ export default function StripeDebug({ dateRange, refreshDataFunction }: StripeDe
         // If no cached data exists, fetch it
         if (!stripeData) {
           console.log("No cached Stripe data, fetching from API");
-          await StripeService.getTransactions(dateRange.startDate, dateRange.endDate);
+          await StripeService.getRawResponse(dateRange.startDate, dateRange.endDate, true);
           stripeData = StripeService.getLastRawResponse();
         }
         
@@ -76,7 +76,7 @@ export default function StripeDebug({ dateRange, refreshDataFunction }: StripeDe
         // Success toast
         toast({
           title: "Datos de Stripe cargados",
-          description: `${stripeData.transactions?.length || 0} transacciones encontradas`,
+          description: `${stripeData?.transactions?.length || 0} transacciones encontradas`,
           variant: "success",
         });
       } catch (stripeErr: any) {
