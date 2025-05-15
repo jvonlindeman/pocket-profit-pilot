@@ -2,6 +2,7 @@
 import { Transaction } from "../types/financial";
 import { supabase } from "@/integrations/supabase/client";
 import { logCacheEvent } from "@/components/Dashboard/CacheMonitor";
+import { toast } from "@/hooks/use-toast";
 
 // Placeholder for mock data
 const getMockTransactions = (startDate: Date, endDate: Date) => {
@@ -92,12 +93,27 @@ const StripeService = {
       if (error) {
         console.error("StripeService: Error fetching transactions:", error);
         logCacheEvent('miss', 'Stripe', { error: error.message }, { startDate, endDate }, durationMs);
+        
+        // Show toast with more specific error details
+        toast({
+          title: "Stripe API Error",
+          description: `Error fetching Stripe data: ${error.message || 'Unknown error'}`,
+          variant: "destructive"
+        });
+        
         return getMockTransactions(startDate, endDate);
       }
 
       if (!data) {
         console.log("StripeService: No data returned, using mock data");
         logCacheEvent('miss', 'Stripe', { reason: 'No data returned' }, { startDate, endDate }, durationMs);
+        
+        toast({
+          title: "Stripe API Warning",
+          description: "No data returned from Stripe API, using mock data",
+          variant: "warning"
+        });
+        
         return getMockTransactions(startDate, endDate);
       }
 
@@ -149,6 +165,13 @@ const StripeService = {
     } catch (err) {
       console.error("StripeService: Unhandled error:", err);
       logCacheEvent('miss', 'Stripe', { error: err instanceof Error ? err.message : 'Unknown error' }, { startDate, endDate });
+      
+      toast({
+        title: "Stripe API Error",
+        description: `Unhandled error: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
+      
       return getMockTransactions(startDate, endDate);
     }
   },
@@ -182,6 +205,14 @@ const StripeService = {
       
       if (error) {
         console.error("StripeService: Error fetching raw response:", error);
+        
+        // Show toast with detailed error message
+        toast({
+          title: "Stripe API Error",
+          description: `Failed to fetch Stripe data: ${error.message}`,
+          variant: "destructive"
+        });
+        
         return { error: error.message };
       }
       
@@ -191,6 +222,13 @@ const StripeService = {
       return data;
     } catch (err) {
       console.error("StripeService: Error in getRawResponse:", err);
+      
+      toast({
+        title: "Stripe API Error",
+        description: `Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
+      
       return { error: err instanceof Error ? err.message : 'Unknown error' };
     }
   },
@@ -200,6 +238,8 @@ const StripeService = {
    */
   checkApiConnectivity: async (): Promise<boolean> => {
     try {
+      console.log("StripeService: Checking API connectivity with ping request");
+      
       // Simple ping to check if API is responding
       const { data, error } = await supabase.functions.invoke("stripe-balance", {
         body: {
@@ -207,8 +247,37 @@ const StripeService = {
         }
       });
 
-      return !error && !!data;
-    } catch {
+      if (error) {
+        console.error("StripeService: Ping failed with error:", error);
+        return false;
+      }
+      
+      console.log("StripeService: Ping response:", data);
+      
+      // Consider it connected if we get a successful response
+      const isConnected = !error && !!data && data.ping === true;
+      
+      if (!isConnected) {
+        console.warn("StripeService: Stripe API is not accessible", data);
+        
+        // Show toast with connection issue
+        toast({
+          title: "Stripe Connectivity Issue",
+          description: data?.message || "Unable to connect to Stripe API",
+          variant: "warning"
+        });
+      }
+      
+      return isConnected;
+    } catch (err) {
+      console.error("StripeService: Error checking API connectivity:", err);
+      
+      toast({
+        title: "Stripe API Error",
+        description: `Connection check failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
+      
       return false;
     }
   }

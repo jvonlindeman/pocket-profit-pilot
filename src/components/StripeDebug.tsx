@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, RefreshCw, CreditCard, Calendar } from 'lucide-react';
+import { Loader2, RefreshCw, CreditCard, Calendar, AlertTriangle, CheckCircle, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import StripeService from '@/services/stripeService';
 import StripeDebugData from '@/components/WebhookDebug/StripeDebugData';
 import { format } from 'date-fns';
@@ -24,18 +25,41 @@ export default function StripeDebug({ dateRange, refreshDataFunction }: StripeDe
     startDate: string;
     endDate: string;
   } | null>(null);
+  const [apiStatus, setApiStatus] = useState<'unknown' | 'connected' | 'disconnected'>('unknown');
   
   // Function to format display dates
   const formatDisplayDate = (date: Date): string => {
     return format(date, 'yyyy-MM-dd');
   };
   
-  // Función para obtener los datos de Stripe
+  // Function to check API connectivity
+  const checkApiConnectivity = async () => {
+    try {
+      const isConnected = await StripeService.checkApiConnectivity();
+      setApiStatus(isConnected ? 'connected' : 'disconnected');
+      return isConnected;
+    } catch (err) {
+      console.error("Error checking API connectivity:", err);
+      setApiStatus('disconnected');
+      return false;
+    }
+  };
+  
+  // Function to fetch Stripe data
   const fetchStripeData = async () => {
     setLoading(true);
     setError(null);
     
     try {
+      // First check API connectivity
+      const isConnected = await checkApiConnectivity();
+      
+      if (!isConnected) {
+        setError("Unable to connect to Stripe API. Please check your API key configuration.");
+        setLoading(false);
+        return;
+      }
+      
       // Display toast notification
       toast({
         title: "Cargando datos de Stripe",
@@ -61,8 +85,7 @@ export default function StripeDebug({ dateRange, refreshDataFunction }: StripeDe
         // If no cached data exists, fetch it
         if (!stripeData) {
           console.log("No cached Stripe data, fetching from API");
-          await StripeService.getRawResponse(dateRange.startDate, dateRange.endDate, true);
-          stripeData = StripeService.getLastRawResponse();
+          stripeData = await StripeService.getRawResponse(dateRange.startDate, dateRange.endDate, true);
         }
         
         setStripeRawData(stripeData);
@@ -106,13 +129,16 @@ export default function StripeDebug({ dateRange, refreshDataFunction }: StripeDe
     }
   };
 
-  // Load data on component mount if needed
+  // Load data and check connectivity on component mount
   useEffect(() => {
     // Check if we already have data cached
     const cachedData = StripeService.getLastRawResponse();
     if (cachedData) {
       setStripeRawData(cachedData);
     }
+    
+    // Check API connectivity
+    checkApiConnectivity();
   }, []);
 
   return (
@@ -121,6 +147,18 @@ export default function StripeDebug({ dateRange, refreshDataFunction }: StripeDe
         <CardTitle className="flex items-center gap-2">
           <CreditCard className="h-5 w-5 text-indigo-500" />
           Depuración de API Stripe
+          
+          {apiStatus === 'connected' && (
+            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center gap-1">
+              <CheckCircle className="h-3 w-3" /> Conectado
+            </span>
+          )}
+          
+          {apiStatus === 'disconnected' && (
+            <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full flex items-center gap-1">
+              <WifiOff className="h-3 w-3" /> Desconectado
+            </span>
+          )}
         </CardTitle>
         <CardDescription>
           Ver la respuesta cruda de la API Stripe para este periodo
@@ -134,18 +172,38 @@ export default function StripeDebug({ dateRange, refreshDataFunction }: StripeDe
               Periodo: {formatDisplayDate(dateRange.startDate)} a {formatDisplayDate(dateRange.endDate)}
             </span>
           </div>
-          <Button 
-            onClick={fetchStripeData} 
-            variant="outline" 
-            disabled={loading}
-          >
-            {loading ? (
-              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Cargando...</>
-            ) : (
-              <><RefreshCw className="h-4 w-4 mr-2" /> Cargar Datos de Stripe</>
-            )}
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={checkApiConnectivity} 
+              variant="outline" 
+              size="sm"
+              disabled={loading}
+            >
+              Verificar conexión
+            </Button>
+            <Button 
+              onClick={fetchStripeData} 
+              variant="outline" 
+              disabled={loading}
+            >
+              {loading ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Cargando...</>
+              ) : (
+                <><RefreshCw className="h-4 w-4 mr-2" /> Cargar Datos de Stripe</>
+              )}
+            </Button>
+          </div>
         </div>
+
+        {apiStatus === 'disconnected' && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Error de conexión</AlertTitle>
+            <AlertDescription>
+              No se pudo conectar a la API de Stripe. Verifica que la clave API esté configurada correctamente.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {lastFetchedDateRange && (
           <div className="bg-blue-50 border border-blue-100 text-blue-800 rounded-lg p-2 mb-4 text-xs">
