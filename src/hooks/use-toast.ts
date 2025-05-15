@@ -1,12 +1,9 @@
 
-import { useToast as useToastOriginal, toast as toastOriginal } from "@/components/ui/use-toast";
+import { toast as originalToast, useToast as originalUseToast } from "@/components/ui/use-toast";
 import type { ToasterToast } from "@/components/ui/use-toast";
 
-// Extend the toast function to handle potential variant updates
-export const useToast = useToastOriginal;
-
-// Create a proxy for the toast function that ensures it uses valid variants
-export const toast = (props: ToasterToast) => {
+// Create a wrapper for the toast function that handles variant conversion
+const toast = (props: Omit<ToasterToast, "id">) => {
   const validProps = { ...props };
   
   // Convert any invalid variants to valid ones
@@ -14,7 +11,11 @@ export const toast = (props: ToasterToast) => {
     validProps.variant = "default";
   }
   
-  return toastOriginal(validProps);
+  return originalToast(validProps);
 };
 
+// Export the original useToast hook
+const useToast = originalUseToast;
+
+export { useToast, toast };
 export type { ToasterToast };

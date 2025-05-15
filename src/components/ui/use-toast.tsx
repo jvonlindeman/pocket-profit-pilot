@@ -1,3 +1,4 @@
+
 import * as React from "react"
 
 const TOAST_LIMIT = 5
@@ -127,10 +128,10 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">
 
-function toast({ ...props }: Omit<ToasterToast, "id">) {
+function toast(props: Toast) {
   const id = genId()
 
-  const update = (props: Omit<ToasterToast, "id">) =>
+  const update = (props: Toast) =>
     dispatch({
       type: actionTypes.UPDATE_TOAST,
       id,

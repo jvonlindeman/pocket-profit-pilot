@@ -110,7 +110,7 @@ const StripeService = {
         toast({
           title: "Stripe API Warning",
           description: "No data returned from Stripe API, using mock data",
-          variant: "default" // Changed from "warning" to "default"
+          variant: "default"
         });
         
         return getMockTransactions(startDate, endDate);
@@ -235,7 +235,7 @@ const StripeService = {
         toast({
           title: "Stripe API Notice",
           description: "No transactions found for the selected period",
-          variant: "default" // Using default variant instead of warning
+          variant: "default"
         });
       }
       
@@ -287,7 +287,7 @@ const StripeService = {
         toast({
           title: "Stripe Connectivity Issue",
           description: data?.message || "Unable to connect to Stripe API",
-          variant: "default" // Using default variant instead of warning
+          variant: "default"
         });
       }
       
