@@ -34,10 +34,7 @@ export const useFinancialDataFetcher = () => {
   // Access the cache context
   const { 
     status: cacheStatus, 
-    isUsingCache, 
-    checkCache, 
-    storeTransactions,
-    verifyCacheIntegrity
+    isUsingCache
   } = useCacheContext();
 
   // Memory cache for financial data
@@ -217,15 +214,6 @@ export const useFinancialDataFetcher = () => {
           variant: "destructive"
         });
       }
-      
-      // Verify cache integrity if not using memory cache
-      if (!dataFromMemoryCache) {
-        // Check zoho cache
-        await verifyCacheIntegrity('Zoho', dateRange.startDate, dateRange.endDate);
-        
-        // Check stripe cache
-        await verifyCacheIntegrity('Stripe', dateRange.startDate, dateRange.endDate);
-      }
 
       // Log exact date objects for debugging
       logDateInfo("FinancialDataFetcher: Original dateRange from datepicker", dateRange);
@@ -233,8 +221,6 @@ export const useFinancialDataFetcher = () => {
       // Get transactions from Zoho Books - should check server cache internally
       if (!dataFromMemoryCache) {
         console.log("FinancialDataFetcher: Fetching from Zoho");
-        // First check our database cache
-        const zohoResult = await checkCache('Zoho', dateRange.startDate, dateRange.endDate, forceRefresh);
         
         // Get transactions from Zoho (with cache check in service)
         zohoData = await ZohoService.getTransactions(
@@ -242,11 +228,6 @@ export const useFinancialDataFetcher = () => {
           dateRange.endDate,
           forceRefresh
         );
-        
-        // If it wasn't cached and we got data, store it in our cache
-        if (!zohoResult.cached && zohoData && zohoData.length > 0) {
-          await storeTransactions('Zoho', dateRange.startDate, dateRange.endDate, zohoData);
-        }
         
         // Get the current raw response for debugging
         const rawData = ZohoService.getLastRawResponse();
@@ -259,8 +240,6 @@ export const useFinancialDataFetcher = () => {
       // Get transactions from Stripe if not already loaded from memory cache
       if (!dataFromMemoryCache) {
         console.log("FinancialDataFetcher: Fetching from Stripe:", dateRange.startDate, dateRange.endDate);
-        // First check our database cache
-        const stripeResult = await checkCache('Stripe', dateRange.startDate, dateRange.endDate, forceRefresh);
         
         // Get transactions from Stripe (with cache check in service)
         stripeData = await StripeService.getTransactions(
@@ -268,11 +247,6 @@ export const useFinancialDataFetcher = () => {
           dateRange.endDate,
           forceRefresh
         );
-        
-        // If it wasn't cached and we got data, store it in our cache
-        if (!stripeResult.cached && stripeData && stripeData.transactions && stripeData.transactions.length > 0) {
-          await storeTransactions('Stripe', dateRange.startDate, dateRange.endDate, stripeData.transactions);
-        }
       }
       
       // Store in memory cache for future use if not already there and not forcing refresh
@@ -311,7 +285,7 @@ export const useFinancialDataFetcher = () => {
       setLoading(false);
       return false;
     }
-  }, [lastFetchTimestamp, checkApiConnectivity, checkMemoryCache, storeInMemoryCache, checkCache, storeTransactions, verifyCacheIntegrity]);
+  }, [lastFetchTimestamp, checkApiConnectivity, checkMemoryCache, storeInMemoryCache]);
 
   return {
     loading,

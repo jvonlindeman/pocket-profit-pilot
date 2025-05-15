@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useCacheContext } from '@/contexts/CacheContext';
-import { CacheEvent } from '@/types/cache';
+import { CacheEvent, CacheMetrics } from '@/types/cache';
 
 // Global events array for cache monitoring
 let cacheEvents: CacheEvent[] = [];
@@ -9,12 +9,12 @@ let cacheEvents: CacheEvent[] = [];
 // Add event to the tracker - exported for direct use in some components
 export const logCacheEvent = (
   type: CacheEvent['type'], 
-  source: CacheEvent['source'], 
+  source: string, 
   details?: any,
-  dateRange?: CacheEvent['dateRange'],
+  dateRange?: { startDate: Date; endDate: Date },
   durationMs?: number
 ) => {
-  const event = {
+  const event: CacheEvent = {
     id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     type,
     source,
@@ -46,7 +46,7 @@ export const clearCacheEvents = () => {
 // Hook for monitoring cache events
 export const useCacheMonitoring = () => {
   const [events, setEvents] = useState<CacheEvent[]>([]);
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<CacheMetrics>({
     hits: 0,
     misses: 0,
     apiCalls: 0,
