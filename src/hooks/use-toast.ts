@@ -7,7 +7,8 @@ const toast = (props: Omit<ToasterToast, "id">) => {
   const validProps = { ...props };
   
   // Convert any invalid variants to valid ones
-  if (validProps.variant === "warning") {
+  // Check if the variant is not one of the valid options
+  if (validProps.variant && !["default", "destructive", "success"].includes(validProps.variant as string)) {
     validProps.variant = "default";
   }
   
