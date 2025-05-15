@@ -1,4 +1,3 @@
-
 import { Transaction } from "../types/financial";
 import { supabase } from "@/integrations/supabase/client";
 import { logCacheEvent } from "@/components/Dashboard/CacheMonitor";
@@ -216,6 +215,30 @@ const StripeService = {
         return { error: error.message };
       }
       
+      // Check if data has an error field indicating a problem
+      if (data && data.error) {
+        console.error("StripeService: Error in response data:", data.error);
+        
+        toast({
+          title: "Stripe API Error",
+          description: `Error from API: ${data.error}`,
+          variant: "destructive"
+        });
+        
+        return data; // Return the data with error field for debugging
+      }
+      
+      // If we have a successful response with no data (empty transactions array perhaps)
+      if (data && data.status === "success" && (!data.transactions || data.transactions.length === 0)) {
+        console.log("StripeService: Successful request but no transactions found");
+        
+        toast({
+          title: "Stripe API Notice",
+          description: "No transactions found for the selected period",
+          variant: "default" // Using default variant instead of warning
+        });
+      }
+      
       // Store the response
       lastApiResponse.data = data;
       
@@ -255,7 +278,7 @@ const StripeService = {
       console.log("StripeService: Ping response:", data);
       
       // Consider it connected if we get a successful response
-      const isConnected = !error && !!data && data.ping === true;
+      const isConnected = !error && !!data && data.status === "success" && data.ping === true;
       
       if (!isConnected) {
         console.warn("StripeService: Stripe API is not accessible", data);
@@ -264,7 +287,7 @@ const StripeService = {
         toast({
           title: "Stripe Connectivity Issue",
           description: data?.message || "Unable to connect to Stripe API",
-          variant: "default" // Changed from "warning" to "default"
+          variant: "default" // Using default variant instead of warning
         });
       }
       

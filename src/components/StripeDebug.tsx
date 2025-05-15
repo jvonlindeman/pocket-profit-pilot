@@ -35,12 +35,35 @@ export default function StripeDebug({ dateRange, refreshDataFunction }: StripeDe
   // Function to check API connectivity
   const checkApiConnectivity = async () => {
     try {
+      setLoading(true);
+      console.log("StripeDebug: Checking API connectivity");
+      
       const isConnected = await StripeService.checkApiConnectivity();
       setApiStatus(isConnected ? 'connected' : 'disconnected');
+      
+      console.log("StripeDebug: API connectivity check result:", isConnected);
+      
+      if (isConnected) {
+        toast({
+          title: "Stripe API Connectivity",
+          description: "Successfully connected to Stripe API",
+          variant: "success",
+        });
+      }
+      
+      setLoading(false);
       return isConnected;
     } catch (err) {
       console.error("Error checking API connectivity:", err);
       setApiStatus('disconnected');
+      setLoading(false);
+      
+      toast({
+        title: "Stripe API Error",
+        description: "Failed to check Stripe API connectivity",
+        variant: "destructive",
+      });
+      
       return false;
     }
   };
@@ -68,7 +91,7 @@ export default function StripeDebug({ dateRange, refreshDataFunction }: StripeDe
       
       // Use the global refresh function if available
       if (refreshDataFunction) {
-        console.log("Usando la función de actualización global para cargar datos");
+        console.log("Using global refresh function to load data");
         refreshDataFunction(true);
         
         // Wait briefly for the update to complete
@@ -88,20 +111,35 @@ export default function StripeDebug({ dateRange, refreshDataFunction }: StripeDe
           stripeData = await StripeService.getRawResponse(dateRange.startDate, dateRange.endDate, true);
         }
         
-        setStripeRawData(stripeData);
-        setLastFetchedDateRange({
-          startDate: formatDisplayDate(dateRange.startDate),
-          endDate: formatDisplayDate(dateRange.endDate)
-        });
-        
-        console.log("Stripe debug data received:", stripeData);
-        
-        // Success toast
-        toast({
-          title: "Datos de Stripe cargados",
-          description: `${stripeData?.transactions?.length || 0} transacciones encontradas`,
-          variant: "success",
-        });
+        // If we got data with a successful status code, clear any error state
+        if (stripeData && !stripeData.error) {
+          setError(null);
+          setStripeRawData(stripeData);
+          setLastFetchedDateRange({
+            startDate: formatDisplayDate(dateRange.startDate),
+            endDate: formatDisplayDate(dateRange.endDate)
+          });
+          
+          console.log("Stripe debug data received:", stripeData);
+          
+          // Success toast
+          toast({
+            title: "Datos de Stripe cargados",
+            description: `${stripeData?.transactions?.length || 0} transacciones encontradas`,
+            variant: "success",
+          });
+        } else {
+          // There's an error in the data
+          const errorMsg = stripeData?.error || "Error desconocido al obtener datos de Stripe";
+          setError(errorMsg);
+          console.error("Error in Stripe data:", errorMsg);
+          
+          toast({
+            title: "Error al cargar datos de Stripe",
+            description: errorMsg,
+            variant: "destructive",
+          });
+        }
       } catch (stripeErr: any) {
         console.error("Failed to fetch Stripe debug data:", stripeErr);
         setError(stripeErr.message || "Error desconocido al obtener datos de Stripe");

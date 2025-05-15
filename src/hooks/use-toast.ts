@@ -1,25 +1,20 @@
 
-// Direct implementation to avoid circular dependencies
-import { toast as baseToast, useToast as baseUseToast } from "@/components/ui/use-toast.tsx"
-import type { ToasterToast } from "@/components/ui/use-toast.tsx"
+import { useToast as useToastOriginal, toast as toastOriginal } from "@/components/ui/use-toast";
+import type { ToasterToast } from "@/components/ui/use-toast";
 
-// Export the type with the same name
-export type { ToasterToast };
+// Extend the toast function to handle potential variant updates
+export const useToast = useToastOriginal;
 
-// Re-export the hook
-export const useToast = baseUseToast;
-
-// Export enhanced toast function that matches the signature of the original toast function
-export const toast = ({
-  title,
-  description,
-  variant,
-  ...props
-}: Omit<ToasterToast, "id">) => {
-  return baseToast({
-    title,
-    description,
-    variant: variant || "default",
-    ...props,
-  });
+// Create a proxy for the toast function that ensures it uses valid variants
+export const toast = (props: ToasterToast) => {
+  const validProps = { ...props };
+  
+  // Convert any invalid variants to valid ones
+  if (validProps.variant === "warning") {
+    validProps.variant = "default";
+  }
+  
+  return toastOriginal(validProps);
 };
+
+export type { ToasterToast };
