@@ -41,7 +41,8 @@ const CacheClearTool: React.FC = () => {
   const loadCacheStats = async () => {
     setIsLoadingStats(true);
     try {
-      const stats = await CacheService.getCacheDetailedStats();
+      // Fix: Change getCacheDetailedStats to getDetailedStats
+      const stats = await CacheService.getDetailedStats();
       setCacheStats(stats);
     } catch (error) {
       console.error("Error loading cache stats:", error);

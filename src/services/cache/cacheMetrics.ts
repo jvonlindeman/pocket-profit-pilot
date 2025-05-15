@@ -9,7 +9,7 @@ export const cacheMetrics = {
   /**
    * Get cache statistics for admin dashboard
    */
-  getCacheStats: async (): Promise<CacheStats | { error: string, lastUpdated: string }> => {
+  getCacheStats: async (): Promise<Partial<CacheStats> & { lastUpdated: string }> => {
     try {
       // Get total cached transactions
       const { count: transactionCount, error: countError } = await supabase

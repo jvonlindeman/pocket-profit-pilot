@@ -1,11 +1,6 @@
 
 import { DateRange as DayPickerDateRange } from "react-day-picker";
-
-// The DateRange type from our financial.ts
-export interface FinancialDateRange {
-  startDate: Date;
-  endDate: Date;
-}
+import { DateRange as FinancialDateRange } from "../types/financial";
 
 /**
  * Convert from DayPicker's DateRange to our FinancialDateRange

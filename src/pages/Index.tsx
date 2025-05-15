@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
@@ -17,7 +16,8 @@ import { useToast } from '@/hooks/use-toast';
 import WebhookDebug from '@/components/WebhookDebug';
 import WebhookRequestDebug from '@/components/WebhookRequestDebug';
 import StripeDebug from '@/components/StripeDebug';
-import { toDayPickerDateRange } from '@/utils/dateRangeAdapter';
+import { toDayPickerDateRange, toFinancialDateRange } from '@/utils/dateRangeAdapter';
+import { DateRange as DayPickerDateRange } from 'react-day-picker';
 
 const Index = () => {
   const {
@@ -121,8 +121,8 @@ const Index = () => {
     refreshData(true);
   };
 
-  // Adapter function to convert between date range formats
-  const handleDateRangeChange = (newRange: DateRange) => {
+  // Handler for date range change
+  const handleDateRangeChange = (newRange: DayPickerDateRange) => {
     if (newRange.from && newRange.to) {
       updateDateRange(toFinancialDateRange(newRange));
     }

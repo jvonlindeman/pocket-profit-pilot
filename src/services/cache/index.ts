@@ -42,7 +42,7 @@ const CacheService = {
   /**
    * Get cache statistics for admin dashboard
    */
-  getCacheStats: async (): Promise<CacheStats> => {
+  getCacheStats: async (): Promise<Partial<CacheStats> & { lastUpdated: string }> => {
     return cacheMetrics.getCacheStats();
   },
   

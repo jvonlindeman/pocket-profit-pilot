@@ -31,7 +31,17 @@ export class StripeRepository {
     forceRefresh = false
   ): Promise<StripeResult> {
     try {
-      return await StripeService.getTransactions(startDate, endDate, forceRefresh);
+      const result = await StripeService.getTransactions(startDate, endDate, forceRefresh);
+      return {
+        transactions: result.transactions,
+        gross: result.gross,
+        fees: result.fees,
+        transactionFees: result.transactionFees,
+        payoutFees: result.payoutFees,
+        additionalFees: result.stripeFees || 0, // Map stripeFees to additionalFees
+        net: result.net,
+        feePercentage: result.feePercentage
+      };
     } catch (error) {
       console.error("Error in stripeRepository.getTransactions:", error);
       return {
