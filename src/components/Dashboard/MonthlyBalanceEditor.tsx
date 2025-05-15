@@ -20,7 +20,12 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
   onBalanceChange 
 }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const { monthlyBalance, updateMonthlyBalance, loading } = useMonthlyBalance({ currentDate });
+  const { 
+    monthlyBalance, 
+    updateMonthlyBalance, 
+    loading,
+    fetchMonthlyBalance 
+  } = useMonthlyBalance({ currentDate });
   
   const form = useForm({
     defaultValues: {
@@ -54,6 +59,8 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
   }, [monthlyBalance, form]);
 
   const onSubmit = async (data: any) => {
+    console.log("Submitting monthly balance form with data:", data);
+    
     const success = await updateMonthlyBalance(
       Number(data.balance),
       Number(data.opexAmount),
@@ -70,6 +77,9 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
         console.log("Notifying parent about balance change:", Number(data.balance));
         onBalanceChange(Number(data.balance));
       }
+      
+      // Fetch the updated balance to ensure UI is in sync
+      fetchMonthlyBalance();
     }
   };
 

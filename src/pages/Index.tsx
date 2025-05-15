@@ -38,7 +38,6 @@ const Index = () => {
     stripeFeePercentage,
     regularIncome,
     collaboratorExpenses,
-    startingBalance,
     updateStartingBalance,
     usingCachedData,
     cacheStatus
@@ -50,7 +49,13 @@ const Index = () => {
   // Convert financial date range to compatible format for useMonthlyBalance
   const currentMonthDate = dateRange.startDate || new Date();
   
-  const { checkBalanceExists, monthlyBalance, fetchMonthlyBalance } = useMonthlyBalance({ 
+  // Use the consolidated hook for monthly balance management
+  const { 
+    checkBalanceExists, 
+    monthlyBalance, 
+    fetchMonthlyBalance, 
+    startingBalance 
+  } = useMonthlyBalance({ 
     currentDate: currentMonthDate
   });
   
@@ -251,7 +256,7 @@ const Index = () => {
               </div>
             )}
 
-            {/* Monthly Balance Editor moved up to be above FinanceSummary */}
+            {/* Monthly Balance Editor */}
             <div className="mb-6">
               <MonthlyBalanceEditor 
                 currentDate={currentMonthDate}
@@ -268,8 +273,10 @@ const Index = () => {
                 opexAmount={opexAmount}
                 itbmAmount={itbmAmount}
                 profitPercentage={profitPercentage}
-                startingBalance={startingBalance}
-                totalZohoExpenses={totalZohoExpenses}
+                startingBalance={startingBalance || 0}
+                totalZohoExpenses={financialData.transactions
+                  .filter(tx => tx.type === 'expense' && tx.source !== 'Stripe')
+                  .reduce((sum, tx) => sum + tx.amount, 0)}
               />
             </div>
 
