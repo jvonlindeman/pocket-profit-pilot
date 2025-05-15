@@ -45,7 +45,7 @@ const StripeIncomeTab: React.FC<StripeIncomeTabProps> = ({
       toast({
         title: "Warning: Stripe Data",
         description: "All Stripe values are zero. Check if data is being passed correctly.",
-        variant: "warning"
+        variant: "destructive" // Changed from "warning" to "destructive"
       });
     }
   }, [

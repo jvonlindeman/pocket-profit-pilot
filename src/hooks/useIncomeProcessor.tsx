@@ -104,7 +104,7 @@ export const useIncomeProcessor = () => {
       toast({
         title: "Stripe Data Warning",
         description: "Received Stripe income data but fees are zero",
-        variant: "warning"
+        variant: "destructive" // Changed from "warning" to "destructive"
       });
     }
     

@@ -9,7 +9,7 @@ type ToasterToast = {
   title?: React.ReactNode
   description?: React.ReactNode
   action?: React.ReactNode
-  variant?: "default" | "destructive" | "success"
+  variant?: "default" | "destructive" | "success" | "warning"
   onOpenChange?: (open: boolean) => void
 }
 
@@ -130,6 +130,13 @@ type Toast = Omit<ToasterToast, "id">
 
 function toast(props: Toast) {
   const id = genId()
+
+  // Validate toast variant to ensure it exists
+  const validVariants = ["default", "destructive", "success", "warning"];
+  if (props.variant && !validVariants.includes(props.variant)) {
+    console.warn(`Toast variant "${props.variant}" is not valid. Using "default" instead.`);
+    props.variant = "default";
+  }
 
   const update = (props: Toast) =>
     dispatch({
