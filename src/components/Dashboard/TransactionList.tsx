@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { 
   Table, 
@@ -62,8 +61,8 @@ const TransactionList: React.FC<TransactionListProps> = ({
     setFilteredTransactions(transactions);
   }, [transactions]);
   
-  // Debug cache status
-  console.log("TransactionList render - Cache Status:", cacheStatus, "Using Cache:", isUsingCache);
+  // Debug cache status with more detailed information
+  console.log("TransactionList render - Cache Status:", cacheStatus, "Using Cache:", isUsingCache, "Has cached transactions:", transactions.some(tx => tx.fromCache === true));
   
   return (
     <div className="space-y-4">

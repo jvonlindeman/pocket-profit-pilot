@@ -1,3 +1,4 @@
+
 // Import necessary types and helpers
 import { Transaction } from "../../types/financial";
 import { handleApiError } from "./utils";
@@ -59,7 +60,8 @@ export const fetchTransactionsFromWebhook = async (
         const cachedResponse = {
           ...lastApiRequest.response,
           cached: true,
-          isCached: true
+          isCached: true,
+          cache_hit: true
         };
         
         return cachedResponse;
@@ -146,7 +148,14 @@ export const fetchTransactionsFromWebhook = async (
     
     // Return raw response for debugging if requested
     if (returnRawResponse) {
-      return data;
+      // Ensure cache flags are properly set in the raw response
+      const enhancedData = {
+        ...data,
+        cached: isCached,
+        cache_hit: isCached,
+        isCached: isCached
+      };
+      return enhancedData;
     }
     
     // If we received processed transactions directly, use those

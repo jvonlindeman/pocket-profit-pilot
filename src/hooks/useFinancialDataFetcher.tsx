@@ -6,6 +6,7 @@ import { formatDateYYYYMMDD, logDateInfo } from '@/utils/dateUtils';
 import CacheService from '@/services/cache';
 import { toast } from '@/components/ui/use-toast';
 import { CLIENT_CACHE_KEY_PREFIX, CACHE_DURATION } from '@/services/zoho/api/config';
+import { Transaction } from '@/types/financial';
 
 // Type for the memory cache entry
 interface MemoryCacheEntry {
@@ -208,6 +209,8 @@ export const useFinancialDataFetcher = () => {
       let zohoData: any[] = [];
       let stripeData: any = { transactions: [] };
       let dataFromMemoryCache = false;
+      let zohoFromCache = false;
+      let stripeFromCache = false;
       
       if (!forceRefresh) {
         const memoryCacheResult = checkMemoryCache(dateRange.startDate, dateRange.endDate);
@@ -218,13 +221,19 @@ export const useFinancialDataFetcher = () => {
           stripeData = memoryCacheResult.stripeData;
           dataFromMemoryCache = true;
           
-          // Update cache status
+          // Verify if transactions have fromCache flag for proper reporting
+          zohoFromCache = zohoData.length > 0 && zohoData.some(tx => tx.fromCache === true);
+          stripeFromCache = stripeData.transactions && 
+                          stripeData.transactions.length > 0 && 
+                          stripeData.transactions.some(tx => tx.fromCache === true);
+          
+          // Update cache status based on actual data flags
           setCacheStatus({
-            zoho: { hit: true, partial: false },
-            stripe: { hit: true, partial: false }
+            zoho: { hit: zohoFromCache, partial: false },
+            stripe: { hit: stripeFromCache, partial: false }
           });
           
-          setUsingCachedData(true);
+          setUsingCachedData(zohoFromCache || stripeFromCache);
           
           // Process the cached data
           const rawData = ZohoService.getLastRawResponse();
@@ -243,6 +252,12 @@ export const useFinancialDataFetcher = () => {
           callbacks.onTransactions(combinedData);
           
           setLoading(false);
+          
+          console.log("FinancialDataFetcher: Finished processing memory cache data with status:", {
+            zohoFromCache, stripeFromCache, zohoDataLength: zohoData.length,
+            stripeDataLength: stripeData.transactions ? stripeData.transactions.length : 0
+          });
+          
           return true;
         }
       }
@@ -287,7 +302,11 @@ export const useFinancialDataFetcher = () => {
           forceRefresh
         );
         
-        // Check if we're using cached data based on the response
+        // Check if we're using cached data based on transactions fromCache flags
+        zohoFromCache = zohoData && zohoData.length > 0 && zohoData.some(tx => tx.fromCache === true);
+        console.log("FinancialDataFetcher: Zoho fromCache flag check:", zohoFromCache, "Sample transaction:", zohoData[0]);
+        
+        // Check raw response metadata
         const rawResponseData = ZohoService.getLastRawResponse();
         console.log("FinancialDataFetcher: Zoho raw response metadata:", { 
           cached: rawResponseData?.cached, 
@@ -295,18 +314,21 @@ export const useFinancialDataFetcher = () => {
           isCached: rawResponseData?.isCached
         });
         
-        const zohoFromCache = !!(rawResponseData && (rawResponseData.cached || rawResponseData.cache_hit || rawResponseData.isCached));
-        
-        // Check if transactions have fromCache flag
-        const transactionsFromCache = zohoData && zohoData.length > 0 && zohoData.some(tx => tx.fromCache);
-        
-        if (zohoFromCache || transactionsFromCache) {
+        // Update status based on transactions and metadata
+        if (zohoFromCache || (rawResponseData && 
+            (rawResponseData.cached || rawResponseData.cache_hit || rawResponseData.isCached))) {
           console.log("FinancialDataFetcher: Using cached Zoho data");
           setCacheStatus(prev => ({
             ...prev,
             zoho: { hit: true, partial: false }
           }));
           setUsingCachedData(true);
+        } else {
+          console.log("FinancialDataFetcher: Using fresh Zoho data");
+          setCacheStatus(prev => ({
+            ...prev,
+            zoho: { hit: false, partial: false }
+          }));
         }
         
         // Get the current raw response for debugging
@@ -327,14 +349,16 @@ export const useFinancialDataFetcher = () => {
         );
         
         // Check if we're using cached Stripe data
-        console.log("FinancialDataFetcher: Stripe data cached flag:", stripeData.cached);
-        console.log("FinancialDataFetcher: Stripe transactions fromCache flag:", 
-          stripeData.transactions && stripeData.transactions.length > 0 && 
-          stripeData.transactions.some(tx => tx.fromCache));
-        
-        const stripeFromCache = stripeData.cached || 
+        stripeFromCache = stripeData.cached || 
           (stripeData.transactions && stripeData.transactions.length > 0 && 
-           stripeData.transactions.some(tx => tx.fromCache));
+           stripeData.transactions.some(tx => tx.fromCache === true));
+        
+        console.log("FinancialDataFetcher: Stripe cache check:", { 
+          cachedFlag: stripeData.cached,
+          hasFromCacheFlag: stripeData.transactions && stripeData.transactions.length > 0 && 
+                           stripeData.transactions.some(tx => tx.fromCache === true),
+          stripeFromCache
+        });
         
         if (stripeFromCache) {
           console.log("FinancialDataFetcher: Using cached Stripe data");
@@ -343,6 +367,12 @@ export const useFinancialDataFetcher = () => {
             stripe: { hit: true, partial: false }
           }));
           setUsingCachedData(prev => prev || true);
+        } else {
+          console.log("FinancialDataFetcher: Using fresh Stripe data");
+          setCacheStatus(prev => ({
+            ...prev,
+            stripe: { hit: false, partial: false }
+          }));
         }
       }
       
@@ -357,9 +387,12 @@ export const useFinancialDataFetcher = () => {
       
       // Debug cache status after fetch
       console.log("FinancialDataFetcher: Final cache status:", {
-        zohoHit: cacheStatus.zoho.hit,
-        stripeHit: cacheStatus.stripe.hit,
+        zoho: cacheStatus.zoho.hit,
+        stripe: cacheStatus.stripe.hit,
         usingCachedData: usingCachedData,
+        zohoFromCache: zohoFromCache,
+        stripeFromCache: stripeFromCache,
+        fromCacheCount: combinedData.filter(tx => tx.fromCache === true).length
       });
       
       // Process separated income

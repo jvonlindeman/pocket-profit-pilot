@@ -106,6 +106,14 @@ const StripeService = {
         if (memoryCacheResult.hit && memoryCacheResult.data) {
           console.log("StripeService: Using data from memory cache");
           
+          // Ensure all transactions have fromCache flag set
+          if (memoryCacheResult.data.transactions && memoryCacheResult.data.transactions.length > 0) {
+            memoryCacheResult.data.transactions = memoryCacheResult.data.transactions.map(tx => ({
+              ...tx,
+              fromCache: true
+            }));
+          }
+          
           // Set last raw response for debugging
           lastRawResponse = {
             cached: true,
@@ -122,7 +130,10 @@ const StripeService = {
             }
           };
           
-          return memoryCacheResult.data;
+          return {
+            ...memoryCacheResult.data,
+            cached: true
+          };
         }
       }
     
@@ -285,7 +296,15 @@ const StripeService = {
       
       // Store in memory cache for future use if not forcing refresh
       if (!forceRefresh) {
-        StripeService.storeInMemoryCache(startDate, endDate, stripeData);
+        // Make sure transactions have fromCache flag set correctly (they should be false here)
+        const stripeDataForCache = {
+          ...stripeData,
+          transactions: stripeData.transactions.map(tx => ({
+            ...tx,
+            fromCache: false // These are fresh transactions from API
+          }))
+        };
+        StripeService.storeInMemoryCache(startDate, endDate, stripeDataForCache);
       }
       
       return stripeData;

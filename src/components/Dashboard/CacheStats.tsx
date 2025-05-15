@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Loader2, RefreshCw } from 'lucide-react';
-import * as ZohoService from '@/services/zohoService';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface CacheStatsProps {
@@ -28,6 +27,7 @@ const CacheStats: React.FC<CacheStatsProps> = ({ dateRange, cacheStatus, isUsing
   useEffect(() => {
     // Update local state whenever the prop changes
     setLocalCacheStatus(cacheStatus);
+    console.log("CacheStats: Received cache status update:", cacheStatus);
   }, [cacheStatus]);
 
   // Handle loading state
@@ -53,6 +53,8 @@ const CacheStats: React.FC<CacheStatsProps> = ({ dateRange, cacheStatus, isUsing
   };
 
   const getCacheStatusMessage = () => {
+    console.log("CacheStats: Generating message with status:", { localCacheStatus, isUsingCache });
+    
     if (isUsingCache) {
       return "Datos cargados desde la caché";
     } else if (localCacheStatus.zoho.hit && localCacheStatus.stripe.hit) {
