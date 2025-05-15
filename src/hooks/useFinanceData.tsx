@@ -5,50 +5,10 @@ import { useFinancialDataFetcher } from '@/hooks/useFinancialDataFetcher';
 import { useCollaboratorProcessor } from '@/hooks/useCollaboratorProcessor';
 import { useIncomeProcessor } from '@/hooks/useIncomeProcessor';
 import { useMonthlyBalanceManager } from '@/hooks/useMonthlyBalanceManager';
-import * as ZohoService from '@/services/zohoService';
+import { financialService } from '@/services/financialService';
+import { zohoRepository } from '@/repositories/zohoRepository';
 import { formatDateYYYYMMDD, getCurrentMonthRange } from '@/utils/dateUtils';
-import { toDayPickerDateRange, toFinancialDateRange } from '@/utils/dateRangeAdapter';
-import type { DateRange } from 'react-day-picker';
-import { Transaction, FinancialData } from '@/types/financial';
-
-// Simple transaction data processor
-const processTransactionData = (transactions: Transaction[], startingBalance: number = 0): FinancialData => {
-  // This is a simple implementation - you might want to implement a more sophisticated processor
-  const summary = {
-    totalIncome: transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0),
-    totalExpense: transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0),
-    collaboratorExpense: 0, // This would be calculated based on your business logic
-    otherExpense: 0, // This would be calculated based on your business logic
-    profit: 0,
-    profitMargin: 0,
-    grossProfit: 0,
-    grossProfitMargin: 0,
-    startingBalance: startingBalance,
-  };
-  
-  // Calculate profits
-  summary.profit = summary.totalIncome - summary.totalExpense;
-  summary.profitMargin = summary.totalIncome > 0 ? (summary.profit / summary.totalIncome) * 100 : 0;
-  summary.grossProfit = summary.totalIncome;
-  summary.grossProfitMargin = summary.totalIncome > 0 ? 100 : 0;
-  
-  // Return basic financial data structure
-  return {
-    summary,
-    transactions,
-    incomeBySource: [],
-    expenseByCategory: [],
-    dailyData: {
-      income: { labels: [], values: [] },
-      expense: { labels: [], values: [] }
-    },
-    monthlyData: {
-      income: { labels: [], values: [] },
-      expense: { labels: [], values: [] },
-      profit: { labels: [], values: [] }
-    }
-  };
-};
+import { Transaction } from '@/types/financial';
 
 export const useFinanceData = () => {
   // States
@@ -81,12 +41,12 @@ export const useFinanceData = () => {
     rawResponse, 
     usingCachedData, 
     fetchFinancialData,
-    cacheStatus  // Add cacheStatus from the fetcher hook
+    cacheStatus
   } = useFinancialDataFetcher();
 
   // Datos financieros procesados
   const financialData = useMemo(() => {
-    return processTransactionData(transactions, startingBalance);
+    return financialService.processTransactionData(transactions, startingBalance);
   }, [transactions, startingBalance]);
 
   // Función para actualizar el rango de fechas
@@ -106,7 +66,7 @@ export const useFinanceData = () => {
     fetchMonthlyBalance(preservedStartDate);
     
     // Check if we need to refresh the cache
-    ZohoService.checkAndRefreshCache(preservedStartDate, preservedEndDate);
+    zohoRepository.checkAndRefreshCache(preservedStartDate, preservedEndDate);
   }, [fetchMonthlyBalance]);
 
   // When dateRange changes, make sure we fetch monthly balance

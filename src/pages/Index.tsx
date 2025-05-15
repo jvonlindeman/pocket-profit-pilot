@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
@@ -6,6 +7,7 @@ import MonthlyBalanceEditor from '@/components/Dashboard/MonthlyBalanceEditor';
 import InitialBalanceDialog from '@/components/Dashboard/InitialBalanceDialog';
 import SalaryCalculator from '@/components/Dashboard/SalaryCalculator';
 import CacheStats from '@/components/Dashboard/CacheStats';
+import CacheMonitor from '@/components/Dashboard/CacheMonitor';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 import { Button } from '@/components/ui/button';
@@ -15,8 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import WebhookDebug from '@/components/WebhookDebug';
 import WebhookRequestDebug from '@/components/WebhookRequestDebug';
 import StripeDebug from '@/components/StripeDebug';
-import { DateRange } from 'react-day-picker';
-import { toFinancialDateRange, toDayPickerDateRange } from '@/utils/dateRangeAdapter';
+import { toDayPickerDateRange } from '@/utils/dateRangeAdapter';
 
 const Index = () => {
   const {
@@ -221,11 +222,9 @@ const Index = () => {
               </Button>
             </div>
             
-            {/* Cache information - Updated to use CacheStats instead of CacheInfo */}
-            <CacheStats 
+            {/* Use our new CacheMonitor component */}
+            <CacheMonitor 
               dateRange={dateRange}
-              cacheStatus={cacheStatus}
-              isUsingCache={usingCachedData}
               onRefresh={() => refreshData(true)}
             />
 

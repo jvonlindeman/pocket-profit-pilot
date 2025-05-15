@@ -2,7 +2,7 @@
 import { Transaction } from "../../types/financial";
 import { cacheOperations } from "./cacheOperations";
 import { cacheMetrics } from "./cacheMetrics";
-import { CacheResponse } from "./cacheTypes";
+import { CacheResponse, CacheResult, CacheStats } from "./cacheTypes";
 
 /**
  * CacheService provides a unified API for working with the transaction cache
@@ -42,7 +42,7 @@ const CacheService = {
   /**
    * Get cache statistics for admin dashboard
    */
-  getCacheStats: async (): Promise<any> => {
+  getCacheStats: async (): Promise<CacheStats> => {
     return cacheMetrics.getCacheStats();
   },
   
@@ -86,7 +86,7 @@ const CacheService = {
   /**
    * Get detailed cache statistics
    */
-  getCacheDetailedStats: async (): Promise<{
+  getDetailedStats: async (): Promise<{
     transactions: { source: string; count: number }[];
     segments: { source: string; count: number }[];
   }> => {

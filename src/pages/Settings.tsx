@@ -1,11 +1,11 @@
-
 import React from 'react';
 import ZohoDebug from '@/components/ZohoDebug';
 import WebhookDebug from '@/components/WebhookDebug/index';
 import StripeDebug from '@/components/StripeDebug';
 import CacheClearTool from '@/components/Dashboard/CacheClearTool';
+import CacheMonitor from '@/components/Dashboard/CacheMonitor';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Bug } from 'lucide-react';
+import { ArrowLeft, Bug, Database } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { endOfMonth, startOfMonth } from 'date-fns';
 import ZohoConfig from '@/components/ZohoConfig';
@@ -47,14 +47,26 @@ const Settings = () => {
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-6">
-          <section>
+          <section className="bg-white shadow-sm rounded-lg p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-              <Bug className="h-5 w-5 mr-2" />
-              Herramientas de Depuración
+              <Database className="h-5 w-5 mr-2 text-blue-500" />
+              Gestión de Caché
             </h2>
             
+            {/* Cache Monitor */}
+            <CacheMonitor />
+            
             {/* Cache Clear Tool */}
-            <CacheClearTool />
+            <div className="mt-4">
+              <CacheClearTool />
+            </div>
+          </section>
+          
+          <section className="bg-white shadow-sm rounded-lg p-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+              <Bug className="h-5 w-5 mr-2 text-amber-500" />
+              Herramientas de Depuración
+            </h2>
             
             {/* Existing Debug Tools */}
             <ZohoDebug />
@@ -64,6 +76,13 @@ const Settings = () => {
             <div className="mt-6">
               <WebhookDebug dateRange={dayPickerDateRange} />
             </div>
+          </section>
+          
+          <section className="bg-white shadow-sm rounded-lg p-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">
+              Configuración
+            </h2>
+            <ZohoConfig />
           </section>
         </div>
       </main>
