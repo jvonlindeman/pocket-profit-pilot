@@ -5,6 +5,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { PANAMA_TIMEZONE } from "@/utils/timezoneUtils";
 import { processRawTransactions, filterExcludedVendors } from "./processor";
 import { preparePanamaDates } from "./formatter";
+import { excludedVendors } from "./config";
+
+// Cache the last API response to prevent duplicate API calls
+let lastApiRequest = {
+  startDate: '',
+  endDate: '',
+  timestamp: 0,
+  response: null as any
+};
 
 // Function to call the Supabase edge function which handles caching
 export const fetchTransactionsFromWebhook = async (
@@ -30,6 +39,29 @@ export const fetchTransactionsFromWebhook = async (
       formattedStartDate, 
       formattedEndDate 
     } = preparePanamaDates(startDate, endDate);
+
+    // Check for recent identical request to prevent duplicate calls
+    const requestKey = `${formattedStartDate}-${formattedEndDate}-${forceRefresh}`;
+    const now = Date.now();
+    if (!forceRefresh && 
+        lastApiRequest.startDate === formattedStartDate && 
+        lastApiRequest.endDate === formattedEndDate && 
+        now - lastApiRequest.timestamp < 60000) { // 1 minute cache
+      console.log("ZohoService: Using cached API response from last minute");
+      
+      if (returnRawResponse) {
+        return lastApiRequest.response;
+      }
+      
+      // If using cached response with transactions, filter vendors
+      if (lastApiRequest.response?.cached_transactions && Array.isArray(lastApiRequest.response.cached_transactions)) {
+        console.log("ZohoService: Returning filtered cached transactions from last API call");
+        return filterExcludedVendors(lastApiRequest.response.cached_transactions);
+      }
+      
+      // Otherwise process the raw response
+      return processRawTransactions(lastApiRequest.response);
+    }
     
     console.log("ZohoService: Formatted Panama dates for webhook request:", {
       startDate: panamaStartDate.toString(),
@@ -42,9 +74,9 @@ export const fetchTransactionsFromWebhook = async (
     console.log("ZohoService: Calling Supabase edge function with Panama timezone dates:", formattedStartDate, formattedEndDate);
     
     if (!forceRefresh) {
-      console.log("ZohoService: No longer checking for cached data, feature removed");
+      console.log("ZohoService: Checking for cached data");
     } else {
-      console.log("ZohoService: Force refresh requested");
+      console.log("ZohoService: Force refresh requested, will bypass cache");
     }
     
     // Call the Supabase edge function instead of make.com webhook directly
@@ -70,7 +102,20 @@ export const fetchTransactionsFromWebhook = async (
       return returnRawResponse ? { message: "No data returned", data: null, raw_response: null } : getMockTransactions(panamaStartDate, panamaEndDate);
     }
     
-    console.log("ZohoService: Received data from Supabase function");
+    console.log("ZohoService: Received data from Supabase function:", {
+      hasData: !!data,
+      isCached: !!data.cached,
+      transactionCount: data.cached_transactions?.length || 'unknown',
+      dataType: typeof data
+    });
+    
+    // Cache this response to avoid redundant calls
+    lastApiRequest = {
+      startDate: formattedStartDate,
+      endDate: formattedEndDate,
+      timestamp: now,
+      response: data
+    };
     
     // Return raw response for debugging if requested
     if (returnRawResponse) {

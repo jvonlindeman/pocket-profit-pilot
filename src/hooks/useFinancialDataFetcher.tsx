@@ -1,10 +1,20 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import * as ZohoService from '@/services/zohoService';
 import StripeService from '@/services/stripeService';
 import { formatDateYYYYMMDD, logDateInfo } from '@/utils/dateUtils';
 import CacheService from '@/services/cache';
 import { toast } from '@/components/ui/use-toast';
+import { CLIENT_CACHE_KEY_PREFIX, CACHE_DURATION } from '@/services/zoho/api/config';
+
+// Type for the memory cache entry
+interface MemoryCacheEntry {
+  dateRangeKey: string;
+  zohoData: any[];
+  stripeData: any;
+  timestamp: number;
+  expiresAt: number;
+}
 
 export const useFinancialDataFetcher = () => {
   const [loading, setLoading] = useState<boolean>(false);
@@ -26,6 +36,67 @@ export const useFinancialDataFetcher = () => {
     zoho: true,
     stripe: true
   });
+
+  // Memory cache for financial data
+  const memoryCache = useRef<MemoryCacheEntry[]>([]);
+
+  // Generate a cache key for a date range
+  const generateDateRangeKey = useCallback((startDate: Date, endDate: Date): string => {
+    return `${CLIENT_CACHE_KEY_PREFIX}_${formatDateYYYYMMDD(startDate)}_${formatDateYYYYMMDD(endDate)}`;
+  }, []);
+
+  // Check if data is in memory cache
+  const checkMemoryCache = useCallback((startDate: Date, endDate: Date): {
+    found: boolean;
+    zohoData?: any[];
+    stripeData?: any;
+  } => {
+    const now = Date.now();
+    const dateRangeKey = generateDateRangeKey(startDate, endDate);
+    
+    // Clean expired entries
+    memoryCache.current = memoryCache.current.filter(entry => entry.expiresAt > now);
+    
+    // Find matching entry
+    const cacheEntry = memoryCache.current.find(entry => entry.dateRangeKey === dateRangeKey);
+    
+    if (cacheEntry) {
+      console.log("Found data in memory cache for range:", dateRangeKey);
+      return {
+        found: true,
+        zohoData: cacheEntry.zohoData,
+        stripeData: cacheEntry.stripeData
+      };
+    }
+    
+    return { found: false };
+  }, [generateDateRangeKey]);
+
+  // Store data in memory cache
+  const storeInMemoryCache = useCallback((startDate: Date, endDate: Date, zohoData: any[], stripeData: any) => {
+    const dateRangeKey = generateDateRangeKey(startDate, endDate);
+    const now = Date.now();
+    
+    // Remove any existing entry with the same key
+    memoryCache.current = memoryCache.current.filter(entry => entry.dateRangeKey !== dateRangeKey);
+    
+    // Add new entry
+    memoryCache.current.push({
+      dateRangeKey,
+      zohoData,
+      stripeData,
+      timestamp: now,
+      expiresAt: now + CACHE_DURATION
+    });
+    
+    console.log("Stored data in memory cache for range:", dateRangeKey);
+    
+    // Limit cache size to 10 entries
+    if (memoryCache.current.length > 10) {
+      memoryCache.current.sort((a, b) => b.timestamp - a.timestamp);
+      memoryCache.current = memoryCache.current.slice(0, 10);
+    }
+  }, [generateDateRangeKey]);
 
   // Check API connectivity
   const checkApiConnectivity = useCallback(async () => {
@@ -124,7 +195,49 @@ export const useFinancialDataFetcher = () => {
     });
 
     try {
-      // Check API connectivity first
+      // Check if we have this data in memory cache first (only if not forcing a refresh)
+      let zohoData: any[] = [];
+      let stripeData: any = { transactions: [] };
+      let dataFromMemoryCache = false;
+      
+      if (!forceRefresh) {
+        const memoryCacheResult = checkMemoryCache(dateRange.startDate, dateRange.endDate);
+        
+        if (memoryCacheResult.found && memoryCacheResult.zohoData && memoryCacheResult.stripeData) {
+          console.log("Using data from memory cache");
+          zohoData = memoryCacheResult.zohoData;
+          stripeData = memoryCacheResult.stripeData;
+          dataFromMemoryCache = true;
+          setUsingCachedData(true);
+          
+          // Update cache status
+          setCacheStatus({
+            zoho: { hit: true, partial: false },
+            stripe: { hit: true, partial: false }
+          });
+          
+          // Process the cached data
+          const rawData = ZohoService.getLastRawResponse();
+          setRawResponse(rawData);
+          
+          // Process collaborator data
+          callbacks.onCollaboratorData(rawData);
+          
+          // Combine the data
+          const combinedData = [...zohoData, ...stripeData.transactions];
+          
+          // Process separated income
+          callbacks.onIncomeTypes(combinedData, stripeData);
+          
+          // Update transactions state
+          callbacks.onTransactions(combinedData);
+          
+          setLoading(false);
+          return true;
+        }
+      }
+      
+      // If not in memory cache, check API connectivity
       const connectivity = await checkApiConnectivity();
       
       if (!connectivity.zoho && !connectivity.stripe) {
@@ -147,101 +260,65 @@ export const useFinancialDataFetcher = () => {
         });
       }
       
-      // Verify cache integrity
-      await verifyCacheIntegrity(dateRange);
+      // Verify cache integrity if not using memory cache
+      if (!dataFromMemoryCache) {
+        await verifyCacheIntegrity(dateRange);
+      }
 
       // Log exact date objects for debugging
       logDateInfo("Original dateRange from datepicker", dateRange);
       
-      // Check Zoho cache first if not forcing refresh
-      let zohoFromCache = false;
-      if (!forceRefresh) {
-        const zohoCache = await CacheService.checkCache(
-          'Zoho', 
+      // Get transactions from Zoho Books - should check server cache internally
+      if (!dataFromMemoryCache) {
+        zohoData = await ZohoService.getTransactions(
           dateRange.startDate, 
-          dateRange.endDate
+          dateRange.endDate,
+          forceRefresh
         );
         
-        if (zohoCache.cached && zohoCache.data) {
-          zohoFromCache = true;
+        // Check if we're using cached data based on the response
+        const rawResponseData = ZohoService.getLastRawResponse();
+        if (rawResponseData && rawResponseData.cached) {
+          console.log("Using cached data from previous response");
+          setUsingCachedData(true);
           setCacheStatus(prev => ({
             ...prev,
             zoho: { hit: true, partial: false }
           }));
-          console.log("Using cached Zoho data with", zohoCache.data.length, "transactions");
-        } else if (zohoCache.partial) {
-          setCacheStatus(prev => ({
-            ...prev,
-            zoho: { hit: false, partial: true }
-          }));
-          console.log("Partial Zoho cache hit, need to fetch more data");
-        } else {
-          console.log("No cached Zoho data available");
         }
+        
+        // Get the current raw response for debugging
+        const rawData = ZohoService.getLastRawResponse();
+        setRawResponse(rawData);
+        console.log("Fetched raw response for debugging:", rawData);
+        
+        // Process collaborator data
+        callbacks.onCollaboratorData(rawData);
       }
       
-      // Get transactions from Zoho Books - either from cache or API
-      const zohoData = await ZohoService.getTransactions(
-        dateRange.startDate, 
-        dateRange.endDate,
-        forceRefresh
-      );
-
-      // Detect if we're using cached data based on the response
-      const rawResponseData = ZohoService.getLastRawResponse();
-      if (rawResponseData && (rawResponseData.cached || zohoFromCache)) {
-        console.log("Using cached data from previous response");
-        setUsingCachedData(true);
-      }
-
-      // Get the current raw response for debugging immediately after
-      const rawData = ZohoService.getLastRawResponse();
-      setRawResponse(rawData);
-      console.log("Fetched raw response for debugging:", rawData);
-
-      // Process collaborator data
-      callbacks.onCollaboratorData(rawData);
-
-      // Check Stripe cache if not forcing refresh
-      let stripeFromCache = false;
-      if (!forceRefresh) {
-        const stripeCache = await CacheService.checkCache(
-          'Stripe', 
-          dateRange.startDate, 
-          dateRange.endDate
+      // Get transactions from Stripe if not already loaded from memory cache
+      if (!dataFromMemoryCache) {
+        console.log("Fetching from Stripe:", dateRange.startDate, dateRange.endDate);
+        stripeData = await StripeService.getTransactions(
+          dateRange.startDate,
+          dateRange.endDate,
+          forceRefresh
         );
         
-        if (stripeCache.cached && stripeCache.data) {
-          stripeFromCache = true;
+        // Check if we're using cached Stripe data
+        if (stripeData.cached) {
           setCacheStatus(prev => ({
             ...prev,
             stripe: { hit: true, partial: false }
           }));
-          console.log("Using cached Stripe data with", stripeCache.data.length, "transactions");
-        } else if (stripeCache.partial) {
-          setCacheStatus(prev => ({
-            ...prev,
-            stripe: { hit: false, partial: true }
-          }));
-          console.log("Partial Stripe cache hit, need to fetch more data");
-        } else {
-          console.log("No cached Stripe data available");
         }
       }
-
-      // Get transactions from Stripe
-      console.log("Fetching from Stripe:", dateRange.startDate, dateRange.endDate);
-      const stripeData = await StripeService.getTransactions(
-        dateRange.startDate,
-        dateRange.endDate,
-        forceRefresh
-      );
       
-      // If both data sources are from cache, mark as using cached data
-      if (zohoFromCache && stripeFromCache) {
-        setUsingCachedData(true);
+      // Store in memory cache for future use if not already there and not forcing refresh
+      if (!dataFromMemoryCache && !forceRefresh) {
+        storeInMemoryCache(dateRange.startDate, dateRange.endDate, zohoData, stripeData);
       }
-
+      
       // Combine the data
       const combinedData = [...zohoData, ...stripeData.transactions];
       console.log("Combined transactions:", combinedData.length);
@@ -261,7 +338,7 @@ export const useFinancialDataFetcher = () => {
       callbacks.onTransactions(combinedData);
       
       // Schedule cache check for background refresh if needed
-      if (!forceRefresh) {
+      if (!forceRefresh && !dataFromMemoryCache) {
         ZohoService.checkAndRefreshCache(dateRange.startDate, dateRange.endDate);
       }
       
@@ -281,7 +358,7 @@ export const useFinancialDataFetcher = () => {
       setLoading(false);
       return false;
     }
-  }, [lastFetchTimestamp, checkApiConnectivity, verifyCacheIntegrity]);
+  }, [lastFetchTimestamp, checkApiConnectivity, verifyCacheIntegrity, checkMemoryCache, storeInMemoryCache]);
 
   return {
     loading,
