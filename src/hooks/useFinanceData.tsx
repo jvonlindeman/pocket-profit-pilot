@@ -59,9 +59,17 @@ export const useFinanceData = () => {
 
   // Función pública para refrescar datos (forzando o no)
   const refreshData = useCallback((force = false) => {
+    // El problema está aquí: necesitamos adaptar las firmas de las funciones
+    // para que coincidan con lo que espera useTransactionData
     return refreshTransactionData(force, {
-      onCollaboratorData: processCollaboratorData,
-      onIncomeTypes: processIncomeTypes
+      // Adaptamos la función processCollaboratorData para que acepte un solo argumento
+      onCollaboratorData: (data: any) => processCollaboratorData(data),
+      // Adaptamos la función processIncomeTypes para que acepte un solo argumento
+      // y luego extraemos transactions y stripeData del objeto pasado
+      onIncomeTypes: (data: any) => {
+        const { transactions, stripeData } = data;
+        return processIncomeTypes(transactions, stripeData);
+      }
     });
   }, [refreshTransactionData, processCollaboratorData, processIncomeTypes]);
 

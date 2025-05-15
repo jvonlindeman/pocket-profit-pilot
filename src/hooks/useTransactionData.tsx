@@ -47,7 +47,10 @@ export function useTransactionData(
           setDataInitialized(true);
         },
         onCollaboratorData: processors.onCollaboratorData,
-        onIncomeTypes: processors.onIncomeTypes
+        // Modificamos cómo se llama a onIncomeTypes para pasar los datos en el formato correcto
+        onIncomeTypes: (transactions, stripeData) => {
+          processors.onIncomeTypes({ transactions, stripeData });
+        }
       }
     );
     return success;
