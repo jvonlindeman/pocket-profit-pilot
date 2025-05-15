@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BadgeDollarSign, Scissors } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
 import SummaryCard from '../SummaryCard';
+import { toast } from '@/hooks/use-toast';
 
 interface StripeIncomeTabProps {
   stripeIncome: number;
@@ -27,15 +28,35 @@ const StripeIncomeTab: React.FC<StripeIncomeTabProps> = ({
   formatCurrency,
   formatPercentage
 }) => {
-  console.log("StripeIncomeTab rendering with values:", {
-    stripeIncome,
-    stripeNet,
-    stripeFees,
-    stripeFeePercentage,
-    stripeTransactionFees,
-    stripeAdditionalFees,
+  // Log values when the component renders or props change
+  useEffect(() => {
+    console.log("StripeIncomeTab rendering with values:", {
+      stripeIncome,
+      stripeNet,
+      stripeFees,
+      stripeFeePercentage,
+      stripeTransactionFees,
+      stripeAdditionalFees,
+      stripePayoutFees
+    });
+    
+    // Notify with a toast if the values are suspiciously low
+    if (stripeIncome === 0 && stripeNet === 0 && stripeFees === 0) {
+      toast({
+        title: "Warning: Stripe Data",
+        description: "All Stripe values are zero. Check if data is being passed correctly.",
+        variant: "warning"
+      });
+    }
+  }, [
+    stripeIncome, 
+    stripeNet, 
+    stripeFees, 
+    stripeFeePercentage, 
+    stripeTransactionFees, 
+    stripeAdditionalFees, 
     stripePayoutFees
-  });
+  ]);
   
   return (
     <div className="bg-green-50 p-4 rounded-lg border border-green-100">

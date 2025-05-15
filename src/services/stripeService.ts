@@ -1,3 +1,4 @@
+
 import { Transaction } from "../types/financial";
 import { supabase } from "@/integrations/supabase/client";
 import { logCacheEvent } from "@/components/Dashboard/CacheMonitor";
@@ -57,9 +58,10 @@ const StripeService = {
       if (
         !forceRefresh &&
         lastApiResponse.dateRange === dateRangeKey &&
-        now - lastApiResponse.timestamp < 60000
+        now - lastApiResponse.timestamp < 60000 &&
+        lastApiResponse.data
       ) {
-        console.log("StripeService: Using cached response from memory");
+        console.log("StripeService: Using cached response from memory:", lastApiResponse.data);
         logCacheEvent('hit', 'memory', { source: 'Stripe', age: now - lastApiResponse.timestamp }, { startDate, endDate });
         
         // Return the cached data with cache flags
@@ -118,6 +120,13 @@ const StripeService = {
 
       console.log("StripeService: Received data:", {
         transactions: data.transactions?.length || 0,
+        gross: data.gross,
+        fees: data.fees,
+        net: data.net,
+        transactionFees: data.transactionFees,
+        payoutFees: data.payoutFees,
+        stripeFees: data.stripeFees,
+        feePercentage: data.feePercentage,
         cached: !!data.cached,
         isCached: !!data.isCached,
         cache_hit: !!data.cache_hit
@@ -215,6 +224,19 @@ const StripeService = {
         return { error: error.message };
       }
       
+      // Detailed logging of the actual response
+      console.log("StripeService: Raw response data received:", {
+        hasData: !!data,
+        gross: data?.gross,
+        net: data?.net,
+        fees: data?.fees,
+        transactionFees: data?.transactionFees,
+        payoutFees: data?.payoutFees,
+        stripeFees: data?.stripeFees,
+        feePercentage: data?.feePercentage,
+        transactions: data?.transactions?.length || 0
+      });
+      
       // Check if data has an error field indicating a problem
       if (data && data.error) {
         console.error("StripeService: Error in response data:", data.error);
@@ -240,7 +262,12 @@ const StripeService = {
       }
       
       // Store the response
-      lastApiResponse.data = data;
+      lastApiResponse = {
+        dateRange: `${formattedStartDate}_${formattedEndDate}`,
+        timestamp: Date.now(),
+        data: data,
+        isCached: !!data?.cached || !!data?.cache_hit || !!data?.isCached
+      };
       
       return data;
     } catch (err) {

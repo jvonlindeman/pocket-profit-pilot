@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StripeIncomeTab from './StripeTabs/StripeIncomeTab';
 import ZohoIncomeTab from './StripeTabs/ZohoIncomeTab';
 import CombinedFinanceTab from './StripeTabs/CombinedFinanceTab';
+import { toast } from '@/hooks/use-toast';
 
 interface IncomeTabsProps {
   summary: FinancialSummary;
@@ -35,7 +36,7 @@ const IncomeTabs: React.FC<IncomeTabsProps> = ({
 }) => {
   // Add logging to debug Stripe data
   useEffect(() => {
-    console.log("IncomeTabs received Stripe data:", {
+    console.log("IncomeTabs component received Stripe data:", {
       stripeIncome,
       stripeFees,
       stripeTransactionFees,
@@ -44,6 +45,10 @@ const IncomeTabs: React.FC<IncomeTabsProps> = ({
       stripeNet,
       stripeFeePercentage
     });
+    
+    if (!stripeIncome && !stripeNet && !stripeFees) {
+      console.warn("IncomeTabs: All Stripe values are zero");
+    }
   }, [
     stripeIncome,
     stripeFees,
