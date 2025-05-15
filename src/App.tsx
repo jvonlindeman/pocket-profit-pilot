@@ -44,8 +44,8 @@ const WebhookDebugWrapper = () => {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <CacheProvider>
-        <Router>
+      <Router>
+        <CacheProvider>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/zoho" element={<ZohoDebug />} />
@@ -55,8 +55,8 @@ function App() {
             <Route path="/webhook" element={<WebhookDebugWrapper />} />
           </Routes>
           <Toaster />
-        </Router>
-      </CacheProvider>
+        </CacheProvider>
+      </Router>
     </QueryClientProvider>
   );
 }
