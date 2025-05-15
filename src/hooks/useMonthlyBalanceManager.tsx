@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { format as formatDate } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -83,6 +83,7 @@ export const useMonthlyBalanceManager = () => {
         return false;
       }
       
+      console.log("Balance updated successfully:", balance);
       setStartingBalance(balance);
       return true;
     } catch (err) {

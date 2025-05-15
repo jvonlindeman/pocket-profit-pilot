@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import FinanceSummary from '@/components/Dashboard/FinanceSummary';
 import TransactionList from '@/components/Dashboard/TransactionList';
@@ -45,11 +45,12 @@ const Index = () => {
   } = useFinanceData();
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
+  const [calculatorRefreshKey, setCalculatorRefreshKey] = useState(0);
   
   // Convert financial date range to compatible format for useMonthlyBalance
   const currentMonthDate = dateRange.startDate || new Date();
   
-  const { checkBalanceExists, monthlyBalance } = useMonthlyBalance({ 
+  const { checkBalanceExists, monthlyBalance, fetchMonthlyBalance } = useMonthlyBalance({ 
     currentDate: currentMonthDate
   });
   
@@ -94,20 +95,24 @@ const Index = () => {
     }
   };
 
-  // Handle balance saved in dialog
+  // Handle balance saved in dialog - now triggers calculator refresh
   const handleBalanceSaved = () => {
     toast({
       title: 'Balance inicial guardado',
       description: 'Cargando datos financieros...',
     });
     refreshData(true);
+    // Force calculator refresh
+    setCalculatorRefreshKey(prev => prev + 1);
   };
 
-  // Handler for balance changes in the MonthlyBalanceEditor
+  // Handler for balance changes in the MonthlyBalanceEditor - improved to trigger calculator refresh
   const handleBalanceChange = (balance: number) => {
     console.log("Balance changed in editor:", balance);
     // We need to make sure the UI reflects the new balance
     refreshData(false);
+    // Force calculator refresh
+    setCalculatorRefreshKey(prev => prev + 1);
   };
 
   // Handler for data refresh
@@ -118,6 +123,8 @@ const Index = () => {
       description: 'Obteniendo datos más recientes...',
     });
     refreshData(true);
+    // Force calculator refresh
+    setCalculatorRefreshKey(prev => prev + 1);
   };
 
   // Adapter function to convert between date range formats
@@ -132,6 +139,13 @@ const Index = () => {
     const financialDateRange = getCurrentMonthRange();
     return toDayPickerDateRange(financialDateRange);
   };
+
+  // Ensure we fetch the monthly balance when date range changes
+  useEffect(() => {
+    if (currentMonthDate) {
+      fetchMonthlyBalance();
+    }
+  }, [currentMonthDate, fetchMonthlyBalance]);
 
   // Get calculator values from the monthly balance
   const opexAmount = monthlyBalance?.opex_amount !== null ? monthlyBalance?.opex_amount || 35 : 35;
@@ -245,9 +259,10 @@ const Index = () => {
               />
             </div>
 
-            {/* New Salary Calculator - Updated with additional props */}
+            {/* New Salary Calculator - Updated with additional props and key for refreshing */}
             <div className="mb-6">
               <SalaryCalculator 
+                key={`salary-calculator-${calculatorRefreshKey}`}
                 zohoIncome={regularIncome}
                 stripeIncome={stripeNet}
                 opexAmount={opexAmount}
