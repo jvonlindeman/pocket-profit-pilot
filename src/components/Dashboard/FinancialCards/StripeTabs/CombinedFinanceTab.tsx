@@ -1,22 +1,17 @@
 
 import React from 'react';
 import { ArrowUpIcon, BadgeDollarSign, ArrowDownIcon } from 'lucide-react';
-import { FinancialSummary } from '@/types/financial';
 import SummaryCard from '../SummaryCard';
+import { useFinance } from '@/contexts/FinanceContext';
 
-interface CombinedFinanceTabProps {
-  summary: FinancialSummary;
-  stripeNet: number;
-  regularIncome: number;
-  formatCurrency: (amount: number) => string;
-}
+const CombinedFinanceTab: React.FC = () => {
+  const {
+    summary,
+    stripeNet,
+    regularIncome,
+    formatCurrency
+  } = useFinance();
 
-const CombinedFinanceTab: React.FC<CombinedFinanceTabProps> = ({
-  summary,
-  stripeNet,
-  regularIncome,
-  formatCurrency
-}) => {
   return (
     <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -56,4 +51,4 @@ const CombinedFinanceTab: React.FC<CombinedFinanceTabProps> = ({
   );
 };
 
-export default CombinedFinanceTab;
+export default React.memo(CombinedFinanceTab);

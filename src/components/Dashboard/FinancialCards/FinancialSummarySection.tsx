@@ -1,22 +1,16 @@
 import React from 'react';
-import { FinancialSummary } from '@/types/financial';
 import { ArrowDownIcon, Users, Calculator, TrendingUpIcon } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
 import SummaryCard from './SummaryCard';
+import { useFinance } from '@/contexts/FinanceContext';
 
-interface FinancialSummarySectionProps {
-  summary: FinancialSummary;
-  otherExpenses: number;
-  formatCurrency: (amount: number) => string;
-  formatPercentage: (percentage: number) => string;
-}
+const FinancialSummarySection: React.FC = () => {
+  const { 
+    summary, 
+    formatCurrency, 
+    formatPercentage 
+  } = useFinance();
 
-const FinancialSummarySection: React.FC<FinancialSummarySectionProps> = ({
-  summary,
-  otherExpenses,
-  formatCurrency,
-  formatPercentage
-}) => {
   return (
     <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
       <h2 className="text-lg font-semibold text-gray-800 mb-4">Resumen Financiero</h2>
@@ -33,7 +27,7 @@ const FinancialSummarySection: React.FC<FinancialSummarySectionProps> = ({
         {/* Other Expenses */}
         <SummaryCard
           title="Otros Gastos"
-          value={formatCurrency(otherExpenses)}
+          value={formatCurrency(summary.otherExpense)}
           icon={ArrowDownIcon}
           iconColor="text-red-500"
           iconBgColor="bg-red-50"
@@ -91,4 +85,4 @@ const FinancialSummarySection: React.FC<FinancialSummarySectionProps> = ({
   );
 };
 
-export default FinancialSummarySection;
+export default React.memo(FinancialSummarySection);
