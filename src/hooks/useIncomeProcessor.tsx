@@ -1,6 +1,7 @@
 
 import { useCallback, useState } from 'react';
 import { Transaction } from '@/types/financial';
+import { toast } from '@/hooks/use-toast';
 
 export const useIncomeProcessor = () => {
   // States for storing processed income data
@@ -26,27 +27,52 @@ export const useIncomeProcessor = () => {
       }
     });
     
+    // Log the Stripe data received for debugging
+    console.log("useIncomeProcessor: Processing Stripe data:", stripeData);
+    
     // Set Stripe income from the API response
-    setStripeIncome(stripeData.gross || 0);
-    setStripeFees(stripeData.fees || 0);
-    setStripeTransactionFees(stripeData.transactionFees || 0);
-    setStripePayoutFees(stripeData.payoutFees || 0);
-    setStripeAdditionalFees(stripeData.stripeFees || 0);
-    setStripeAdvances(stripeData.advances || 0);
-    setStripeAdvanceFunding(stripeData.advanceFunding || 0);
-    setStripeNet(stripeData.net || 0);
-    setStripeFeePercentage(stripeData.feePercentage || 0);
+    const gross = stripeData.gross || 0;
+    const fees = stripeData.fees || 0;
+    const transactionFees = stripeData.transactionFees || 0;
+    const payoutFees = stripeData.payoutFees || 0;
+    const stripeFees = stripeData.stripeFees || 0;
+    const advances = stripeData.advances || 0;
+    const advanceFunding = stripeData.advanceFunding || 0;
+    const net = stripeData.net || 0;
+    const feePercentage = stripeData.feePercentage || 0;
+    
+    // Record values to state
+    setStripeIncome(gross);
+    setStripeFees(fees);
+    setStripeTransactionFees(transactionFees);
+    setStripePayoutFees(payoutFees);
+    setStripeAdditionalFees(stripeFees);
+    setStripeAdvances(advances);
+    setStripeAdvanceFunding(advanceFunding);
+    setStripeNet(net);
+    setStripeFeePercentage(feePercentage);
     setRegularIncome(regularAmount);
     
+    // Show toast for debugging if data is unexpected
+    if (fees === 0 && gross > 0) {
+      toast({
+        title: "Stripe Data Warning",
+        description: "Received Stripe income data but fees are zero",
+        variant: "destructive"
+      });
+    }
+    
+    // Return processed data
     return { 
-      stripeGross: stripeData.gross || 0, 
-      stripeFees: stripeData.fees || 0,
-      stripeTransactionFees: stripeData.transactionFees || 0,
-      stripePayoutFees: stripeData.payoutFees || 0,
-      stripeAdditionalFees: stripeData.stripeFees || 0,
-      stripeAdvances: stripeData.advances || 0,
-      stripeAdvanceFunding: stripeData.advanceFunding || 0,
-      stripeNet: stripeData.net || 0,
+      stripeGross: gross, 
+      stripeFees: fees,
+      stripeTransactionFees: transactionFees,
+      stripePayoutFees: payoutFees,
+      stripeAdditionalFees: stripeFees,
+      stripeAdvances: advances,
+      stripeAdvanceFunding: advanceFunding,
+      stripeNet: net,
+      stripeFeePercentage: feePercentage,
       regularAmount 
     };
   }, []);
