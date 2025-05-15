@@ -1,9 +1,10 @@
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { useFinancialDataFetcher } from '@/hooks/useFinancialDataFetcher';
 import { useCollaboratorProcessor } from '@/hooks/useCollaboratorProcessor';
 import { useIncomeProcessor } from '@/hooks/useIncomeProcessor';
-import { useMonthlyBalanceManager } from '@/hooks/useMonthlyBalanceManager';
+import { useMonthlyBalance } from '@/hooks/useMonthlyBalance'; // Updated import
 import * as ZohoService from '@/services/zohoService';
 import { formatDateYYYYMMDD, getCurrentMonthRange } from '@/utils/dateUtils';
 import { toDayPickerDateRange, toFinancialDateRange } from '@/utils/dateRangeAdapter';
@@ -135,8 +136,20 @@ export const useFinanceData = () => {
     return { startDate, endDate };
   });
 
+  // Use the consolidated hook for monthly balance management
+  // Changed from useMonthlyBalanceManager to useMonthlyBalance
+  const currentMonthDate = dateRange.startDate || new Date();
+  const { 
+    monthlyBalance, 
+    fetchMonthlyBalance, 
+    updateMonthlyBalance,
+    startingBalance, 
+    setStartingBalance
+  } = useMonthlyBalance({ 
+    currentDate: currentMonthDate
+  });
+
   // Import functionality from smaller hooks
-  const { startingBalance, fetchMonthlyBalance, updateStartingBalance } = useMonthlyBalanceManager();
   const { 
     stripeIncome, stripeFees, 
     stripeTransactionFees, stripePayoutFees, stripeAdditionalFees,
@@ -150,7 +163,7 @@ export const useFinanceData = () => {
     rawResponse, 
     usingCachedData, 
     fetchFinancialData,
-    cacheStatus  // Add cacheStatus from the fetcher hook
+    cacheStatus
   } = useFinancialDataFetcher();
 
   // Datos financieros procesados
@@ -173,7 +186,7 @@ export const useFinanceData = () => {
     });
 
     // Fetch monthly balance when date range changes
-    fetchMonthlyBalance(preservedStartDate);
+    fetchMonthlyBalance();
     
     // Check if we need to refresh the cache
     ZohoService.checkAndRefreshCache(preservedStartDate, preservedEndDate);
@@ -181,7 +194,7 @@ export const useFinanceData = () => {
 
   // When dateRange changes, make sure we fetch monthly balance
   useEffect(() => {
-    fetchMonthlyBalance(dateRange.startDate);
+    fetchMonthlyBalance();
   }, [dateRange.startDate, fetchMonthlyBalance]);
 
   // Función para cargar los datos 
@@ -231,7 +244,7 @@ export const useFinanceData = () => {
     regularIncome,
     collaboratorExpenses,
     startingBalance,
-    updateStartingBalance,
+    updateStartingBalance: setStartingBalance, // Updated to match the consolidated hook
     usingCachedData,
     cacheStatus
   };
