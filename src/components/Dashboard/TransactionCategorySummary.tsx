@@ -20,9 +20,9 @@ const TransactionCategorySummary: React.FC<CategorySummaryProps> = ({ transactio
     return null;
   }
   
-  // Group transactions by category
+  // Group transactions by category, excluding collaborator expenses
   const expensesByCategory = transactions
-    .filter(t => t.type === 'expense')
+    .filter(t => t.type === 'expense' && !t.category?.toLowerCase().includes('colaborador'))
     .reduce((acc, transaction) => {
       const category = transaction.category || 'Sin categoría';
       if (!acc[category]) {

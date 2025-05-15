@@ -44,7 +44,11 @@ const TransactionFilters: React.FC<TransactionFiltersProps> = ({
           filtered = filtered.filter(t => t.type === 'income');
           break;
         case "gastos":
-          filtered = filtered.filter(t => t.type === 'expense');
+          // Modified to exclude collaborator expenses
+          filtered = filtered.filter(t => 
+            t.type === 'expense' && 
+            !(t.category?.toLowerCase().includes('colaborador'))
+          );
           break;
         case "colaboradores":
           filtered = filtered.filter(t => 
