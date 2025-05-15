@@ -1,6 +1,10 @@
 
-import { toast as baseToast, useToast as baseUseToast } from "@/components/ui/use-toast";
-import type { ToasterToast } from "@/components/ui/use-toast";
+// Import directly from the main implementation
+import { 
+  toast as originalToast, 
+  useToast as originalUseToast,
+  type ToasterToast 
+} from "@/components/ui/use-toast.tsx";
 
 // Create a wrapper for the toast function that handles variant conversion
 const toast = (props: Omit<ToasterToast, "id">) => {
@@ -12,11 +16,11 @@ const toast = (props: Omit<ToasterToast, "id">) => {
     validProps.variant = "default";
   }
   
-  return baseToast(validProps);
+  return originalToast(validProps);
 };
 
 // Use the original useToast hook
-const useToast = baseUseToast;
+const useToast = originalUseToast;
 
 export { useToast, toast };
 export type { ToasterToast };
