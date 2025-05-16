@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { Transaction } from '@/types/financial';
 import {
   Select,
@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Check } from 'lucide-react';
+import { COLLABORATOR_IDENTIFIER } from '@/hooks/useTransactionProcessor';
 
 export interface FilterOptions {
   categories: Set<string>;
@@ -19,81 +20,92 @@ export interface FilterOptions {
   maxAmount?: number;
 }
 
+export type FilterType = 'todos' | 'ingresos' | 'gastos' | 'colaboradores' | 'zoho_ingresos' | 'stripe_ingresos';
+
 interface TransactionFiltersProps {
   transactions: Transaction[];
   onFilterChange: (filteredTransactions: Transaction[]) => void;
   onFilterOptionsChange?: (options: FilterOptions) => void;
+  initialFilterType?: FilterType;
 }
 
 const TransactionFilters: React.FC<TransactionFiltersProps> = ({
   transactions,
   onFilterChange,
-  onFilterOptionsChange
+  onFilterOptionsChange,
+  initialFilterType = 'todos'
 }) => {
   // Selected filter type
-  const [filterType, setFilterType] = useState<string>("todos");
+  const [filterType, setFilterType] = React.useState<FilterType>(initialFilterType);
   
-  // Apply filters when selections change
-  useEffect(() => {
-    if (transactions) {
-      let filtered = [...transactions];
-      
-      // Apply filters based on selected type
-      switch (filterType) {
-        case "ingresos":
-          filtered = filtered.filter(t => t.type === 'income');
-          break;
-        case "gastos":
-          // Modified to exclude collaborator expenses
-          filtered = filtered.filter(t => 
-            t.type === 'expense' && 
-            !(t.category?.toLowerCase().includes('colaborador'))
-          );
-          break;
-        case "colaboradores":
-          filtered = filtered.filter(t => 
-            t.type === 'expense' && 
-            t.category?.toLowerCase().includes('colaborador')
-          );
-          break;
-        case "zoho_ingresos":
-          filtered = filtered.filter(t => 
-            t.type === 'income' && 
-            t.source === 'Zoho'
-          );
-          break;
-        case "stripe_ingresos":
-          filtered = filtered.filter(t => 
-            t.type === 'income' && 
-            t.source === 'Stripe'
-          );
-          break;
-        case "todos":
-        default:
-          // No filtering needed for "todos"
-          break;
-      }
-      
-      onFilterChange(filtered);
-      
-      if (onFilterOptionsChange) {
-        // Extract all unique categories, sources, and types from filtered results
-        const categories = new Set(filtered.map(t => t.category).filter(Boolean));
-        const sources = new Set(filtered.map(t => t.source).filter(Boolean));
-        const types = new Set(filtered.map(t => t.type).filter(Boolean));
+  // Apply filters when selections change - memoized to avoid unnecessary recalculations
+  const filteredTransactions = useMemo(() => {
+    if (!transactions || transactions.length === 0) return [];
+    
+    // Apply filter based on the current filter type
+    switch (filterType) {
+      case 'ingresos':
+        return transactions.filter(t => t.type === 'income');
         
-        onFilterOptionsChange({
-          categories,
-          sources,
-          types
-        });
-      }
+      case 'gastos':
+        return transactions.filter(t => 
+          t.type === 'expense' && 
+          !t.category?.toLowerCase().includes(COLLABORATOR_IDENTIFIER)
+        );
+        
+      case 'colaboradores':
+        return transactions.filter(t => 
+          t.type === 'expense' && 
+          t.category?.toLowerCase().includes(COLLABORATOR_IDENTIFIER)
+        );
+        
+      case 'zoho_ingresos':
+        return transactions.filter(t => 
+          t.type === 'income' && 
+          t.source === 'Zoho'
+        );
+        
+      case 'stripe_ingresos':
+        return transactions.filter(t => 
+          t.type === 'income' && 
+          t.source === 'Stripe'
+        );
+        
+      case 'todos':
+      default:
+        return [...transactions];
     }
-  }, [filterType, transactions, onFilterChange, onFilterOptionsChange]);
+  }, [filterType, transactions]);
+  
+  // Extract filter options - memoized
+  const filterOptions = useMemo(() => {
+    if (!filteredTransactions.length) {
+      return {
+        categories: new Set<string>(),
+        sources: new Set<string>(),
+        types: new Set<string>()
+      };
+    }
+    
+    return {
+      categories: new Set(filteredTransactions.map(t => t.category).filter(Boolean)),
+      sources: new Set(filteredTransactions.map(t => t.source).filter(Boolean)),
+      types: new Set(filteredTransactions.map(t => t.type).filter(Boolean))
+    };
+  }, [filteredTransactions]);
+
+  // Update parent component when filters change
+  React.useEffect(() => {
+    onFilterChange(filteredTransactions);
+    
+    if (onFilterOptionsChange) {
+      onFilterOptionsChange(filterOptions);
+    }
+  }, [filteredTransactions, filterOptions, onFilterChange, onFilterOptionsChange]);
 
   // Handle filter type change
   const handleFilterTypeChange = (value: string) => {
-    setFilterType(value);
+    setFilterType(value as FilterType);
   };
 
   return (
@@ -140,4 +152,4 @@ const TransactionFilters: React.FC<TransactionFiltersProps> = ({
   );
 };
 
-export default TransactionFilters;
+export default React.memo(TransactionFilters);

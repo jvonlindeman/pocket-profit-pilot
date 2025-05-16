@@ -3,16 +3,20 @@ import React from 'react';
 import { ArrowDownIcon, Users } from 'lucide-react';
 import SummaryCard from './SummaryCard';
 import { useFinance } from '@/contexts/FinanceContext';
+import { useFinanceFormatter } from '@/hooks/useFinanceFormatter';
+import { useFinanceMetrics } from '@/hooks/useFinanceMetrics';
 
 const ExpensesSection: React.FC = () => {
   const { 
     summary, 
-    formatCurrency,
     collaboratorExpenses
   } = useFinance();
+  
+  const { formatCurrency } = useFinanceFormatter();
+  const { calculateCollaboratorExpense } = useFinanceMetrics();
 
-  // Calculate total collaborator expense from the collaboratorExpenses array
-  const totalCollaboratorExpense = collaboratorExpenses.reduce((sum, item) => sum + item.amount, 0);
+  // Calculate total collaborator expense using the metrics hook
+  const totalCollaboratorExpense = calculateCollaboratorExpense(collaboratorExpenses);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

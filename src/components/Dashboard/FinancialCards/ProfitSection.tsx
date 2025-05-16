@@ -4,13 +4,15 @@ import { Calculator, TrendingUpIcon } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
 import SummaryCard from './SummaryCard';
 import { useFinance } from '@/contexts/FinanceContext';
+import { useFinanceFormatter } from '@/hooks/useFinanceFormatter';
 
 const ProfitSection: React.FC = () => {
-  const { 
-    summary, 
-    formatCurrency, 
-    formatPercentage 
-  } = useFinance();
+  const { summary } = useFinance();
+  const { formatCurrency, formatPercentage, getValueColorClass } = useFinanceFormatter();
+
+  // Get color classes based on values
+  const profitMarginColorClass = getValueColorClass(summary.profitMargin);
+  const grossProfitMarginColorClass = getValueColorClass(summary.grossProfitMargin);
 
   return (
     <>
@@ -23,7 +25,7 @@ const ProfitSection: React.FC = () => {
           iconColor="text-green-500"
           iconBgColor="bg-green-50"
           additionalContent={
-            <div className={`text-sm font-medium ml-2 ${summary.grossProfitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            <div className={`text-sm font-medium ml-2 ${grossProfitMarginColorClass}`}>
               Margen: {formatPercentage(summary.grossProfitMargin)}
             </div>
           }
@@ -44,7 +46,7 @@ const ProfitSection: React.FC = () => {
               <div className="text-2xl font-bold text-blue-500 animate-value">
                 {formatCurrency(summary.profit)}
               </div>
-              <div className={`text-sm font-medium ml-2 ${summary.profitMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <div className={`text-sm font-medium ml-2 ${profitMarginColorClass}`}>
                 Margen: {formatPercentage(summary.profitMargin)}
               </div>
             </div>

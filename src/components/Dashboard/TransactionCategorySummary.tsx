@@ -2,74 +2,24 @@
 import React from 'react';
 import { Transaction } from '@/types/financial';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from '@/components/ui/separator';
+import { useTransactionProcessor } from '@/hooks/useTransactionProcessor';
+import { useFinanceFormatter } from '@/hooks/useFinanceFormatter';
 
-interface CategoryTotal {
-  category: string;
-  amount: number;
-  count: number;
-}
-
-interface CategorySummaryProps {
+interface TransactionCategorySummaryProps {
   transactions: Transaction[];
 }
 
-const TransactionCategorySummary: React.FC<CategorySummaryProps> = ({ transactions }) => {
+const TransactionCategorySummary: React.FC<TransactionCategorySummaryProps> = ({ transactions }) => {
+  // Use our new hooks
+  const { categorySummary } = useTransactionProcessor(transactions);
+  const { formatCurrency } = useFinanceFormatter();
+  
   // No transactions, don't show anything
   if (!transactions || transactions.length === 0) {
     return null;
   }
   
-  // Group transactions by category, excluding collaborator expenses
-  const expensesByCategory = transactions
-    .filter(t => t.type === 'expense' && !t.category?.toLowerCase().includes('colaborador'))
-    .reduce((acc, transaction) => {
-      const category = transaction.category || 'Sin categoría';
-      if (!acc[category]) {
-        acc[category] = {
-          category,
-          amount: 0,
-          count: 0
-        };
-      }
-      acc[category].amount += transaction.amount;
-      acc[category].count += 1;
-      return acc;
-    }, {} as Record<string, CategoryTotal>);
-    
-  // Group transactions by source
-  const incomeBySource = transactions
-    .filter(t => t.type === 'income')
-    .reduce((acc, transaction) => {
-      const source = transaction.source || 'Sin fuente';
-      if (!acc[source]) {
-        acc[source] = {
-          category: source,
-          amount: 0,
-          count: 0
-        };
-      }
-      acc[source].amount += transaction.amount;
-      acc[source].count += 1;
-      return acc;
-    }, {} as Record<string, CategoryTotal>);
-    
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2
-    }).format(amount);
-  };
-  
-  // Calculate totals
-  const totalExpenses = Object.values(expensesByCategory).reduce((sum, cat) => sum + cat.amount, 0);
-  const totalIncome = Object.values(incomeBySource).reduce((sum, src) => sum + src.amount, 0);
-  
-  // Sort by amount (descending)
-  const sortedExpenses = Object.values(expensesByCategory).sort((a, b) => b.amount - a.amount);
-  const sortedIncome = Object.values(incomeBySource).sort((a, b) => b.amount - a.amount);
+  const { byCategory: sortedExpenses, bySource: sortedIncome, totalExpense, totalIncome } = categorySummary;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -78,7 +28,7 @@ const TransactionCategorySummary: React.FC<CategorySummaryProps> = ({ transactio
         <CardHeader className="pb-2">
           <CardTitle className="text-md font-semibold text-red-700">
             Resumen de Gastos
-            <span className="float-right">{formatCurrency(totalExpenses)}</span>
+            <span className="float-right">{formatCurrency(totalExpense)}</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -134,4 +84,4 @@ const TransactionCategorySummary: React.FC<CategorySummaryProps> = ({ transactio
   );
 };
 
-export default TransactionCategorySummary;
+export default React.memo(TransactionCategorySummary);

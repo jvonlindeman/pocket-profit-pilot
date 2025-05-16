@@ -1,6 +1,6 @@
 
 import { useMemo } from 'react';
-import { FinancialSummary } from '@/types/financial';
+import { FinancialSummary, CategorySummary } from '@/types/financial';
 
 export const useFinanceMetrics = () => {
   /**
@@ -8,6 +8,13 @@ export const useFinanceMetrics = () => {
    */
   const calculateTotalIncome = (stripeNet: number, regularIncome: number): number => {
     return stripeNet + regularIncome;
+  };
+
+  /**
+   * Calculate collaborator expense total
+   */
+  const calculateCollaboratorExpense = (collaboratorExpenses: CategorySummary[]): number => {
+    return collaboratorExpenses.reduce((sum, item) => sum + item.amount, 0);
   };
 
   /**
@@ -27,21 +34,44 @@ export const useFinanceMetrics = () => {
   };
 
   /**
-   * Calculate expense distribution
+   * Calculate expense breakdown
    */
-  const calculateExpenseDistribution = (
+  const calculateExpenseBreakdown = (
     collaboratorExpense: number,
-    totalExpense: number
-  ): { collaboratorPercentage: number; otherPercentage: number } => {
-    if (totalExpense === 0) return { collaboratorPercentage: 0, otherPercentage: 0 };
+    otherExpense: number
+  ): { 
+    totalExpense: number, 
+    collaboratorPercentage: number, 
+    otherPercentage: number 
+  } => {
+    const totalExpense = collaboratorExpense + otherExpense;
+    
+    if (totalExpense === 0) {
+      return {
+        totalExpense: 0,
+        collaboratorPercentage: 0,
+        otherPercentage: 0
+      };
+    }
     
     const collaboratorPercentage = (collaboratorExpense / totalExpense) * 100;
-    const otherPercentage = 100 - collaboratorPercentage;
     
     return {
+      totalExpense,
       collaboratorPercentage,
-      otherPercentage
+      otherPercentage: 100 - collaboratorPercentage
     };
+  };
+
+  /**
+   * Calculate profit after expenses
+   */
+  const calculateProfit = (
+    totalIncome: number,
+    totalExpense: number,
+    startingBalance: number = 0
+  ): number => {
+    return startingBalance + totalIncome - totalExpense;
   };
 
   /**
@@ -57,9 +87,11 @@ export const useFinanceMetrics = () => {
 
   return useMemo(() => ({
     calculateTotalIncome,
+    calculateCollaboratorExpense,
     calculateGrossProfitMargin,
     calculateProfitMargin,
-    calculateExpenseDistribution,
+    calculateExpenseBreakdown,
+    calculateProfit,
     analyzeFinancialHealth
   }), []);
 };

@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, ReactNode } from 'react';
-import { FinancialSummary, Transaction } from '@/types/financial';
+import { FinancialSummary, Transaction, CategorySummary } from '@/types/financial';
 import { useFinanceFormatter } from '@/hooks/useFinanceFormatter';
 
 // Define the context value type
@@ -22,9 +22,9 @@ interface FinanceContextType {
   regularIncome: number;
   
   // Collaborator expenses
-  collaboratorExpenses: any[];
+  collaboratorExpenses: CategorySummary[];
   
-  // Formatting functions
+  // Formatting functions from useFinanceFormatter
   formatCurrency: (amount: number) => string;
   formatPercentage: (percentage: number) => string;
   formatChange: (value: number) => string;
@@ -74,7 +74,7 @@ interface FinanceProviderProps {
   stripeNet: number;
   stripeFeePercentage: number;
   regularIncome: number;
-  collaboratorExpenses: any[];
+  collaboratorExpenses: CategorySummary[];
 }
 
 // Provider component
