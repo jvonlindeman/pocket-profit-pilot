@@ -1,4 +1,3 @@
-
 import { Transaction, FinancialData } from "../types/financial";
 import { zohoRepository } from "../repositories/zohoRepository";
 import { stripeRepository } from "../repositories/stripeRepository";
