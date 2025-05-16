@@ -1,20 +1,18 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 import { useToast } from '@/hooks/use-toast';
-import { toDayPickerDateRange, toFinancialDateRange } from '@/utils/dateRangeAdapter';
-import { DateRange as DayPickerDateRange } from 'react-day-picker';
+import { useDateRangeManager } from '@/hooks/useDateRangeManager';
+import { useDateFormatter } from '@/hooks/useDateFormatter';
 
 // Component imports
 import DashboardHeader from '@/components/Dashboard/Header/DashboardHeader';
-import InitialBalanceDialog from '@/components/Dashboard/InitialBalanceDialog';
-import InitialLoadPrompt from '@/components/Dashboard/InitialLoadPrompt';
-import LoadingSpinner from '@/components/Dashboard/LoadingSpinner';
-import ErrorDisplay from '@/components/Dashboard/ErrorDisplay';
+import LoadingErrorState from '@/components/Dashboard/LoadingErrorState';
 import DashboardContent from '@/components/Dashboard/DashboardContent';
 import DebugSection from '@/components/Dashboard/DebugTools/DebugSection';
 import Footer from '@/components/Dashboard/Footer';
+import InitialSetup from '@/components/Dashboard/InitialSetup';
 
 const Index = () => {
   const {
@@ -37,8 +35,7 @@ const Index = () => {
     regularIncome,
     collaboratorExpenses,
     startingBalance,
-    updateStartingBalance,
-    setStartingBalance, // We'll use this directly
+    setStartingBalance,
     usingCachedData,
     cacheStatus
   } = useFinanceData();
@@ -53,27 +50,27 @@ const Index = () => {
   });
   
   const { toast } = useToast();
+  const { handleDateRangeChange, getDatePickerCurrentMonthRange } = useDateRangeManager({
+    dateRange,
+    updateDateRange,
+    getCurrentMonthRange
+  });
+  
+  const { createPeriodTitle } = useDateFormatter();
+  
+  // Title of the period
+  const periodTitle = useMemo(() => 
+    createPeriodTitle(dateRange.startDate, dateRange.endDate),
+    [createPeriodTitle, dateRange.startDate, dateRange.endDate]
+  );
 
-  // Format dates for titles with safety check
-  const formatDateForTitle = (date: Date | undefined) => {
-    if (!date) return 'Fecha inválida';
-    
-    try {
-      return new Date(date).toLocaleDateString('es-ES', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-      });
-    } catch (error) {
-      console.error("Error formatting date for title:", error);
-      return 'Fecha inválida';
-    }
-  };
-
-  // Title of the period with safety checks
-  const periodTitle = dateRange.startDate && dateRange.endDate 
-    ? `${formatDateForTitle(dateRange.startDate)} - ${formatDateForTitle(dateRange.endDate)}`
-    : 'Periodo no seleccionado';
+  // Calculate total Zoho expenses - all expenses except those from Stripe
+  const totalZohoExpenses = useMemo(() => 
+    financialData.transactions
+      .filter(tx => tx.type === 'expense' && tx.source !== 'Stripe')
+      .reduce((sum, tx) => sum + tx.amount, 0),
+    [financialData.transactions]
+  );
 
   // Handler for loading initial data
   const handleInitialLoad = async () => {
@@ -102,7 +99,7 @@ const Index = () => {
     refreshData(true);
   };
 
-  // UPDATED: Improved handler for balance changes in the MonthlyBalanceEditor
+  // Improved handler for balance changes in the MonthlyBalanceEditor
   const handleBalanceChange = (balance: number) => {
     console.log("Balance changed in editor:", balance);
     
@@ -129,31 +126,15 @@ const Index = () => {
     refreshData(true);
   };
 
-  // Handler for date range change
-  const handleDateRangeChange = (newRange: DayPickerDateRange) => {
-    if (newRange.from && newRange.to) {
-      updateDateRange(toFinancialDateRange(newRange));
-    }
-  };
-
-  // Map the current month range function to match DateRangePicker's expected format
-  const getDatePickerCurrentMonthRange = () => {
-    const financialDateRange = getCurrentMonthRange();
-    return toDayPickerDateRange(financialDateRange);
-  };
-
-  // Calculate total Zoho expenses - all expenses except those from Stripe
-  const totalZohoExpenses = financialData.transactions
-    .filter(tx => tx.type === 'expense' && tx.source !== 'Stripe')
-    .reduce((sum, tx) => sum + tx.amount, 0);
-
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Dialog to set initial balance */}
-      <InitialBalanceDialog 
-        open={showBalanceDialog} 
-        onOpenChange={setShowBalanceDialog} 
-        currentDate={currentMonthDate}
+      {/* Initial setup components */}
+      <InitialSetup 
+        dataInitialized={dataInitialized}
+        onLoadData={handleInitialLoad}
+        showBalanceDialog={showBalanceDialog}
+        setShowBalanceDialog={setShowBalanceDialog}
+        currentMonthDate={currentMonthDate}
         onBalanceSaved={handleBalanceSaved}
       />
       
@@ -166,16 +147,14 @@ const Index = () => {
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {!dataInitialized && (
-          <InitialLoadPrompt onLoadData={handleInitialLoad} />
-        )}
+        {/* Loading and error state handling */}
+        <LoadingErrorState 
+          loading={loading} 
+          error={error}
+          onRetry={handleRefresh}
+        />
         
-        {loading && <LoadingSpinner />}
-        
-        {error && (
-          <ErrorDisplay error={error} onRetry={handleRefresh} />
-        )}
-        
+        {/* Dashboard content */}
         {dataInitialized && !loading && !error && (
           <DashboardContent 
             periodTitle={periodTitle}
@@ -200,7 +179,7 @@ const Index = () => {
           />
         )}
 
-        {/* Sección de depuración */}
+        {/* Debug section */}
         <DebugSection 
           dateRange={dateRange}
           refreshData={refreshData}
