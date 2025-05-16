@@ -54,8 +54,7 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
     currentMonthYear,
   } = useMonthlyBalance({ currentDate });
 
-  // Update form values when data is loaded, but DON'T call onBalanceChange
-  // to prevent infinite loop
+  // Update form values when data is loaded
   useEffect(() => {
     if (monthlyBalance) {
       form.reset({
@@ -65,8 +64,6 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
         profitPercentage: monthlyBalance.profit_percentage !== null ? monthlyBalance.profit_percentage : 1,
         notes: monthlyBalance.notes || ''
       });
-      
-      // Removed the onBalanceChange call here to prevent infinite loop
     }
   }, [monthlyBalance, form]);
 
@@ -84,8 +81,9 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
       data.notes
     );
     
-    // Only notify parent component if update was successful
+    // IMPROVED: Immediately notify parent component on successful update
     if (success && onBalanceChange) {
+      // Call the parent's onBalanceChange to update the UI immediately
       onBalanceChange(data.balance);
     }
   };

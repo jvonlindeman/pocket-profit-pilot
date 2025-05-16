@@ -23,7 +23,11 @@ const InitialBalanceSection: React.FC<InitialBalanceSectionProps> = ({
           </div>
           <div className="flex items-center bg-blue-50 p-3 rounded-lg">
             <Wallet className="h-5 w-5 text-blue-600 mr-3" />
-            <div className="text-lg font-bold text-blue-600 animate-value">
+            <div 
+              className="text-lg font-bold text-blue-600 animate-value"
+              // Adding key based on the balance value forces React to re-render when value changes
+              key={`balance-${startingBalance}`}
+            >
               {formatCurrency(startingBalance)}
             </div>
           </div>

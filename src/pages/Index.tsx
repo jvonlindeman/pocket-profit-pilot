@@ -38,6 +38,7 @@ const Index = () => {
     collaboratorExpenses,
     startingBalance,
     updateStartingBalance,
+    setStartingBalance, // We'll use this directly
     usingCachedData,
     cacheStatus
   } = useFinanceData();
@@ -101,10 +102,20 @@ const Index = () => {
     refreshData(true);
   };
 
-  // Handler for balance changes in the MonthlyBalanceEditor
+  // UPDATED: Improved handler for balance changes in the MonthlyBalanceEditor
   const handleBalanceChange = (balance: number) => {
     console.log("Balance changed in editor:", balance);
-    // We need to make sure the UI reflects the new balance
+    
+    // Immediately update local state for faster UI feedback
+    setStartingBalance(balance);
+    
+    // Force a refresh to ensure all components get the updated data
+    toast({
+      title: 'Balance inicial actualizado',
+      description: 'Actualizando datos financieros...',
+    });
+    
+    // Refresh data from backend but without showing the loading state
     refreshData(false);
   };
 

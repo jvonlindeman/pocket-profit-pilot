@@ -23,6 +23,7 @@ export const useMonthlyBalanceManager = () => {
 
       if (data) {
         console.log("Fetched monthly balance:", data);
+        // Update the local state with the balance from the database
         setStartingBalance(data.balance);
       } else {
         console.log("No monthly balance found for:", monthYear);
@@ -83,7 +84,9 @@ export const useMonthlyBalanceManager = () => {
         return false;
       }
       
+      // Immediately update local state for faster UI feedback
       setStartingBalance(balance);
+      console.log("Starting balance updated to:", balance);
       return true;
     } catch (err) {
       console.error("Error updating starting balance:", err);
@@ -95,6 +98,6 @@ export const useMonthlyBalanceManager = () => {
     startingBalance,
     fetchMonthlyBalance,
     updateStartingBalance,
-    setStartingBalance
+    setStartingBalance // Export this function to allow direct state updates
   };
 };
