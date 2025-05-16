@@ -9,6 +9,12 @@ interface FinanceContextType {
   summary: FinancialSummary;
   transactions: Transaction[];
   
+  // Date range for the current financial data
+  dateRange: {
+    startDate: Date | null;
+    endDate: Date | null;
+  };
+  
   // Stripe-specific data
   stripeIncome: number;
   stripeFees: number;
@@ -45,6 +51,10 @@ export const FinanceContext = createContext<FinanceContextType>({
     grossProfitMargin: 0,
   },
   transactions: [],
+  dateRange: {
+    startDate: null,
+    endDate: null,
+  },
   stripeIncome: 0,
   stripeFees: 0,
   stripeTransactionFees: 0,
@@ -66,6 +76,7 @@ interface FinanceProviderProps {
   children: ReactNode;
   summary: FinancialSummary;
   transactions: Transaction[];
+  dateRange?: { startDate: Date | null; endDate: Date | null };
   stripeIncome: number;
   stripeFees: number;
   stripeTransactionFees: number;
@@ -82,6 +93,7 @@ export const FinanceProvider: React.FC<FinanceProviderProps> = ({
   children,
   summary,
   transactions,
+  dateRange = { startDate: null, endDate: null },
   stripeIncome,
   stripeFees,
   stripeTransactionFees,
@@ -104,6 +116,7 @@ export const FinanceProvider: React.FC<FinanceProviderProps> = ({
   const contextValue: FinanceContextType = {
     summary,
     transactions,
+    dateRange,
     stripeIncome,
     stripeFees,
     stripeTransactionFees,

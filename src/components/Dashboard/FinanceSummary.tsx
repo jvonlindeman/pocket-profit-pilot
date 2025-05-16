@@ -19,6 +19,7 @@ interface FinanceSummaryProps {
   stripeNet?: number;
   stripeFeePercentage?: number;
   regularIncome?: number;
+  dateRange?: { startDate: Date | null; endDate: Date | null };
 }
 
 const FinanceSummary: React.FC<FinanceSummaryProps> = ({
@@ -31,7 +32,8 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
   stripeAdditionalFees = 0,
   stripeNet = 0,
   stripeFeePercentage = 0,
-  regularIncome = 0
+  regularIncome = 0,
+  dateRange = { startDate: null, endDate: null }
 }) => {
   // Filter collaborator expenses using our utility function
   const collaboratorExpenses = expenseCategories.filter(
@@ -55,12 +57,14 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
     console.log("FinanceSummary - Original summary:", summary);
     console.log("FinanceSummary - Refined summary:", refinedSummary);
     console.log("FinanceSummary - Processed data:", processedData);
-  }, [expenseCategories, collaboratorExpenses, summary, refinedSummary, processedData]);
+    console.log("FinanceSummary - Date range:", dateRange);
+  }, [expenseCategories, collaboratorExpenses, summary, refinedSummary, processedData, dateRange]);
 
   return (
     <FinanceProvider
       summary={refinedSummary}
       transactions={[]} // We don't need transactions in this component tree
+      dateRange={dateRange}
       stripeIncome={stripeIncome}
       stripeFees={stripeFees}
       stripeTransactionFees={stripeTransactionFees}
