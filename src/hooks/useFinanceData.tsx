@@ -9,6 +9,7 @@ import { financialService } from '@/services/financialService';
 import { zohoRepository } from '@/repositories/zohoRepository';
 import { formatDateYYYYMMDD, getCurrentMonthRange } from '@/utils/dateUtils';
 import { Transaction } from '@/types/financial';
+import { toast } from "@/hooks/use-toast";
 
 export const useFinanceData = () => {
   // States
@@ -52,6 +53,29 @@ export const useFinanceData = () => {
     return financialService.processTransactionData(transactions, startingBalance, collaboratorExpenses);
   }, [transactions, startingBalance, collaboratorExpenses]);
 
+  // Save financial summary to database when data is processed
+  useEffect(() => {
+    // Only save when we have actual financial data and valid date range
+    if (financialData && financialData.summary && dateRange.startDate && dateRange.endDate && transactions.length > 0 && !loading) {
+      console.log("Saving financial data to database:", { 
+        financialData,
+        dateRange
+      });
+      
+      financialService.saveFinancialSummary(financialData, dateRange)
+        .then(summaryId => {
+          if (summaryId) {
+            console.log("Financial summary saved with ID:", summaryId);
+          } else {
+            console.warn("Failed to save financial summary");
+          }
+        })
+        .catch(err => {
+          console.error("Error saving financial summary:", err);
+        });
+    }
+  }, [financialData, dateRange, transactions.length, loading]);
+
   // Función para actualizar el rango de fechas
   const updateDateRange = useCallback((newRange: { startDate: Date; endDate: Date }) => {
     console.log("Date range updated:", newRange);
@@ -91,12 +115,21 @@ export const useFinanceData = () => {
         onIncomeTypes: processIncomeTypes
       }
     );
+    
+    if (success && transactions.length > 0) {
+      toast({
+        title: "Datos financieros actualizados",
+        description: `Se procesaron ${transactions.length} transacciones`
+      });
+    }
+    
     return success;
   }, [
     dateRange, 
     fetchFinancialData, 
     processCollaboratorData, 
-    processIncomeTypes
+    processIncomeTypes,
+    transactions.length
   ]);
   
   // Función pública para refrescar datos (forzando o no)
@@ -125,7 +158,7 @@ export const useFinanceData = () => {
     collaboratorExpenses,
     startingBalance,
     updateStartingBalance,
-    setStartingBalance, // Now we're properly including this in the return value
+    setStartingBalance, 
     usingCachedData,
     cacheStatus,
     apiConnectivity,

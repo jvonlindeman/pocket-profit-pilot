@@ -1,11 +1,12 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useStoredFinancialSummaries } from '@/hooks/useStoredFinancialSummaries';
 import { useFinanceFormatter } from '@/hooks/useFinanceFormatter';
 import { formatFinancialDate } from '@/utils/financialUtils';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon } from 'lucide-react';
+import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, RefreshCcwIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface FinancialHistorySummaryProps {
   startDate?: Date;
@@ -13,7 +14,7 @@ interface FinancialHistorySummaryProps {
 }
 
 const FinancialHistorySummary: React.FC<FinancialHistorySummaryProps> = ({ startDate, endDate }) => {
-  const { summaries, loading } = useStoredFinancialSummaries({ 
+  const { summaries, loading, error, loadSummaries } = useStoredFinancialSummaries({ 
     startDate, 
     endDate,
     autoLoad: true
@@ -21,12 +22,41 @@ const FinancialHistorySummary: React.FC<FinancialHistorySummaryProps> = ({ start
   
   const { formatCurrency, formatPercentage } = useFinanceFormatter();
   
+  useEffect(() => {
+    console.log("FinancialHistorySummary - Current summaries:", summaries);
+  }, [summaries]);
+  
+  const handleRefresh = () => {
+    loadSummaries();
+  };
+  
   if (loading) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Cargando historial financiero...</CardTitle>
         </CardHeader>
+        <CardContent className="flex justify-center items-center p-8">
+          <div className="animate-spin">
+            <RefreshCcwIcon className="h-8 w-8 text-gray-400" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Error al cargar historial financiero</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-red-500 mb-4">Ocurrió un error al cargar los datos históricos</p>
+          <Button onClick={handleRefresh} variant="outline" size="sm">
+            <RefreshCcwIcon className="h-4 w-4 mr-2" /> Reintentar
+          </Button>
+        </CardContent>
       </Card>
     );
   }
@@ -34,17 +64,26 @@ const FinancialHistorySummary: React.FC<FinancialHistorySummaryProps> = ({ start
   if (!summaries || summaries.length === 0) {
     return (
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>No hay datos históricos disponibles</CardTitle>
+          <Button onClick={handleRefresh} variant="ghost" size="sm">
+            <RefreshCcwIcon className="h-4 w-4" />
+          </Button>
         </CardHeader>
+        <CardContent>
+          <p className="text-gray-500">No se encontraron resúmenes financieros guardados para el rango de fechas seleccionado.</p>
+        </CardContent>
       </Card>
     );
   }
   
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg font-semibold">Historial Financiero</CardTitle>
+        <Button onClick={handleRefresh} variant="ghost" size="sm">
+          <RefreshCcwIcon className="h-4 w-4" />
+        </Button>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">

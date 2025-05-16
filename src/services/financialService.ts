@@ -1,4 +1,3 @@
-
 import { Transaction, FinancialData } from "../types/financial";
 import { zohoRepository } from "../repositories/zohoRepository";
 import { stripeRepository } from "../repositories/stripeRepository";
@@ -220,16 +219,36 @@ export class FinancialService {
     financialData: FinancialData, 
     dateRange: { startDate: Date; endDate: Date },
     cacheSegmentId?: string
-  ): Promise<void> {
+  ): Promise<string | null> {
     try {
-      await financialSummaryService.saveFinancialSummary(
+      // Check for valid date range
+      if (!dateRange.startDate || !dateRange.endDate) {
+        console.error("Cannot save financial summary: Invalid date range", dateRange);
+        return null;
+      }
+      
+      console.log("Attempting to save financial summary:", {
+        summary: financialData.summary,
+        dateRange
+      });
+      
+      const summaryId = await financialSummaryService.saveFinancialSummary(
         financialData.summary,
         dateRange.startDate,
         dateRange.endDate,
         cacheSegmentId
       );
+      
+      if (summaryId) {
+        console.log("Financial summary saved successfully with ID:", summaryId);
+      } else {
+        console.error("Failed to save financial summary");
+      }
+      
+      return summaryId;
     } catch (err) {
       console.error("Error saving financial summary:", err);
+      return null;
     }
   }
 

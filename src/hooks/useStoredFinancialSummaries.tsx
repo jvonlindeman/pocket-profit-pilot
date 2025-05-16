@@ -34,7 +34,13 @@ export const useStoredFinancialSummaries = ({
   
   // Function to load summaries from the database
   const loadSummaries = useCallback(async () => {
-    if (!startDate || !endDate) return;
+    if (!startDate || !endDate) {
+      console.log("useStoredFinancialSummaries - Cannot load without date range");
+      return;
+    }
+    
+    console.log("useStoredFinancialSummaries - Loading summaries for range:", 
+      startDate.toISOString(), "to", endDate.toISOString());
     
     setLoading(true);
     setError(null);
@@ -45,6 +51,8 @@ export const useStoredFinancialSummaries = ({
         endDate
       );
       
+      console.log("useStoredFinancialSummaries - Raw retrieved summaries:", storedSummaries);
+      
       // Convert to application format
       const formattedSummaries = storedSummaries.map(stored => ({
         date: stored.date_range_start,
@@ -52,7 +60,7 @@ export const useStoredFinancialSummaries = ({
         id: stored.id
       }));
       
-      console.log("Loaded financial summaries:", formattedSummaries);
+      console.log("useStoredFinancialSummaries - Formatted summaries:", formattedSummaries);
       setSummaries(formattedSummaries);
     } catch (err) {
       console.error("Error loading stored financial summaries:", err);
@@ -64,10 +72,10 @@ export const useStoredFinancialSummaries = ({
   
   // Load summaries when dates change if autoLoad is true
   useEffect(() => {
-    if (autoLoad) {
+    if (autoLoad && startDate && endDate) {
       loadSummaries();
     }
-  }, [loadSummaries, autoLoad]);
+  }, [loadSummaries, autoLoad, startDate, endDate]);
   
   return {
     summaries,
