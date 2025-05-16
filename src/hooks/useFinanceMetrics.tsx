@@ -14,7 +14,19 @@ export const useFinanceMetrics = () => {
    * Calculate collaborator expense total
    */
   const calculateCollaboratorExpense = (collaboratorExpenses: CategorySummary[]): number => {
-    return collaboratorExpenses.reduce((sum, item) => sum + item.amount, 0);
+    if (!collaboratorExpenses || !Array.isArray(collaboratorExpenses)) {
+      console.warn("Invalid collaborator expenses data:", collaboratorExpenses);
+      return 0;
+    }
+    
+    const total = collaboratorExpenses.reduce((sum, item) => {
+      // Make sure we're only adding valid numeric amounts
+      const amount = typeof item.amount === 'number' ? item.amount : 0;
+      return sum + amount;
+    }, 0);
+    
+    console.log("useFinanceMetrics - Total collaborator expense calculated:", total);
+    return total;
   };
 
   /**

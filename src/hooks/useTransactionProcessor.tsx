@@ -2,8 +2,8 @@
 import { useMemo } from 'react';
 import { Transaction, CategorySummary } from '@/types/financial';
 
-// Constants for category identification
-export const COLLABORATOR_IDENTIFIER = 'colaborador';
+// Constants for category identification - updated to match both cases
+export const COLLABORATOR_IDENTIFIERS = ['colaborador', 'pagos a colaboradores'];
 
 interface TransactionSummary {
   byCategory: CategorySummary[];
@@ -24,19 +24,23 @@ export const useTransactionProcessor = (transactions: Transaction[]) => {
     return processTransactions(t => t.type === type);
   };
   
-  // Get collaborator expenses specifically
+  // Get collaborator expenses specifically - improved case-insensitive filtering
   const getCollaboratorExpenses = (): Transaction[] => {
     return processTransactions(t => 
       t.type === 'expense' && 
-      t.category?.toLowerCase().includes(COLLABORATOR_IDENTIFIER)
+      COLLABORATOR_IDENTIFIERS.some(identifier => 
+        t.category?.toLowerCase().includes(identifier.toLowerCase())
+      )
     );
   };
 
-  // Get expenses excluding collaborators
+  // Get expenses excluding collaborators - improved case-insensitive filtering
   const getNonCollaboratorExpenses = (): Transaction[] => {
     return processTransactions(t => 
       t.type === 'expense' && 
-      !t.category?.toLowerCase().includes(COLLABORATOR_IDENTIFIER)
+      !COLLABORATOR_IDENTIFIERS.some(identifier => 
+        t.category?.toLowerCase().includes(identifier.toLowerCase())
+      )
     );
   };
 

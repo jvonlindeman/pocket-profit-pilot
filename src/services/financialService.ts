@@ -1,3 +1,4 @@
+
 import { Transaction, FinancialData } from "../types/financial";
 import { zohoRepository } from "../repositories/zohoRepository";
 import { stripeRepository } from "../repositories/stripeRepository";
@@ -28,8 +29,15 @@ export class FinancialService {
    * Process transaction data to calculate financial metrics
    */
   processTransactionData(transactions: Transaction[], startingBalance: number = 0, collaboratorExpenses: any[] = []): FinancialData {
+    console.log("Processing transaction data with collaborator expenses:", collaboratorExpenses);
+    
     // Calculate total collaborator expense from the collaboratorExpenses array
-    const collaboratorExpense = collaboratorExpenses.reduce((sum, item) => sum + item.amount, 0);
+    const collaboratorExpense = collaboratorExpenses.reduce((sum, item) => {
+      const amount = typeof item.amount === 'number' ? item.amount : 0;
+      return sum + amount;
+    }, 0);
+    
+    console.log("Total collaborator expense calculated:", collaboratorExpense);
     
     const summary = {
       totalIncome: transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0),
@@ -45,11 +53,14 @@ export class FinancialService {
     
     // Calculate other expenses (total expense minus collaborator expenses)
     summary.otherExpense = summary.totalExpense - summary.collaboratorExpense;
+    console.log("Other expenses calculated:", summary.otherExpense);
     
     summary.profit = summary.totalIncome - summary.totalExpense;
     summary.profitMargin = summary.totalIncome > 0 ? (summary.profit / summary.totalIncome) * 100 : 0;
     summary.grossProfit = summary.totalIncome;
     summary.grossProfitMargin = summary.totalIncome > 0 ? 100 : 0;
+    
+    console.log("Final financial summary:", summary);
     
     return {
       summary,

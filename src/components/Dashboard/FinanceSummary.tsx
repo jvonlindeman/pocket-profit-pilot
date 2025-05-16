@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { FinancialSummary, CategorySummary } from '@/types/financial';
 import InitialBalanceSection from './FinancialCards/InitialBalanceSection';
 import IncomeTabs from './FinancialCards/IncomeTabs';
@@ -31,10 +31,18 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
   stripeFeePercentage = 0,
   regularIncome = 0
 }) => {
-  // Get collaborator expenses from expense categories
+  // Get collaborator expenses from expense categories - using case-insensitive matching
   const collaboratorExpenses = expenseCategories.filter(
-    category => category.category.toLowerCase().includes('colaborador')
+    category => category.category.toLowerCase().includes('colaborador') ||
+                category.category.toLowerCase().includes('pagos a colaboradores')
   );
+  
+  // Add debugging to check what's being found
+  useEffect(() => {
+    console.log("FinanceSummary - All expense categories:", expenseCategories);
+    console.log("FinanceSummary - Filtered collaborator expenses:", collaboratorExpenses);
+    console.log("FinanceSummary - Summary data:", summary);
+  }, [expenseCategories, collaboratorExpenses, summary]);
 
   return (
     <FinanceProvider
