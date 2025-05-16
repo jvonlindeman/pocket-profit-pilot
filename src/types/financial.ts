@@ -1,3 +1,4 @@
+
 export interface Transaction {
   id: string;
   date: string;
@@ -28,6 +29,7 @@ export interface CategorySummary {
   amount: number;
   percentage: number;
   date?: string; // Fecha opcional para los colaboradores
+  count?: number; // Added count property for number of transactions in category
 }
 
 export interface DateRange {
