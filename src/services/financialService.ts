@@ -1,4 +1,3 @@
-
 import { Transaction, FinancialData } from "../types/financial";
 import { zohoRepository } from "../repositories/zohoRepository";
 import { stripeRepository } from "../repositories/stripeRepository";
@@ -29,10 +28,13 @@ export class FinancialService {
    * Process transaction data to calculate financial metrics
    */
   processTransactionData(transactions: Transaction[], startingBalance: number = 0, collaboratorExpenses: any[] = []): FinancialData {
+    // Calculate total collaborator expense from the collaboratorExpenses array
+    const collaboratorExpense = collaboratorExpenses.reduce((sum, item) => sum + item.amount, 0);
+    
     const summary = {
       totalIncome: transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0),
       totalExpense: transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0),
-      collaboratorExpense: collaboratorExpenses.reduce((sum, item) => sum + item.amount, 0),
+      collaboratorExpense: collaboratorExpense,
       otherExpense: 0,
       profit: 0,
       profitMargin: 0,
@@ -191,7 +193,7 @@ export class FinancialService {
       this.lastRawResponse = zohoRepository.getLastRawResponse();
       console.log("Fetched raw response for debugging:", this.lastRawResponse);
 
-      // Process collaborator data
+      // Process collaborator data - this is crucial for the fix
       callbacks.onCollaboratorData(this.lastRawResponse);
 
       // Get transactions from Stripe

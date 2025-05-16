@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ArrowDownIcon, Users } from 'lucide-react';
 import SummaryCard from './SummaryCard';
@@ -6,15 +7,19 @@ import { useFinance } from '@/contexts/FinanceContext';
 const ExpensesSection: React.FC = () => {
   const { 
     summary, 
-    formatCurrency
+    formatCurrency,
+    collaboratorExpenses
   } = useFinance();
+
+  // Calculate total collaborator expense from the collaboratorExpenses array
+  const totalCollaboratorExpense = collaboratorExpenses.reduce((sum, item) => sum + item.amount, 0);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {/* Collaborator Expenses */}
       <SummaryCard
         title="Gastos Colaboradores"
-        value={formatCurrency(summary.collaboratorExpense || 0)}
+        value={formatCurrency(totalCollaboratorExpense)}
         icon={Users}
         iconColor="text-amber-500"
         iconBgColor="bg-amber-50"
