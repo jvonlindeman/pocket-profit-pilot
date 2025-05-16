@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Transaction } from '@/types/financial';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTransactionProcessor } from '@/hooks/useTransactionProcessor';
@@ -10,7 +10,7 @@ interface TransactionCategorySummaryProps {
 }
 
 const TransactionCategorySummary: React.FC<TransactionCategorySummaryProps> = ({ transactions }) => {
-  // Use our new hooks
+  // Process transaction data specifically for the current filtered view
   const { categorySummary } = useTransactionProcessor(transactions);
   const { formatCurrency } = useFinanceFormatter();
   

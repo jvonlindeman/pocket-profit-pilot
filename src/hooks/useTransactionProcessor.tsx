@@ -60,43 +60,53 @@ export const useTransactionProcessor = (transactions: Transaction[]) => {
       };
     }
 
-    // Group expenses by category, excluding collaborators
-    const expensesByCategory = getNonCollaboratorExpenses()
-      .reduce((acc, transaction) => {
-        const category = transaction.category || 'Sin categoría';
-        
-        if (!acc[category]) {
-          acc[category] = {
-            category,
-            amount: 0,
-            percentage: 0,
-            count: 0
-          };
-        }
-        
-        acc[category].amount += transaction.amount;
-        acc[category].count += 1;
-        return acc;
-      }, {} as Record<string, CategorySummary & { count?: number }>);
+    // Determine if we're looking at collaborator expenses or regular expenses
+    const isCollaboratorView = transactions.every(t => 
+      t.type === 'expense' && 
+      COLLABORATOR_IDENTIFIERS.some(identifier => 
+        t.category?.toLowerCase().includes(identifier.toLowerCase())
+      )
+    );
+    
+    // For filtered views, use the transactions directly
+    const expensesToUse = transactions.filter(t => t.type === 'expense');
+    const incomesToUse = transactions.filter(t => t.type === 'income');
+
+    // Group expenses by category
+    const expensesByCategory = expensesToUse.reduce((acc, transaction) => {
+      const category = transaction.category || 'Sin categoría';
+      
+      if (!acc[category]) {
+        acc[category] = {
+          category,
+          amount: 0,
+          percentage: 0,
+          count: 0
+        };
+      }
+      
+      acc[category].amount += transaction.amount;
+      acc[category].count += 1;
+      return acc;
+    }, {} as Record<string, CategorySummary & { count?: number }>);
       
     // Group incomes by source
-    const incomeBySource = getByType('income')
-      .reduce((acc, transaction) => {
-        const source = transaction.source || 'Sin fuente';
-        
-        if (!acc[source]) {
-          acc[source] = {
-            category: source,
-            amount: 0,
-            percentage: 0,
-            count: 0
-          };
-        }
-        
-        acc[source].amount += transaction.amount;
-        acc[source].count += 1;
-        return acc;
-      }, {} as Record<string, CategorySummary & { count?: number }>);
+    const incomeBySource = incomesToUse.reduce((acc, transaction) => {
+      const source = transaction.source || 'Sin fuente';
+      
+      if (!acc[source]) {
+        acc[source] = {
+          category: source,
+          amount: 0,
+          percentage: 0,
+          count: 0
+        };
+      }
+      
+      acc[source].amount += transaction.amount;
+      acc[source].count += 1;
+      return acc;
+    }, {} as Record<string, CategorySummary & { count?: number }>);
       
     // Calculate totals
     const totalExpenses = Object.values(expensesByCategory).reduce((sum, cat) => sum + cat.amount, 0);
