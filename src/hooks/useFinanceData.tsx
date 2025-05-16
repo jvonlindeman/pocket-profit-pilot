@@ -27,7 +27,7 @@ export const useFinanceData = () => {
   });
 
   // Import functionality from smaller hooks
-  const { startingBalance, fetchMonthlyBalance, updateStartingBalance } = useMonthlyBalanceManager();
+  const { startingBalance, fetchMonthlyBalance, updateStartingBalance, setStartingBalance } = useMonthlyBalanceManager();
   const { 
     stripeIncome, stripeFees, 
     stripeTransactionFees, stripePayoutFees, stripeAdditionalFees,
@@ -125,6 +125,7 @@ export const useFinanceData = () => {
     collaboratorExpenses,
     startingBalance,
     updateStartingBalance,
+    setStartingBalance, // Now we're properly including this in the return value
     usingCachedData,
     cacheStatus,
     apiConnectivity,
