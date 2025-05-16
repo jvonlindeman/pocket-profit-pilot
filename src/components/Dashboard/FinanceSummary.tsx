@@ -6,6 +6,7 @@ import IncomeTabs from './FinancialCards/IncomeTabs';
 import { FinanceProvider } from '@/contexts/FinanceContext';
 import { useFinancialSummaryProcessor } from '@/hooks/useFinancialSummaryProcessor';
 import RefinedFinancialSummary from './FinancialCards/RefinedFinancialSummary';
+import { isCollaboratorExpense } from '@/utils/financialUtils';
 
 interface FinanceSummaryProps {
   summary: FinancialSummary;
@@ -32,16 +33,15 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
   stripeFeePercentage = 0,
   regularIncome = 0
 }) => {
-  // Filter collaborator expenses - using case-insensitive matching
+  // Filter collaborator expenses using our utility function
   const collaboratorExpenses = expenseCategories.filter(
-    category => category.category.toLowerCase().includes('colaborador') ||
-                category.category.toLowerCase().includes('pagos a colaboradores')
+    category => isCollaboratorExpense(category.category)
   );
   
-  // Use the new hook to get processed data
+  // Use the processor hook to get a more accurate financial summary
   const processedData = useFinancialSummaryProcessor([], summary.startingBalance || 0, collaboratorExpenses);
   
-  // Calculate a more accurate summary that considers both the original summary and collaborator expenses
+  // Create an improved summary that includes both original and processed data
   const refinedSummary = {
     ...summary,
     collaboratorExpense: processedData.summary.collaboratorExpense,
@@ -78,7 +78,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
         {/* Income Sources Section with Tabs */}
         <IncomeTabs />
 
-        {/* Financial Summary Section - Using our new component */}
+        {/* Financial Summary Section - Using our refined component */}
         <RefinedFinancialSummary />
       </div>
     </FinanceProvider>

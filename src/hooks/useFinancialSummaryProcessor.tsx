@@ -1,7 +1,12 @@
 
 import { useMemo } from 'react';
 import { Transaction, CategorySummary, FinancialData } from '@/types/financial';
+import { isCollaboratorExpense, validateFinancialValue } from '@/utils/financialUtils';
 
+/**
+ * A hook that processes financial data and provides consistent calculations
+ * This hook serves as the single source of truth for financial calculations
+ */
 export const useFinancialSummaryProcessor = (
   transactions: Transaction[],
   startingBalance: number = 0,
@@ -13,7 +18,8 @@ export const useFinancialSummaryProcessor = (
     
     // Calculate total collaborator expense from the provided CategorySummary objects
     const totalCollaboratorExpense = collaboratorExpenses.reduce((sum, item) => {
-      const amount = typeof item.amount === 'number' ? item.amount : 0;
+      const amount = validateFinancialValue(item.amount);
+      console.log(`Processing collaborator expense: ${item.category || 'unnamed'} - $${amount}`);
       return sum + amount;
     }, 0);
     
@@ -22,15 +28,31 @@ export const useFinancialSummaryProcessor = (
     // Calculate income and expenses from transactions
     const totalIncome = transactions
       .filter(t => t.type === 'income')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + validateFinancialValue(t.amount), 0);
     
     // Calculate total expense from transactions
     const totalExpense = transactions
       .filter(t => t.type === 'expense')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + validateFinancialValue(t.amount), 0);
+    
+    // Calculate collaborator expenses from transactions if no specific collaborator expenses provided
+    let collaboratorExpenseFromTransactions = 0;
+    if (collaboratorExpenses.length === 0) {
+      collaboratorExpenseFromTransactions = transactions
+        .filter(t => t.type === 'expense' && isCollaboratorExpense(t.category))
+        .reduce((sum, t) => sum + validateFinancialValue(t.amount), 0);
+        
+      console.log("useFinancialSummaryProcessor - Calculated collaborator expense from transactions:", 
+        collaboratorExpenseFromTransactions);
+    }
+    
+    // Use either the provided collaborator expenses or calculated from transactions
+    const finalCollaboratorExpense = collaboratorExpenses.length > 0 
+      ? totalCollaboratorExpense 
+      : collaboratorExpenseFromTransactions;
     
     // Calculate other expenses (total expenses minus collaborator expenses)
-    const otherExpense = totalExpense - totalCollaboratorExpense;
+    const otherExpense = totalExpense - finalCollaboratorExpense;
     
     // Calculate profit metrics
     const profit = totalIncome - totalExpense;
@@ -42,13 +64,13 @@ export const useFinancialSummaryProcessor = (
     const summary = {
       totalIncome,
       totalExpense,
-      collaboratorExpense: totalCollaboratorExpense,
+      collaboratorExpense: finalCollaboratorExpense,
       otherExpense,
       profit,
       profitMargin,
       grossProfit,
       grossProfitMargin,
-      startingBalance
+      startingBalance: validateFinancialValue(startingBalance)
     };
     
     console.log("useFinancialSummaryProcessor - Final summary:", summary);
@@ -64,23 +86,24 @@ export const useFinancialSummaryProcessor = (
     // Process transactions to categorize them
     transactions.forEach(transaction => {
       const category = transaction.category || 'Uncategorized';
+      const amount = validateFinancialValue(transaction.amount);
       
       if (transaction.type === 'expense') {
         if (!expenseCategories[category]) {
           expenseCategories[category] = { amount: 0, count: 0 };
         }
-        expenseCategories[category].amount += transaction.amount;
+        expenseCategories[category].amount += amount;
         expenseCategories[category].count += 1;
       } else {
         if (!incomeCategories[category]) {
           incomeCategories[category] = { amount: 0, count: 0 };
         }
-        incomeCategories[category].amount += transaction.amount;
+        incomeCategories[category].amount += amount;
         incomeCategories[category].count += 1;
       }
     });
     
-    // Convert expense categories to array
+    // Convert expense categories to array with proper validation
     Object.entries(expenseCategories).forEach(([category, data]) => {
       expenseByCategory.push({
         category,
@@ -90,7 +113,7 @@ export const useFinancialSummaryProcessor = (
       });
     });
     
-    // Convert income categories to array
+    // Convert income categories to array with proper validation
     Object.entries(incomeCategories).forEach(([category, data]) => {
       incomeBySource.push({
         category,

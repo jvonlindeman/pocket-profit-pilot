@@ -1,13 +1,14 @@
 
 import { useMemo } from 'react';
 import { FinancialSummary, CategorySummary } from '@/types/financial';
+import { validateFinancialValue } from '@/utils/financialUtils';
 
 export const useFinanceMetrics = () => {
   /**
    * Calculate total income from different sources
    */
   const calculateTotalIncome = (stripeNet: number, regularIncome: number): number => {
-    return stripeNet + regularIncome;
+    return validateFinancialValue(stripeNet) + validateFinancialValue(regularIncome);
   };
 
   /**
@@ -21,7 +22,7 @@ export const useFinanceMetrics = () => {
     
     const total = collaboratorExpenses.reduce((sum, item) => {
       // Make sure we're only adding valid numeric amounts
-      const amount = typeof item.amount === 'number' ? item.amount : 0;
+      const amount = validateFinancialValue(item.amount);
       return sum + amount;
     }, 0);
     
@@ -33,16 +34,22 @@ export const useFinanceMetrics = () => {
    * Calculate gross profit margin
    */
   const calculateGrossProfitMargin = (grossProfit: number, totalIncome: number): number => {
-    if (totalIncome === 0) return 0;
-    return (grossProfit / totalIncome) * 100;
+    const validGrossProfit = validateFinancialValue(grossProfit);
+    const validTotalIncome = validateFinancialValue(totalIncome);
+    
+    if (validTotalIncome === 0) return 0;
+    return (validGrossProfit / validTotalIncome) * 100;
   };
 
   /**
    * Calculate profit margin
    */
   const calculateProfitMargin = (profit: number, totalIncome: number): number => {
-    if (totalIncome === 0) return 0;
-    return (profit / totalIncome) * 100;
+    const validProfit = validateFinancialValue(profit);
+    const validTotalIncome = validateFinancialValue(totalIncome);
+    
+    if (validTotalIncome === 0) return 0;
+    return (validProfit / validTotalIncome) * 100;
   };
 
   /**
@@ -56,7 +63,9 @@ export const useFinanceMetrics = () => {
     collaboratorPercentage: number, 
     otherPercentage: number 
   } => {
-    const totalExpense = collaboratorExpense + otherExpense;
+    const validCollaboratorExpense = validateFinancialValue(collaboratorExpense);
+    const validOtherExpense = validateFinancialValue(otherExpense);
+    const totalExpense = validCollaboratorExpense + validOtherExpense;
     
     if (totalExpense === 0) {
       return {
@@ -66,7 +75,7 @@ export const useFinanceMetrics = () => {
       };
     }
     
-    const collaboratorPercentage = (collaboratorExpense / totalExpense) * 100;
+    const collaboratorPercentage = (validCollaboratorExpense / totalExpense) * 100;
     
     return {
       totalExpense,
@@ -83,17 +92,21 @@ export const useFinanceMetrics = () => {
     totalExpense: number,
     startingBalance: number = 0
   ): number => {
-    return startingBalance + totalIncome - totalExpense;
+    return validateFinancialValue(startingBalance) + 
+           validateFinancialValue(totalIncome) - 
+           validateFinancialValue(totalExpense);
   };
 
   /**
    * Analyze financial health based on profit margin
    */
   const analyzeFinancialHealth = (profitMargin: number): 'excellent' | 'good' | 'average' | 'concern' | 'critical' => {
-    if (profitMargin >= 20) return 'excellent';
-    if (profitMargin >= 10) return 'good';
-    if (profitMargin >= 5) return 'average';
-    if (profitMargin >= 0) return 'concern';
+    const validProfitMargin = validateFinancialValue(profitMargin);
+    
+    if (validProfitMargin >= 20) return 'excellent';
+    if (validProfitMargin >= 10) return 'good';
+    if (validProfitMargin >= 5) return 'average';
+    if (validProfitMargin >= 0) return 'concern';
     return 'critical';
   };
 

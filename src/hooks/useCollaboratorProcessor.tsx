@@ -2,6 +2,7 @@
 import { useCallback, useState, useEffect } from 'react';
 import { CategorySummary } from '@/types/financial';
 import { excludedVendors } from '@/services/zoho/api/config';
+import { validateFinancialValue } from '@/utils/financialUtils';
 
 export const useCollaboratorProcessor = () => {
   const [collaboratorExpenses, setCollaboratorExpenses] = useState<CategorySummary[]>([]);
@@ -30,10 +31,10 @@ export const useCollaboratorProcessor = () => {
     // Group collaborators by name and sum their amounts
     const collaboratorMap = validCollaborators.reduce((acc: Record<string, number>, item: any) => {
       const vendorName = item.vendor_name;
-      const amount = Number(item.total);
+      const amount = validateFinancialValue(item.total);
       
       // Only add valid amounts
-      if (!isNaN(amount) && amount > 0) {
+      if (amount > 0) {
         acc[vendorName] = (acc[vendorName] || 0) + amount;
         console.log(`Adding collaborator: ${vendorName} - $${amount}`);
       }
@@ -47,20 +48,22 @@ export const useCollaboratorProcessor = () => {
     const groupedCollaborators = Object.entries(collaboratorMap)
       .map(([name, amount]) => ({
         category: name,
-        amount: Number(amount),
+        amount: validateFinancialValue(amount),
         percentage: 0 // We'll calculate this below
       }))
       .filter(item => item.amount > 0);
       
     // Calculate the total
-    const totalAmount = groupedCollaborators.reduce((sum, item) => sum + item.amount, 0);
+    const totalAmount = groupedCollaborators.reduce(
+      (sum, item) => sum + validateFinancialValue(item.amount), 0
+    );
     
     console.log("Total collaborator expense:", totalAmount);
     
     // Calculate percentages and format for the chart
     const formattedData = groupedCollaborators.map(item => ({
       category: item.category,
-      amount: item.amount,
+      amount: validateFinancialValue(item.amount),
       percentage: totalAmount > 0 ? (item.amount / totalAmount) * 100 : 0
     })).sort((a, b) => b.amount - a.amount);
     
