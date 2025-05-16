@@ -31,50 +31,114 @@ export class FinancialService {
     console.log("Processing transaction data with collaborator expenses:", collaboratorExpenses);
     
     // Calculate total collaborator expense from the collaboratorExpenses array
-    const collaboratorExpense = collaboratorExpenses.reduce((sum, item) => {
-      const amount = typeof item.amount === 'number' ? item.amount : 0;
-      return sum + amount;
-    }, 0);
+    // with improved logging and error handling
+    const collaboratorExpense = Array.isArray(collaboratorExpenses) 
+      ? collaboratorExpenses.reduce((sum, item) => {
+          if (!item || typeof item !== 'object') {
+            console.warn("Invalid collaborator expense item:", item);
+            return sum;
+          }
+          const amount = typeof item.amount === 'number' ? item.amount : 0;
+          console.log(`Adding collaborator expense: ${item.category || 'unnamed'} - $${amount}`);
+          return sum + amount;
+        }, 0)
+      : 0;
     
     console.log("Total collaborator expense calculated:", collaboratorExpense);
     
+    // Calculate income and expenses from transactions
+    const totalIncome = transactions
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0);
+    
+    const totalExpense = transactions
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+    
     const summary = {
-      totalIncome: transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0),
-      totalExpense: transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0),
-      collaboratorExpense: collaboratorExpense,
-      otherExpense: 0,
-      profit: 0,
-      profitMargin: 0,
-      grossProfit: 0,
-      grossProfitMargin: 0,
-      startingBalance: startingBalance,
+      totalIncome,
+      totalExpense,
+      collaboratorExpense,
+      otherExpense: totalExpense - collaboratorExpense,
+      profit: totalIncome - totalExpense,
+      profitMargin: totalIncome > 0 ? ((totalIncome - totalExpense) / totalIncome) * 100 : 0,
+      grossProfit: totalIncome,
+      grossProfitMargin: totalIncome > 0 ? 100 : 0,
+      startingBalance,
     };
     
-    // Calculate other expenses (total expense minus collaborator expenses)
-    summary.otherExpense = summary.totalExpense - summary.collaboratorExpense;
-    console.log("Other expenses calculated:", summary.otherExpense);
-    
-    summary.profit = summary.totalIncome - summary.totalExpense;
-    summary.profitMargin = summary.totalIncome > 0 ? (summary.profit / summary.totalIncome) * 100 : 0;
-    summary.grossProfit = summary.totalIncome;
-    summary.grossProfitMargin = summary.totalIncome > 0 ? 100 : 0;
-    
     console.log("Final financial summary:", summary);
+    
+    // Process income and expense data by category
+    const incomeBySource: any[] = [];
+    const expenseByCategory: any[] = [];
+    
+    // Group transactions by category
+    const expenseCategories: Record<string, {amount: number, count: number}> = {};
+    const incomeCategories: Record<string, {amount: number, count: number}> = {};
+    
+    transactions.forEach(transaction => {
+      const category = transaction.category || 'Uncategorized';
+      
+      if (transaction.type === 'expense') {
+        if (!expenseCategories[category]) {
+          expenseCategories[category] = { amount: 0, count: 0 };
+        }
+        expenseCategories[category].amount += transaction.amount;
+        expenseCategories[category].count += 1;
+      } else {
+        if (!incomeCategories[category]) {
+          incomeCategories[category] = { amount: 0, count: 0 };
+        }
+        incomeCategories[category].amount += transaction.amount;
+        incomeCategories[category].count += 1;
+      }
+    });
+    
+    // Convert expense categories to array
+    Object.entries(expenseCategories).forEach(([category, data]) => {
+      expenseByCategory.push({
+        category,
+        amount: data.amount,
+        percentage: summary.totalExpense > 0 ? (data.amount / summary.totalExpense) * 100 : 0,
+        count: data.count
+      });
+    });
+    
+    // Convert income categories to array
+    Object.entries(incomeCategories).forEach(([category, data]) => {
+      incomeBySource.push({
+        category,
+        amount: data.amount,
+        percentage: summary.totalIncome > 0 ? (data.amount / summary.totalIncome) * 100 : 0,
+        count: data.count
+      });
+    });
+    
+    // Sort by amount (highest first)
+    expenseByCategory.sort((a, b) => b.amount - a.amount);
+    incomeBySource.sort((a, b) => b.amount - a.amount);
+    
+    // Add daily and monthly data placeholders
+    // In a real implementation, we would calculate these values
+    const dailyData = {
+      income: { labels: [], values: [] },
+      expense: { labels: [], values: [] }
+    };
+    
+    const monthlyData = {
+      income: { labels: [], values: [] },
+      expense: { labels: [], values: [] },
+      profit: { labels: [], values: [] }
+    };
     
     return {
       summary,
       transactions,
-      incomeBySource: [],
-      expenseByCategory: [],
-      dailyData: {
-        income: { labels: [], values: [] },
-        expense: { labels: [], values: [] }
-      },
-      monthlyData: {
-        income: { labels: [], values: [] },
-        expense: { labels: [], values: [] },
-        profit: { labels: [], values: [] }
-      }
+      incomeBySource,
+      expenseByCategory,
+      dailyData,
+      monthlyData
     };
   }
 

@@ -6,7 +6,7 @@ import { excludedVendors } from '@/services/zoho/api/config';
 export const useCollaboratorProcessor = () => {
   const [collaboratorExpenses, setCollaboratorExpenses] = useState<CategorySummary[]>([]);
 
-  // Función para procesar datos de colaboradores
+  // Function to process collaborator data
   const processCollaboratorData = useCallback((rawResponse: any) => {
     console.log("Processing collaborator data from raw response:", rawResponse);
     
@@ -16,7 +16,7 @@ export const useCollaboratorProcessor = () => {
       return [];
     }
 
-    // Filtrar colaboradores con datos válidos y excluir los proveedores especificados
+    // Filter out invalid collaborator data and excluded vendors
     const validCollaborators = rawResponse.colaboradores
       .filter((item: any) => 
         item && 
@@ -27,35 +27,42 @@ export const useCollaboratorProcessor = () => {
     
     console.log("Valid collaborators after filtering:", validCollaborators);
       
-    // Agrupar colaboradores por nombre y sumar sus montos
+    // Group collaborators by name and sum their amounts
     const collaboratorMap = validCollaborators.reduce((acc: Record<string, number>, item: any) => {
       const vendorName = item.vendor_name;
-      acc[vendorName] = (acc[vendorName] || 0) + Number(item.total);
+      const amount = Number(item.total);
+      
+      // Only add valid amounts
+      if (!isNaN(amount) && amount > 0) {
+        acc[vendorName] = (acc[vendorName] || 0) + amount;
+        console.log(`Adding collaborator: ${vendorName} - $${amount}`);
+      }
+      
       return acc;
     }, {});
     
     console.log("Grouped collaborator expenses:", collaboratorMap);
     
-    // Convertir el mapa agrupado a un array de objetos
+    // Convert the grouped map to an array of CategorySummary objects
     const groupedCollaborators = Object.entries(collaboratorMap)
       .map(([name, amount]) => ({
         category: name,
         amount: Number(amount),
         percentage: 0 // We'll calculate this below
       }))
-      .filter((item: any) => item.amount > 0);
+      .filter(item => item.amount > 0);
       
-    // Calcular el total
-    const totalAmount = groupedCollaborators.reduce((sum: number, item: any) => sum + item.amount, 0);
+    // Calculate the total
+    const totalAmount = groupedCollaborators.reduce((sum, item) => sum + item.amount, 0);
     
     console.log("Total collaborator expense:", totalAmount);
     
-    // Calcular porcentajes y formatear para el gráfico
-    const formattedData = groupedCollaborators.map((item: any) => ({
-      category: item.name || item.category,
+    // Calculate percentages and format for the chart
+    const formattedData = groupedCollaborators.map(item => ({
+      category: item.category,
       amount: item.amount,
       percentage: totalAmount > 0 ? (item.amount / totalAmount) * 100 : 0
-    })).sort((a: any, b: any) => b.amount - a.amount);
+    })).sort((a, b) => b.amount - a.amount);
     
     console.log("Final formatted collaborator data:", formattedData);
     
