@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Check } from 'lucide-react';
-import { COLLABORATOR_IDENTIFIER } from '@/hooks/useTransactionProcessor';
+import { COLLABORATOR_IDENTIFIERS } from '@/hooks/useTransactionProcessor';
 
 export interface FilterOptions {
   categories: Set<string>;
@@ -50,13 +50,17 @@ const TransactionFilters: React.FC<TransactionFiltersProps> = ({
       case 'gastos':
         return transactions.filter(t => 
           t.type === 'expense' && 
-          !t.category?.toLowerCase().includes(COLLABORATOR_IDENTIFIER)
+          !COLLABORATOR_IDENTIFIERS.some(identifier => 
+            t.category?.toLowerCase().includes(identifier.toLowerCase())
+          )
         );
         
       case 'colaboradores':
         return transactions.filter(t => 
           t.type === 'expense' && 
-          t.category?.toLowerCase().includes(COLLABORATOR_IDENTIFIER)
+          COLLABORATOR_IDENTIFIERS.some(identifier => 
+            t.category?.toLowerCase().includes(identifier.toLowerCase())
+          )
         );
         
       case 'zoho_ingresos':

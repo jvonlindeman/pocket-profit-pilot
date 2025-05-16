@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Transaction } from '@/types/financial';
 import { formatDateForDisplay } from '@/utils/dateUtils';
 import { useFinanceFormatter } from '@/hooks/useFinanceFormatter';
-import { COLLABORATOR_IDENTIFIER } from '@/hooks/useTransactionProcessor';
+import { COLLABORATOR_IDENTIFIERS } from '@/hooks/useTransactionProcessor';
 
 interface TransactionTableProps {
   transactions: Transaction[];
@@ -28,7 +28,9 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
   // Helper function to determine transaction color
   const getTransactionColorClass = (transaction: Transaction): string => {
     if (transaction.type === 'expense') {
-      return transaction.category?.toLowerCase().includes(COLLABORATOR_IDENTIFIER)
+      return COLLABORATOR_IDENTIFIERS.some(identifier => 
+        transaction.category?.toLowerCase().includes(identifier.toLowerCase())
+      )
         ? 'text-amber-600'
         : 'text-red-600';
     }
@@ -38,7 +40,9 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
   // Helper function to determine indicator color
   const getCategoryIndicatorClass = (transaction: Transaction): string => {
     if (transaction.type === 'expense') {
-      return transaction.category?.toLowerCase().includes(COLLABORATOR_IDENTIFIER)
+      return COLLABORATOR_IDENTIFIERS.some(identifier => 
+        transaction.category?.toLowerCase().includes(identifier.toLowerCase())
+      )
         ? 'text-amber-500'
         : 'text-red-500';
     }
