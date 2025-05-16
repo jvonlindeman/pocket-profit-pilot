@@ -5,8 +5,9 @@ import { useFinanceFormatter } from '@/hooks/useFinanceFormatter';
 import { formatFinancialDate } from '@/utils/financialUtils';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, RefreshCcwIcon } from 'lucide-react';
+import { ArrowUpIcon, ArrowDownIcon, TrendingUpIcon, RefreshCcwIcon, DatabaseIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/hooks/use-toast';
 
 interface FinancialHistorySummaryProps {
   startDate?: Date;
@@ -27,7 +28,25 @@ const FinancialHistorySummary: React.FC<FinancialHistorySummaryProps> = ({ start
   }, [summaries]);
   
   const handleRefresh = () => {
-    loadSummaries();
+    toast({
+      title: "Actualizando historial",
+      description: "Cargando datos financieros históricos..."
+    });
+    loadSummaries()
+      .then(() => {
+        toast({
+          title: "Historial actualizado",
+          description: "Los datos financieros históricos han sido actualizados"
+        });
+      })
+      .catch((err) => {
+        console.error("Error refreshing summaries:", err);
+        toast({
+          title: "Error",
+          description: "No se pudo actualizar el historial financiero",
+          variant: "destructive"
+        });
+      });
   };
   
   if (loading) {
@@ -72,6 +91,12 @@ const FinancialHistorySummary: React.FC<FinancialHistorySummaryProps> = ({ start
         </CardHeader>
         <CardContent>
           <p className="text-gray-500">No se encontraron resúmenes financieros guardados para el rango de fechas seleccionado.</p>
+          <div className="flex items-center justify-center mt-4">
+            <DatabaseIcon className="h-12 w-12 text-gray-300 mr-2" />
+            <div className="text-sm text-gray-400">
+              Los datos financieros se guardarán automáticamente cuando se procesen.
+            </div>
+          </div>
         </CardContent>
       </Card>
     );

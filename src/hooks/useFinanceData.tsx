@@ -10,6 +10,7 @@ import { zohoRepository } from '@/repositories/zohoRepository';
 import { formatDateYYYYMMDD, getCurrentMonthRange } from '@/utils/dateUtils';
 import { Transaction } from '@/types/financial';
 import { toast } from "@/hooks/use-toast";
+import CacheService from '@/services/cache';
 
 export const useFinanceData = () => {
   // States
@@ -53,6 +54,36 @@ export const useFinanceData = () => {
     return financialService.processTransactionData(transactions, startingBalance, collaboratorExpenses);
   }, [transactions, startingBalance, collaboratorExpenses]);
 
+  // Helper function to get cache segment ID for the current data
+  const getCacheSegmentIds = useCallback(async () => {
+    if (!dateRange.startDate || !dateRange.endDate) {
+      console.log("Cannot get cache segment IDs without date range");
+      return { zoho: null, stripe: null };
+    }
+
+    try {
+      // Try to get the cache segment ID for Zoho
+      const zohoSegmentId = await CacheService.getCacheSegmentId(
+        'Zoho',
+        dateRange.startDate,
+        dateRange.endDate
+      );
+      
+      // Try to get the cache segment ID for Stripe
+      const stripeSegmentId = await CacheService.getCacheSegmentId(
+        'Stripe',
+        dateRange.startDate,
+        dateRange.endDate
+      );
+      
+      console.log(`Retrieved cache segment IDs - Zoho: ${zohoSegmentId || 'none'}, Stripe: ${stripeSegmentId || 'none'}`);
+      return { zoho: zohoSegmentId, stripe: stripeSegmentId };
+    } catch (err) {
+      console.error("Error retrieving cache segment IDs:", err);
+      return { zoho: null, stripe: null };
+    }
+  }, [dateRange]);
+
   // Save financial summary to database when data is processed
   useEffect(() => {
     // Only save when we have actual financial data and valid date range
@@ -62,19 +93,28 @@ export const useFinanceData = () => {
         dateRange
       });
       
-      financialService.saveFinancialSummary(financialData, dateRange)
-        .then(summaryId => {
-          if (summaryId) {
-            console.log("Financial summary saved with ID:", summaryId);
-          } else {
-            console.warn("Failed to save financial summary");
-          }
-        })
-        .catch(err => {
-          console.error("Error saving financial summary:", err);
-        });
+      // Get the cache segment ID before saving the financial summary
+      getCacheSegmentIds().then(({ zoho, stripe }) => {
+        // Use the appropriate cache segment ID based on data sources
+        // Prefer Zoho if available, otherwise use Stripe if available
+        const cacheSegmentId = zoho || stripe || null;
+        
+        console.log("Using cache segment ID for saving financial summary:", cacheSegmentId);
+        
+        financialService.saveFinancialSummary(financialData, dateRange, cacheSegmentId)
+          .then(summaryId => {
+            if (summaryId) {
+              console.log("Financial summary saved with ID:", summaryId);
+            } else {
+              console.warn("Failed to save financial summary");
+            }
+          })
+          .catch(err => {
+            console.error("Error saving financial summary:", err);
+          });
+      });
     }
-  }, [financialData, dateRange, transactions.length, loading]);
+  }, [financialData, dateRange, transactions.length, loading, getCacheSegmentIds]);
 
   // Función para actualizar el rango de fechas
   const updateDateRange = useCallback((newRange: { startDate: Date; endDate: Date }) => {

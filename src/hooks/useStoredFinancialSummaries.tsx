@@ -53,6 +53,13 @@ export const useStoredFinancialSummaries = ({
       
       console.log("useStoredFinancialSummaries - Raw retrieved summaries:", storedSummaries);
       
+      if (!storedSummaries || storedSummaries.length === 0) {
+        console.log("useStoredFinancialSummaries - No summaries found in database");
+        setSummaries([]);
+        setLoading(false);
+        return;
+      }
+      
       // Convert to application format
       const formattedSummaries = storedSummaries.map(stored => ({
         date: stored.date_range_start,
