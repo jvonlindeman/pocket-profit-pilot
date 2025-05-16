@@ -51,3 +51,15 @@ export const validateFinancialValue = (value: unknown): number => {
   const numValue = typeof value === 'string' ? parseFloat(value) : Number(value);
   return isNaN(numValue) ? 0 : numValue;
 };
+
+/**
+ * Format a date for display in financial records
+ */
+export const formatFinancialDate = (date: Date | string): string => {
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  return dateObj.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+};

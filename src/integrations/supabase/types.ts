@@ -135,6 +135,65 @@ export type Database = {
         }
         Relationships: []
       }
+      financial_summaries: {
+        Row: {
+          cache_segment_id: string | null
+          collaborator_expense: number
+          created_at: string
+          date_range_end: string
+          date_range_start: string
+          id: string
+          metadata: Json | null
+          other_expense: number
+          profit: number
+          profit_margin: number
+          starting_balance: number | null
+          total_expense: number
+          total_income: number
+          updated_at: string
+        }
+        Insert: {
+          cache_segment_id?: string | null
+          collaborator_expense?: number
+          created_at?: string
+          date_range_end: string
+          date_range_start: string
+          id?: string
+          metadata?: Json | null
+          other_expense?: number
+          profit?: number
+          profit_margin?: number
+          starting_balance?: number | null
+          total_expense?: number
+          total_income?: number
+          updated_at?: string
+        }
+        Update: {
+          cache_segment_id?: string | null
+          collaborator_expense?: number
+          created_at?: string
+          date_range_end?: string
+          date_range_start?: string
+          id?: string
+          metadata?: Json | null
+          other_expense?: number
+          profit?: number
+          profit_margin?: number
+          starting_balance?: number | null
+          total_expense?: number
+          total_income?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financial_summaries_cache_segment_id_fkey"
+            columns: ["cache_segment_id"]
+            isOneToOne: false
+            referencedRelation: "cache_segments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       monthly_balances: {
         Row: {
           balance: number

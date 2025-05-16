@@ -91,6 +91,23 @@ const CacheService = {
     segments: { source: string; count: number }[];
   }> => {
     return cacheOperations.getCacheStats();
+  },
+
+  /**
+   * Get cache segment id for a date range
+   */
+  getCacheSegmentId: async (
+    source: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<string | null> => {
+    try {
+      const { data } = await cacheOperations.getCacheSegmentInfo(source, startDate, endDate);
+      return data?.id || null;
+    } catch (error) {
+      console.error("Error getting cache segment id:", error);
+      return null;
+    }
   }
 };
 

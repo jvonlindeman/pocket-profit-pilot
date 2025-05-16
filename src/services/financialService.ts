@@ -1,8 +1,10 @@
+
 import { Transaction, FinancialData } from "../types/financial";
 import { zohoRepository } from "../repositories/zohoRepository";
 import { stripeRepository } from "../repositories/stripeRepository";
 import CacheService from "../services/cache";
 import { toast } from "@/hooks/use-toast";
+import { financialSummaryService } from "./financialSummaryService";
 
 export interface FinancialDataCallbacks {
   onTransactions: (transactions: Transaction[]) => void;
@@ -208,6 +210,26 @@ export class FinancialService {
       }
     } catch (err) {
       console.error("Error verifying cache integrity:", err);
+    }
+  }
+
+  /**
+   * Save financial data to the database
+   */
+  async saveFinancialSummary(
+    financialData: FinancialData, 
+    dateRange: { startDate: Date; endDate: Date },
+    cacheSegmentId?: string
+  ): Promise<void> {
+    try {
+      await financialSummaryService.saveFinancialSummary(
+        financialData.summary,
+        dateRange.startDate,
+        dateRange.endDate,
+        cacheSegmentId
+      );
+    } catch (err) {
+      console.error("Error saving financial summary:", err);
     }
   }
 
