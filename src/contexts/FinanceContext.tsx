@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, ReactNode } from 'react';
 import { FinancialSummary, Transaction } from '@/types/financial';
+import { useFinanceFormatter } from '@/hooks/useFinanceFormatter';
 
 // Define the context value type
 interface FinanceContextType {
@@ -26,6 +27,9 @@ interface FinanceContextType {
   // Formatting functions
   formatCurrency: (amount: number) => string;
   formatPercentage: (percentage: number) => string;
+  formatChange: (value: number) => string;
+  formatCompactNumber: (num: number) => string;
+  getValueColorClass: (value: number) => string;
 }
 
 // Create the context with default values
@@ -52,6 +56,9 @@ export const FinanceContext = createContext<FinanceContextType>({
   collaboratorExpenses: [],
   formatCurrency: () => '',
   formatPercentage: () => '',
+  formatChange: () => '',
+  formatCompactNumber: () => '',
+  getValueColorClass: () => '',
 });
 
 // Props for the FinanceProvider component
@@ -85,23 +92,14 @@ export const FinanceProvider: React.FC<FinanceProviderProps> = ({
   regularIncome,
   collaboratorExpenses,
 }) => {
-  // Format currency (USD)
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2
-    }).format(amount);
-  };
-
-  // Format percentage 
-  const formatPercentage = (percentage: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'percent',
-      minimumFractionDigits: 1,
-      maximumFractionDigits: 1
-    }).format(percentage / 100);
-  };
+  // Use our formatter hook
+  const {
+    formatCurrency,
+    formatPercentage,
+    formatChange,
+    formatCompactNumber,
+    getValueColorClass
+  } = useFinanceFormatter();
 
   const contextValue: FinanceContextType = {
     summary,
@@ -117,6 +115,9 @@ export const FinanceProvider: React.FC<FinanceProviderProps> = ({
     collaboratorExpenses,
     formatCurrency,
     formatPercentage,
+    formatChange,
+    formatCompactNumber,
+    getValueColorClass,
   };
 
   return (

@@ -18,7 +18,7 @@ const ZohoIncomeTab: React.FC = () => {
           iconBgColor="bg-green-50"
         />
         
-        {/* Additional info or placeholder cards could go here */}
+        {/* Information panel */}
         <div className="col-span-3 flex items-center justify-center py-8">
           <p className="text-gray-500 italic">
             Todos los ingresos registrados directamente en Zoho Books.

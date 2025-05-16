@@ -34,10 +34,26 @@ export const useFinanceFormatter = () => {
     }).format(num);
   };
 
-  return {
+  // Get text color class based on value
+  const getValueColorClass = (value: number): string => {
+    return value >= 0 ? 'text-green-600' : 'text-red-600';
+  };
+
+  // Format with appropriate local currency
+  const formatLocalCurrency = (amount: number, locale: string = 'en-US', currency: string = 'USD') => {
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 2
+    }).format(amount);
+  };
+
+  return useMemo(() => ({
     formatCurrency,
     formatPercentage,
     formatChange,
-    formatCompactNumber
-  };
+    formatCompactNumber,
+    getValueColorClass,
+    formatLocalCurrency
+  }), []);
 };
