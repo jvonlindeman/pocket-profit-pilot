@@ -7,12 +7,21 @@ interface DateRangeManagerProps {
   dateRange: { startDate: Date; endDate: Date };
   updateDateRange: (newRange: { startDate: Date; endDate: Date }) => void;
   getCurrentMonthRange: () => { startDate: Date; endDate: Date };
+  children: (helpers: {
+    handleDateRangeChange: (newRange: DayPickerDateRange) => void;
+    getDatePickerCurrentMonthRange: () => DayPickerDateRange;
+  }) => React.ReactNode;
 }
 
+/**
+ * DateRangeManager is a wrapper component that provides date range functionality
+ * to its children through render props pattern.
+ */
 const DateRangeManager: React.FC<DateRangeManagerProps> = ({
   dateRange,
   updateDateRange,
-  getCurrentMonthRange
+  getCurrentMonthRange,
+  children
 }) => {
   // Handler for date range change
   const handleDateRangeChange = (newRange: DayPickerDateRange) => {
@@ -27,10 +36,15 @@ const DateRangeManager: React.FC<DateRangeManagerProps> = ({
     return toDayPickerDateRange(financialDateRange);
   };
   
-  return {
-    handleDateRangeChange,
-    getDatePickerCurrentMonthRange
-  };
+  // Provide the helpers to the children through render props
+  return (
+    <>
+      {children({
+        handleDateRangeChange,
+        getDatePickerCurrentMonthRange
+      })}
+    </>
+  );
 };
 
 export default DateRangeManager;
