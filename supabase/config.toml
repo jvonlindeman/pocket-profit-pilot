@@ -19,3 +19,7 @@ verify_jwt = false
 [[functions]]
 name = "cache-manager"
 verify_jwt = false
+
+[[functions]]
+name = "financial-assistant"
+verify_jwt = false
