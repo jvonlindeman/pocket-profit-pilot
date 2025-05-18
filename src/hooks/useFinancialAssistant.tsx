@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useFinance } from '@/contexts/FinanceContext';
+import { captureUIData, optimizeUIData } from '@/utils/uiDataCapture';
 
 export interface ChatMessage {
   id: string;
@@ -21,7 +22,7 @@ export const useFinancialAssistant = () => {
     },
   ]);
   const [isLoading, setIsLoading] = useState(false);
-  const { dateRange } = useFinance();
+  const financeContext = useFinance();
 
   // Send a message and get a response from the assistant
   const sendMessage = useCallback(async (content: string) => {
@@ -39,20 +40,25 @@ export const useFinancialAssistant = () => {
     setIsLoading(true);
     
     try {
+      // Capture current UI data
+      const uiData = captureUIData(financeContext);
+      const optimizedUIData = optimizeUIData(uiData);
+      
       // Prepare messages for the API (exclude 'system' messages)
       const apiMessages = messages
         .filter(msg => msg.role !== 'system')
         .concat(userMessage)
         .map(({ role, content }) => ({ role, content }));
       
-      // Call the financial-assistant edge function
+      // Call the financial-assistant edge function with UI data
       const { data, error } = await supabase.functions.invoke('financial-assistant', {
         body: {
           messages: apiMessages,
           dateRange: {
-            startDate: dateRange.startDate?.toISOString() || null,
-            endDate: dateRange.endDate?.toISOString() || null,
+            startDate: financeContext.dateRange.startDate?.toISOString() || null,
+            endDate: financeContext.dateRange.endDate?.toISOString() || null,
           },
+          uiData: optimizedUIData // Send the UI data to the edge function
         },
       });
       
@@ -90,7 +96,7 @@ export const useFinancialAssistant = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [messages, dateRange, setMessages]);
+  }, [messages, financeContext, setMessages]);
   
   // Clear all messages and reset to initial state
   const resetChat = useCallback(() => {

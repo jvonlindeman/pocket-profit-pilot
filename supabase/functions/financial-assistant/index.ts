@@ -16,7 +16,7 @@ const GPT_API_KEY = Deno.env.get('GPT_API_KEY') ?? '';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Helper function to generate system prompt with context
-async function generateSystemPrompt(dateRange) {
+async function generateSystemPrompt(dateRange, uiData = null) {
   try {
     // Fetch recent financial summaries
     const { data: financialSummaries, error: summariesError } = await supabase
@@ -74,22 +74,71 @@ async function generateSystemPrompt(dateRange) {
       financialContext += "No monthly balances available.\n\n";
     }
     
+    // Add UI data context if available
+    let uiDataContext = "";
+    if (uiData) {
+      uiDataContext = "\n\nCurrent UI Data:\n";
+      
+      // Add summary information
+      if (uiData.summary) {
+        uiDataContext += "Financial Summary:\n";
+        uiDataContext += `- Total Income: $${uiData.summary.totalIncome}\n`;
+        uiDataContext += `- Total Expenses: $${uiData.summary.totalExpense}\n`;
+        uiDataContext += `- Collaborator Expenses: $${uiData.summary.collaboratorExpense}\n`;
+        uiDataContext += `- Other Expenses: $${uiData.summary.otherExpense}\n`;
+        uiDataContext += `- Profit: $${uiData.summary.profit}\n`;
+        uiDataContext += `- Profit Margin: ${uiData.summary.profitMargin}%\n`;
+        uiDataContext += `- Starting Balance: $${uiData.summary.startingBalance || 0}\n\n`;
+      }
+      
+      // Add income breakdown
+      uiDataContext += "Income Breakdown:\n";
+      uiDataContext += `- Regular Income: $${uiData.regularIncome}\n`;
+      uiDataContext += `- Stripe Income: $${uiData.stripeIncome}\n`;
+      uiDataContext += `- Stripe Fees: $${uiData.stripeFees}\n`;
+      uiDataContext += `- Stripe Net: $${uiData.stripeNet}\n`;
+      uiDataContext += `- Stripe Fee Percentage: ${uiData.stripeFeePercentage}%\n\n`;
+      
+      // Add collaborator expenses
+      if (uiData.collaboratorExpenses && uiData.collaboratorExpenses.length > 0) {
+        uiDataContext += "Collaborator Expenses:\n";
+        uiData.collaboratorExpenses.forEach(expense => {
+          uiDataContext += `- ${expense.category}: $${expense.amount}\n`;
+        });
+        uiDataContext += "\n";
+      }
+      
+      // Add recent transactions
+      if (uiData.transactions && uiData.transactions.length > 0) {
+        uiDataContext += "Recent Transactions (Limited to 20):\n";
+        uiData.transactions.slice(0, 20).forEach((tx, index) => {
+          uiDataContext += `${index + 1}. ${tx.description || 'No description'} - $${tx.amount} (${tx.type})\n`;
+        });
+        uiDataContext += "\n";
+      }
+    }
+    
     // Create the system prompt
     const systemPrompt = `
 You are a helpful financial assistant with expertise in business finances, accounting, and financial analysis.
 You are analyzing financial data for a small business, with the following context:
 
 ${financialContext}
+${uiDataContext}
 
 Your goal is to:
 1. Provide insights on profit trends, expense patterns, and financial health
 2. When asked, help forecast future financial scenarios based on historical data
 3. Suggest ways to optimize expenses and improve profit margins
-4. Answer questions about the financial data clearly and accurately
+4. Answer questions about the financial data clearly and accurately, specifically referencing UI data when relevant
 5. If data is missing for a specific analysis, acknowledge that limitation
 6. Be factual, precise, and provide numerical analysis when relevant
 
 Currently analyzing data for the date range: ${dateRange.startDate} to ${dateRange.endDate}.
+
+When answering questions about specific UI components or data, refer to them directly.
+For example, say "Looking at your current financial summary in the dashboard..." or
+"Based on the transaction data visible in your interface...".
 
 Respond in a helpful, clear, and professional manner, providing specific numeric insights whenever possible.
     `;
@@ -113,10 +162,10 @@ serve(async (req) => {
       throw new Error("GPT_API_KEY is not configured");
     }
 
-    const { messages, dateRange } = await req.json();
+    const { messages, dateRange, uiData } = await req.json();
     
-    // Generate system prompt with current financial context
-    const systemPrompt = await generateSystemPrompt(dateRange);
+    // Generate system prompt with current financial context and UI data
+    const systemPrompt = await generateSystemPrompt(dateRange, uiData);
     
     // Prepare messages for OpenAI, including the system prompt
     const openaiMessages = [
@@ -124,7 +173,7 @@ serve(async (req) => {
       ...messages
     ];
     
-    console.log("Sending request to OpenAI with context and messages");
+    console.log("Sending request to OpenAI with context, UI data, and messages");
     
     // Make request to OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
