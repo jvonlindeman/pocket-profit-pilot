@@ -17,12 +17,13 @@ export const useFinancialAssistant = () => {
     {
       id: 'welcome',
       role: 'assistant',
-      content: '¡Hola! Soy tu asistente financiero. ¿En qué puedo ayudarte hoy? Puedes preguntarme sobre tus finanzas, solicitar análisis o consejos para mejorar tus resultados.',
+      content: '¡Hola! Soy tu asistente financiero. ¿En qué puedo ayudarte hoy? Puedo analizar tus datos financieros actuales, identificar tendencias o responder preguntas específicas sobre tus finanzas.',
       timestamp: new Date(),
     },
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const financeContext = useFinance();
+  const [conversationContext, setConversationContext] = useState<Record<string, any>>({});
 
   // Send a message and get a response from the assistant
   const sendMessage = useCallback(async (content: string) => {
@@ -50,6 +51,16 @@ export const useFinancialAssistant = () => {
         .concat(userMessage)
         .map(({ role, content }) => ({ role, content }));
       
+      // Track which UI elements were visible for this question
+      setConversationContext(prev => ({
+        ...prev,
+        lastQuery: {
+          timestamp: new Date().toISOString(),
+          visibleComponents: uiData.activeComponents,
+          focusedElement: uiData.focusedElement
+        }
+      }));
+      
       // Call the financial-assistant edge function with UI data
       const { data, error } = await supabase.functions.invoke('financial-assistant', {
         body: {
@@ -58,11 +69,12 @@ export const useFinancialAssistant = () => {
             startDate: financeContext.dateRange.startDate?.toISOString() || null,
             endDate: financeContext.dateRange.endDate?.toISOString() || null,
           },
-          uiData: optimizedUIData // Send the UI data to the edge function
+          uiData: optimizedUIData, // Send the optimized UI data to the edge function
+          conversationContext // Send additional context about the conversation
         },
       });
       
-      if (error) throw new Error(error.message || 'Error communicating with AI assistant');
+      if (error) throw new Error(error.message || 'Error comunicando con asistente IA');
       
       // Add the assistant's response to messages
       setMessages((prev) => [
@@ -79,7 +91,7 @@ export const useFinancialAssistant = () => {
       console.error('Error in financial assistant:', err);
       toast({
         title: 'Error',
-        description: err instanceof Error ? err.message : 'Error processing your request',
+        description: err instanceof Error ? err.message : 'Error procesando tu solicitud',
         variant: 'destructive',
       });
       
@@ -96,7 +108,7 @@ export const useFinancialAssistant = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [messages, financeContext, setMessages]);
+  }, [messages, financeContext, setMessages, conversationContext]);
   
   // Clear all messages and reset to initial state
   const resetChat = useCallback(() => {
@@ -104,10 +116,11 @@ export const useFinancialAssistant = () => {
       {
         id: 'welcome',
         role: 'assistant',
-        content: '¡Hola! Soy tu asistente financiero. ¿En qué puedo ayudarte hoy? Puedes preguntarme sobre tus finanzas, solicitar análisis o consejos para mejorar tus resultados.',
+        content: '¡Hola! Soy tu asistente financiero. ¿En qué puedo ayudarte hoy? Puedo analizar tus datos financieros actuales, identificar tendencias o responder preguntas específicas sobre tus finanzas.',
         timestamp: new Date(),
       },
     ]);
+    setConversationContext({}); // Reset conversation context
   }, []);
 
   return {
@@ -115,5 +128,6 @@ export const useFinancialAssistant = () => {
     isLoading,
     sendMessage,
     resetChat,
+    conversationContext
   };
 };

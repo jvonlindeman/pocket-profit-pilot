@@ -16,7 +16,7 @@ const GPT_API_KEY = Deno.env.get('GPT_API_KEY') ?? '';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Helper function to generate system prompt with context
-async function generateSystemPrompt(dateRange, uiData = null) {
+async function generateSystemPrompt(dateRange, uiData = null, conversationContext = null) {
   try {
     // Fetch recent financial summaries
     const { data: financialSummaries, error: summariesError } = await supabase
@@ -79,6 +79,17 @@ async function generateSystemPrompt(dateRange, uiData = null) {
     if (uiData) {
       uiDataContext = "\n\nCurrent UI Data:\n";
       
+      // Add active UI components information
+      if (uiData.activeComponents && uiData.activeComponents.length > 0) {
+        uiDataContext += "Active Components in UI: " + uiData.activeComponents.join(", ") + "\n\n";
+      }
+      
+      // Add visible sections information
+      if (uiData.visibleSections && uiData.visibleSections.length > 0) {
+        uiDataContext += "Visible Sections: " + uiData.visibleSections.join(", ") + "\n";
+        uiDataContext += "User's Current Focus: " + (uiData.focusedElement || "None") + "\n\n";
+      }
+      
       // Add summary information
       if (uiData.summary) {
         uiDataContext += "Financial Summary:\n";
@@ -108,31 +119,67 @@ async function generateSystemPrompt(dateRange, uiData = null) {
         uiDataContext += "\n";
       }
       
+      // Add transaction insights if available
+      if (uiData.transactionInsights && uiData.transactionInsights.length > 0) {
+        uiDataContext += "Transaction Insights:\n";
+        uiData.transactionInsights.forEach((insight) => {
+          uiDataContext += `- ${insight.description} (${insight.significance} significance)\n`;
+        });
+        uiDataContext += "\n";
+      }
+      
+      // Add metric comparisons if available
+      if (uiData.currentMetricComparisons && uiData.currentMetricComparisons.length > 0) {
+        uiDataContext += "Current Metric Comparisons:\n";
+        uiData.currentMetricComparisons.forEach(comparison => {
+          uiDataContext += `- ${comparison.metricName}: Current ${comparison.currentValue}% vs Previous ${comparison.previousValue}% (${comparison.percentageChange > 0 ? '+' : ''}${comparison.percentageChange.toFixed(2)}% change)\n`;
+        });
+        uiDataContext += "\n";
+      }
+      
       // Add recent transactions
       if (uiData.transactions && uiData.transactions.length > 0) {
-        uiDataContext += "Recent Transactions (Limited to 20):\n";
-        uiData.transactions.slice(0, 20).forEach((tx, index) => {
-          uiDataContext += `${index + 1}. ${tx.description || 'No description'} - $${tx.amount} (${tx.type})\n`;
+        uiDataContext += "Recent & Relevant Transactions:\n";
+        uiData.transactions.forEach((tx, index) => {
+          const date = tx.date ? new Date(tx.date).toISOString().split('T')[0] : 'No date';
+          const category = tx.category || 'Uncategorized';
+          uiDataContext += `${index + 1}. [${date}] ${tx.description || 'No description'} - $${tx.amount} (${tx.type}) - Category: ${category}\n`;
         });
         uiDataContext += "\n";
       }
     }
     
+    // Add conversation context if available
+    let conversationContextStr = "";
+    if (conversationContext) {
+      conversationContextStr = "\nConversation Context:\n";
+      if (conversationContext.lastQuery) {
+        conversationContextStr += `Last query at: ${conversationContext.lastQuery.timestamp}\n`;
+        if (conversationContext.lastQuery.visibleComponents) {
+          conversationContextStr += `Components visible during last query: ${conversationContext.lastQuery.visibleComponents.join(", ")}\n`;
+        }
+        if (conversationContext.lastQuery.focusedElement) {
+          conversationContextStr += `User was focused on: ${conversationContext.lastQuery.focusedElement}\n`;
+        }
+      }
+    }
+    
     // Create the system prompt
     const systemPrompt = `
-You are a helpful financial assistant with expertise in business finances, accounting, and financial analysis.
-You are analyzing financial data for a small business, with the following context:
+You are an advanced financial assistant with expertise in business finances, accounting, and financial analysis.
+You are analyzing financial data for a business, with access to both historical database records and real-time UI data.
 
 ${financialContext}
 ${uiDataContext}
+${conversationContextStr}
 
 Your goal is to:
-1. Provide insights on profit trends, expense patterns, and financial health
-2. When asked, help forecast future financial scenarios based on historical data
-3. Suggest ways to optimize expenses and improve profit margins
-4. Answer questions about the financial data clearly and accurately, specifically referencing UI data when relevant
-5. If data is missing for a specific analysis, acknowledge that limitation
-6. Be factual, precise, and provide numerical analysis when relevant
+1. Provide data-driven insights on profit trends, expense patterns, and financial health
+2. Refer specifically to the data the user can currently see in their dashboard
+3. Analyze transactions and identify patterns, anomalies, or opportunities
+4. Suggest actionable ways to optimize expenses and improve profit margins
+5. Answer questions about the financial data with precision, specifically referencing UI components and data when relevant
+6. When you notice significant patterns or outliers in the data, point them out even if not directly asked
 
 Currently analyzing data for the date range: ${dateRange.startDate} to ${dateRange.endDate}.
 
@@ -140,7 +187,14 @@ When answering questions about specific UI components or data, refer to them dir
 For example, say "Looking at your current financial summary in the dashboard..." or
 "Based on the transaction data visible in your interface...".
 
-Respond in a helpful, clear, and professional manner, providing specific numeric insights whenever possible.
+Key guidelines for your responses:
+- Be specific and refer to exact numbers from the data
+- Highlight trends and compare current figures to previous periods when relevant
+- If you notice something interesting or concerning in the data, mention it
+- When making suggestions, explain the financial reasoning behind them 
+- If the user asks about something that's not in the data, acknowledge the limitation
+
+Respond in a helpful, clear, and professional manner in Spanish, providing specific numeric insights whenever possible.
     `;
     
     return systemPrompt;
@@ -162,10 +216,10 @@ serve(async (req) => {
       throw new Error("GPT_API_KEY is not configured");
     }
 
-    const { messages, dateRange, uiData } = await req.json();
+    const { messages, dateRange, uiData, conversationContext } = await req.json();
     
     // Generate system prompt with current financial context and UI data
-    const systemPrompt = await generateSystemPrompt(dateRange, uiData);
+    const systemPrompt = await generateSystemPrompt(dateRange, uiData, conversationContext);
     
     // Prepare messages for OpenAI, including the system prompt
     const openaiMessages = [
