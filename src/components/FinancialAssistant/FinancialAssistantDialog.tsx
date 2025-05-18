@@ -106,8 +106,8 @@ export const FinancialAssistantDialog: React.FC<FinancialAssistantDialogProps> =
   };
   
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()} className="financial-assistant-dialog">
-      <DialogContent className="sm:max-w-[600px] h-[80vh] max-h-[700px] flex flex-col p-0" data-component="financial-assistant">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+      <DialogContent className="sm:max-w-[600px] h-[80vh] max-h-[700px] flex flex-col p-0 financial-assistant-dialog" data-component="financial-assistant">
         <DialogHeader className="px-6 py-4 border-b">
           <DialogTitle className="flex items-center">
             <MessageCircleIcon className="mr-2 h-5 w-5" />
@@ -171,3 +171,4 @@ export const FinancialAssistantDialog: React.FC<FinancialAssistantDialogProps> =
     </Dialog>
   );
 };
+
