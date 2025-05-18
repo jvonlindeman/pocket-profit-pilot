@@ -1,7 +1,7 @@
 
 import { useMemo, useCallback } from 'react';
 import { useFinanceDateRange } from '@/hooks/useFinanceDateRange';
-import { useEnhancedFinancialDataFetcher } from '@/hooks/useFinanceDataFetcher';
+import { useEnhancedFinancialDataFetcher } from '@/hooks/useEnhancedFinancialDataFetcher';
 import { useFinancialPersistence } from '@/hooks/useFinancialPersistence';
 import { useCollaboratorProcessor } from '@/hooks/useCollaboratorProcessor';
 import { useIncomeProcessor } from '@/hooks/useIncomeProcessor';

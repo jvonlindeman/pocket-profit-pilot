@@ -3,7 +3,11 @@ import { useState, useCallback } from 'react';
 import { financialService } from '@/services/financialService';
 import { zohoRepository } from '@/repositories/zohoRepository';
 
+/**
+ * Base hook for fetching financial data
+ */
 export const useFinancialDataFetcher = () => {
+  // States
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [rawResponse, setRawResponse] = useState<any>(null);
