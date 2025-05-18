@@ -3,13 +3,22 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useFinance } from '@/contexts/FinanceContext';
-import { captureUIData, optimizeUIData } from '@/utils/uiDataCapture';
+import { captureUIData, optimizeUIData, registerInteraction } from '@/utils/uiDataCapture';
 
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
+}
+
+interface ConversationMemory {
+  lastQuery: {
+    timestamp: string;
+    visibleComponents: string[];
+    focusedElement: string | null;
+  };
+  sharedInsights: string[];
 }
 
 export const useFinancialAssistant = () => {
@@ -23,11 +32,42 @@ export const useFinancialAssistant = () => {
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const financeContext = useFinance();
-  const [conversationContext, setConversationContext] = useState<Record<string, any>>({});
+  const [conversationContext, setConversationContext] = useState<ConversationMemory>({
+    lastQuery: {
+      timestamp: '',
+      visibleComponents: [],
+      focusedElement: null
+    },
+    sharedInsights: []
+  });
+
+  // Helper to extract key insights from assistant responses
+  const extractInsights = useCallback((content: string): string[] => {
+    const insights: string[] = [];
+    
+    // Split content into paragraphs
+    const paragraphs = content.split('\n\n');
+    
+    // Look for insights in paragraphs that contain numbers or percentages
+    paragraphs.forEach(paragraph => {
+      if (
+        (paragraph.includes('$') || paragraph.includes('%')) && 
+        (paragraph.includes('aumentado') || paragraph.includes('disminuido') || 
+         paragraph.includes('tendencia') || paragraph.includes('comparación'))
+      ) {
+        insights.push(paragraph.trim());
+      }
+    });
+    
+    return insights;
+  }, []);
 
   // Send a message and get a response from the assistant
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim()) return;
+    
+    // Register this interaction
+    registerInteraction('financial-assistant', 'select', { query: content });
     
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -41,9 +81,17 @@ export const useFinancialAssistant = () => {
     setIsLoading(true);
     
     try {
-      // Capture current UI data
+      // Capture current UI data with detailed logging
+      console.log('Capturing UI data for financial assistant...');
       const uiData = captureUIData(financeContext);
       const optimizedUIData = optimizeUIData(uiData);
+      
+      console.log('UI data captured:', {
+        activeComponents: uiData.activeComponents,
+        hasSummary: Boolean(uiData.summary),
+        transactionCount: uiData.transactions.length,
+        expenseCount: uiData.collaboratorExpenses.length
+      });
       
       // Prepare messages for the API (exclude 'system' messages)
       const apiMessages = messages
@@ -61,6 +109,8 @@ export const useFinancialAssistant = () => {
         }
       }));
       
+      console.log('Sending request to financial-assistant edge function...');
+      
       // Call the financial-assistant edge function with UI data
       const { data, error } = await supabase.functions.invoke('financial-assistant', {
         body: {
@@ -74,7 +124,27 @@ export const useFinancialAssistant = () => {
         },
       });
       
-      if (error) throw new Error(error.message || 'Error comunicando con asistente IA');
+      if (error) {
+        console.error('Error calling financial assistant:', error);
+        throw new Error(error.message || 'Error comunicando con asistente IA');
+      }
+      
+      console.log('Received response from financial-assistant edge function');
+      
+      if (!data || !data.response || !data.response.content) {
+        throw new Error('Respuesta vacía del asistente financiero');
+      }
+      
+      const assistantResponse = data.response.content;
+      
+      // Extract and store insights from the assistant's response
+      const newInsights = extractInsights(assistantResponse);
+      if (newInsights.length > 0) {
+        setConversationContext(prev => ({
+          ...prev,
+          sharedInsights: [...prev.sharedInsights, ...newInsights].slice(-10) // Keep last 10 insights
+        }));
+      }
       
       // Add the assistant's response to messages
       setMessages((prev) => [
@@ -82,7 +152,7 @@ export const useFinancialAssistant = () => {
         {
           id: `assistant-${Date.now()}`,
           role: 'assistant',
-          content: data.response.content,
+          content: assistantResponse,
           timestamp: new Date(),
         },
       ]);
@@ -108,7 +178,7 @@ export const useFinancialAssistant = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [messages, financeContext, setMessages, conversationContext]);
+  }, [messages, financeContext, setMessages, conversationContext, extractInsights]);
   
   // Clear all messages and reset to initial state
   const resetChat = useCallback(() => {
@@ -120,7 +190,14 @@ export const useFinancialAssistant = () => {
         timestamp: new Date(),
       },
     ]);
-    setConversationContext({}); // Reset conversation context
+    setConversationContext({
+      lastQuery: {
+        timestamp: '',
+        visibleComponents: [],
+        focusedElement: null
+      },
+      sharedInsights: []
+    }); 
   }, []);
 
   return {

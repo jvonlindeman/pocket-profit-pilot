@@ -1,9 +1,11 @@
+
 import React, { useEffect } from 'react';
 import { ArrowDownIcon, Users } from 'lucide-react';
 import SummaryCard from './SummaryCard';
 import { useFinance } from '@/contexts/FinanceContext';
 import { useFinanceFormatter } from '@/hooks/useFinanceFormatter';
 import { validateFinancialValue } from '@/utils/financialUtils';
+import { registerVisibleSection } from '@/utils/uiDataCapture';
 
 const RefinedExpensesSection: React.FC = () => {
   const { 
@@ -17,6 +19,12 @@ const RefinedExpensesSection: React.FC = () => {
   const collaboratorExpense = validateFinancialValue(summary.collaboratorExpense);
   const otherExpense = validateFinancialValue(summary.otherExpense);
   const totalExpense = validateFinancialValue(summary.totalExpense);
+  
+  // Register this component as visible
+  useEffect(() => {
+    registerVisibleSection('expenses-section');
+    return () => {};
+  }, []);
   
   // Debug the values being used for display
   useEffect(() => {
@@ -33,7 +41,7 @@ const RefinedExpensesSection: React.FC = () => {
   }, [summary, collaboratorExpenses, collaboratorExpense, otherExpense, totalExpense]);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6" data-component="expenses">
       {/* Collaborator Expenses */}
       <SummaryCard
         title="Gastos Colaboradores"

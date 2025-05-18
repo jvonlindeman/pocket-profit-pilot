@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SendIcon, RefreshCcwIcon, MessageCircleIcon } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { registerInteraction } from '@/utils/uiDataCapture';
 
 interface FinancialAssistantDialogProps {
   isOpen: boolean;
@@ -69,15 +70,31 @@ export const FinancialAssistantDialog: React.FC<FinancialAssistantDialogProps> =
       setTimeout(() => {
         inputRef.current?.focus();
       }, 100);
+      
+      // Register assistant dialog opened
+      registerInteraction('financial-assistant-dialog', 'click', { opened: true });
     }
   }, [isOpen]);
+  
+  // Register dialog close
+  const handleClose = () => {
+    registerInteraction('financial-assistant-dialog', 'click', { closed: true });
+    onClose();
+  };
   
   // Handle sending a message
   const handleSend = () => {
     if (inputValue.trim() && !isLoading) {
+      registerInteraction('financial-assistant-input', 'select', { query: inputValue });
       sendMessage(inputValue);
       setInputValue('');
     }
+  };
+  
+  // Handle reset chat
+  const handleResetChat = () => {
+    registerInteraction('financial-assistant-reset', 'click');
+    resetChat();
   };
   
   // Handle Enter key press
@@ -89,8 +106,8 @@ export const FinancialAssistantDialog: React.FC<FinancialAssistantDialogProps> =
   };
   
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[600px] h-[80vh] max-h-[700px] flex flex-col p-0">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()} className="financial-assistant-dialog">
+      <DialogContent className="sm:max-w-[600px] h-[80vh] max-h-[700px] flex flex-col p-0" data-component="financial-assistant">
         <DialogHeader className="px-6 py-4 border-b">
           <DialogTitle className="flex items-center">
             <MessageCircleIcon className="mr-2 h-5 w-5" />
@@ -121,7 +138,7 @@ export const FinancialAssistantDialog: React.FC<FinancialAssistantDialogProps> =
             variant="outline"
             size="icon"
             disabled={isLoading}
-            onClick={resetChat}
+            onClick={handleResetChat}
             title="Nueva conversación"
             className="mr-2 flex-shrink-0"
           >

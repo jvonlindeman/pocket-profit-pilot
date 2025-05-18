@@ -36,6 +36,11 @@ async function generateSystemPrompt(dateRange, uiData = null, conversationContex
       
     if (balancesError) throw balancesError;
     
+    console.log('Financial data from database:', { 
+      summaries: financialSummaries?.length || 0,
+      balances: monthlyBalances?.length || 0
+    });
+    
     // Format the context data for the system prompt
     let financialContext = "Financial Summaries:\n";
     
@@ -77,11 +82,21 @@ async function generateSystemPrompt(dateRange, uiData = null, conversationContex
     // Add UI data context if available
     let uiDataContext = "";
     if (uiData) {
+      console.log('UI data received:', { 
+        hasActiveComponents: Boolean(uiData.activeComponents?.length),
+        activeComponentsCount: uiData.activeComponents?.length || 0,
+        hasTransactions: Boolean(uiData.transactions?.length),
+        transactionsCount: uiData.transactions?.length || 0,
+        hasSummary: Boolean(uiData.summary)
+      });
+      
       uiDataContext = "\n\nCurrent UI Data:\n";
       
       // Add active UI components information
       if (uiData.activeComponents && uiData.activeComponents.length > 0) {
         uiDataContext += "Active Components in UI: " + uiData.activeComponents.join(", ") + "\n\n";
+      } else {
+        uiDataContext += "No active components detected in UI. User likely viewing a blank dashboard.\n\n";
       }
       
       // Add visible sections information
@@ -93,30 +108,39 @@ async function generateSystemPrompt(dateRange, uiData = null, conversationContex
       // Add summary information
       if (uiData.summary) {
         uiDataContext += "Financial Summary:\n";
-        uiDataContext += `- Total Income: $${uiData.summary.totalIncome}\n`;
-        uiDataContext += `- Total Expenses: $${uiData.summary.totalExpense}\n`;
-        uiDataContext += `- Collaborator Expenses: $${uiData.summary.collaboratorExpense}\n`;
-        uiDataContext += `- Other Expenses: $${uiData.summary.otherExpense}\n`;
-        uiDataContext += `- Profit: $${uiData.summary.profit}\n`;
-        uiDataContext += `- Profit Margin: ${uiData.summary.profitMargin}%\n`;
+        uiDataContext += `- Total Income: $${uiData.summary.totalIncome || 0}\n`;
+        uiDataContext += `- Total Expenses: $${uiData.summary.totalExpense || 0}\n`;
+        uiDataContext += `- Collaborator Expenses: $${uiData.summary.collaboratorExpense || 0}\n`;
+        uiDataContext += `- Other Expenses: $${uiData.summary.otherExpense || 0}\n`;
+        uiDataContext += `- Profit: $${uiData.summary.profit || 0}\n`;
+        uiDataContext += `- Profit Margin: ${uiData.summary.profitMargin || 0}%\n`;
         uiDataContext += `- Starting Balance: $${uiData.summary.startingBalance || 0}\n\n`;
+      } else {
+        uiDataContext += "No financial summary available in the UI.\n\n";
       }
       
       // Add income breakdown
+      const hasIncomeData = uiData.regularIncome || uiData.stripeIncome;
       uiDataContext += "Income Breakdown:\n";
-      uiDataContext += `- Regular Income: $${uiData.regularIncome}\n`;
-      uiDataContext += `- Stripe Income: $${uiData.stripeIncome}\n`;
-      uiDataContext += `- Stripe Fees: $${uiData.stripeFees}\n`;
-      uiDataContext += `- Stripe Net: $${uiData.stripeNet}\n`;
-      uiDataContext += `- Stripe Fee Percentage: ${uiData.stripeFeePercentage}%\n\n`;
+      if (hasIncomeData) {
+        uiDataContext += `- Regular Income: $${uiData.regularIncome || 0}\n`;
+        uiDataContext += `- Stripe Income: $${uiData.stripeIncome || 0}\n`;
+        uiDataContext += `- Stripe Fees: $${uiData.stripeFees || 0}\n`;
+        uiDataContext += `- Stripe Net: $${uiData.stripeNet || 0}\n`;
+        uiDataContext += `- Stripe Fee Percentage: ${uiData.stripeFeePercentage || 0}%\n\n`;
+      } else {
+        uiDataContext += "No income data currently visible in UI.\n\n";
+      }
       
       // Add collaborator expenses
       if (uiData.collaboratorExpenses && uiData.collaboratorExpenses.length > 0) {
         uiDataContext += "Collaborator Expenses:\n";
         uiData.collaboratorExpenses.forEach(expense => {
-          uiDataContext += `- ${expense.category}: $${expense.amount}\n`;
+          uiDataContext += `- ${expense.category}: $${expense.amount || 0}\n`;
         });
         uiDataContext += "\n";
+      } else {
+        uiDataContext += "No collaborator expense data visible in UI.\n\n";
       }
       
       // Add transaction insights if available
@@ -126,6 +150,8 @@ async function generateSystemPrompt(dateRange, uiData = null, conversationContex
           uiDataContext += `- ${insight.description} (${insight.significance} significance)\n`;
         });
         uiDataContext += "\n";
+      } else {
+        uiDataContext += "No transaction insights available.\n\n";
       }
       
       // Add metric comparisons if available
@@ -135,6 +161,8 @@ async function generateSystemPrompt(dateRange, uiData = null, conversationContex
           uiDataContext += `- ${comparison.metricName}: Current ${comparison.currentValue}% vs Previous ${comparison.previousValue}% (${comparison.percentageChange > 0 ? '+' : ''}${comparison.percentageChange.toFixed(2)}% change)\n`;
         });
         uiDataContext += "\n";
+      } else {
+        uiDataContext += "No metric comparisons available.\n\n";
       }
       
       // Add recent transactions
@@ -146,7 +174,23 @@ async function generateSystemPrompt(dateRange, uiData = null, conversationContex
           uiDataContext += `${index + 1}. [${date}] ${tx.description || 'No description'} - $${tx.amount} (${tx.type}) - Category: ${category}\n`;
         });
         uiDataContext += "\n";
+      } else {
+        uiDataContext += "No transactions currently visible in the UI.\n\n";
       }
+      
+      // Add interaction history if available
+      if (uiData.interactionHistory && uiData.interactionHistory.length > 0) {
+        uiDataContext += "Recent User Interactions:\n";
+        uiData.interactionHistory.slice(0, 5).forEach((interaction, idx) => {
+          uiDataContext += `${idx + 1}. ${interaction.action} on ${interaction.component} at ${new Date(interaction.timestamp).toLocaleTimeString()}\n`;
+        });
+        uiDataContext += "\n";
+      } else {
+        uiDataContext += "No recent UI interactions recorded.\n\n";
+      }
+    } else {
+      console.log('No UI data received in request');
+      uiDataContext = "\n\nUI Data: Not available. User may be on a different page or UI data collection failed.\n\n";
     }
     
     // Add conversation context if available
@@ -161,6 +205,15 @@ async function generateSystemPrompt(dateRange, uiData = null, conversationContex
         if (conversationContext.lastQuery.focusedElement) {
           conversationContextStr += `User was focused on: ${conversationContext.lastQuery.focusedElement}\n`;
         }
+      }
+      
+      // Add previous insights if available
+      if (conversationContext.sharedInsights) {
+        conversationContextStr += "\nPreviously shared insights:\n";
+        conversationContext.sharedInsights.forEach((insight, idx) => {
+          conversationContextStr += `${idx + 1}. ${insight}\n`;
+        });
+        conversationContextStr += "\n";
       }
     }
     
@@ -181,7 +234,7 @@ Your goal is to:
 5. Answer questions about the financial data with precision, specifically referencing UI components and data when relevant
 6. When you notice significant patterns or outliers in the data, point them out even if not directly asked
 
-Currently analyzing data for the date range: ${dateRange.startDate} to ${dateRange.endDate}.
+Currently analyzing data for the date range: ${dateRange.startDate || 'unknown'} to ${dateRange.endDate || 'unknown'}.
 
 When answering questions about specific UI components or data, refer to them directly.
 For example, say "Looking at your current financial summary in the dashboard..." or
@@ -193,6 +246,7 @@ Key guidelines for your responses:
 - If you notice something interesting or concerning in the data, mention it
 - When making suggestions, explain the financial reasoning behind them 
 - If the user asks about something that's not in the data, acknowledge the limitation
+- If there is no data available, inform the user clearly and suggest uploading data
 
 Respond in a helpful, clear, and professional manner in Spanish, providing specific numeric insights whenever possible.
     `;
@@ -217,6 +271,18 @@ serve(async (req) => {
     }
 
     const { messages, dateRange, uiData, conversationContext } = await req.json();
+    
+    // Log request information for debugging
+    console.log("Financial assistant request received", {
+      messageCount: messages?.length,
+      hasDateRange: Boolean(dateRange),
+      hasUIData: Boolean(uiData),
+      hasConversationContext: Boolean(conversationContext),
+      dateRange: dateRange ? {
+        startDate: dateRange.startDate,
+        endDate: dateRange.endDate
+      } : null
+    });
     
     // Generate system prompt with current financial context and UI data
     const systemPrompt = await generateSystemPrompt(dateRange, uiData, conversationContext);
@@ -246,6 +312,7 @@ serve(async (req) => {
     const data = await response.json();
     
     if (data.error) {
+      console.error("OpenAI API error:", data.error);
       throw new Error(`OpenAI API error: ${data.error.message}`);
     }
     

@@ -23,4 +23,3 @@ verify_jwt = false
 [[functions]]
 name = "financial-assistant"
 verify_jwt = false
-
