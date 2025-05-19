@@ -3,7 +3,7 @@ import { Transaction } from "../../types/financial";
 import { cacheOperations } from "./operations";
 import { cacheMetrics } from "./metrics";
 import { cacheStorage } from "./storage";
-import { CacheResponse, CacheResult, CacheStats, DetailedCacheStats, CacheClearOptions } from "./types";
+import type { CacheResponse, CacheResult, CacheStats, DetailedCacheStats, CacheClearOptions } from "./types";
 
 /**
  * CacheService provides a unified API for working with the transaction cache
@@ -102,4 +102,5 @@ const CacheService = {
 };
 
 export default CacheService;
-export { CacheClearOptions, CacheResponse, CacheResult, CacheStats, DetailedCacheStats };
+// Use export type for types to fix the isolatedModules issue
+export type { CacheClearOptions, CacheResponse, CacheResult, CacheStats, DetailedCacheStats };

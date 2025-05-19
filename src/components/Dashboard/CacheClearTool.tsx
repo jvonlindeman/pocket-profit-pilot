@@ -10,9 +10,10 @@ import { Trash } from 'lucide-react';
 import { formatDateYYYYMMDD } from "@/utils/dateUtils";
 import { endOfMonth, startOfMonth, subMonths } from 'date-fns';
 import { useCacheAdmin } from "@/hooks/cache/useCacheAdmin";
+import { CacheClearOptions } from "@/services/cache/types";
 
 const CacheClearTool: React.FC = () => {
-  const [source, setSource] = useState<string>("all");
+  const [source, setSource] = useState<'all' | 'Zoho' | 'Stripe'>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   
   // Use our new hook for cache administration
@@ -53,8 +54,8 @@ const CacheClearTool: React.FC = () => {
     }
     
     // Prepare options for cache clearing
-    const options = {
-      source: source !== "all" ? source as 'Zoho' | 'Stripe' : 'all',
+    const options: CacheClearOptions = {
+      source: source,
       startDate: dateRange.from,
       endDate: dateRange.to
     };
@@ -80,7 +81,7 @@ const CacheClearTool: React.FC = () => {
             <label className="block text-sm font-medium mb-1">Data Source</label>
             <Select 
               value={source} 
-              onValueChange={setSource}
+              onValueChange={(val) => setSource(val as 'all' | 'Zoho' | 'Stripe')}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select source" />

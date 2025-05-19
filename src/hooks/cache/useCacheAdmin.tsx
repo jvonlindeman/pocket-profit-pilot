@@ -87,7 +87,7 @@ export const useCacheAdmin = () => {
         toast({
           title: "Cache Inconsistency Detected",
           description: `Found ${result.segmentCount} segments but ${result.transactionCount} transactions`,
-          variant: "warning"
+          variant: "destructive"  // Changed from "warning" to "destructive" as warning is not a valid variant
         });
         
         // Try to repair
