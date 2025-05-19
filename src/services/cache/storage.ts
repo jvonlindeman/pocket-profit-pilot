@@ -1,10 +1,10 @@
-
 import { CacheSource, CacheClearOptions, DetailedCacheStats } from "./types";
 import { Transaction } from "../../types/financial";
 import { segmentRepository } from "./db/segments";
 import { transactionRepository } from "./db/transactions";
 import { statsRepository } from "./db/statistics";
 import { monthlyRepository } from "./db/monthly";
+import { supabase } from "../../integrations/supabase/client";
 
 /**
  * CacheStorage handles all database interactions for the cache system
@@ -55,22 +55,8 @@ export class CacheStorage {
     month: number
   ): Promise<{ id: string; transaction_count: number } | null> {
     try {
-      const { data, error } = await monthlyRepository.getClient()
-        .from('monthly_cache')
-        .select('id, transaction_count')
-        .eq('source', source)
-        .eq('year', year)
-        .eq('month', month)
-        .single();
-
-      if (error || !data) {
-        return null;
-      }
-
-      return {
-        id: data.id,
-        transaction_count: data.transaction_count
-      };
+      // Use the repository method instead of direct access to getClient()
+      return monthlyRepository.getMonthCacheInfo(source, year, month);
     } catch (err) {
       console.error("Exception getting month cache info:", err);
       return null;

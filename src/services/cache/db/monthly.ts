@@ -2,6 +2,7 @@
 import { CacheDbClient } from "./client";
 import { CacheSource } from "../types";
 import { Transaction } from "../../../types/financial";
+import { supabase } from "../../../integrations/supabase/client";
 
 /**
  * MonthlyRepository handles all month-based cache operations
@@ -17,7 +18,7 @@ export class MonthlyRepository extends CacheDbClient {
   ): Promise<{ isCached: boolean, transactionCount: number }> {
     try {
       // Call the database function to check if month is cached
-      const { data, error } = await this.getClient()
+      const { data, error } = await supabase
         .rpc('is_month_cached', {
           p_source: source,
           p_year: year,
@@ -52,7 +53,7 @@ export class MonthlyRepository extends CacheDbClient {
     month: number
   ): Promise<Transaction[]> {
     try {
-      const { data, error } = await this.getClient()
+      const { data, error } = await supabase
         .from('cached_transactions')
         .select('*')
         .eq('source', source)
@@ -109,7 +110,7 @@ export class MonthlyRepository extends CacheDbClient {
       
       for (let i = 0; i < dbTransactions.length; i += batchSize) {
         const batch = dbTransactions.slice(i, i + batchSize);
-        const { error } = await this.getClient()
+        const { error } = await supabase
           .from('cached_transactions')
           .upsert(batch, { 
             onConflict: 'source,external_id',
@@ -126,7 +127,7 @@ export class MonthlyRepository extends CacheDbClient {
       }
       
       // Create or update monthly cache entry
-      const { error: monthlyError } = await this.getClient()
+      const { error: monthlyError } = await supabase
         .from('monthly_cache')
         .upsert({
           source: source,
@@ -157,7 +158,7 @@ export class MonthlyRepository extends CacheDbClient {
    */
   async getCachedMonths(source: CacheSource | string): Promise<{ year: number, month: number, count: number }[]> {
     try {
-      const { data, error } = await this.getClient()
+      const { data, error } = await supabase
         .from('monthly_cache')
         .select('*')
         .eq('source', source)
@@ -177,6 +178,37 @@ export class MonthlyRepository extends CacheDbClient {
     } catch (err) {
       this.logError("Exception retrieving cached months", err);
       return [];
+    }
+  }
+
+  /**
+   * Get information about a monthly cache entry
+   */
+  async getMonthCacheInfo(
+    source: CacheSource | string,
+    year: number,
+    month: number
+  ): Promise<{ id: string; transaction_count: number } | null> {
+    try {
+      const { data, error } = await supabase
+        .from('monthly_cache')
+        .select('id, transaction_count')
+        .eq('source', source)
+        .eq('year', year)
+        .eq('month', month)
+        .single();
+
+      if (error || !data) {
+        return null;
+      }
+
+      return {
+        id: data.id,
+        transaction_count: data.transaction_count
+      };
+    } catch (err) {
+      console.error("Exception getting month cache info:", err);
+      return null;
     }
   }
 }
