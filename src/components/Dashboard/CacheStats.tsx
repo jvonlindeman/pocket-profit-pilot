@@ -65,7 +65,7 @@ const CacheStats: React.FC<CacheStatsProps> = ({
         toast({
           title: "Actualización parcial",
           description: "Algunos datos de caché no pudieron actualizarse",
-          variant: "warning"
+          variant: "destructive"
         });
       }
       

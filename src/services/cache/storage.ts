@@ -204,39 +204,53 @@ export class CacheStorage {
    */
   async getDetailedStats(): Promise<DetailedCacheStats> {
     try {
-      // Get transaction counts by source
+      // For transaction counts by source, we'll use a different approach instead of group
       const { data: txData, error: txError } = await supabase
         .from('cached_transactions')
-        .select('source, count(*)')
-        .group('source');
+        .select('source, count')
+        .select('source, count(*)', { count: 'exact' })
+        .eq('source', 'Zoho');
+      
+      const { data: txStripeData, error: txStripeError } = await supabase
+        .from('cached_transactions')
+        .select('source, count')
+        .select('source, count(*)', { count: 'exact' })
+        .eq('source', 'Stripe');
         
-      if (txError) {
-        console.error("Error getting transaction stats:", txError);
+      if (txError || txStripeError) {
+        console.error("Error getting transaction stats:", txError || txStripeError);
         return { transactions: [], segments: [] };
       }
       
       // Format transaction counts
-      const transactions: CacheSourceStats[] = txData.map(item => ({
-        source: item.source,
-        count: parseInt(item.count || '0')
-      }));
+      const transactions: CacheSourceStats[] = [
+        { source: 'Zoho', count: parseInt(txData?.[0]?.count || '0') },
+        { source: 'Stripe', count: parseInt(txStripeData?.[0]?.count || '0') }
+      ];
       
-      // Get segment counts by source
-      const { data: segmentData, error: segmentError } = await supabase
+      // For segment counts by source, we'll use a similar approach
+      const { data: segmentZohoData, error: segmentZohoError } = await supabase
         .from('cache_segments')
-        .select('source, count(*)')
-        .group('source');
+        .select('source, count')
+        .select('source, count(*)', { count: 'exact' })
+        .eq('source', 'Zoho');
         
-      if (segmentError) {
-        console.error("Error getting segment stats:", segmentError);
+      const { data: segmentStripeData, error: segmentStripeError } = await supabase
+        .from('cache_segments')
+        .select('source, count')
+        .select('source, count(*)', { count: 'exact' })
+        .eq('source', 'Stripe');
+        
+      if (segmentZohoError || segmentStripeError) {
+        console.error("Error getting segment stats:", segmentZohoError || segmentStripeError);
         return { transactions, segments: [] };
       }
       
       // Format segment counts
-      const segments: CacheSourceStats[] = segmentData.map(item => ({
-        source: item.source,
-        count: parseInt(item.count || '0')
-      }));
+      const segments: CacheSourceStats[] = [
+        { source: 'Zoho', count: parseInt(segmentZohoData?.[0]?.count || '0') },
+        { source: 'Stripe', count: parseInt(segmentStripeData?.[0]?.count || '0') }
+      ];
       
       return { transactions, segments };
     } catch (err) {
