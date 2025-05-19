@@ -285,27 +285,27 @@ export class CacheStorage {
       
       const hitRate = hits + misses > 0 ? (hits / (hits + misses) * 100).toFixed(1) + '%' : 'N/A';
       
+      // Change transactionCount to fit with the DetailedCacheStats interface
       return {
-        transactionCount: (zohoCount || 0) + (stripeCount || 0),
+        transactions,
         segments,
         recentMetrics: metrics || [],
         hitRate,
         hits,
         misses,
-        lastUpdated: new Date().toISOString(),
-        transactions
+        lastUpdated: new Date().toISOString()
       };
     } catch (err) {
       console.error("Exception getting cache stats:", err);
+      // Change transactionCount to fit with the DetailedCacheStats interface
       return {
-        transactionCount: 0,
+        transactions: [],
         segments: [],
         recentMetrics: [],
         hitRate: 'N/A',
         hits: 0,
         misses: 0,
-        lastUpdated: new Date().toISOString(),
-        transactions: []
+        lastUpdated: new Date().toISOString()
       };
     }
   }
