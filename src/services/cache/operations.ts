@@ -4,6 +4,7 @@ import { cacheStorage } from "./storage";
 import { cacheMetrics } from "./metrics";
 import { CacheResponse, CacheResult, CacheSource } from "./types";
 import { supabase } from "../../integrations/supabase/client";
+import { startOfMonth, endOfMonth } from "date-fns";
 
 /**
  * CacheOperations provides the high-level cache functionality
@@ -33,6 +34,16 @@ export class CacheOperations {
   }
 
   /**
+   * Extract year and month from date
+   */
+  private getYearAndMonth(date: Date): { year: number, month: number } {
+    return {
+      year: date.getFullYear(),
+      month: date.getMonth() + 1 // JavaScript months are 0-indexed, add 1 to match SQL conventions
+    };
+  }
+
+  /**
    * Check cache for transactions
    */
   async checkCache(
@@ -44,6 +55,10 @@ export class CacheOperations {
     // Format dates for API
     const formattedStartDate = this.formatDate(startDate);
     const formattedEndDate = this.formatDate(endDate);
+    
+    // Extract year and month from dates
+    const startInfo = this.getYearAndMonth(startDate);
+    const endInfo = this.getYearAndMonth(endDate);
 
     // Prepare response for API error cases
     const errorResponse: CacheResponse = {
@@ -69,39 +84,120 @@ export class CacheOperations {
         return { cached: false, status: "force_refresh", partial: false };
       }
 
-      // Call the cache-manager edge function to check cache status
-      const { data, error } = await supabase.functions.invoke("cache-manager", {
-        body: {
-          source,
-          startDate: formattedStartDate,
-          endDate: formattedEndDate
+      // For the monthly approach, we check if the exact month is cached
+      // The most common case is requesting data for exactly one month
+      if (
+        startInfo.year === endInfo.year && 
+        startInfo.month === endInfo.month &&
+        startDate.getDate() === 1 && 
+        endDate.getDate() === new Date(endInfo.year, endInfo.month, 0).getDate()
+      ) {
+        // This is a request for exactly one month, which is our optimized case
+        const isCached = await cacheStorage.isMonthCached(
+          source, 
+          startInfo.year, 
+          startInfo.month
+        );
+        
+        if (isCached) {
+          // Get transactions for this month
+          const transactions = await cacheStorage.getMonthTransactions(
+            source,
+            startInfo.year,
+            startInfo.month
+          );
+          
+          // Record the cache hit
+          await cacheMetrics.recordCacheAccess(
+            source,
+            formattedStartDate,
+            formattedEndDate,
+            true,
+            false,
+            transactions.length
+          );
+          
+          const result: CacheResponse = {
+            cached: true,
+            status: "complete",
+            data: transactions,
+            partial: false,
+            metrics: {
+              source,
+              startDate: formattedStartDate,
+              endDate: formattedEndDate,
+              transactionCount: transactions.length,
+              cacheHit: true,
+              partialHit: false
+            }
+          };
+          
+          this.setLastCacheCheckResult(result);
+          return result;
+        } else {
+          // Record the cache miss
+          await cacheMetrics.recordCacheAccess(
+            source,
+            formattedStartDate,
+            formattedEndDate,
+            false,
+            false,
+            0
+          );
+          
+          const result: CacheResponse = {
+            cached: false,
+            status: "missing",
+            partial: false,
+            metrics: {
+              source,
+              startDate: formattedStartDate,
+              endDate: formattedEndDate,
+              cacheHit: false,
+              partialHit: false
+            }
+          };
+          
+          this.setLastCacheCheckResult(result);
+          return result;
         }
-      });
-      
-      if (error) {
-        console.error("Error calling cache-manager:", error);
-        return errorResponse;
+      } 
+      else {
+        // This is a more complex date range, possibly spanning multiple months
+        // Call the cache-manager edge function to handle this case
+        const { data, error } = await supabase.functions.invoke("cache-manager", {
+          body: {
+            source,
+            startDate: formattedStartDate,
+            endDate: formattedEndDate
+          }
+        });
+        
+        if (error) {
+          console.error("Error calling cache-manager:", error);
+          return errorResponse;
+        }
+        
+        if (!data) {
+          console.error("No data returned from cache-manager");
+          return errorResponse;
+        }
+        
+        // Process the cache response
+        const cacheResponse: CacheResponse = {
+          cached: data.cached || false,
+          status: data.status || "unknown",
+          data: data.data,
+          partial: data.partial || false,
+          missingRanges: data.missingRanges,
+          metrics: data.metrics
+        };
+        
+        // Store the cache check result
+        this.setLastCacheCheckResult(cacheResponse);
+        
+        return cacheResponse;
       }
-      
-      if (!data) {
-        console.error("No data returned from cache-manager");
-        return errorResponse;
-      }
-      
-      // Process the cache response
-      const cacheResponse: CacheResponse = {
-        cached: data.cached || false,
-        status: data.status || "unknown",
-        data: data.data,
-        partial: data.partial || false,
-        missingRanges: data.missingRanges,
-        metrics: data.metrics
-      };
-      
-      // Store the cache check result
-      this.setLastCacheCheckResult(cacheResponse);
-      
-      return cacheResponse;
     } catch (err) {
       console.error("Exception checking cache:", err);
       return errorResponse;
@@ -122,73 +218,97 @@ export class CacheOperations {
       const formattedStartDate = this.formatDate(startDate);
       const formattedEndDate = this.formatDate(endDate);
       
-      // Store transactions in cache storage
-      const result = await cacheStorage.storeTransactions(
-        source,
-        formattedStartDate,
-        formattedEndDate,
-        transactions
-      );
+      // Extract year and month
+      const { year, month } = this.getYearAndMonth(startDate);
       
-      // Record a successful cache update
-      if (result.success) {
-        await cacheMetrics.recordCacheUpdate(
-          source, 
-          formattedStartDate,
-          formattedEndDate,
-          transactions.length
-        );
-      }
-      
-      return result.success;
-    } catch (err) {
-      console.error("Exception storing transactions in cache:", err);
-      return false;
-    }
-  }
-
-  /**
-   * Repair cache segments
-   */
-  async repairCacheSegments(
-    source: CacheSource,
-    startDate: Date,
-    endDate: Date
-  ): Promise<boolean> {
-    try {
-      // Format dates for API
-      const formattedStartDate = this.formatDate(startDate);
-      const formattedEndDate = this.formatDate(endDate);
-      
-      // Check integrity
-      const integrity = await cacheMetrics.verifyCacheIntegrity(
-        source, 
-        formattedStartDate,
-        formattedEndDate
-      );
-      
-      if (!integrity.isConsistent) {
-        // Clear the cache range
-        await cacheStorage.clearCache(
-          source,
-          formattedStartDate,
-          formattedEndDate
-        );
+      // For most cases, we're storing exactly one month's worth of data
+      if (
+        startDate.getDate() === 1 && 
+        endDate.getTime() >= endOfMonth(startDate).getTime()
+      ) {
+        // Filter transactions to ensure they belong to this month
+        const currentMonthStart = startOfMonth(startDate);
+        const currentMonthEnd = endOfMonth(startDate);
         
-        // Record the repair operation
-        await cacheMetrics.recordCacheOperation(
-          source,
-          formattedStartDate,
-          formattedEndDate,
-          "repair"
-        );
+        const monthTransactions = transactions.filter(tx => {
+          const txDate = new Date(tx.date);
+          return txDate >= currentMonthStart && txDate <= currentMonthEnd;
+        });
+        
+        if (monthTransactions.length > 0) {
+          // Store transactions for this month
+          const success = await cacheStorage.storeMonthTransactions(
+            source, 
+            year, 
+            month, 
+            monthTransactions
+          );
+          
+          // Record a successful cache update
+          if (success) {
+            await cacheMetrics.recordCacheUpdate(
+              source, 
+              formattedStartDate,
+              formattedEndDate,
+              monthTransactions.length
+            );
+          }
+          
+          return success;
+        }
         
         return true;
+      } 
+      else {
+        // Complex case - processing a date range that doesn't match exactly one month
+        // Store transactions in monthly buckets
+        const monthMap = new Map<string, Transaction[]>();
+        
+        transactions.forEach(tx => {
+          const txDate = new Date(tx.date);
+          const key = `${txDate.getFullYear()}-${txDate.getMonth() + 1}`;
+          
+          if (!monthMap.has(key)) {
+            monthMap.set(key, []);
+          }
+          
+          monthMap.get(key)!.push(tx);
+        });
+        
+        // Store each month's transactions separately
+        const results: boolean[] = [];
+        for (const [key, txs] of monthMap.entries()) {
+          const [yearStr, monthStr] = key.split('-');
+          const year = parseInt(yearStr);
+          const month = parseInt(monthStr);
+          
+          const success = await cacheStorage.storeMonthTransactions(
+            source,
+            year,
+            month,
+            txs
+          );
+          
+          results.push(success);
+          
+          if (success) {
+            // Calculate the month's date range for metrics
+            const monthStart = new Date(year, month - 1, 1);
+            const monthEnd = endOfMonth(monthStart);
+            
+            await cacheMetrics.recordCacheUpdate(
+              source,
+              this.formatDate(monthStart),
+              this.formatDate(monthEnd),
+              txs.length
+            );
+          }
+        }
+        
+        return results.every(result => result);
       }
-      
-      return true;
     } catch (err) {
-      console.error("Exception repairing cache segments:", err);
+      console.error("Exception storing transactions in cache:", err);
       return false;
     }
   }
@@ -209,9 +329,35 @@ export class CacheOperations {
       if (options?.startDate && options?.endDate) {
         formattedStartDate = this.formatDate(options.startDate);
         formattedEndDate = this.formatDate(options.endDate);
-      }
+        
+        // If this is a full month, use the monthly approach
+        const startInfo = this.getYearAndMonth(options.startDate);
+        const endInfo = this.getYearAndMonth(options.endDate);
+        
+        if (
+          startInfo.year === endInfo.year &&
+          startInfo.month === endInfo.month &&
+          options.startDate.getDate() === 1 &&
+          options.endDate.getDate() === new Date(endInfo.year, endInfo.month, 0).getDate()
+        ) {
+          // Record the clear operation
+          await cacheMetrics.recordCacheOperation(
+            source === 'all' ? 'All' : source,
+            formattedStartDate,
+            formattedEndDate,
+            "clear"
+          );
+          
+          // Clear just this month
+          return await cacheStorage.clearMonthlyCache(
+            source === 'all' ? undefined : source as CacheSource,
+            startInfo.year,
+            startInfo.month
+          );
+        }
+      } 
       
-      // Record the clear operation
+      // For non-month-aligned cases, use the traditional approach
       if (formattedStartDate && formattedEndDate) {
         await cacheMetrics.recordCacheOperation(
           source === 'all' ? 'All' : source,
@@ -250,7 +396,28 @@ export class CacheOperations {
     try {
       const formattedStartDate = this.formatDate(startDate);
       const formattedEndDate = this.formatDate(endDate);
+
+      // For the monthly approach, use the monthly_cache ID if the request is for exactly one month
+      const startInfo = this.getYearAndMonth(startDate);
+      const endInfo = this.getYearAndMonth(endDate);
       
+      if (
+        startInfo.year === endInfo.year &&
+        startInfo.month === endInfo.month &&
+        startDate.getDate() === 1 &&
+        endDate.getDate() === new Date(endInfo.year, endInfo.month, 0).getDate()
+      ) {
+        // Get monthly cache information
+        const monthlyCacheInfo = await cacheStorage.getMonthCacheInfo(
+          source,
+          startInfo.year,
+          startInfo.month
+        );
+        
+        return monthlyCacheInfo?.id || null;
+      }
+      
+      // Fallback to legacy method for complex date ranges
       const segmentInfo = await cacheStorage.getCacheSegmentInfo(
         source,
         formattedStartDate,

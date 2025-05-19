@@ -100,8 +100,10 @@ export type Database = {
           gross: number | null
           id: string
           metadata: Json | null
+          month: number | null
           source: string
           type: string
+          year: number | null
         }
         Insert: {
           amount: number
@@ -115,8 +117,10 @@ export type Database = {
           gross?: number | null
           id?: string
           metadata?: Json | null
+          month?: number | null
           source: string
           type: string
+          year?: number | null
         }
         Update: {
           amount?: number
@@ -130,8 +134,10 @@ export type Database = {
           gross?: number | null
           id?: string
           metadata?: Json | null
+          month?: number | null
           source?: string
           type?: string
+          year?: number | null
         }
         Relationships: []
       }
@@ -233,6 +239,39 @@ export type Database = {
         }
         Relationships: []
       }
+      monthly_cache: {
+        Row: {
+          created_at: string
+          id: string
+          month: number
+          source: string
+          status: string
+          transaction_count: number
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          month: number
+          source: string
+          status?: string
+          transaction_count?: number
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          month?: number
+          source?: string
+          status?: string
+          transaction_count?: number
+          updated_at?: string
+          year?: number
+        }
+        Relationships: []
+      }
       zoho_integration: {
         Row: {
           access_token: string | null
@@ -282,6 +321,13 @@ export type Database = {
           segments_found: number
           missing_start_date: string
           missing_end_date: string
+        }[]
+      }
+      is_month_cached: {
+        Args: { p_source: string; p_year: number; p_month: number }
+        Returns: {
+          is_cached: boolean
+          transaction_count: number
         }[]
       }
     }

@@ -1,345 +1,291 @@
 
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// Follow this setup guide to integrate the Supabase client library in your Edge Function
+// https://supabase.com/docs/guides/functions/edge-functions
 
-// CORS headers for browser requests
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
+
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-const supabaseUrl = Deno.env.get("SUPABASE_URL") as string;
-const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
-
-const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
-
-interface CacheRequest {
-  source: string;
-  startDate: string;
-  endDate: string;
-  forceRefresh?: boolean;
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 }
 
-interface CacheStatus {
-  isCached: boolean;
-  isPartial: boolean;
-  segmentsFound: number;
-  missingStartDate: string | null;
-  missingEndDate: string | null;
-}
-
-serve(async (req: Request) => {
-  console.log(`Cache manager function called with method: ${req.method}`);
-  
+serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const requestData: CacheRequest = await req.json();
-    const { source, startDate, endDate, forceRefresh = false } = requestData;
-    
-    console.log(`Cache request for ${source} data from ${startDate} to ${endDate}, forceRefresh: ${forceRefresh}`);
-    
-    // Generate a unique request ID
-    const requestId = crypto.randomUUID();
-    
-    // Get user agent for tracking
-    const userAgent = req.headers.get("user-agent") || "";
-    
-    // Start timing the operation
-    const startTime = Date.now();
-    
-    // If force refresh is requested, we skip cache
-    if (forceRefresh) {
-      console.log("Force refresh requested, skipping cache check");
-      
-      // Log cache metrics
-      await supabase.from("cache_metrics").insert({
-        source,
-        start_date: startDate,
-        end_date: endDate,
-        cache_hit: false,
-        partial_hit: false,
-        refresh_triggered: true,
-        request_id: requestId,
-        user_agent: userAgent
-      });
-      
-      // Fetch the data from the appropriate source - we'll invoke the respective function
-      let functionName: string;
-      switch (source.toLowerCase()) {
-        case 'zoho':
-          functionName = "zoho-transactions";
-          break;
-        case 'stripe':
-          functionName = "stripe-balance";
-          break;
-        default:
-          throw new Error(`Unknown data source: ${source}`);
-      }
-      
-      // Call the appropriate function to get fresh data
-      console.log(`Calling ${functionName} to get fresh data`);
-      const { data: freshData, error: functionError } = await supabase.functions.invoke(
-        functionName,
-        {
-          body: {
-            startDate,
-            endDate,
-            forceRefresh: true
-          }
-        }
-      );
-      
-      if (functionError) {
-        console.error(`Error calling ${functionName}:`, functionError);
-        throw new Error(`Failed to fetch fresh data: ${functionError.message}`);
-      }
-      
-      // Calculate request duration
-      const duration = Date.now() - startTime;
-      
-      // Store the transactions in the cache
-      if (freshData && freshData.transactions) {
-        // Insert new cache segment
-        const { data: segmentData, error: segmentError } = await supabase
-          .from('cache_segments')
-          .insert({
-            source,
-            start_date: startDate,
-            end_date: endDate,
-            transaction_count: freshData.transactions.length,
-            status: 'complete',
-            last_refreshed_at: new Date().toISOString()
-          })
-          .select()
-          .single();
-          
-        if (segmentError) {
-          console.error("Error creating cache segment:", segmentError);
-          throw new Error(`Failed to create cache segment: ${segmentError.message}`);
-        }
-        
-        // Only store transactions if we have any
-        if (freshData.transactions.length > 0) {
-          // Format transactions for storage
-          const formattedTransactions = freshData.transactions.map((t: any) => ({
-            external_id: t.id,
-            date: t.date.split('T')[0],
-            amount: t.amount,
-            description: t.description,
-            category: t.category || null,
-            type: t.type,
-            source: t.source,
-            fees: t.fees || null,
-            gross: t.gross || null,
-            metadata: t.metadata || {},
-            fetched_at: new Date().toISOString()
-          }));
-          
-          // Store transactions in batches
-          const batchSize = 100;
-          let storageSuccess = true;
-          
-          for (let i = 0; i < formattedTransactions.length; i += batchSize) {
-            const batch = formattedTransactions.slice(i, i + batchSize);
-            const { error: batchError } = await supabase
-              .from('cached_transactions')
-              .upsert(batch, { 
-                onConflict: 'source,external_id',
-                ignoreDuplicates: true
-              });
-              
-            if (batchError) {
-              console.error(`Error storing batch ${i/batchSize + 1}:`, batchError);
-              storageSuccess = false;
-              
-              // Update segment to partial if we had an error
-              await supabase
-                .from('cache_segments')
-                .update({
-                  status: 'partial',
-                  transaction_count: i
-                })
-                .eq('id', segmentData.id);
-                
-              break;
-            }
-          }
-          
-          // Update cache metrics with success and transaction count
-          await supabase
-            .from('cache_metrics')
-            .update({
-              transaction_count: freshData.transactions.length,
-              fetch_duration_ms: duration
-            })
-            .eq('request_id', requestId);
-            
-          // Return the fresh data
-          return new Response(
-            JSON.stringify({
-              cached: false,
-              success: storageSuccess,
-              data: freshData.transactions,
-              status: "refreshed",
-              metrics: {
-                source,
-                startDate,
-                endDate,
-                transactionCount: freshData.transactions.length,
-                fetchDuration: duration,
-                cacheHit: false
-              }
-            }),
-            { 
-              status: 200, 
-              headers: { ...corsHeaders, "Content-Type": "application/json" } 
-            }
-          );
-        }
-      }
-      
-      // If we got here, we didn't have any transactions to store
-      return new Response(
-        JSON.stringify({
-          cached: false,
-          status: "refresh_requested",
-          success: true
-        }),
-        { 
-          status: 200, 
-          headers: { ...corsHeaders, "Content-Type": "application/json" } 
-        }
-      );
+    // Create a Supabase client with the Auth context of the function
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    )
+
+    // Handle only POST requests
+    if (req.method !== 'POST') {
+      return new Response(JSON.stringify({ 
+        error: 'Method not allowed', 
+        message: 'Only POST requests are allowed' 
+      }), { 
+        status: 405, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      })
     }
 
-    // Check if we have this date range cached
-    const { data: cacheStatus, error: cacheCheckError } = await supabase.rpc(
-      "is_date_range_cached",
-      {
-        p_source: source,
-        p_start_date: startDate,
-        p_end_date: endDate
-      }
-    );
-    
-    if (cacheCheckError) {
-      console.error("Error checking cache status:", cacheCheckError);
-      throw new Error(`Cache check failed: ${cacheCheckError.message}`);
+    // Parse request body
+    const requestData = await req.json()
+    const { source, startDate, endDate, forceRefresh = false } = requestData
+
+    // Validate required parameters
+    if (!source || !startDate || !endDate) {
+      return new Response(JSON.stringify({ 
+        error: 'Bad request', 
+        message: 'Missing required parameters: source, startDate, endDate' 
+      }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      })
     }
+
+    console.log(`Cache manager function called with method: ${req.method}`)
+    console.log(`Cache request for ${source} data from ${startDate} to ${endDate}, forceRefresh: ${forceRefresh}`)
+
+    // Check if we're dealing with a monthly request (first day of month to last day)
+    const startDateObj = new Date(startDate)
+    const endDateObj = new Date(endDate)
+    const startYear = startDateObj.getFullYear()
+    const startMonth = startDateObj.getMonth() + 1 // JavaScript months are 0-indexed
+    const isFirstDayOfMonth = startDateObj.getDate() === 1
     
-    console.log("Cache status:", cacheStatus);
+    // Check if end date is last day of month
+    const lastDayOfMonth = new Date(startYear, startMonth, 0).getDate()
+    const isLastDayOfMonth = endDateObj.getDate() === lastDayOfMonth
     
-    // Extract cache status
-    const { is_cached, is_partial, segments_found, missing_start_date, missing_end_date } = cacheStatus[0] as {
-      is_cached: boolean,
-      is_partial: boolean,
-      segments_found: number,
-      missing_start_date: string | null,
-      missing_end_date: string | null
-    };
+    // Check if exactly one month range
+    const isSameYearMonth = 
+      startDateObj.getFullYear() === endDateObj.getFullYear() &&
+      startDateObj.getMonth() === endDateObj.getMonth()
     
-    // Calculate request duration
-    const duration = Date.now() - startTime;
-    
-    // Log cache metrics
-    await supabase.from("cache_metrics").insert({
-      source,
-      start_date: startDate,
-      end_date: endDate,
-      cache_hit: is_cached,
-      partial_hit: is_partial,
-      refresh_triggered: false,
-      fetch_duration_ms: duration,
-      request_id: requestId,
-      user_agent: userAgent
-    });
-    
-    // If we have a full cache hit, get the transactions
-    if (is_cached && !is_partial) {
-      console.log(`Complete cache hit for ${source} from ${startDate} to ${endDate}`);
+    const isExactlyOneMonth = isSameYearMonth && isFirstDayOfMonth && isLastDayOfMonth
+
+    // If it's a monthly request, use the new approach
+    if (isExactlyOneMonth || forceRefresh) {
+      try {
+        // Check if the month is cached using new function
+        const { data: monthCached, error: monthError } = await supabaseClient
+          .rpc('is_month_cached', {
+            p_source: source,
+            p_year: startYear,
+            p_month: startMonth
+          })
+          
+        if (monthError) {
+          throw new Error(`Error checking monthly cache: ${monthError.message}`)
+        }
+        
+        if (monthCached && monthCached.length > 0 && monthCached[0].is_cached && !forceRefresh) {
+          // Month is cached, return the transactions
+          const { data: transactions, error: txError } = await supabaseClient
+            .from('cached_transactions')
+            .select('*')
+            .eq('source', source)
+            .eq('year', startYear)
+            .eq('month', startMonth)
+
+          if (txError) {
+            throw new Error(`Error fetching cached transactions: ${txError.message}`)
+          }
+
+          console.log(`Complete cache hit for ${source} from ${startDate} to ${endDate}`)
+          
+          // Return cache hit response with transactions
+          return new Response(JSON.stringify({
+            cached: true,
+            status: 'complete',
+            data: transactions,
+            partial: false,
+            metrics: {
+              source,
+              startDate,
+              endDate,
+              transactionCount: transactions?.length || 0,
+              cacheHit: true,
+              partialHit: false
+            }
+          }), { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          })
+        } else {
+          // Month is not cached
+          console.log(`Cache miss for ${source} from ${startDate} to ${endDate}`)
+
+          // Use the request ID from the header if available, for tracking
+          const requestId = req.headers.get('x-request-id') || crypto.randomUUID()
+
+          // Record the cache miss or refresh request
+          await supabaseClient
+            .from('cache_metrics')
+            .insert({
+              source,
+              start_date: startDate,
+              end_date: endDate,
+              cache_hit: false,
+              partial_hit: false,
+              refresh_triggered: forceRefresh,
+              request_id: requestId,
+              user_agent: req.headers.get('user-agent')
+            })
+
+          // Return cache miss response
+          return new Response(JSON.stringify({
+            cached: false,
+            status: forceRefresh ? 'force_refresh' : 'missing',
+            partial: false,
+            missingRanges: {
+              startDate,
+              endDate
+            },
+            metrics: {
+              source,
+              startDate,
+              endDate,
+              cacheHit: false,
+              partialHit: false
+            }
+          }), { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          })
+        }
+      } catch (error: any) {
+        console.error(`Error checking cache status: ${error}`)
+        throw new Error(`Cache check failed: ${error.message}`)
+      }
+    } else {
+      // For more complex date ranges, we need to check if multiple months are cached
+      // Extract all months in the date range
+      const months: { year: number, month: number }[] = []
+      let currentDate = new Date(startDateObj)
       
-      // Fetch the cached transactions
-      const { data: transactions, error: fetchError } = await supabase
-        .from("cached_transactions")
-        .select("*")
-        .eq("source", source)
-        .gte("date", startDate)
-        .lte("date", endDate)
-        .order("date", { ascending: true });
-      
-      if (fetchError) {
-        console.error("Error fetching cached transactions:", fetchError);
-        throw new Error(`Transaction fetch failed: ${fetchError.message}`);
+      while (currentDate <= endDateObj) {
+        months.push({
+          year: currentDate.getFullYear(),
+          month: currentDate.getMonth() + 1
+        })
+        
+        // Move to next month
+        currentDate.setMonth(currentDate.getMonth() + 1)
       }
       
-      // Update the metrics with transaction count
-      await supabase
-        .from("cache_metrics")
-        .update({ transaction_count: transactions.length })
-        .eq("request_id", requestId);
+      // Check if all months in range are cached
+      let allCached = true
+      let transactionCount = 0
       
-      return new Response(
-        JSON.stringify({
+      for (const { year, month } of months) {
+        const { data: monthCached, error: monthError } = await supabaseClient
+          .rpc('is_month_cached', {
+            p_source: source,
+            p_year: year,
+            p_month: month
+          })
+          
+        if (monthError || !monthCached || monthCached.length === 0 || !monthCached[0].is_cached) {
+          allCached = false
+          break
+        }
+        
+        transactionCount += monthCached[0].transaction_count || 0
+      }
+      
+      if (allCached && !forceRefresh) {
+        // All months in range are cached, fetch all transactions
+        const { data: transactions, error: txError } = await supabaseClient
+          .from('cached_transactions')
+          .select('*')
+          .eq('source', source)
+          .gte('date', startDate)
+          .lte('date', endDate)
+
+        if (txError) {
+          throw new Error(`Error fetching cached transactions: ${txError.message}`)
+        }
+
+        console.log(`Complete cache hit for ${source} from ${startDate} to ${endDate}`)
+        
+        // Return cache hit response with transactions
+        return new Response(JSON.stringify({
           cached: true,
+          status: 'complete',
           data: transactions,
-          status: "complete",
+          partial: false,
           metrics: {
             source,
             startDate,
             endDate,
-            transactionCount: transactions.length,
-            fetchDuration: duration,
+            transactionCount: transactions?.length || 0,
             cacheHit: true,
+            partialHit: false
           }
-        }),
-        { 
+        }), { 
           status: 200, 
-          headers: { ...corsHeaders, "Content-Type": "application/json" } 
-        }
-      );
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        })
+      } else {
+        // Not all months are cached
+        console.log(`Cache miss or force refresh for ${source} from ${startDate} to ${endDate}`)
+
+        // Record the cache miss or refresh request
+        const requestId = req.headers.get('x-request-id') || crypto.randomUUID()
+        await supabaseClient
+          .from('cache_metrics')
+          .insert({
+            source,
+            start_date: startDate,
+            end_date: endDate,
+            cache_hit: false,
+            partial_hit: false,
+            refresh_triggered: forceRefresh,
+            request_id: requestId,
+            user_agent: req.headers.get('user-agent')
+          })
+
+        // Return cache miss response
+        return new Response(JSON.stringify({
+          cached: false,
+          status: forceRefresh ? 'force_refresh' : 'missing',
+          partial: false,
+          missingRanges: {
+            startDate,
+            endDate
+          },
+          metrics: {
+            source,
+            startDate,
+            endDate,
+            cacheHit: false,
+            partialHit: false
+          }
+        }), { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        })
+      }
     }
+  } catch (error: any) {
+    console.error(`Error in cache-manager function: ${error}`)
     
-    // For partial or no cache, return the cache status
-    return new Response(
-      JSON.stringify({
-        cached: false,
-        partial: is_partial,
-        status: is_partial ? "partial" : "miss",
-        segments: segments_found,
-        missingRanges: {
-          startDate: missing_start_date,
-          endDate: missing_end_date
-        },
-        metrics: {
-          source,
-          startDate,
-          endDate,
-          duration,
-          cacheHit: false,
-          partialHit: is_partial
-        }
-      }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
-      }
-    );
-  } catch (error) {
-    console.error("Error in cache-manager function:", error);
-    
-    return new Response(
-      JSON.stringify({ 
-        error: "Cache manager error", 
-        details: error.message 
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
-      }
-    );
+    return new Response(JSON.stringify({
+      error: error.message,
+      cached: false,
+      status: 'error'
+    }), { 
+      status: 500, 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    })
   }
-});
+})

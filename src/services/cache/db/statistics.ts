@@ -42,20 +42,20 @@ export class StatsRepository extends CacheDbClient {
         { source: 'Stripe', count: stripeCount || 0 }
       ];
       
-      // Get count of Zoho segments
-      const { count: zohoSegmentCount, error: zohoSegmentError } = await this.getClient()
-        .from('cache_segments')
-        .select('*', { count: 'exact', head: true })
+      // Get count of monthly cache entries for Zoho
+      const { data: zohoMonthlyData, error: zohoMonthlyError } = await this.getClient()
+        .from('monthly_cache')
+        .select('*', { count: 'exact' })
         .eq('source', 'Zoho');
         
-      // Get count of Stripe segments
-      const { count: stripeSegmentCount, error: stripeSegmentError } = await this.getClient()
-        .from('cache_segments')
-        .select('*', { count: 'exact', head: true })
+      // Get count of monthly cache entries for Stripe
+      const { data: stripeMonthlyData, error: stripeMonthlyError } = await this.getClient()
+        .from('monthly_cache')
+        .select('*', { count: 'exact' })
         .eq('source', 'Stripe');
         
-      if (zohoSegmentError || stripeSegmentError) {
-        this.logError("Error getting segment stats", zohoSegmentError || stripeSegmentError);
+      if (zohoMonthlyError || stripeMonthlyError) {
+        this.logError("Error getting monthly cache stats", zohoMonthlyError || stripeMonthlyError);
         return { 
           transactions, 
           segments: [], 
@@ -67,10 +67,10 @@ export class StatsRepository extends CacheDbClient {
         };
       }
       
-      // Format segment counts
+      // Format monthly cache counts
       const segments: CacheSourceStats[] = [
-        { source: 'Zoho', count: zohoSegmentCount || 0 },
-        { source: 'Stripe', count: stripeSegmentCount || 0 }
+        { source: 'Zoho', count: zohoMonthlyData?.length || 0 },
+        { source: 'Stripe', count: stripeMonthlyData?.length || 0 }
       ];
       
       // Get recent cache metrics
@@ -158,10 +158,95 @@ export class StatsRepository extends CacheDbClient {
         this.logError("Error clearing cached transactions", error);
         return false;
       }
+
+      // Also clear monthly cache entries if we're deleting transactions
+      if (startDate && endDate) {
+        const startYear = parseInt(startDate.split('-')[0]);
+        const startMonth = parseInt(startDate.split('-')[1]);
+        const endYear = parseInt(endDate.split('-')[0]);
+        const endMonth = parseInt(endDate.split('-')[1]);
+
+        // Handle case where we might be deleting transactions from multiple months
+        let monthlyQuery = this.getClient().from('monthly_cache').delete();
+
+        if (source) {
+          monthlyQuery = monthlyQuery.eq('source', source);
+        }
+
+        // We'll need a more complex query to handle multi-month ranges
+        if (startYear === endYear) {
+          // Same year, check if same or different months
+          monthlyQuery = monthlyQuery
+            .eq('year', startYear)
+            .gte('month', startMonth)
+            .lte('month', endMonth);
+        } else {
+          // Different years, need to use OR logic which is more complex in Supabase
+          // For now, fetch and delete manually
+          const { data: monthsToDelete } = await this.getClient()
+            .from('monthly_cache')
+            .select('*')
+            .or(`year.gt.${startYear},and(year.eq.${startYear},month.gte.${startMonth})`)
+            .or(`year.lt.${endYear},and(year.eq.${endYear},month.lte.${endMonth})`);
+          
+          if (monthsToDelete && monthsToDelete.length > 0) {
+            const ids = monthsToDelete.map(m => m.id);
+            const { error: deleteError } = await this.getClient()
+              .from('monthly_cache')
+              .delete()
+              .in('id', ids);
+              
+            if (deleteError) {
+              this.logError("Error clearing monthly cache entries", deleteError);
+            }
+          }
+          
+          return true;
+        }
+        
+        const { error: monthlyError } = await monthlyQuery;
+        
+        if (monthlyError) {
+          this.logError("Error clearing monthly cache", monthlyError);
+        }
+      }
       
       return true;
     } catch (err) {
       this.logError("Exception clearing cached transactions", err);
+      return false;
+    }
+  }
+
+  /**
+   * Clear monthly cache
+   */
+  async clearMonthlyCache(source?: CacheSource, year?: number, month?: number): Promise<boolean> {
+    try {
+      let query = this.getClient().from('monthly_cache').delete();
+      
+      if (source) {
+        query = query.eq('source', source);
+      }
+      
+      if (year) {
+        query = query.eq('year', year);
+      }
+      
+      if (month) {
+        query = query.eq('month', month);
+      }
+      
+      const { error } = await query;
+      
+      if (error) {
+        this.logError("Error clearing monthly cache", error);
+        return false;
+      }
+      
+      return true;
+    } catch (err) {
+      this.logError("Exception clearing monthly cache", err);
       return false;
     }
   }

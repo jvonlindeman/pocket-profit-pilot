@@ -58,6 +58,15 @@ export interface CacheSegmentInfo {
   transaction_count: number;
 }
 
+// Monthly cache information 
+export interface MonthlyCacheInfo {
+  id: string;
+  year: number;
+  month: number;
+  transaction_count: number;
+  status: string;
+}
+
 // Cache clear options
 export interface CacheClearOptions {
   source?: CacheSource | 'all';
@@ -75,11 +84,11 @@ export interface CacheSourceStats {
 export interface DetailedCacheStats {
   transactions: CacheSourceStats[];
   segments: CacheSourceStats[];
-  recentMetrics: any[]; // Add this property
-  hitRate: string;      // Add this property
-  hits: number;         // Add this property
-  misses: number;       // Add this property
-  lastUpdated: string;  // Add this property
+  recentMetrics: any[]; 
+  hitRate: string;
+  hits: number;
+  misses: number;
+  lastUpdated: string;
 }
 
 // Cache statistics used in admin dashboard

@@ -4,6 +4,7 @@ import { Transaction } from "../../types/financial";
 import { segmentRepository } from "./db/segments";
 import { transactionRepository } from "./db/transactions";
 import { statsRepository } from "./db/statistics";
+import { monthlyRepository } from "./db/monthly";
 
 /**
  * CacheStorage handles all database interactions for the cache system
@@ -11,7 +12,85 @@ import { statsRepository } from "./db/statistics";
  */
 export class CacheStorage {
   /**
+   * Check if a month is cached
+   */
+  async isMonthCached(
+    source: CacheSource | string,
+    year: number,
+    month: number
+  ): Promise<boolean> {
+    const result = await monthlyRepository.isMonthCached(source, year, month);
+    return result.isCached;
+  }
+
+  /**
+   * Get transactions for a specific month
+   */
+  async getMonthTransactions(
+    source: CacheSource | string,
+    year: number,
+    month: number
+  ): Promise<Transaction[]> {
+    return monthlyRepository.getMonthTransactions(source, year, month);
+  }
+
+  /**
+   * Store transactions for a specific month
+   */
+  async storeMonthTransactions(
+    source: CacheSource | string,
+    year: number,
+    month: number,
+    transactions: Transaction[]
+  ): Promise<boolean> {
+    return monthlyRepository.storeMonthTransactions(source, year, month, transactions);
+  }
+
+  /**
+   * Get information about a monthly cache entry
+   */
+  async getMonthCacheInfo(
+    source: CacheSource | string,
+    year: number,
+    month: number
+  ): Promise<{ id: string; transaction_count: number } | null> {
+    try {
+      const { data, error } = await monthlyRepository.getClient()
+        .from('monthly_cache')
+        .select('id, transaction_count')
+        .eq('source', source)
+        .eq('year', year)
+        .eq('month', month)
+        .single();
+
+      if (error || !data) {
+        return null;
+      }
+
+      return {
+        id: data.id,
+        transaction_count: data.transaction_count
+      };
+    } catch (err) {
+      console.error("Exception getting month cache info:", err);
+      return null;
+    }
+  }
+
+  /**
+   * Clear monthly cache
+   */
+  async clearMonthlyCache(
+    source?: CacheSource,
+    year?: number,
+    month?: number
+  ): Promise<boolean> {
+    return statsRepository.clearMonthlyCache(source, year, month);
+  }
+
+  /**
    * Check if a date range exists in cache using database function
+   * Legacy method kept for backward compatibility
    */
   async checkDateRangeCached(
     source: CacheSource | string,
@@ -23,6 +102,7 @@ export class CacheStorage {
 
   /**
    * Retrieve transactions from cache
+   * Legacy method kept for backward compatibility
    */
   async getTransactions(
     source: CacheSource | string,
@@ -34,6 +114,7 @@ export class CacheStorage {
 
   /**
    * Store transactions in cache
+   * Legacy method kept for backward compatibility
    */
   async storeTransactions(
     source: CacheSource | string,
@@ -79,6 +160,7 @@ export class CacheStorage {
 
   /**
    * Get cache segment information
+   * Legacy method kept for backward compatibility
    */
   async getCacheSegmentInfo(
     source: CacheSource | string,

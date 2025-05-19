@@ -1,0 +1,184 @@
+
+import { CacheDbClient } from "./client";
+import { CacheSource } from "../types";
+import { Transaction } from "../../../types/financial";
+
+/**
+ * MonthlyRepository handles all month-based cache operations
+ */
+export class MonthlyRepository extends CacheDbClient {
+  /**
+   * Check if a specific month is cached for a source
+   */
+  async isMonthCached(
+    source: CacheSource | string,
+    year: number,
+    month: number
+  ): Promise<{ isCached: boolean, transactionCount: number }> {
+    try {
+      // Call the database function to check if month is cached
+      const { data, error } = await this.getClient()
+        .rpc('is_month_cached', {
+          p_source: source,
+          p_year: year,
+          p_month: month
+        });
+
+      if (error) {
+        this.logError("Error checking if month is cached", error);
+        return { isCached: false, transactionCount: 0 };
+      }
+
+      if (data && data.length > 0) {
+        return { 
+          isCached: data[0].is_cached || false, 
+          transactionCount: data[0].transaction_count || 0 
+        };
+      }
+
+      return { isCached: false, transactionCount: 0 };
+    } catch (err) {
+      this.logError("Exception checking if month is cached", err);
+      return { isCached: false, transactionCount: 0 };
+    }
+  }
+
+  /**
+   * Get transactions for a specific month
+   */
+  async getMonthTransactions(
+    source: CacheSource | string,
+    year: number,
+    month: number
+  ): Promise<Transaction[]> {
+    try {
+      const { data, error } = await this.getClient()
+        .from('cached_transactions')
+        .select('*')
+        .eq('source', source)
+        .eq('year', year)
+        .eq('month', month);
+
+      if (error) {
+        this.logError("Error fetching monthly transactions", error);
+        return [];
+      }
+
+      return data as Transaction[];
+    } catch (err) {
+      this.logError("Exception retrieving monthly transactions", err);
+      return [];
+    }
+  }
+
+  /**
+   * Store transactions for a specific month
+   */
+  async storeMonthTransactions(
+    source: CacheSource | string,
+    year: number,
+    month: number,
+    transactions: Transaction[]
+  ): Promise<boolean> {
+    try {
+      console.log(`Storing ${transactions.length} transactions for ${source} ${year}-${month}...`);
+      
+      // Format transactions for the database, ensuring year and month are set
+      const dbTransactions = transactions.map(t => {
+        const transactionDate = new Date(t.date);
+        return {
+          external_id: t.id,
+          date: t.date.split('T')[0], // Ensure we just get the date part
+          year: year,
+          month: month,
+          amount: t.amount,
+          description: t.description,
+          category: t.category,
+          type: t.type,
+          source: t.source,
+          fees: t.fees || null,
+          gross: t.gross || null,
+          metadata: t.metadata || {},
+          fetched_at: new Date().toISOString()
+        };
+      });
+      
+      // Store transactions in batches to avoid payload limits
+      const batchSize = 100;
+      let totalStored = 0;
+      
+      for (let i = 0; i < dbTransactions.length; i += batchSize) {
+        const batch = dbTransactions.slice(i, i + batchSize);
+        const { error } = await this.getClient()
+          .from('cached_transactions')
+          .upsert(batch, { 
+            onConflict: 'source,external_id',
+            ignoreDuplicates: true
+          });
+          
+        if (error) {
+          this.logError(`Error storing batch ${i/batchSize + 1}`, error);
+          return false;
+        }
+        
+        totalStored += batch.length;
+        console.log(`Stored batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(dbTransactions.length/batchSize)} (${batch.length} transactions)`);
+      }
+      
+      // Create or update monthly cache entry
+      const { error: monthlyError } = await this.getClient()
+        .from('monthly_cache')
+        .upsert({
+          source: source,
+          year: year,
+          month: month,
+          transaction_count: transactions.length,
+          status: 'complete',
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'source,year,month'
+        });
+      
+      if (monthlyError) {
+        this.logError("Error updating monthly cache", monthlyError);
+        return false;
+      }
+      
+      console.log(`Successfully stored ${totalStored} transactions for ${source} ${year}-${month}`);
+      return true;
+    } catch (err) {
+      this.logError("Exception storing monthly transactions", err);
+      return false;
+    }
+  }
+
+  /**
+   * Get all cached months for a source
+   */
+  async getCachedMonths(source: CacheSource | string): Promise<{ year: number, month: number, count: number }[]> {
+    try {
+      const { data, error } = await this.getClient()
+        .from('monthly_cache')
+        .select('*')
+        .eq('source', source)
+        .order('year', { ascending: false })
+        .order('month', { ascending: false });
+
+      if (error) {
+        this.logError("Error fetching cached months", error);
+        return [];
+      }
+
+      return data.map(item => ({
+        year: item.year,
+        month: item.month,
+        count: item.transaction_count
+      }));
+    } catch (err) {
+      this.logError("Exception retrieving cached months", err);
+      return [];
+    }
+  }
+}
+
+export const monthlyRepository = new MonthlyRepository();
