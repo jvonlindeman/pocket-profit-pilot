@@ -32,7 +32,15 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
   const remainingZohoIncome = adjustedZohoIncome - totalZohoDeductions;
   const halfStripeIncome = stripeIncome / 2;
   const halfRemainingZoho = remainingZohoIncome / 2;
+  
+  // Nuevo cálculo: 7% adicional sobre el 50% de Zoho Restante para cubrir ITBMs
+  const itbmCoveragePercentage = 7;
+  const itbmCoverageAmount = (halfRemainingZoho * itbmCoveragePercentage) / 100;
+  const halfRemainingZohoWithItbm = halfRemainingZoho + itbmCoverageAmount;
+  
+  // El salario ahora incluye el ajuste para cubrir ITBMs
   const salary = halfStripeIncome + halfRemainingZoho;
+  const salaryWithItbmCoverage = halfStripeIncome + halfRemainingZohoWithItbm;
   
   // Formato para valores monetarios
   const formatCurrency = (amount: number) => {
@@ -327,19 +335,67 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                     <p className="text-xs">Mitad del ingreso restante de Zoho</p>
                   </TooltipContent>
                 </Tooltip>
+
+                {/* NUEVO: 50% de Zoho Restante + 7% para ITBM */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="bg-white p-3 rounded-md shadow-sm border border-purple-100">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="text-xs text-gray-500">50% Zoho + {itbmCoveragePercentage}% (ITBM)</p>
+                          <p className="font-medium text-purple-600">{formatCurrency(halfRemainingZohoWithItbm)}</p>
+                        </div>
+                        <div className="bg-purple-100 p-2 rounded-full">
+                          <Percent className="h-4 w-4 text-purple-600" />
+                        </div>
+                      </div>
+                      <p className="text-xs text-purple-600 mt-2">Incluye adicional para cubrir ITBM</p>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">50% del Zoho restante más 7% adicional para cubrir ITBM</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </div>
             
-            {/* Resultado final del cálculo con explicación */}
-            <div className="mt-6">
+            {/* Resultados finales de cálculo con explicación */}
+            <div className="mt-6 space-y-4">
+              {/* Salario base */}
               <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 rounded-lg text-white">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-blue-100">Fórmula del cálculo:</p>
+                    <p className="text-xs text-blue-100">Fórmula del cálculo estándar:</p>
                     <p className="font-medium">50% de Stripe + 50% de Zoho Restante = Salario</p>
                   </div>
                   <div className="text-xl font-bold">
                     {formatCurrency(salary)}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Salario con ajuste ITBM */}
+              <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 rounded-lg text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-purple-100">Con ajuste para ITBM ({itbmCoveragePercentage}%):</p>
+                    <p className="font-medium">50% de Stripe + 50% de Zoho Restante + {itbmCoveragePercentage}% ITBM</p>
+                  </div>
+                  <div className="text-xl font-bold">
+                    {formatCurrency(salaryWithItbmCoverage)}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Diferencia */}
+              <div className="bg-white p-3 rounded-md shadow-sm border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-500">ITBM Adicional a Facturar</p>
+                    <p className="text-sm text-gray-700">(Diferencia para cubrir el ITBM)</p>
+                  </div>
+                  <div className="text-lg font-bold text-purple-600">
+                    {formatCurrency(itbmCoverageAmount)}
                   </div>
                 </div>
               </div>
