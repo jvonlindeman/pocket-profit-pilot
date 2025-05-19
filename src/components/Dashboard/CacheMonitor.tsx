@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useCache } from '@/contexts/CacheContext';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Database, XCircle } from 'lucide-react';
@@ -13,10 +13,10 @@ interface CacheMonitorProps {
 const CacheMonitor = ({ dateRange, onRefresh }: CacheMonitorProps) => {
   const { isCacheEnabled, toggleCache, forceCacheRefresh, cacheStats, isLoading } = useCache();
   
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     forceCacheRefresh();
     if (onRefresh) onRefresh();
-  };
+  }, [forceCacheRefresh, onRefresh]);
   
   if (!cacheStats) return null;
 

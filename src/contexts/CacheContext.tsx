@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import CacheService from '@/services/cache';
 
@@ -9,6 +9,7 @@ interface CacheContextState {
   forceCacheRefresh: () => void;
   cacheStats: any | null;
   isLoading: boolean;
+  lastUpdated: string | null;
 }
 
 const CacheContext = createContext<CacheContextState | undefined>(undefined);
@@ -18,6 +19,7 @@ export const CacheProvider = ({ children }: { children: ReactNode }) => {
   const [isCacheEnabled, setIsCacheEnabled] = useState<boolean>(true);
   const [cacheStats, setCacheStats] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   // Initialize state from URL params
   useEffect(() => {
@@ -27,8 +29,22 @@ export const CacheProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [searchParams]);
 
+  // Load cache statistics
+  const loadCacheStats = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const stats = await CacheService.getCacheStats();
+      setCacheStats(stats);
+      setLastUpdated(new Date().toISOString());
+    } catch (error) {
+      console.error("Error loading cache stats:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   // Toggle cache state
-  const toggleCache = () => {
+  const toggleCache = useCallback(() => {
     const newState = !isCacheEnabled;
     setIsCacheEnabled(newState);
     
@@ -39,28 +55,15 @@ export const CacheProvider = ({ children }: { children: ReactNode }) => {
       searchParams.set('nocache', 'true');
     }
     setSearchParams(searchParams);
-  };
+  }, [isCacheEnabled, searchParams, setSearchParams]);
 
   // Force refresh of cache
-  const forceCacheRefresh = () => {
+  const forceCacheRefresh = useCallback(() => {
     searchParams.set('refresh', Date.now().toString());
     setSearchParams(searchParams);
-  };
+  }, [searchParams, setSearchParams]);
 
-  // Load cache statistics
-  const loadCacheStats = async () => {
-    try {
-      setIsLoading(true);
-      const stats = await CacheService.getCacheStats();
-      setCacheStats(stats);
-    } catch (error) {
-      console.error("Error loading cache stats:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Load cache stats on initial load
+  // Load cache stats on initial load and set up refresh interval
   useEffect(() => {
     loadCacheStats();
     
@@ -70,7 +73,7 @@ export const CacheProvider = ({ children }: { children: ReactNode }) => {
     }, 5 * 60 * 1000);
     
     return () => clearInterval(interval);
-  }, []);
+  }, [loadCacheStats]);
 
   return (
     <CacheContext.Provider
@@ -80,6 +83,7 @@ export const CacheProvider = ({ children }: { children: ReactNode }) => {
         forceCacheRefresh,
         cacheStats,
         isLoading,
+        lastUpdated
       }}
     >
       {children}

@@ -1,15 +1,15 @@
 
-import { supabase } from "@/integrations/supabase/client";
-import { CacheStats } from "./cacheTypes";
+import { supabase } from "../../integrations/supabase/client";
+import { CacheStats } from "./types";
 
 /**
- * Cache statistics and metrics functions
+ * CacheMetrics provides functionality for analyzing cache performance
  */
-export const cacheMetrics = {
+export class CacheMetrics {
   /**
    * Get cache statistics for admin dashboard
    */
-  getCacheStats: async (): Promise<Partial<CacheStats> & { lastUpdated: string }> => {
+  async getCacheStats(): Promise<Partial<CacheStats> & { lastUpdated: string }> {
     try {
       // Get total cached transactions
       const { count: transactionCount, error: countError } = await supabase
@@ -81,7 +81,6 @@ export const cacheMetrics = {
       };
     } catch (err) {
       console.error("CacheMetrics: Error getting cache stats:", err);
-      // Fixed: Return type that matches the expected return type
       return {
         transactionCount: 0,
         segments: [],
@@ -93,4 +92,60 @@ export const cacheMetrics = {
       };
     }
   }
-};
+
+  /**
+   * Verify cache integrity for a date range
+   */
+  async verifyCacheIntegrity(
+    source: string,
+    startDate: string,
+    endDate: string
+  ): Promise<{
+    isConsistent: boolean;
+    segmentCount: number;
+    transactionCount: number;
+  }> {
+    try {
+      // Count segments
+      const { count: segmentCount, error: segmentError } = await supabase
+        .from('cache_segments')
+        .select('*', { count: 'exact', head: true })
+        .eq('source', source)
+        .lte('start_date', startDate)
+        .gte('end_date', endDate)
+        .eq('status', 'complete');
+        
+      if (segmentError) {
+        console.error("Error counting cache segments:", segmentError);
+        return { isConsistent: false, segmentCount: 0, transactionCount: 0 };
+      }
+      
+      // Count transactions
+      const { count: transactionCount, error: txError } = await supabase
+        .from('cached_transactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('source', source)
+        .gte('date', startDate)
+        .lte('date', endDate);
+        
+      if (txError) {
+        console.error("Error counting cache transactions:", txError);
+        return { isConsistent: false, segmentCount: 0, transactionCount: 0 };
+      }
+      
+      // Check consistency
+      const isConsistent = segmentCount > 0 && transactionCount > 0;
+      
+      return {
+        isConsistent,
+        segmentCount: segmentCount || 0,
+        transactionCount: transactionCount || 0
+      };
+    } catch (err) {
+      console.error("Exception verifying cache integrity:", err);
+      return { isConsistent: false, segmentCount: 0, transactionCount: 0 };
+    }
+  }
+}
+
+export const cacheMetrics = new CacheMetrics();

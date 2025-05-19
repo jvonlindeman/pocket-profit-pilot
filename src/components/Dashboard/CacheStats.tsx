@@ -1,10 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Loader2, RefreshCw } from 'lucide-react';
-import * as ZohoService from '@/services/zohoService';
 
 interface CacheStatsProps {
   dateRange: {
@@ -19,13 +18,18 @@ interface CacheStatsProps {
   onRefresh: () => void;
 }
 
-const CacheStats: React.FC<CacheStatsProps> = ({ dateRange, cacheStatus, isUsingCache, onRefresh }) => {
+const CacheStats: React.FC<CacheStatsProps> = ({ 
+  dateRange, 
+  cacheStatus, 
+  isUsingCache, 
+  onRefresh 
+}) => {
   const [loading, setLoading] = useState(false);
   const [localCacheStatus, setLocalCacheStatus] = useState(cacheStatus);
 
   // Store the cacheStatus in local state to prevent losing it during data fetching
   useEffect(() => {
-    if (cacheStatus.zoho.hit || cacheStatus.stripe.hit) {
+    if (cacheStatus?.zoho?.hit || cacheStatus?.stripe?.hit) {
       setLocalCacheStatus(cacheStatus);
     }
   }, [cacheStatus]);
@@ -40,31 +44,31 @@ const CacheStats: React.FC<CacheStatsProps> = ({ dateRange, cacheStatus, isUsing
     }
   }, [loading]);
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     setLoading(true);
     onRefresh();
-  };
+  }, [onRefresh]);
 
-  const totalCacheProgress = () => {
+  const totalCacheProgress = useCallback(() => {
     let progress = 0;
-    if (localCacheStatus.zoho.hit) progress += 50;
-    if (localCacheStatus.stripe.hit) progress += 50;
+    if (localCacheStatus?.zoho?.hit) progress += 50;
+    if (localCacheStatus?.stripe?.hit) progress += 50;
     return progress;
-  };
+  }, [localCacheStatus]);
 
-  const getCacheStatusMessage = () => {
+  const getCacheStatusMessage = useCallback(() => {
     if (isUsingCache) {
       return "Datos cargados desde la caché";
-    } else if (localCacheStatus.zoho.hit && localCacheStatus.stripe.hit) {
+    } else if (localCacheStatus?.zoho?.hit && localCacheStatus?.stripe?.hit) {
       return "Datos de Zoho y Stripe cargados desde la caché";
-    } else if (localCacheStatus.zoho.hit) {
+    } else if (localCacheStatus?.zoho?.hit) {
       return "Datos de Zoho cargados desde la caché";
-    } else if (localCacheStatus.stripe.hit) {
+    } else if (localCacheStatus?.stripe?.hit) {
       return "Datos de Stripe cargados desde la caché";
     } else {
       return "Cargando datos desde las APIs";
     }
-  };
+  }, [isUsingCache, localCacheStatus]);
 
   return (
     <Card>

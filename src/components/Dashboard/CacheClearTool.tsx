@@ -1,24 +1,28 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateRange } from "react-day-picker";
-import { toast } from "@/components/ui/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import DateRangePicker from "@/components/Dashboard/DateRangePicker";
 import { Trash } from 'lucide-react';
 import { formatDateYYYYMMDD } from "@/utils/dateUtils";
 import { endOfMonth, startOfMonth, subMonths } from 'date-fns';
-import CacheService from "@/services/cache";
-import type { DateRange as AppDateRange } from '@/types/financial';
+import { useCacheAdmin } from "@/hooks/cache/useCacheAdmin";
 
 const CacheClearTool: React.FC = () => {
   const [source, setSource] = useState<string>("all");
-  const [isClearing, setIsClearing] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [cacheStats, setCacheStats] = useState<any>(null);
-  const [isLoadingStats, setIsLoadingStats] = useState(false);
+  
+  // Use our new hook for cache administration
+  const { 
+    cacheStats, 
+    isLoadingStats, 
+    isClearingCache, 
+    loadCacheStats, 
+    clearCache 
+  } = useCacheAdmin();
   
   // Set default date range to last 3 months
   const today = new Date();
@@ -38,81 +42,26 @@ const CacheClearTool: React.FC = () => {
     }
   };
   
-  const loadCacheStats = async () => {
-    setIsLoadingStats(true);
-    try {
-      // Fix: Change getCacheDetailedStats to getDetailedStats
-      const stats = await CacheService.getDetailedStats();
-      setCacheStats(stats);
-    } catch (error) {
-      console.error("Error loading cache stats:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load cache statistics",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoadingStats(false);
-    }
-  };
+  // Load stats when component mounts
+  useEffect(() => {
+    loadCacheStats();
+  }, [loadCacheStats]);
   
   const handleClearCache = async () => {
-    setIsClearing(true);
-    try {
-      // Prepare options for cache clearing
-      const options: {
-        source?: 'Zoho' | 'Stripe' | 'all';
-        startDate?: Date;
-        endDate?: Date;
-      } = {};
-      
-      // Add source filter if selected
-      if (source !== "all") {
-        options.source = source as 'Zoho' | 'Stripe';
-      }
-      
-      // Add date range if selected
-      if (dateRange.from && dateRange.to) {
-        options.startDate = dateRange.from;
-        options.endDate = dateRange.to;
-      }
-      
-      // Clear the cache
-      const result = await CacheService.clearCache(options);
-      
-      if (result) {
-        toast({
-          title: "Cache Cleared",
-          description: "The selected cache data has been successfully cleared",
-          variant: "success"
-        });
-        
-        // Refresh cache stats
-        await loadCacheStats();
-      } else {
-        toast({
-          title: "Failed to Clear Cache",
-          description: "There was an error clearing the cache data",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error("Error clearing cache:", error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred while clearing the cache",
-        variant: "destructive"
-      });
-    } finally {
-      setIsClearing(false);
-      setIsDialogOpen(false);
+    if (!dateRange.from || !dateRange.to) {
+      return;
     }
+    
+    // Prepare options for cache clearing
+    const options = {
+      source: source !== "all" ? source as 'Zoho' | 'Stripe' : 'all',
+      startDate: dateRange.from,
+      endDate: dateRange.to
+    };
+    
+    await clearCache(options);
+    setIsDialogOpen(false);
   };
-  
-  // Load cache stats on component mount
-  React.useEffect(() => {
-    loadCacheStats();
-  }, []);
   
   return (
     <Card className="w-full mb-6">
@@ -162,23 +111,25 @@ const CacheClearTool: React.FC = () => {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <p className="text-xs text-muted-foreground">Transactions</p>
-                  {cacheStats.transactions && cacheStats.transactions.map((item: any) => (
-                    <p key={item.source} className="text-sm">
-                      {item.source}: <span className="font-medium">{item.count}</span>
-                    </p>
-                  ))}
-                  {(!cacheStats.transactions || cacheStats.transactions.length === 0) && (
+                  {cacheStats.transactions && cacheStats.transactions.length > 0 ? (
+                    cacheStats.transactions.map((item: any) => (
+                      <p key={item.source} className="text-sm">
+                        {item.source}: <span className="font-medium">{item.count}</span>
+                      </p>
+                    ))
+                  ) : (
                     <p className="text-sm text-muted-foreground">No cached transactions</p>
                   )}
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Cache Segments</p>
-                  {cacheStats.segments && cacheStats.segments.map((item: any) => (
-                    <p key={item.source} className="text-sm">
-                      {item.source}: <span className="font-medium">{item.count}</span>
-                    </p>
-                  ))}
-                  {(!cacheStats.segments || cacheStats.segments.length === 0) && (
+                  {cacheStats.segments && cacheStats.segments.length > 0 ? (
+                    cacheStats.segments.map((item: any) => (
+                      <p key={item.source} className="text-sm">
+                        {item.source}: <span className="font-medium">{item.count}</span>
+                      </p>
+                    ))
+                  ) : (
                     <p className="text-sm text-muted-foreground">No cache segments</p>
                   )}
                 </div>
@@ -198,13 +149,13 @@ const CacheClearTool: React.FC = () => {
         </div>
       </CardContent>
       <CardFooter className="flex justify-between">
-        <Button variant="outline" onClick={() => loadCacheStats()}>
+        <Button variant="outline" onClick={loadCacheStats} disabled={isLoadingStats}>
           Refresh Stats
         </Button>
         <Button 
           variant="destructive"
           onClick={() => setIsDialogOpen(true)}
-          disabled={isClearing}
+          disabled={isClearingCache}
         >
           Clear Cache
         </Button>
@@ -224,16 +175,16 @@ const CacheClearTool: React.FC = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isClearing}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isClearingCache}>Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={(e) => {
                 e.preventDefault();
                 handleClearCache();
               }}
-              disabled={isClearing}
+              disabled={isClearingCache}
               className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
             >
-              {isClearing ? "Clearing..." : "Clear Cache"}
+              {isClearingCache ? "Clearing..." : "Clear Cache"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

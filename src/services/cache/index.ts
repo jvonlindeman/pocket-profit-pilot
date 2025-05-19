@@ -1,8 +1,9 @@
 
 import { Transaction } from "../../types/financial";
-import { cacheOperations } from "./cacheOperations";
-import { cacheMetrics } from "./cacheMetrics";
-import { CacheResponse, CacheResult, CacheStats } from "./cacheTypes";
+import { cacheOperations } from "./operations";
+import { cacheMetrics } from "./metrics";
+import { cacheStorage } from "./storage";
+import { CacheResponse, CacheResult, CacheStats, DetailedCacheStats, CacheClearOptions } from "./types";
 
 /**
  * CacheService provides a unified API for working with the transaction cache
@@ -54,7 +55,11 @@ const CacheService = {
     startDate: Date,
     endDate: Date
   ): Promise<{ isConsistent: boolean, segmentCount: number, transactionCount: number }> => {
-    return cacheOperations.verifyCacheIntegrity(source, startDate, endDate);
+    return cacheMetrics.verifyCacheIntegrity(
+      source, 
+      startDate.toISOString().split("T")[0], 
+      endDate.toISOString().split("T")[0]
+    );
   },
   
   /**
@@ -73,24 +78,15 @@ const CacheService = {
    * @param options Clear cache options
    * @returns Promise<boolean> Success status
    */
-  clearCache: async (
-    options?: {
-      source?: 'Zoho' | 'Stripe' | 'all';
-      startDate?: Date;
-      endDate?: Date;
-    }
-  ): Promise<boolean> => {
+  clearCache: async (options?: CacheClearOptions): Promise<boolean> => {
     return cacheOperations.clearCache(options);
   },
   
   /**
    * Get detailed cache statistics
    */
-  getDetailedStats: async (): Promise<{
-    transactions: { source: string; count: number }[];
-    segments: { source: string; count: number }[];
-  }> => {
-    return cacheOperations.getCacheStats();
+  getDetailedStats: async (): Promise<DetailedCacheStats> => {
+    return cacheStorage.getDetailedStats();
   },
 
   /**
@@ -101,14 +97,9 @@ const CacheService = {
     startDate: Date,
     endDate: Date
   ): Promise<string | null> => {
-    try {
-      const { data } = await cacheOperations.getCacheSegmentInfo(source, startDate, endDate);
-      return data?.id || null;
-    } catch (error) {
-      console.error("Error getting cache segment id:", error);
-      return null;
-    }
+    return cacheOperations.getCacheSegmentId(source, startDate, endDate);
   }
 };
 
 export default CacheService;
+export { CacheClearOptions, CacheResponse, CacheResult, CacheStats, DetailedCacheStats };
