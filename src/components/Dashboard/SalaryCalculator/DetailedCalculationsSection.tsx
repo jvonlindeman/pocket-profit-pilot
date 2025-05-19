@@ -11,7 +11,7 @@ interface DetailedCalculationsSectionProps {
   taxReserveAmount: number;
   taxReservePercentage: number;
   remainingZohoIncome: number;
-  halfStripeIncome: number;
+  halfStripeIncome: number; // Keeping for backward compatibility
   halfRemainingZoho: number;
   halfRemainingZohoWithItbm: number;
   itbmCoveragePercentage: number;
@@ -24,7 +24,6 @@ export const DetailedCalculationsSection: React.FC<DetailedCalculationsSectionPr
   taxReserveAmount,
   taxReservePercentage,
   remainingZohoIncome,
-  halfStripeIncome,
   halfRemainingZoho,
   halfRemainingZohoWithItbm,
   itbmCoveragePercentage
@@ -118,26 +117,6 @@ export const DetailedCalculationsSection: React.FC<DetailedCalculationsSectionPr
             </TooltipTrigger>
             <TooltipContent>
               <p className="text-xs">Ingreso de Zoho después de todas las deducciones</p>
-            </TooltipContent>
-          </Tooltip>
-
-          {/* 50% de Stripe */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="bg-white p-3 rounded-md shadow-sm border border-blue-100">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-xs text-gray-500">50% de Stripe</p>
-                    <p className="font-medium text-blue-600">{formatCurrency(halfStripeIncome)}</p>
-                  </div>
-                  <div className="bg-blue-100 p-2 rounded-full">
-                    <Percent className="h-4 w-4 text-blue-600" />
-                  </div>
-                </div>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs">Mitad de los ingresos de Stripe</p>
             </TooltipContent>
           </Tooltip>
 

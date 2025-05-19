@@ -5,7 +5,6 @@ import * as calculationUtils from './calculationUtils';
 
 export const useSalaryCalculator = ({
   zohoIncome,
-  stripeIncome,
   opexAmount,
   itbmAmount,
   profitPercentage,
@@ -53,10 +52,9 @@ export const useSalaryCalculator = ({
       totalZohoDeductions
     );
     
-    // Calculate half of Stripe income
-    const halfStripeIncome = calculationUtils.calculateHalf(stripeIncome);
+    // For the new format, we're only using Zoho and ignoring Stripe
     
-    // Calculate half of remaining Zoho income
+    // Calculate half of remaining Zoho income for each column
     const halfRemainingZoho = calculationUtils.calculateHalf(remainingZohoIncome);
     
     // Calculate ITBM coverage amount
@@ -71,17 +69,16 @@ export const useSalaryCalculator = ({
       itbmCoverageAmount
     );
     
-    // Calculate salary
-    const salary = calculationUtils.calculateSalary(
-      halfStripeIncome,
-      halfRemainingZoho
-    );
+    // Calculate salary (now just based on remaining Zoho)
+    const salary = remainingZohoIncome;
     
     // Calculate salary with ITBM coverage
-    const salaryWithItbmCoverage = calculationUtils.calculateSalaryWithItbmCoverage(
-      halfStripeIncome,
-      halfRemainingZohoWithItbm
-    );
+    const salaryWithItbmCoverage = remainingZohoIncome + itbmCoverageAmount;
+    
+    // For the columnar display format
+    const leftColumnAmount = halfRemainingZoho;
+    const rightColumnAmount = halfRemainingZoho;
+    const itbmRowAmount = itbmCoverageAmount;
     
     return {
       adjustedZohoIncome,
@@ -90,17 +87,18 @@ export const useSalaryCalculator = ({
       taxReservePercentage,
       totalZohoDeductions,
       remainingZohoIncome,
-      halfStripeIncome,
       halfRemainingZoho,
       itbmCoveragePercentage,
       itbmCoverageAmount,
       halfRemainingZohoWithItbm,
       salary,
-      salaryWithItbmCoverage
+      salaryWithItbmCoverage,
+      leftColumnAmount,
+      rightColumnAmount,
+      itbmRowAmount
     };
   }, [
     zohoIncome,
-    stripeIncome,
     opexAmount,
     itbmAmount,
     profitPercentage,

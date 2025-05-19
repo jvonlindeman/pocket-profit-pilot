@@ -13,7 +13,7 @@ import { SalaryResultsSection } from './SalaryResultsSection';
 
 const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
   zohoIncome,
-  stripeIncome,
+  stripeIncome, // Keeping for backward compatibility
   opexAmount,
   itbmAmount,
   profitPercentage,
@@ -23,7 +23,7 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
   // Use the salary calculator hook to get all calculation results
   const results = useSalaryCalculator({
     zohoIncome,
-    stripeIncome,
+    stripeIncome, // Keeping for backward compatibility
     opexAmount,
     itbmAmount,
     profitPercentage,
@@ -37,17 +37,17 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
         <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 pb-4">
           <CardTitle className="flex items-center text-white">
             <Calculator className="h-6 w-6 mr-2" />
-            Calculadora de Salario
+            Calculadora de Salario (Solo Zoho)
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {/* Sección de resumen principal - Visible primero */}
           <div className="p-6 bg-gradient-to-br from-blue-500/10 to-indigo-500/5">
-            <SalarySummaryCard salary={results.salary} />
+            <SalarySummaryCard salaryWithItbmCoverage={results.salaryWithItbmCoverage} />
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <IncomeSourcesSection 
-                stripeIncome={stripeIncome}
+                stripeIncome={0} // Not showing Stripe
                 startingBalance={startingBalance}
                 zohoIncome={zohoIncome}
               />
@@ -69,7 +69,7 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
               taxReserveAmount={results.taxReserveAmount}
               taxReservePercentage={results.taxReservePercentage}
               remainingZohoIncome={results.remainingZohoIncome}
-              halfStripeIncome={results.halfStripeIncome}
+              halfStripeIncome={0} // Not showing Stripe
               halfRemainingZoho={results.halfRemainingZoho}
               halfRemainingZohoWithItbm={results.halfRemainingZohoWithItbm}
               itbmCoveragePercentage={results.itbmCoveragePercentage}
@@ -80,6 +80,9 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
               salaryWithItbmCoverage={results.salaryWithItbmCoverage}
               itbmCoverageAmount={results.itbmCoverageAmount}
               itbmCoveragePercentage={results.itbmCoveragePercentage}
+              leftColumnAmount={results.leftColumnAmount}
+              rightColumnAmount={results.rightColumnAmount}
+              itbmRowAmount={results.itbmRowAmount}
             />
           </div>
         </CardContent>
