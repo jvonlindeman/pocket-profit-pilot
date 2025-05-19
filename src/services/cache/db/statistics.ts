@@ -1,6 +1,6 @@
 
 import { CacheDbClient } from "./client";
-import { CacheSourceStats, DetailedCacheStats } from "../types";
+import { CacheSourceStats, DetailedCacheStats, CacheSource } from "../types";
 
 /**
  * StatsRepository handles all statistics-related database operations
