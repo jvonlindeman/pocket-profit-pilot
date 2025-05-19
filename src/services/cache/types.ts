@@ -75,6 +75,11 @@ export interface CacheSourceStats {
 export interface DetailedCacheStats {
   transactions: CacheSourceStats[];
   segments: CacheSourceStats[];
+  recentMetrics: any[]; // Add this property
+  hitRate: string;      // Add this property
+  hits: number;         // Add this property
+  misses: number;       // Add this property
+  lastUpdated: string;  // Add this property
 }
 
 // Cache statistics used in admin dashboard

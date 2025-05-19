@@ -1,4 +1,3 @@
-
 import { supabase } from "../../integrations/supabase/client";
 import { Transaction } from "../../types/financial";
 import { CacheSegmentInfo, CacheSourceStats, DetailedCacheStats, CacheSource } from "./types";
@@ -218,7 +217,7 @@ export class CacheStorage {
         
       if (zohoError || stripeError) {
         console.error("Error getting transaction stats:", zohoError || stripeError);
-        return { transactions: [], segments: [] };
+        return { transactions: [], segments: [], recentMetrics: [], hitRate: 'N/A', hits: 0, misses: 0, lastUpdated: new Date().toISOString() };
       }
       
       // Format transaction counts
@@ -241,7 +240,7 @@ export class CacheStorage {
         
       if (zohoSegmentError || stripeSegmentError) {
         console.error("Error getting segment stats:", zohoSegmentError || stripeSegmentError);
-        return { transactions, segments: [] };
+        return { transactions, segments: [], recentMetrics: [], hitRate: 'N/A', hits: 0, misses: 0, lastUpdated: new Date().toISOString() };
       }
       
       // Format segment counts
@@ -285,7 +284,6 @@ export class CacheStorage {
       
       const hitRate = hits + misses > 0 ? (hits / (hits + misses) * 100).toFixed(1) + '%' : 'N/A';
       
-      // Change transactionCount to fit with the DetailedCacheStats interface
       return {
         transactions,
         segments,
@@ -297,7 +295,6 @@ export class CacheStorage {
       };
     } catch (err) {
       console.error("Exception getting cache stats:", err);
-      // Change transactionCount to fit with the DetailedCacheStats interface
       return {
         transactions: [],
         segments: [],
