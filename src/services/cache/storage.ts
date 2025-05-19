@@ -204,58 +204,109 @@ export class CacheStorage {
    */
   async getDetailedStats(): Promise<DetailedCacheStats> {
     try {
-      // For transaction counts by source, we'll use a different approach instead of group
-      const { data: txData, error: txError } = await supabase
+      // Get count of Zoho transactions
+      const { count: zohoCount, error: zohoError } = await supabase
         .from('cached_transactions')
-        .select('source, count')
-        .select('source, count(*)', { count: 'exact' })
+        .select('*', { count: 'exact', head: true })
         .eq('source', 'Zoho');
       
-      const { data: txStripeData, error: txStripeError } = await supabase
+      // Get count of Stripe transactions
+      const { count: stripeCount, error: stripeError } = await supabase
         .from('cached_transactions')
-        .select('source, count')
-        .select('source, count(*)', { count: 'exact' })
+        .select('*', { count: 'exact', head: true })
         .eq('source', 'Stripe');
         
-      if (txError || txStripeError) {
-        console.error("Error getting transaction stats:", txError || txStripeError);
+      if (zohoError || stripeError) {
+        console.error("Error getting transaction stats:", zohoError || stripeError);
         return { transactions: [], segments: [] };
       }
       
       // Format transaction counts
       const transactions: CacheSourceStats[] = [
-        { source: 'Zoho', count: parseInt(txData?.[0]?.count || '0') },
-        { source: 'Stripe', count: parseInt(txStripeData?.[0]?.count || '0') }
+        { source: 'Zoho', count: zohoCount || 0 },
+        { source: 'Stripe', count: stripeCount || 0 }
       ];
       
-      // For segment counts by source, we'll use a similar approach
-      const { data: segmentZohoData, error: segmentZohoError } = await supabase
+      // Get count of Zoho segments
+      const { count: zohoSegmentCount, error: zohoSegmentError } = await supabase
         .from('cache_segments')
-        .select('source, count')
-        .select('source, count(*)', { count: 'exact' })
+        .select('*', { count: 'exact', head: true })
         .eq('source', 'Zoho');
         
-      const { data: segmentStripeData, error: segmentStripeError } = await supabase
+      // Get count of Stripe segments
+      const { count: stripeSegmentCount, error: stripeSegmentError } = await supabase
         .from('cache_segments')
-        .select('source, count')
-        .select('source, count(*)', { count: 'exact' })
+        .select('*', { count: 'exact', head: true })
         .eq('source', 'Stripe');
         
-      if (segmentZohoError || segmentStripeError) {
-        console.error("Error getting segment stats:", segmentZohoError || segmentStripeError);
+      if (zohoSegmentError || stripeSegmentError) {
+        console.error("Error getting segment stats:", zohoSegmentError || stripeSegmentError);
         return { transactions, segments: [] };
       }
       
       // Format segment counts
       const segments: CacheSourceStats[] = [
-        { source: 'Zoho', count: parseInt(segmentZohoData?.[0]?.count || '0') },
-        { source: 'Stripe', count: parseInt(segmentStripeData?.[0]?.count || '0') }
+        { source: 'Zoho', count: zohoSegmentCount || 0 },
+        { source: 'Stripe', count: stripeSegmentCount || 0 }
       ];
       
-      return { transactions, segments };
+      // Get recent cache metrics
+      const { data: metrics, error: metricsError } = await supabase
+        .from('cache_metrics')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(10);
+      
+      if (metricsError) {
+        console.error("Error getting metrics:", metricsError);
+      }
+      
+      // Calculate hit rate manually
+      const { data: hitRateData, error: hitRateError } = await supabase
+        .from('cache_metrics')
+        .select('cache_hit');
+      
+      if (hitRateError) {
+        console.error("Error calculating hit rate:", hitRateError);
+      }
+      
+      let hits = 0;
+      let misses = 0;
+      
+      if (hitRateData) {
+        hitRateData.forEach(item => {
+          if (item.cache_hit) {
+            hits++;
+          } else {
+            misses++;
+          }
+        });
+      }
+      
+      const hitRate = hits + misses > 0 ? (hits / (hits + misses) * 100).toFixed(1) + '%' : 'N/A';
+      
+      return {
+        transactionCount: (zohoCount || 0) + (stripeCount || 0),
+        segments,
+        recentMetrics: metrics || [],
+        hitRate,
+        hits,
+        misses,
+        lastUpdated: new Date().toISOString(),
+        transactions
+      };
     } catch (err) {
       console.error("Exception getting cache stats:", err);
-      return { transactions: [], segments: [] };
+      return {
+        transactionCount: 0,
+        segments: [],
+        recentMetrics: [],
+        hitRate: 'N/A',
+        hits: 0,
+        misses: 0,
+        lastUpdated: new Date().toISOString(),
+        transactions: []
+      };
     }
   }
 
