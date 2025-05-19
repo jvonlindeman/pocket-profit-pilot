@@ -1,7 +1,7 @@
 
 import { supabase } from "../../integrations/supabase/client";
 import { Transaction } from "../../types/financial";
-import { CacheSegmentInfo, CacheSourceStats, DetailedCacheStats } from "./types";
+import { CacheSegmentInfo, CacheSourceStats, DetailedCacheStats, CacheSource } from "./types";
 
 /**
  * CacheStorage handles all database interactions for the cache system
@@ -11,7 +11,7 @@ export class CacheStorage {
    * Check if a date range exists in cache using database function
    */
   async checkDateRangeCached(
-    source: string,
+    source: CacheSource | string,
     startDate: string,
     endDate: string
   ): Promise<{
@@ -49,11 +49,13 @@ export class CacheStorage {
    * Retrieve transactions from cache
    */
   async getTransactions(
-    source: string,
+    source: CacheSource | string,
     startDate: string,
     endDate: string
   ): Promise<Transaction[]> {
     try {
+      console.log(`Getting cached transactions for ${source} from ${startDate} to ${endDate}`);
+      
       const { data, error } = await supabase
         .from('cached_transactions')
         .select('*')
@@ -67,6 +69,8 @@ export class CacheStorage {
         return [];
       }
       
+      console.log(`Retrieved ${data?.length || 0} cached transactions`);
+      
       return data as Transaction[];
     } catch (err) {
       console.error("Exception retrieving transactions:", err);
@@ -78,7 +82,7 @@ export class CacheStorage {
    * Store transactions in cache
    */
   async storeTransactions(
-    source: string,
+    source: CacheSource | string,
     startDate: string,
     endDate: string,
     transactions: Transaction[]
@@ -94,7 +98,8 @@ export class CacheStorage {
           start_date: startDate,
           end_date: endDate,
           transaction_count: transactions.length,
-          status: 'complete'
+          status: 'complete',
+          last_refreshed_at: new Date().toISOString()
         })
         .select()
         .single();
@@ -115,7 +120,8 @@ export class CacheStorage {
         source: t.source,
         fees: t.fees || null,
         gross: t.gross || null,
-        metadata: t.metadata || {}
+        metadata: t.metadata || {},
+        fetched_at: new Date().toISOString()
       }));
       
       // Store transactions in batches to avoid payload limits
@@ -167,7 +173,7 @@ export class CacheStorage {
    * Get cache segment information
    */
   async getCacheSegmentInfo(
-    source: string,
+    source: CacheSource | string,
     startDate: string,
     endDate: string
   ): Promise<CacheSegmentInfo | null> {
@@ -201,65 +207,38 @@ export class CacheStorage {
       // Get transaction counts by source
       const { data: txData, error: txError } = await supabase
         .from('cached_transactions')
-        .select('source')
-        .then(async ({ data, error }) => {
-          if (error || !data) {
-            return { data: [], error };
-          }
-          
-          // Group by source and count
-          const counts: Record<string, number> = {};
-          data.forEach(tx => {
-            const source = tx.source;
-            counts[source] = (counts[source] || 0) + 1;
-          });
-          
-          return { 
-            data: Object.entries(counts).map(([source, count]) => ({ 
-              source, count 
-            })),
-            error: null
-          };
-        });
+        .select('source, count(*)')
+        .group('source');
         
       if (txError) {
         console.error("Error getting transaction stats:", txError);
         return { transactions: [], segments: [] };
       }
       
+      // Format transaction counts
+      const transactions: CacheSourceStats[] = txData.map(item => ({
+        source: item.source,
+        count: parseInt(item.count || '0')
+      }));
+      
       // Get segment counts by source
       const { data: segmentData, error: segmentError } = await supabase
         .from('cache_segments')
-        .select('source')
-        .then(async ({ data, error }) => {
-          if (error || !data) {
-            return { data: [], error };
-          }
-          
-          // Group by source and count
-          const counts: Record<string, number> = {};
-          data.forEach(segment => {
-            const source = segment.source;
-            counts[source] = (counts[source] || 0) + 1;
-          });
-          
-          return { 
-            data: Object.entries(counts).map(([source, count]) => ({ 
-              source, count 
-            })),
-            error: null
-          };
-        });
+        .select('source, count(*)')
+        .group('source');
         
       if (segmentError) {
         console.error("Error getting segment stats:", segmentError);
-        return { transactions: txData || [], segments: [] };
+        return { transactions, segments: [] };
       }
       
-      return {
-        transactions: txData || [],
-        segments: segmentData || []
-      };
+      // Format segment counts
+      const segments: CacheSourceStats[] = segmentData.map(item => ({
+        source: item.source,
+        count: parseInt(item.count || '0')
+      }));
+      
+      return { transactions, segments };
     } catch (err) {
       console.error("Exception getting cache stats:", err);
       return { transactions: [], segments: [] };
@@ -270,7 +249,7 @@ export class CacheStorage {
    * Clear cache data
    */
   async clearCache(
-    source?: 'Zoho' | 'Stripe' | 'all',
+    source?: CacheSource | 'all',
     startDate?: string,
     endDate?: string
   ): Promise<boolean> {
@@ -317,6 +296,7 @@ export class CacheStorage {
         return false;
       }
       
+      console.log(`Cache cleared for ${source || 'all'} sources ${startDate ? 'from ' + startDate + ' to ' + endDate : ''}`);
       return true;
     } catch (err) {
       console.error("Exception clearing cache:", err);

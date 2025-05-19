@@ -3,6 +3,9 @@
  * Core cache types used throughout the cache system
  */
 
+// Valid cache sources
+export type CacheSource = 'Zoho' | 'Stripe';
+
 // Base cache response from edge function
 export interface CacheResponse {
   cached: boolean;
@@ -57,7 +60,7 @@ export interface CacheSegmentInfo {
 
 // Cache clear options
 export interface CacheClearOptions {
-  source?: 'Zoho' | 'Stripe' | 'all';
+  source?: CacheSource | 'all';
   startDate?: Date;
   endDate?: Date;
 }
@@ -93,6 +96,16 @@ export interface CacheStats {
 export interface CacheStatus {
   zoho: { hit: boolean; partial: boolean };
   stripe: { hit: boolean; partial: boolean };
+}
+
+// Cache access record
+export interface CacheAccessRecord {
+  source: string;
+  startDate: string;
+  endDate: string;
+  cacheHit: boolean;
+  partialHit: boolean;
+  transactionCount?: number;
 }
 
 // Import Transaction type from the financial types

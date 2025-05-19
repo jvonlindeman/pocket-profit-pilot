@@ -1,195 +1,218 @@
 
-import React, { useState, useEffect } from 'react';
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DateRange } from "react-day-picker";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import DateRangePicker from "@/components/Dashboard/DateRangePicker";
-import { Trash } from 'lucide-react';
-import { formatDateYYYYMMDD } from "@/utils/dateUtils";
-import { endOfMonth, startOfMonth, subMonths } from 'date-fns';
-import { useCacheAdmin } from "@/hooks/cache/useCacheAdmin";
-import { CacheClearOptions } from "@/services/cache/types";
+import React, { useState, useCallback } from 'react';
+import { 
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { toast } from '@/components/ui/use-toast';
+import { useCacheAdmin } from '@/hooks/cache/useCacheAdmin';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { format } from 'date-fns';
+import { Calendar as CalendarIcon, Trash, RefreshCw, Database } from 'lucide-react';
 
-const CacheClearTool: React.FC = () => {
-  const [source, setSource] = useState<'all' | 'Zoho' | 'Stripe'>('all');
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  
-  // Use our new hook for cache administration
-  const { 
-    cacheStats, 
-    isLoadingStats, 
-    isClearingCache, 
-    loadCacheStats, 
-    clearCache 
-  } = useCacheAdmin();
-  
-  // Set default date range to last 3 months
-  const today = new Date();
-  today.setHours(12, 0, 0, 0); // Set to noon to avoid timezone issues
-  const threeMonthsAgo = subMonths(today, 3);
-  
-  // Create a DayPicker compatible DateRange for the UI component
-  const [dateRange, setDateRange] = useState<DateRange>({
-    from: startOfMonth(threeMonthsAgo),
-    to: endOfMonth(today)
+const CacheClearTool = () => {
+  const { isLoadingStats, isClearingCache, clearCache, loadCacheStats, verifyCacheIntegrity } = useCacheAdmin();
+
+  const [source, setSource] = useState<'Zoho' | 'Stripe' | 'all'>('all');
+  const [showDateRangePicker, setShowDateRangePicker] = useState(false);
+  const [dateRange, setDateRange] = useState<{ startDate: Date | undefined; endDate: Date | undefined }>({
+    startDate: undefined,
+    endDate: undefined
   });
-  
-  // Handle date range updates from the picker
-  const handleDateRangeUpdate = (range: DateRange) => {
-    if (range.from && range.to) {
-      setDateRange(range);
+  const [startDateOpen, setStartDateOpen] = useState(false);
+  const [endDateOpen, setEndDateOpen] = useState(false);
+
+  // Handler for clearing the cache
+  const handleClearCache = useCallback(async () => {
+    // Build options based on selected values
+    const options: {
+      source?: 'Zoho' | 'Stripe' | 'all';
+      startDate?: Date;
+      endDate?: Date;
+    } = { source };
+
+    // Only include date range if both dates are set
+    if (showDateRangePicker && dateRange.startDate && dateRange.endDate) {
+      options.startDate = dateRange.startDate;
+      options.endDate = dateRange.endDate;
     }
-  };
-  
-  // Load stats when component mounts
-  useEffect(() => {
-    loadCacheStats();
-  }, [loadCacheStats]);
-  
-  const handleClearCache = async () => {
-    if (!dateRange.from || !dateRange.to) {
+
+    const sourceDisplay = source === 'all' ? 'todas las fuentes' : source;
+    const dateRangeDisplay = (showDateRangePicker && dateRange.startDate && dateRange.endDate)
+      ? `del ${format(dateRange.startDate, 'dd/MM/yyyy')} al ${format(dateRange.endDate, 'dd/MM/yyyy')}`
+      : 'todo el período';
+
+    // Ask for confirmation
+    if (!window.confirm(
+      `¿Estás seguro de que quieres borrar la caché para ${sourceDisplay} ${dateRangeDisplay}?`
+    )) {
+      return;
+    }
+
+    // Perform the clear operation
+    const success = await clearCache(options);
+    
+    if (success) {
+      // Reset the date range if it was used
+      if (showDateRangePicker) {
+        setDateRange({ startDate: undefined, endDate: undefined });
+        setShowDateRangePicker(false);
+      }
+      
+      // Refresh the stats
+      await loadCacheStats();
+    }
+  }, [source, showDateRangePicker, dateRange, clearCache, loadCacheStats]);
+
+  const handleVerifyCacheIntegrity = useCallback(async () => {
+    if (!dateRange.startDate || !dateRange.endDate) {
+      toast({
+        title: "Fechas requeridas",
+        description: "Por favor selecciona un rango de fechas para verificar la integridad de la caché",
+        variant: "destructive"
+      });
       return;
     }
     
-    // Prepare options for cache clearing
-    const options: CacheClearOptions = {
-      source: source,
-      startDate: dateRange.from,
-      endDate: dateRange.to
-    };
-    
-    await clearCache(options);
-    setIsDialogOpen(false);
-  };
-  
+    await verifyCacheIntegrity(source, dateRange.startDate, dateRange.endDate);
+  }, [source, dateRange, verifyCacheIntegrity]);
+
   return (
-    <Card className="w-full mb-6">
+    <Card>
       <CardHeader>
         <CardTitle className="flex items-center">
-          <Trash className="mr-2 h-5 w-5" />
-          Cache Clear Tool
+          <Database className="w-5 h-5 mr-2" />
+          Administración de caché
         </CardTitle>
         <CardDescription>
-          Clear cached transactions for testing purposes
+          Herramientas para administrar los datos en caché
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Data Source</label>
-            <Select 
-              value={source} 
-              onValueChange={(val) => setSource(val as 'all' | 'Zoho' | 'Stripe')}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select source" />
+          <div className="flex flex-col space-y-2">
+            <label htmlFor="source" className="text-sm font-medium">Fuente de datos</label>
+            <Select value={source} onValueChange={(value) => setSource(value as 'Zoho' | 'Stripe' | 'all')}>
+              <SelectTrigger id="source" className="w-full">
+                <SelectValue placeholder="Seleccionar fuente" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Sources</SelectItem>
-                <SelectItem value="Zoho">Zoho Only</SelectItem>
-                <SelectItem value="Stripe">Stripe Only</SelectItem>
+                <SelectItem value="all">Todas las fuentes</SelectItem>
+                <SelectItem value="Zoho">Zoho</SelectItem>
+                <SelectItem value="Stripe">Stripe</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          
-          <div>
-            <label className="block text-sm font-medium mb-1">Date Range</label>
-            <DateRangePicker 
-              dateRange={dateRange} 
-              onRangeChange={handleDateRangeUpdate}
-              getCurrentMonthRange={() => ({
-                from: startOfMonth(new Date()),
-                to: endOfMonth(new Date())
-              })}
+
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="dateRangeToggle"
+              checked={showDateRangePicker}
+              onChange={() => setShowDateRangePicker(!showDateRangePicker)}
+              className="mr-2"
             />
+            <label htmlFor="dateRangeToggle" className="text-sm font-medium">
+              Limitar por rango de fechas
+            </label>
           </div>
-          
-          {cacheStats && (
-            <div className="bg-muted p-4 rounded-md mt-4">
-              <h4 className="text-sm font-semibold mb-2">Current Cache Status:</h4>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <p className="text-xs text-muted-foreground">Transactions</p>
-                  {cacheStats.transactions && cacheStats.transactions.length > 0 ? (
-                    cacheStats.transactions.map((item: any) => (
-                      <p key={item.source} className="text-sm">
-                        {item.source}: <span className="font-medium">{item.count}</span>
-                      </p>
-                    ))
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No cached transactions</p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Cache Segments</p>
-                  {cacheStats.segments && cacheStats.segments.length > 0 ? (
-                    cacheStats.segments.map((item: any) => (
-                      <p key={item.source} className="text-sm">
-                        {item.source}: <span className="font-medium">{item.count}</span>
-                      </p>
-                    ))
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No cache segments</p>
-                  )}
-                </div>
+
+          {showDateRangePicker && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Fecha de inicio</label>
+                <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateRange.startDate ? format(dateRange.startDate, 'PPP') : <span>Seleccionar fecha</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateRange.startDate}
+                      onSelect={(date) => {
+                        setDateRange(prev => ({ ...prev, startDate: date || undefined }));
+                        setStartDateOpen(false);
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
-              <div className="mt-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={loadCacheStats} 
-                  disabled={isLoadingStats}
-                >
-                  {isLoadingStats ? "Loading..." : "Refresh Stats"}
-                </Button>
+
+              <div>
+                <label className="text-sm font-medium">Fecha de fin</label>
+                <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateRange.endDate ? format(dateRange.endDate, 'PPP') : <span>Seleccionar fecha</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateRange.endDate}
+                      onSelect={(date) => {
+                        setDateRange(prev => ({ ...prev, endDate: date || undefined }));
+                        setEndDateOpen(false);
+                      }}
+                      initialFocus
+                      disabled={(date) => 
+                        dateRange.startDate ? date < dateRange.startDate : false
+                      }
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
           )}
+
+          <div className="flex justify-between pt-4">
+            <Button
+              variant="outline"
+              disabled={isLoadingStats || !showDateRangePicker || !dateRange.startDate || !dateRange.endDate}
+              onClick={handleVerifyCacheIntegrity}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Verificar integridad
+            </Button>
+            
+            <Button
+              variant="destructive"
+              onClick={handleClearCache}
+              disabled={isClearingCache}
+            >
+              {isClearingCache ? (
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash className="mr-2 h-4 w-4" />
+              )}
+              Borrar caché
+            </Button>
+          </div>
         </div>
       </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button variant="outline" onClick={loadCacheStats} disabled={isLoadingStats}>
-          Refresh Stats
-        </Button>
-        <Button 
-          variant="destructive"
-          onClick={() => setIsDialogOpen(true)}
-          disabled={isClearingCache}
-        >
-          Clear Cache
-        </Button>
-      </CardFooter>
-      
-      <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete{' '}
-              {source === 'all' ? 'all cached data' : `cached ${source} data`}
-              {dateRange.from && dateRange.to
-                ? ` from ${formatDateYYYYMMDD(dateRange.from)} to ${formatDateYYYYMMDD(dateRange.to)}`
-                : ''}
-              . This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isClearingCache}>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={(e) => {
-                e.preventDefault();
-                handleClearCache();
-              }}
-              disabled={isClearingCache}
-              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
-            >
-              {isClearingCache ? "Clearing..." : "Clear Cache"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </Card>
   );
 };

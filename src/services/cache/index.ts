@@ -3,7 +3,7 @@ import { Transaction } from "../../types/financial";
 import { cacheOperations } from "./operations";
 import { cacheMetrics } from "./metrics";
 import { cacheStorage } from "./storage";
-import type { CacheResponse, CacheResult, CacheStats, DetailedCacheStats, CacheClearOptions } from "./types";
+import type { CacheResponse, CacheResult, CacheStats, DetailedCacheStats, CacheClearOptions, CacheSource } from "./types";
 
 /**
  * CacheService provides a unified API for working with the transaction cache
@@ -13,7 +13,7 @@ const CacheService = {
    * Check if data for a date range is in cache
    */
   checkCache: async (
-    source: string,
+    source: CacheSource,
     startDate: Date,
     endDate: Date,
     forceRefresh = false
@@ -25,7 +25,7 @@ const CacheService = {
    * Store transactions in cache
    */
   storeTransactions: async (
-    source: string,
+    source: CacheSource,
     startDate: Date,
     endDate: Date,
     transactions: Transaction[]
@@ -51,7 +51,7 @@ const CacheService = {
    * Verify cache integrity for a date range
    */
   verifyCacheIntegrity: async (
-    source: string,
+    source: CacheSource,
     startDate: Date,
     endDate: Date
   ): Promise<{ isConsistent: boolean, segmentCount: number, transactionCount: number }> => {
@@ -66,7 +66,7 @@ const CacheService = {
    * Repair cache segments to match actual transaction counts
    */
   repairCacheSegments: async (
-    source: string,
+    source: CacheSource,
     startDate: Date,
     endDate: Date
   ): Promise<boolean> => {
@@ -93,14 +93,39 @@ const CacheService = {
    * Get cache segment id for a date range
    */
   getCacheSegmentId: async (
-    source: string,
+    source: CacheSource,
     startDate: Date,
     endDate: Date
   ): Promise<string | null> => {
     return cacheOperations.getCacheSegmentId(source, startDate, endDate);
+  },
+  
+  /**
+   * Refresh cache data for a date range
+   */
+  refreshCache: async (
+    source: CacheSource,
+    startDate: Date,
+    endDate: Date
+  ): Promise<boolean> => {
+    return cacheOperations.refreshCache(source, startDate, endDate);
+  },
+  
+  /**
+   * Check cache status and record metrics
+   */
+  recordCacheAccess: async (
+    source: CacheSource,
+    startDate: Date,
+    endDate: Date,
+    isCacheHit: boolean,
+    isPartial: boolean,
+    transactionCount?: number
+  ): Promise<boolean> => {
+    return cacheMetrics.recordCacheAccess(source, startDate, endDate, isCacheHit, isPartial, transactionCount);
   }
 };
 
 export default CacheService;
 // Use export type for types to fix the isolatedModules issue
-export type { CacheClearOptions, CacheResponse, CacheResult, CacheStats, DetailedCacheStats };
+export type { CacheClearOptions, CacheResponse, CacheResult, CacheStats, DetailedCacheStats, CacheSource };

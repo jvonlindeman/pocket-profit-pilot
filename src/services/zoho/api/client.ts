@@ -1,3 +1,4 @@
+
 import { Transaction } from "../../../types/financial";
 import { handleApiError } from "../utils";
 import { getMockTransactions } from "../mockData";
@@ -31,7 +32,7 @@ export const fetchTransactionsFromWebhook = async (
       formattedEndDate 
     } = preparePanamaDates(startDate, endDate);
     
-    console.log("ZohoService: Formatted Panama dates for webhook request:", {
+    console.log("ZohoService: Formatted Panama dates:", {
       startDate: panamaStartDate.toString(),
       formattedStartDate,
       endDate: panamaEndDate.toString(),
@@ -39,15 +40,43 @@ export const fetchTransactionsFromWebhook = async (
       timezone: PANAMA_TIMEZONE
     });
     
-    console.log("ZohoService: Calling Supabase edge function with Panama timezone dates:", formattedStartDate, formattedEndDate);
-    
+    // First, check the cache via cache-manager
     if (!forceRefresh) {
-      console.log("ZohoService: No longer checking for cached data, feature removed");
+      console.log("ZohoService: Checking cache via cache-manager");
+      
+      const { data: cacheData, error: cacheError } = await supabase.functions.invoke("cache-manager", {
+        body: {
+          source: "Zoho",
+          startDate: formattedStartDate,
+          endDate: formattedEndDate,
+          forceRefresh: false
+        }
+      });
+      
+      if (cacheError) {
+        console.error("Error checking cache via cache-manager:", cacheError);
+      } else if (cacheData?.cached && cacheData?.data) {
+        console.log("ZohoService: Cache hit via cache-manager");
+        
+        // Return the cached data
+        if (returnRawResponse) {
+          return { 
+            cached: true, 
+            source: "cache", 
+            data: cacheData.data,
+            raw_response: cacheData
+          };
+        }
+        
+        return filterExcludedVendors(cacheData.data);
+      }
+      
+      console.log("ZohoService: Cache miss or error, proceeding to fetch from zoho-transactions");
     } else {
       console.log("ZohoService: Force refresh requested");
     }
     
-    // Call the Supabase edge function instead of make.com webhook directly
+    // Call the Supabase edge function to get transactions
     const { data, error } = await supabase.functions.invoke("zoho-transactions", {
       body: {
         startDate: formattedStartDate,

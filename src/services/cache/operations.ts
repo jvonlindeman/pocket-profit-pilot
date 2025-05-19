@@ -2,7 +2,8 @@
 import { Transaction } from "../../types/financial";
 import { cacheStorage } from "./storage";
 import { cacheMetrics } from "./metrics";
-import { CacheResponse, CacheResult } from "./types";
+import { CacheResponse, CacheResult, CacheSource } from "./types";
+import { supabase } from "../../integrations/supabase/client";
 
 /**
  * CacheOperations provides the high-level cache functionality
@@ -35,7 +36,7 @@ export class CacheOperations {
    * Check cache for transactions
    */
   async checkCache(
-    source: string,
+    source: CacheSource,
     startDate: Date,
     endDate: Date,
     forceRefresh = false
@@ -54,58 +55,53 @@ export class CacheOperations {
     try {
       // If force refresh, skip cache check
       if (forceRefresh) {
+        // Record the cache access with forced refresh
+        await cacheMetrics.recordCacheAccess(
+          source,
+          formattedStartDate,
+          formattedEndDate,
+          false,
+          false,
+          undefined,
+          true
+        );
+        
         return { cached: false, status: "force_refresh", partial: false };
       }
 
-      // Check if date range is in cache
-      const cacheInfo = await cacheStorage.checkDateRangeCached(
-        source,
-        formattedStartDate,
-        formattedEndDate
-      );
+      // Call the cache-manager edge function to check cache status
+      const { data, error } = await supabase.functions.invoke("cache-manager", {
+        body: {
+          source,
+          startDate: formattedStartDate,
+          endDate: formattedEndDate
+        }
+      });
       
-      if (!cacheInfo) {
+      if (error) {
+        console.error("Error calling cache-manager:", error);
         return errorResponse;
       }
       
-      // Get transactions if cached
-      if (cacheInfo.is_cached) {
-        const transactions = await cacheStorage.getTransactions(
-          source,
-          formattedStartDate,
-          formattedEndDate
-        );
-          
-        if (!transactions || transactions.length === 0) {
-          return errorResponse;
-        }
-        
-        // Format the response with the cache status
-        const response: CacheResponse = {
-          cached: true,
-          status: "complete",
-          data: transactions,
-          partial: cacheInfo.is_partial,
-        };
-        
-        // If partial, include missing ranges
-        if (cacheInfo.is_partial) {
-          response.missingRanges = {
-            startDate: cacheInfo.missing_start_date,
-            endDate: cacheInfo.missing_end_date,
-          };
-        }
-        
-        this.setLastCacheCheckResult(response);
-        return response;
+      if (!data) {
+        console.error("No data returned from cache-manager");
+        return errorResponse;
       }
       
-      // Not cached
-      return {
-        cached: false,
-        status: "not_cached",
-        partial: false,
+      // Process the cache response
+      const cacheResponse: CacheResponse = {
+        cached: data.cached || false,
+        status: data.status || "unknown",
+        data: data.data,
+        partial: data.partial || false,
+        missingRanges: data.missingRanges,
+        metrics: data.metrics
       };
+      
+      // Store the cache check result
+      this.setLastCacheCheckResult(cacheResponse);
+      
+      return cacheResponse;
     } catch (err) {
       console.error("Exception checking cache:", err);
       return errorResponse;
@@ -116,7 +112,7 @@ export class CacheOperations {
    * Store transactions in cache
    */
   async storeTransactions(
-    source: string,
+    source: CacheSource,
     startDate: Date,
     endDate: Date,
     transactions: Transaction[]
@@ -126,12 +122,23 @@ export class CacheOperations {
       const formattedStartDate = this.formatDate(startDate);
       const formattedEndDate = this.formatDate(endDate);
       
+      // Store transactions in cache storage
       const result = await cacheStorage.storeTransactions(
         source,
         formattedStartDate,
         formattedEndDate,
         transactions
       );
+      
+      // Record a successful cache update
+      if (result.success) {
+        await cacheMetrics.recordCacheUpdate(
+          source, 
+          formattedStartDate,
+          formattedEndDate,
+          transactions.length
+        );
+      }
       
       return result.success;
     } catch (err) {
@@ -144,7 +151,7 @@ export class CacheOperations {
    * Repair cache segments
    */
   async repairCacheSegments(
-    source: string,
+    source: CacheSource,
     startDate: Date,
     endDate: Date
   ): Promise<boolean> {
@@ -163,11 +170,20 @@ export class CacheOperations {
       if (!integrity.isConsistent) {
         // Clear the cache range
         await cacheStorage.clearCache(
-          source as 'Zoho' | 'Stripe',
+          source,
           formattedStartDate,
           formattedEndDate
         );
-        return false;
+        
+        // Record the repair operation
+        await cacheMetrics.recordCacheOperation(
+          source,
+          formattedStartDate,
+          formattedEndDate,
+          "repair"
+        );
+        
+        return true;
       }
       
       return true;
@@ -181,7 +197,7 @@ export class CacheOperations {
    * Clear cache
    */
   async clearCache(options?: {
-    source?: 'Zoho' | 'Stripe' | 'all';
+    source?: CacheSource | 'all';
     startDate?: Date;
     endDate?: Date;
   }): Promise<boolean> {
@@ -193,6 +209,23 @@ export class CacheOperations {
       if (options?.startDate && options?.endDate) {
         formattedStartDate = this.formatDate(options.startDate);
         formattedEndDate = this.formatDate(options.endDate);
+      }
+      
+      // Record the clear operation
+      if (formattedStartDate && formattedEndDate) {
+        await cacheMetrics.recordCacheOperation(
+          source === 'all' ? 'All' : source,
+          formattedStartDate,
+          formattedEndDate,
+          "clear"
+        );
+      } else {
+        await cacheMetrics.recordCacheOperation(
+          source === 'all' ? 'All' : source,
+          "all",
+          "all",
+          "clear"
+        );
       }
       
       return await cacheStorage.clearCache(
@@ -210,7 +243,7 @@ export class CacheOperations {
    * Get cache segment ID for a date range
    */
   async getCacheSegmentId(
-    source: string,
+    source: CacheSource,
     startDate: Date,
     endDate: Date
   ): Promise<string | null> {
@@ -228,6 +261,49 @@ export class CacheOperations {
     } catch (error) {
       console.error("Error getting cache segment id:", error);
       return null;
+    }
+  }
+  
+  /**
+   * Refresh cache data for a date range
+   */
+  async refreshCache(
+    source: CacheSource,
+    startDate: Date,
+    endDate: Date
+  ): Promise<boolean> {
+    try {
+      // Format dates for API
+      const formattedStartDate = this.formatDate(startDate);
+      const formattedEndDate = this.formatDate(endDate);
+      
+      // Call the cache-manager edge function with forceRefresh flag
+      const { data, error } = await supabase.functions.invoke("cache-manager", {
+        body: {
+          source,
+          startDate: formattedStartDate,
+          endDate: formattedEndDate,
+          forceRefresh: true
+        }
+      });
+      
+      if (error) {
+        console.error("Error refreshing cache via cache-manager:", error);
+        return false;
+      }
+      
+      // Record the cache refresh attempt
+      await cacheMetrics.recordCacheOperation(
+        source,
+        formattedStartDate,
+        formattedEndDate,
+        "refresh"
+      );
+      
+      return data?.success || false;
+    } catch (err) {
+      console.error("Exception refreshing cache:", err);
+      return false;
     }
   }
 }

@@ -1,7 +1,7 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { toast } from '@/components/ui/use-toast';
-import CacheService, { DetailedCacheStats, CacheClearOptions } from '@/services/cache';
+import CacheService, { DetailedCacheStats, CacheClearOptions, CacheSource } from '@/services/cache';
 
 /**
  * Hook for cache administration functionality
@@ -10,6 +10,11 @@ export const useCacheAdmin = () => {
   const [cacheStats, setCacheStats] = useState<DetailedCacheStats | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState<boolean>(false);
   const [isClearingCache, setIsClearingCache] = useState<boolean>(false);
+  
+  // Load stats on mount
+  useEffect(() => {
+    loadCacheStats();
+  }, []);
 
   /**
    * Load detailed cache statistics
@@ -73,49 +78,150 @@ export const useCacheAdmin = () => {
   }, [loadCacheStats]);
 
   /**
-   * Verify and repair cache integrity
+   * Refresh cache for a source and date range
    */
-  const verifyCacheIntegrity = useCallback(async (
-    source: string,
+  const refreshCache = useCallback(async (
+    source: CacheSource,
     startDate: Date,
     endDate: Date
   ): Promise<boolean> => {
     try {
-      const result = await CacheService.verifyCacheIntegrity(source, startDate, endDate);
+      setIsLoadingStats(true);
+      const result = await CacheService.refreshCache(source, startDate, endDate);
       
-      if (!result.isConsistent) {
+      if (result) {
         toast({
-          title: "Cache Inconsistency Detected",
-          description: `Found ${result.segmentCount} segments but ${result.transactionCount} transactions`,
-          variant: "destructive"  // Changed from "warning" to "destructive" as warning is not a valid variant
+          title: "Cache Refreshed",
+          description: `Successfully refreshed ${source} cache data`,
+          variant: "default"
         });
         
-        // Try to repair
-        const repaired = await CacheService.repairCacheSegments(source, startDate, endDate);
+        // Reload stats after refresh
+        await loadCacheStats();
+        return true;
+      } else {
+        toast({
+          title: "Cache Refresh Failed",
+          description: `Unable to refresh ${source} cache data`,
+          variant: "destructive"
+        });
+        return false;
+      }
+    } catch (error) {
+      console.error("Error refreshing cache:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while refreshing the cache",
+        variant: "destructive"
+      });
+      return false;
+    } finally {
+      setIsLoadingStats(false);
+    }
+  }, [loadCacheStats]);
+
+  /**
+   * Verify and repair cache integrity
+   */
+  const verifyCacheIntegrity = useCallback(async (
+    source: CacheSource | 'all',
+    startDate: Date,
+    endDate: Date
+  ): Promise<boolean> => {
+    try {
+      // If source is 'all', verify both Zoho and Stripe
+      if (source === 'all') {
+        const zohoResult = await CacheService.verifyCacheIntegrity('Zoho', startDate, endDate);
+        const stripeResult = await CacheService.verifyCacheIntegrity('Stripe', startDate, endDate);
         
-        if (repaired) {
+        const hasIssues = !zohoResult.isConsistent || !stripeResult.isConsistent;
+        
+        if (hasIssues) {
           toast({
-            title: "Cache Repaired",
-            description: "Cache segments have been repaired successfully",
+            title: "Cache Inconsistency Detected",
+            description: "Issues found in cache data. Attempting repair...",
+            variant: "destructive"
+          });
+          
+          // Repair both sources
+          const zohoRepaired = !zohoResult.isConsistent ? 
+            await CacheService.repairCacheSegments('Zoho', startDate, endDate) : true;
+          const stripeRepaired = !stripeResult.isConsistent ? 
+            await CacheService.repairCacheSegments('Stripe', startDate, endDate) : true;
+          
+          if (zohoRepaired && stripeRepaired) {
+            toast({
+              title: "Cache Repaired",
+              description: "Cache segments have been repaired successfully",
+              variant: "default"
+            });
+            await loadCacheStats();
+            return true;
+          } else {
+            toast({
+              title: "Cache Repair Failed",
+              description: "Unable to repair some cache segments automatically",
+              variant: "destructive"
+            });
+            return false;
+          }
+        } else {
+          toast({
+            title: "Cache Integrity Verified",
+            description: "All cache segments are consistent",
             variant: "default"
           });
           return true;
-        } else {
+        }
+      } else {
+        // Verify single source
+        const result = await CacheService.verifyCacheIntegrity(source, startDate, endDate);
+        
+        if (!result.isConsistent) {
           toast({
-            title: "Cache Repair Failed",
-            description: "Unable to repair cache segments automatically",
+            title: "Cache Inconsistency Detected",
+            description: `Found ${result.segmentCount} segments but ${result.transactionCount} transactions`,
             variant: "destructive"
           });
-          return false;
+          
+          // Try to repair
+          const repaired = await CacheService.repairCacheSegments(source, startDate, endDate);
+          
+          if (repaired) {
+            toast({
+              title: "Cache Repaired",
+              description: "Cache segments have been repaired successfully",
+              variant: "default"
+            });
+            await loadCacheStats();
+            return true;
+          } else {
+            toast({
+              title: "Cache Repair Failed",
+              description: "Unable to repair cache segments automatically",
+              variant: "destructive"
+            });
+            return false;
+          }
+        } else {
+          toast({
+            title: "Cache Integrity Verified",
+            description: `Found ${result.segmentCount} segments with ${result.transactionCount} transactions`,
+            variant: "default"
+          });
+          return true;
         }
       }
-      
-      return true;
     } catch (error) {
       console.error("Error verifying cache integrity:", error);
+      toast({
+        title: "Error",
+        description: "Failed to verify cache integrity",
+        variant: "destructive"
+      });
       return false;
     }
-  }, []);
+  }, [loadCacheStats]);
 
   return {
     cacheStats,
@@ -123,6 +229,7 @@ export const useCacheAdmin = () => {
     isClearingCache,
     loadCacheStats,
     clearCache,
+    refreshCache,
     verifyCacheIntegrity
   };
 };

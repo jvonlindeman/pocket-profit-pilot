@@ -40,7 +40,7 @@ serve(async (req: Request) => {
     const requestData: CacheRequest = await req.json();
     const { source, startDate, endDate, forceRefresh = false } = requestData;
     
-    console.log(`Cache request for ${source} data from ${startDate} to ${endDate}`);
+    console.log(`Cache request for ${source} data from ${startDate} to ${endDate}, forceRefresh: ${forceRefresh}`);
     
     // Generate a unique request ID
     const requestId = crypto.randomUUID();
@@ -67,10 +67,147 @@ serve(async (req: Request) => {
         user_agent: userAgent
       });
       
+      // Fetch the data from the appropriate source - we'll invoke the respective function
+      let functionName: string;
+      switch (source.toLowerCase()) {
+        case 'zoho':
+          functionName = "zoho-transactions";
+          break;
+        case 'stripe':
+          functionName = "stripe-balance";
+          break;
+        default:
+          throw new Error(`Unknown data source: ${source}`);
+      }
+      
+      // Call the appropriate function to get fresh data
+      console.log(`Calling ${functionName} to get fresh data`);
+      const { data: freshData, error: functionError } = await supabase.functions.invoke(
+        functionName,
+        {
+          body: {
+            startDate,
+            endDate,
+            forceRefresh: true
+          }
+        }
+      );
+      
+      if (functionError) {
+        console.error(`Error calling ${functionName}:`, functionError);
+        throw new Error(`Failed to fetch fresh data: ${functionError.message}`);
+      }
+      
+      // Calculate request duration
+      const duration = Date.now() - startTime;
+      
+      // Store the transactions in the cache
+      if (freshData && freshData.transactions) {
+        // Insert new cache segment
+        const { data: segmentData, error: segmentError } = await supabase
+          .from('cache_segments')
+          .insert({
+            source,
+            start_date: startDate,
+            end_date: endDate,
+            transaction_count: freshData.transactions.length,
+            status: 'complete',
+            last_refreshed_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+          
+        if (segmentError) {
+          console.error("Error creating cache segment:", segmentError);
+          throw new Error(`Failed to create cache segment: ${segmentError.message}`);
+        }
+        
+        // Only store transactions if we have any
+        if (freshData.transactions.length > 0) {
+          // Format transactions for storage
+          const formattedTransactions = freshData.transactions.map((t: any) => ({
+            external_id: t.id,
+            date: t.date.split('T')[0],
+            amount: t.amount,
+            description: t.description,
+            category: t.category || null,
+            type: t.type,
+            source: t.source,
+            fees: t.fees || null,
+            gross: t.gross || null,
+            metadata: t.metadata || {},
+            fetched_at: new Date().toISOString()
+          }));
+          
+          // Store transactions in batches
+          const batchSize = 100;
+          let storageSuccess = true;
+          
+          for (let i = 0; i < formattedTransactions.length; i += batchSize) {
+            const batch = formattedTransactions.slice(i, i + batchSize);
+            const { error: batchError } = await supabase
+              .from('cached_transactions')
+              .upsert(batch, { 
+                onConflict: 'source,external_id',
+                ignoreDuplicates: true
+              });
+              
+            if (batchError) {
+              console.error(`Error storing batch ${i/batchSize + 1}:`, batchError);
+              storageSuccess = false;
+              
+              // Update segment to partial if we had an error
+              await supabase
+                .from('cache_segments')
+                .update({
+                  status: 'partial',
+                  transaction_count: i
+                })
+                .eq('id', segmentData.id);
+                
+              break;
+            }
+          }
+          
+          // Update cache metrics with success and transaction count
+          await supabase
+            .from('cache_metrics')
+            .update({
+              transaction_count: freshData.transactions.length,
+              fetch_duration_ms: duration
+            })
+            .eq('request_id', requestId);
+            
+          // Return the fresh data
+          return new Response(
+            JSON.stringify({
+              cached: false,
+              success: storageSuccess,
+              data: freshData.transactions,
+              status: "refreshed",
+              metrics: {
+                source,
+                startDate,
+                endDate,
+                transactionCount: freshData.transactions.length,
+                fetchDuration: duration,
+                cacheHit: false
+              }
+            }),
+            { 
+              status: 200, 
+              headers: { ...corsHeaders, "Content-Type": "application/json" } 
+            }
+          );
+        }
+      }
+      
+      // If we got here, we didn't have any transactions to store
       return new Response(
         JSON.stringify({
           cached: false,
-          status: "refresh_requested"
+          status: "refresh_requested",
+          success: true
         }),
         { 
           status: 200, 
