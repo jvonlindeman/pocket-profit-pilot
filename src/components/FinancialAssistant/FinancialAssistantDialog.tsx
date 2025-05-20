@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useFinancialAssistant, ChatMessage } from '@/hooks/useFinancialAssistant';
 import { 

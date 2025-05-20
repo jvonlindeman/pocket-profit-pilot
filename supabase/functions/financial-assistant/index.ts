@@ -44,6 +44,46 @@ async function fetchAvailableCacheMonths() {
   }
 }
 
+// Function to fetch ALL historical transactions with pagination
+async function fetchHistoricalTransactions(limit = 1000, page = 0) {
+  try {
+    const offset = page * limit;
+    const { data, error, count } = await supabase
+      .from('cached_transactions')
+      .select('*', { count: 'exact' })
+      .order('date', { ascending: false })
+      .range(offset, offset + limit - 1);
+    
+    if (error) throw error;
+    
+    console.log(`Retrieved ${data?.length || 0} historical transactions (page ${page + 1})`);
+    return { data: data || [], total: count || 0 };
+  } catch (err) {
+    console.error(`Error fetching historical transactions (page ${page + 1}):`, err);
+    return { data: [], total: 0 };
+  }
+}
+
+// Function to fetch transactions by date range
+async function fetchTransactionsByDateRange(startDate: string, endDate: string) {
+  try {
+    const { data, error } = await supabase
+      .from('cached_transactions')
+      .select('*')
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .order('date', { ascending: true });
+    
+    if (error) throw error;
+    
+    console.log(`Retrieved ${data?.length || 0} transactions from ${startDate} to ${endDate}`);
+    return data || [];
+  } catch (err) {
+    console.error(`Error fetching transactions from ${startDate} to ${endDate}:`, err);
+    return [];
+  }
+}
+
 // Function to fetch transactions for a specific month and source
 async function fetchMonthTransactions(source: string, year: number, month: number) {
   try {
@@ -65,8 +105,8 @@ async function fetchMonthTransactions(source: string, year: number, month: numbe
   }
 }
 
-// Helper function to fetch financial summaries
-async function fetchFinancialSummaries(limit = 12) {
+// Helper function to fetch ALL financial summaries
+async function fetchFinancialSummaries(limit = 100) {
   try {
     const { data, error } = await supabase
       .from('financial_summaries')
@@ -84,8 +124,8 @@ async function fetchFinancialSummaries(limit = 12) {
   }
 }
 
-// Helper function to fetch monthly balances
-async function fetchMonthlyBalances(limit = 12) {
+// Helper function to fetch monthly balances (increased limit)
+async function fetchMonthlyBalances(limit = 48) { // Increased to 4 years of monthly data
   try {
     const { data, error } = await supabase
       .from('monthly_balances')
@@ -103,9 +143,240 @@ async function fetchMonthlyBalances(limit = 12) {
   }
 }
 
-// Helper to calculate year-over-year and month-over-month comparisons
-function calculateComparisons(summaries) {
-  if (!summaries || summaries.length < 2) return { yoy: null, mom: null };
+// Helper function to analyze and aggregate transaction data by month
+async function analyzeMonthlyTransactionData(transactions) {
+  try {
+    // Group transactions by month
+    const monthlyData = {};
+    
+    transactions.forEach(tx => {
+      if (!tx.date) return;
+      
+      const date = new Date(tx.date);
+      const yearMonth = format(date, 'yyyy-MM');
+      
+      if (!monthlyData[yearMonth]) {
+        monthlyData[yearMonth] = {
+          income: 0,
+          expense: 0,
+          transactions: 0,
+          byCategory: {},
+        };
+      }
+      
+      monthlyData[yearMonth].transactions += 1;
+      
+      if (tx.type === 'income' || tx.amount > 0) {
+        monthlyData[yearMonth].income += Math.abs(tx.amount);
+        
+        // Category tracking for income
+        const category = tx.category || 'Uncategorized';
+        if (!monthlyData[yearMonth].byCategory[category]) {
+          monthlyData[yearMonth].byCategory[category] = { income: 0, expense: 0 };
+        }
+        monthlyData[yearMonth].byCategory[category].income += Math.abs(tx.amount);
+      } else {
+        monthlyData[yearMonth].expense += Math.abs(tx.amount);
+        
+        // Category tracking for expense
+        const category = tx.category || 'Uncategorized';
+        if (!monthlyData[yearMonth].byCategory[category]) {
+          monthlyData[yearMonth].byCategory[category] = { income: 0, expense: 0 };
+        }
+        monthlyData[yearMonth].byCategory[category].expense += Math.abs(tx.amount);
+      }
+    });
+    
+    // Convert to array and calculate profit metrics
+    const monthlyArray = Object.entries(monthlyData).map(([month, data]) => {
+      const { income, expense, transactions, byCategory } = data as any;
+      const profit = income - expense;
+      const profitMargin = income > 0 ? (profit / income) * 100 : 0;
+      
+      // Convert categories to array
+      const categories = Object.entries(byCategory).map(([category, amounts]) => ({
+        category,
+        income: amounts.income,
+        expense: amounts.expense,
+        net: amounts.income - amounts.expense
+      }));
+      
+      return {
+        month,
+        income,
+        expense,
+        profit,
+        profitMargin,
+        transactionCount: transactions,
+        categories: categories.sort((a, b) => Math.abs(b.net) - Math.abs(a.net))
+      };
+    });
+    
+    // Sort by month (descending)
+    return monthlyArray.sort((a, b) => b.month.localeCompare(a.month));
+  } catch (err) {
+    console.error('Error analyzing monthly transaction data:', err);
+    return [];
+  }
+}
+
+// Helper function to analyze transactions by quarter
+async function analyzeQuarterlyData(monthlyData) {
+  try {
+    const quarterlyData = {};
+    
+    monthlyData.forEach(month => {
+      const [year, monthNum] = month.month.split('-');
+      const quarter = Math.ceil(parseInt(monthNum) / 3);
+      const quarterKey = `${year}-Q${quarter}`;
+      
+      if (!quarterlyData[quarterKey]) {
+        quarterlyData[quarterKey] = {
+          income: 0,
+          expense: 0,
+          profit: 0,
+          transactionCount: 0,
+          months: 0,
+          categories: {}
+        };
+      }
+      
+      // Aggregate financial data
+      quarterlyData[quarterKey].income += month.income;
+      quarterlyData[quarterKey].expense += month.expense;
+      quarterlyData[quarterKey].profit += month.profit;
+      quarterlyData[quarterKey].transactionCount += month.transactionCount;
+      quarterlyData[quarterKey].months += 1;
+      
+      // Aggregate categories
+      month.categories.forEach(cat => {
+        const category = cat.category;
+        if (!quarterlyData[quarterKey].categories[category]) {
+          quarterlyData[quarterKey].categories[category] = {
+            income: 0,
+            expense: 0,
+            net: 0
+          };
+        }
+        
+        quarterlyData[quarterKey].categories[category].income += cat.income;
+        quarterlyData[quarterKey].categories[category].expense += cat.expense;
+        quarterlyData[quarterKey].categories[category].net += cat.net;
+      });
+    });
+    
+    // Convert to array and calculate profit metrics
+    const quarterlyArray = Object.entries(quarterlyData).map(([quarter, data]) => {
+      const { income, expense, profit, transactionCount, months, categories } = data as any;
+      const profitMargin = income > 0 ? (profit / income) * 100 : 0;
+      
+      // Convert categories to array
+      const categoriesArray = Object.entries(categories).map(([category, amounts]) => ({
+        category,
+        income: amounts.income,
+        expense: amounts.expense,
+        net: amounts.net
+      }));
+      
+      return {
+        quarter,
+        income,
+        expense,
+        profit,
+        profitMargin,
+        transactionCount,
+        months,
+        categories: categoriesArray.sort((a, b) => Math.abs(b.net) - Math.abs(a.net))
+      };
+    });
+    
+    // Sort by quarter (descending)
+    return quarterlyArray.sort((a, b) => b.quarter.localeCompare(a.quarter));
+  } catch (err) {
+    console.error('Error analyzing quarterly data:', err);
+    return [];
+  }
+}
+
+// Helper function to analyze year-over-year data
+async function analyzeYearlyData(monthlyData) {
+  try {
+    const yearlyData = {};
+    
+    monthlyData.forEach(month => {
+      const year = month.month.split('-')[0];
+      
+      if (!yearlyData[year]) {
+        yearlyData[year] = {
+          income: 0,
+          expense: 0,
+          profit: 0,
+          transactionCount: 0,
+          months: 0,
+          categories: {}
+        };
+      }
+      
+      // Aggregate financial data
+      yearlyData[year].income += month.income;
+      yearlyData[year].expense += month.expense;
+      yearlyData[year].profit += month.profit;
+      yearlyData[year].transactionCount += month.transactionCount;
+      yearlyData[year].months += 1;
+      
+      // Aggregate categories
+      month.categories.forEach(cat => {
+        const category = cat.category;
+        if (!yearlyData[year].categories[category]) {
+          yearlyData[year].categories[category] = {
+            income: 0,
+            expense: 0,
+            net: 0
+          };
+        }
+        
+        yearlyData[year].categories[category].income += cat.income;
+        yearlyData[year].categories[category].expense += cat.expense;
+        yearlyData[year].categories[category].net += cat.net;
+      });
+    });
+    
+    // Convert to array and calculate profit metrics
+    const yearlyArray = Object.entries(yearlyData).map(([year, data]) => {
+      const { income, expense, profit, transactionCount, months, categories } = data as any;
+      const profitMargin = income > 0 ? (profit / income) * 100 : 0;
+      
+      // Convert categories to array
+      const categoriesArray = Object.entries(categories).map(([category, amounts]) => ({
+        category,
+        income: amounts.income,
+        expense: amounts.expense,
+        net: amounts.net
+      }));
+      
+      return {
+        year,
+        income,
+        expense,
+        profit,
+        profitMargin,
+        transactionCount,
+        months,
+        categories: categoriesArray.sort((a, b) => Math.abs(b.net) - Math.abs(a.net))
+      };
+    });
+    
+    // Sort by year (descending)
+    return yearlyArray.sort((a, b) => b.year.localeCompare(a.year));
+  } catch (err) {
+    console.error('Error analyzing yearly data:', err);
+    return [];
+  }
+}
+
+// Enhanced function to calculate year-over-year and month-over-month comparisons
+function calculateComparisons(summaries, monthlyData) {
+  if (!summaries || summaries.length < 2) return { yoy: null, mom: null, quarterly: null };
   
   // Most recent two months for MoM comparison
   const currentMonth = summaries[0];
@@ -121,6 +392,78 @@ function calculateComparisons(summaries) {
     return startDate.getMonth() === sameMonthLastYearDate.getMonth() &&
            startDate.getFullYear() === sameMonthLastYearDate.getFullYear();
   });
+  
+  // Quarterly comparison using monthly data
+  let quarterlyComparison = null;
+  if (monthlyData && monthlyData.length >= 6) {
+    // Group by quarter
+    const quarterGroups = {};
+    
+    monthlyData.slice(0, 6).forEach(month => {
+      const [year, monthNum] = month.month.split('-');
+      const quarter = Math.ceil(parseInt(monthNum) / 3);
+      const quarterKey = `${year}-Q${quarter}`;
+      
+      if (!quarterGroups[quarterKey]) {
+        quarterGroups[quarterKey] = {
+          income: 0,
+          expense: 0,
+          profit: 0,
+          profitMargin: 0,
+          count: 0
+        };
+      }
+      
+      quarterGroups[quarterKey].income += month.income;
+      quarterGroups[quarterKey].expense += month.expense;
+      quarterGroups[quarterKey].profit += month.profit;
+      quarterGroups[quarterKey].count += 1;
+    });
+    
+    // Calculate profit margin for each quarter
+    Object.values(quarterGroups).forEach((q: any) => {
+      q.profitMargin = q.income > 0 ? (q.profit / q.income) * 100 : 0;
+    });
+    
+    // Get the quarters in descending order
+    const quarters = Object.keys(quarterGroups).sort((a, b) => b.localeCompare(a));
+    
+    if (quarters.length >= 2) {
+      const currentQuarter = quarterGroups[quarters[0]];
+      const previousQuarter = quarterGroups[quarters[1]];
+      
+      quarterlyComparison = {
+        current: quarters[0],
+        previous: quarters[1],
+        income: {
+          current: currentQuarter.income,
+          previous: previousQuarter.income,
+          change: currentQuarter.income - previousQuarter.income,
+          percentChange: previousQuarter.income !== 0 ? 
+            ((currentQuarter.income - previousQuarter.income) / previousQuarter.income * 100) : 0
+        },
+        expense: {
+          current: currentQuarter.expense,
+          previous: previousQuarter.expense,
+          change: currentQuarter.expense - previousQuarter.expense,
+          percentChange: previousQuarter.expense !== 0 ? 
+            ((currentQuarter.expense - previousQuarter.expense) / previousQuarter.expense * 100) : 0
+        },
+        profit: {
+          current: currentQuarter.profit,
+          previous: previousQuarter.profit,
+          change: currentQuarter.profit - previousQuarter.profit,
+          percentChange: previousQuarter.profit !== 0 ? 
+            ((currentQuarter.profit - previousQuarter.profit) / Math.abs(previousQuarter.profit) * 100) : 0
+        },
+        profitMargin: {
+          current: currentQuarter.profitMargin,
+          previous: previousQuarter.profitMargin,
+          change: currentQuarter.profitMargin - previousQuarter.profitMargin
+        }
+      };
+    }
+  }
   
   return {
     mom: previousMonth ? {
@@ -173,37 +516,247 @@ function calculateComparisons(summaries) {
         previous: sameMonthLastYear.profit_margin,
         change: currentMonth.profit_margin - sameMonthLastYear.profit_margin
       }
-    } : null
+    } : null,
+    
+    quarterly: quarterlyComparison
   };
 }
 
-// Helper function to detect trends in financial data
-function detectTrends(summaries, transactions) {
-  if (!summaries || summaries.length < 3) return [];
-  
+// Enhanced trend detection with more sophisticated algorithms
+function detectTrends(summaries, transactions, monthlyData, yearlyData) {
   const trends = [];
   
-  // Detect profit margin trend
-  const profitMargins = summaries.slice(0, 6).map(s => s.profit_margin);
-  const isIncreasing = profitMargins.every((val, i) => i === 0 || val >= profitMargins[i - 1]);
-  const isDecreasing = profitMargins.every((val, i) => i === 0 || val <= profitMargins[i - 1]);
-  
-  if (isIncreasing && profitMargins[0] > profitMargins[profitMargins.length - 1] + 5) {
+  // Check if we have enough data
+  if (!summaries || summaries.length < 3) {
     trends.push({
-      type: 'profit_margin',
-      description: `Profit margin has been steadily increasing over the last ${profitMargins.length} months, from ${profitMargins[profitMargins.length - 1].toFixed(2)}% to ${profitMargins[0].toFixed(2)}%`,
-      significance: 'high'
+      type: 'data_limitation',
+      description: `Datos históricos limitados para análisis de tendencias. Solo se encontraron ${summaries?.length || 0} resúmenes financieros.`,
+      significance: 'informative'
     });
-  } else if (isDecreasing && profitMargins[0] < profitMargins[profitMargins.length - 1] - 5) {
-    trends.push({
-      type: 'profit_margin',
-      description: `Profit margin has been declining over the last ${profitMargins.length} months, from ${profitMargins[profitMargins.length - 1].toFixed(2)}% to ${profitMargins[0].toFixed(2)}%`,
-      significance: 'high'
+    return trends;
+  }
+  
+  // 1. Advanced profit margin trend analysis
+  if (monthlyData && monthlyData.length >= 6) {
+    const recentMonths = monthlyData.slice(0, 6);
+    const profitMargins = recentMonths.map(m => m.profitMargin).reverse(); // oldest to newest
+    
+    // Calculate trend using linear regression
+    const trend = calculateLinearTrend(profitMargins);
+    
+    if (Math.abs(trend) > 1) {  // Significant slope in either direction
+      trends.push({
+        type: 'profit_margin_trend',
+        description: `Margen de beneficio está ${trend > 0 ? 'incrementando' : 'disminuyendo'} consistentemente en los últimos 6 meses, con una pendiente de ${trend.toFixed(2)}% por mes.`,
+        significance: trend > 0 ? 'positive' : 'warning',
+        data: profitMargins
+      });
+    }
+    
+    // Volatility analysis
+    const volatility = calculateVolatility(profitMargins);
+    if (volatility > 10) { // More than 10% standard deviation
+      trends.push({
+        type: 'profit_volatility',
+        description: `Alta volatilidad en el margen de beneficio (${volatility.toFixed(2)}% desviación estándar), lo que indica inestabilidad financiera.`,
+        significance: 'warning',
+        volatility
+      });
+    }
+  }
+  
+  // 2. Expense category growth analysis
+  if (monthlyData && monthlyData.length >= 3) {
+    // Track categories with consistent growth
+    const categoryTrends = {};
+    
+    // Analyze recent 3 months
+    const recent3Months = monthlyData.slice(0, 3);
+    
+    // Collect all expense categories
+    recent3Months.forEach(month => {
+      month.categories.forEach(cat => {
+        if (cat.expense > 0) {
+          if (!categoryTrends[cat.category]) {
+            categoryTrends[cat.category] = {
+              expenses: [],
+              months: []
+            };
+          }
+          categoryTrends[cat.category].expenses.push(cat.expense);
+          categoryTrends[cat.category].months.push(month.month);
+        }
+      });
+    });
+    
+    // Check for consistent growth in top categories
+    Object.entries(categoryTrends).forEach(([category, data]) => {
+      const { expenses, months } = data as any;
+      
+      if (expenses.length >= 3) {
+        // Check if expenses are consistently increasing
+        const isIncreasing = expenses.slice().reverse().every((val, i, arr) => 
+          i === 0 || val < arr[i-1]
+        );
+        
+        const isDecreasing = expenses.slice().reverse().every((val, i, arr) => 
+          i === 0 || val > arr[i-1]
+        );
+        
+        if (isIncreasing && expenses[0] > 500) { // Significant expense (over $500)
+          const growthRate = ((expenses[0] - expenses[expenses.length-1]) / expenses[expenses.length-1] * 100);
+          
+          if (growthRate > 20) { // Over 20% growth
+            trends.push({
+              type: 'category_growth',
+              description: `Gastos en categoría "${category}" han crecido constantemente en los últimos 3 meses, con un aumento total del ${growthRate.toFixed(2)}%.`,
+              significance: 'warning',
+              data: { category, expenses: expenses.reverse(), months: months.reverse(), growthRate }
+            });
+          }
+        } else if (isDecreasing && expenses[expenses.length-1] > 500) {
+          const reductionRate = ((expenses[expenses.length-1] - expenses[0]) / expenses[expenses.length-1] * 100);
+          
+          if (reductionRate > 20) { // Over 20% reduction
+            trends.push({
+              type: 'category_reduction',
+              description: `Gastos en categoría "${category}" han disminuido constantemente en los últimos 3 meses, con una reducción total del ${reductionRate.toFixed(2)}%.`,
+              significance: 'positive',
+              data: { category, expenses: expenses.reverse(), months: months.reverse(), reductionRate }
+            });
+          }
+        }
+      }
     });
   }
   
-  // Detect expense categories with significant increases
-  if (transactions && transactions.length > 0) {
+  // 3. Seasonality detection
+  if (monthlyData && monthlyData.length >= 12) {
+    const monthNames = [
+      "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ];
+    
+    // Group data by month number
+    const monthlyAverages = Array(12).fill(0).map(() => ({ 
+      incomeSum: 0, 
+      expenseSum: 0,
+      profitSum: 0,
+      count: 0 
+    }));
+    
+    monthlyData.forEach(data => {
+      const monthIndex = parseInt(data.month.split('-')[1]) - 1;
+      monthlyAverages[monthIndex].incomeSum += data.income;
+      monthlyAverages[monthIndex].expenseSum += data.expense;
+      monthlyAverages[monthIndex].profitSum += data.profit;
+      monthlyAverages[monthIndex].count += 1;
+    });
+    
+    // Calculate averages and identify seasonal patterns
+    const monthlyStats = monthlyAverages.map((data, idx) => ({
+      month: monthNames[idx],
+      incomeAvg: data.count > 0 ? data.incomeSum / data.count : 0,
+      expenseAvg: data.count > 0 ? data.expenseSum / data.count : 0,
+      profitAvg: data.count > 0 ? data.profitSum / data.count : 0,
+      dataPoints: data.count
+    }));
+    
+    // Only consider months with data
+    const validMonthStats = monthlyStats.filter(m => m.dataPoints > 0);
+    
+    if (validMonthStats.length > 3) {
+      // Find highest and lowest months
+      const sortedByIncome = [...validMonthStats].sort((a, b) => b.incomeAvg - a.incomeAvg);
+      const sortedByExpense = [...validMonthStats].sort((a, b) => b.expenseAvg - a.expenseAvg);
+      const sortedByProfit = [...validMonthStats].sort((a, b) => b.profitAvg - a.profitAvg);
+      
+      // Top income months
+      if (sortedByIncome[0].incomeAvg > 0 && 
+          sortedByIncome[0].incomeAvg > 1.5 * (validMonthStats.reduce((sum, m) => sum + m.incomeAvg, 0) / validMonthStats.length)) {
+        trends.push({
+          type: 'seasonal_income',
+          description: `Estacionalidad detectada en ingresos: ${sortedByIncome[0].month} tiene históricamente los ingresos más altos (promedio ${formatCurrency(sortedByIncome[0].incomeAvg)}).`,
+          significance: 'insight',
+          data: { month: sortedByIncome[0].month, average: sortedByIncome[0].incomeAvg }
+        });
+      }
+      
+      // Top expense months
+      if (sortedByExpense[0].expenseAvg > 0 && 
+          sortedByExpense[0].expenseAvg > 1.5 * (validMonthStats.reduce((sum, m) => sum + m.expenseAvg, 0) / validMonthStats.length)) {
+        trends.push({
+          type: 'seasonal_expense',
+          description: `Estacionalidad detectada en gastos: ${sortedByExpense[0].month} tiene históricamente los gastos más altos (promedio ${formatCurrency(sortedByExpense[0].expenseAvg)}).`,
+          significance: 'insight',
+          data: { month: sortedByExpense[0].month, average: sortedByExpense[0].expenseAvg }
+        });
+      }
+      
+      // Best and worst months for profit
+      if (validMonthStats.length >= 4) {
+        trends.push({
+          type: 'best_profit_months',
+          description: `Mejores meses para beneficio: ${sortedByProfit[0].month} (${formatCurrency(sortedByProfit[0].profitAvg)}), ${sortedByProfit[1].month} (${formatCurrency(sortedByProfit[1].profitAvg)})`,
+          significance: 'insight',
+          data: { bestMonths: [sortedByProfit[0], sortedByProfit[1]] }
+        });
+        
+        const worstMonths = [...sortedByProfit].reverse();
+        trends.push({
+          type: 'worst_profit_months',
+          description: `Peores meses para beneficio: ${worstMonths[0].month} (${formatCurrency(worstMonths[0].profitAvg)}), ${worstMonths[1].month} (${formatCurrency(worstMonths[1].profitAvg)})`,
+          significance: 'insight', 
+          data: { worstMonths: [worstMonths[0], worstMonths[1]] }
+        });
+      }
+    }
+  }
+  
+  // 4. Year-over-year growth analysis
+  if (yearlyData && yearlyData.length >= 2) {
+    const currentYear = yearlyData[0];
+    const previousYear = yearlyData[1];
+    
+    // Ensure we're comparing years with sufficient month coverage
+    if (currentYear.months >= 6 && previousYear.months >= 6) {
+      // Calculate YoY growth rates
+      const incomeGrowth = ((currentYear.income / currentYear.months) - (previousYear.income / previousYear.months)) / (previousYear.income / previousYear.months) * 100;
+      const expenseGrowth = ((currentYear.expense / currentYear.months) - (previousYear.expense / previousYear.months)) / (previousYear.expense / previousYear.months) * 100;
+      const profitGrowth = previousYear.profit !== 0 ? ((currentYear.profit / currentYear.months) - (previousYear.profit / previousYear.months)) / Math.abs(previousYear.profit / previousYear.months) * 100 : 0;
+      
+      // Report significant YoY changes
+      if (Math.abs(incomeGrowth) > 15) {
+        trends.push({
+          type: 'yoy_income',
+          description: `Ingresos ${incomeGrowth > 0 ? 'incrementaron' : 'disminuyeron'} un ${Math.abs(incomeGrowth).toFixed(2)}% respecto al año anterior (ajustado por meses).`,
+          significance: incomeGrowth > 0 ? 'positive' : 'warning',
+          data: { currentYear: currentYear.year, previousYear: previousYear.year, growthRate: incomeGrowth }
+        });
+      }
+      
+      if (Math.abs(expenseGrowth) > 15) {
+        trends.push({
+          type: 'yoy_expense',
+          description: `Gastos ${expenseGrowth > 0 ? 'incrementaron' : 'disminuyeron'} un ${Math.abs(expenseGrowth).toFixed(2)}% respecto al año anterior (ajustado por meses).`,
+          significance: expenseGrowth > 0 ? 'warning' : 'positive',
+          data: { currentYear: currentYear.year, previousYear: previousYear.year, growthRate: expenseGrowth }
+        });
+      }
+      
+      if (Math.abs(profitGrowth) > 15) {
+        trends.push({
+          type: 'yoy_profit',
+          description: `Beneficio ${profitGrowth > 0 ? 'incrementó' : 'disminuyó'} un ${Math.abs(profitGrowth).toFixed(2)}% respecto al año anterior (ajustado por meses).`,
+          significance: profitGrowth > 0 ? 'positive' : 'warning',
+          data: { currentYear: currentYear.year, previousYear: previousYear.year, growthRate: profitGrowth }
+        });
+      }
+    }
+  }
+  
+  // 5. Expense category analysis
+  if (transactions && transactions.length > 20) {
     // Group by category and sum amounts
     const categorySums = {};
     const currentMonthTransactions = transactions.filter(t => 
@@ -213,91 +766,284 @@ function detectTrends(summaries, transactions) {
     currentMonthTransactions.forEach(tx => {
       const category = tx.category || 'Uncategorized';
       if (!categorySums[category]) {
-        categorySums[category] = 0;
+        categorySums[category] = {
+          amount: 0,
+          count: 0
+        };
       }
-      categorySums[category] += Math.abs(tx.amount);
+      categorySums[category].amount += Math.abs(tx.amount);
+      categorySums[category].count += 1;
     });
     
     // Find the top expense categories
     const topCategories = Object.entries(categorySums)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3);
+      .map(([category, data]) => ({ 
+        category, 
+        amount: (data as any).amount,
+        count: (data as any).count,
+        averageTransaction: (data as any).amount / (data as any).count
+      }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5);
     
     if (topCategories.length > 0) {
       trends.push({
         type: 'top_expenses',
-        description: `Top expense categories: ${topCategories.map(([cat, amount]) => `${cat} (${formatCurrency(amount)})`).join(', ')}`,
-        significance: 'medium'
+        description: `Las 5 principales categorías de gasto: ${topCategories.map(c => `${c.category} (${formatCurrency(c.amount)})`).join(', ')}`,
+        significance: 'medium',
+        data: topCategories
       });
+      
+      // Find categories with unusually high average transaction amounts
+      const highValueCategories = [...topCategories]
+        .filter(c => c.count >= 3 && c.averageTransaction > 500)
+        .sort((a, b) => b.averageTransaction - a.averageTransaction);
+      
+      if (highValueCategories.length > 0) {
+        trends.push({
+          type: 'high_value_expenses',
+          description: `Categorías con transacciones promedio de alto valor: ${highValueCategories.map(c => `${c.category} (promedio ${formatCurrency(c.averageTransaction)})`).join(', ')}`,
+          significance: 'medium',
+          data: highValueCategories
+        });
+      }
     }
-  }
-  
-  // Detect income trend
-  const incomes = summaries.slice(0, 3).map(s => s.total_income);
-  const incomeChange = incomes.length > 1 ? 
-    ((incomes[0] - incomes[incomes.length - 1]) / incomes[incomes.length - 1] * 100) : 0;
-    
-  if (Math.abs(incomeChange) > 20) {
-    trends.push({
-      type: 'income',
-      description: `Income has ${incomeChange > 0 ? 'increased' : 'decreased'} by ${Math.abs(incomeChange).toFixed(2)}% over the last ${incomes.length} months`,
-      significance: incomeChange > 0 ? 'positive' : 'warning'
-    });
   }
   
   return trends;
 }
 
-// Helper function to generate system prompt with context
+// Helper function to calculate linear trend (slope)
+function calculateLinearTrend(data) {
+  // Need at least 2 points to calculate a trend
+  if (!data || data.length < 2) return 0;
+  
+  const n = data.length;
+  const indices = Array.from({ length: n }, (_, i) => i);
+  
+  // Calculate means
+  const meanX = indices.reduce((sum, i) => sum + i, 0) / n;
+  const meanY = data.reduce((sum, y) => sum + y, 0) / n;
+  
+  // Calculate slope (beta)
+  const numerator = indices.reduce((sum, x, i) => sum + (x - meanX) * (data[i] - meanY), 0);
+  const denominator = indices.reduce((sum, x) => sum + Math.pow(x - meanX, 2), 0);
+  
+  return denominator !== 0 ? numerator / denominator : 0;
+}
+
+// Helper function to calculate volatility (standard deviation)
+function calculateVolatility(data) {
+  if (!data || data.length < 2) return 0;
+  
+  const mean = data.reduce((sum, val) => sum + val, 0) / data.length;
+  const squareDiffs = data.map(val => Math.pow(val - mean, 2));
+  const variance = squareDiffs.reduce((sum, val) => sum + val, 0) / data.length;
+  
+  return Math.sqrt(variance);
+}
+
+// Detect anomalies in data
+function detectAnomalies(monthlyData, transactions) {
+  const anomalies = [];
+  
+  // Need at least 6 months of data to detect anomalies
+  if (!monthlyData || monthlyData.length < 6) return anomalies;
+  
+  // Check for unusual months (income, expense, profit)
+  const recent6Months = monthlyData.slice(0, 6);
+  
+  // Calculate means and standard deviations
+  const incomes = recent6Months.map(m => m.income);
+  const expenses = recent6Months.map(m => m.expense);
+  const profits = recent6Months.map(m => m.profit);
+  
+  const incomeMean = incomes.reduce((sum, val) => sum + val, 0) / incomes.length;
+  const expenseMean = expenses.reduce((sum, val) => sum + val, 0) / expenses.length;
+  const profitMean = profits.reduce((sum, val) => sum + val, 0) / profits.length;
+  
+  const incomeStdDev = Math.sqrt(incomes.map(val => Math.pow(val - incomeMean, 2)).reduce((sum, val) => sum + val, 0) / incomes.length);
+  const expenseStdDev = Math.sqrt(expenses.map(val => Math.pow(val - expenseMean, 2)).reduce((sum, val) => sum + val, 0) / expenses.length);
+  const profitStdDev = Math.sqrt(profits.map(val => Math.pow(val - profitMean, 2)).reduce((sum, val) => sum + val, 0) / profits.length);
+  
+  // Check most recent month for anomalies
+  const latestMonth = recent6Months[0];
+  
+  if (Math.abs(latestMonth.income - incomeMean) > 2 * incomeStdDev) {
+    anomalies.push({
+      type: 'income_anomaly',
+      description: `Ingresos anómalos en ${latestMonth.month}: ${formatCurrency(latestMonth.income)} (${latestMonth.income > incomeMean ? '+' : ''}${((latestMonth.income - incomeMean) / incomeMean * 100).toFixed(2)}% de lo normal)`,
+      significance: latestMonth.income > incomeMean ? 'positive' : 'warning',
+      deviation: (latestMonth.income - incomeMean) / incomeStdDev
+    });
+  }
+  
+  if (Math.abs(latestMonth.expense - expenseMean) > 2 * expenseStdDev) {
+    anomalies.push({
+      type: 'expense_anomaly',
+      description: `Gastos anómalos en ${latestMonth.month}: ${formatCurrency(latestMonth.expense)} (${latestMonth.expense > expenseMean ? '+' : ''}${((latestMonth.expense - expenseMean) / expenseMean * 100).toFixed(2)}% de lo normal)`,
+      significance: latestMonth.expense > expenseMean ? 'warning' : 'positive',
+      deviation: (latestMonth.expense - expenseMean) / expenseStdDev
+    });
+  }
+  
+  if (Math.abs(latestMonth.profit - profitMean) > 2 * profitStdDev) {
+    anomalies.push({
+      type: 'profit_anomaly',
+      description: `Beneficio anómalo en ${latestMonth.month}: ${formatCurrency(latestMonth.profit)} (${latestMonth.profit > profitMean ? '+' : ''}${((latestMonth.profit - profitMean) / Math.abs(profitMean) * 100).toFixed(2)}% de lo normal)`,
+      significance: latestMonth.profit > profitMean ? 'positive' : 'warning',
+      deviation: (latestMonth.profit - profitMean) / profitStdDev
+    });
+  }
+  
+  // Check for unusual transactions
+  if (transactions && transactions.length > 0) {
+    // Group transactions by category
+    const categoryStats = {};
+    
+    transactions.forEach(tx => {
+      const category = tx.category || 'Uncategorized';
+      const amount = Math.abs(tx.amount);
+      
+      if (!categoryStats[category]) {
+        categoryStats[category] = {
+          transactions: [],
+          total: 0,
+          count: 0,
+          mean: 0,
+          stdDev: 0
+        };
+      }
+      
+      categoryStats[category].transactions.push(amount);
+      categoryStats[category].total += amount;
+      categoryStats[category].count += 1;
+    });
+    
+    // Calculate statistics for each category
+    Object.entries(categoryStats).forEach(([category, stats]) => {
+      const { transactions, total, count } = stats as any;
+      
+      // Only check categories with at least 5 transactions
+      if (count >= 5) {
+        const mean = total / count;
+        const variance = transactions.reduce((sum, amount) => sum + Math.pow(amount - mean, 2), 0) / count;
+        const stdDev = Math.sqrt(variance);
+        
+        stats.mean = mean;
+        stats.stdDev = stdDev;
+        
+        // Find anomalous transactions (more than 3 standard deviations)
+        const anomalousTransactions = transactions.filter(amount => Math.abs(amount - mean) > 3 * stdDev);
+        
+        if (anomalousTransactions.length > 0) {
+          anomalies.push({
+            type: 'transaction_anomaly',
+            description: `Encontradas ${anomalousTransactions.length} transacciones anómalas en categoría "${category}" que se desvían significativamente del promedio`,
+            significance: 'medium',
+            data: {
+              category,
+              mean,
+              stdDev,
+              anomalousCount: anomalousTransactions.length
+            }
+          });
+        }
+      }
+    });
+  }
+  
+  return anomalies;
+}
+
+// Enhanced system prompt generator
 async function generateSystemPrompt(dateRange, uiData = null, conversationContext = null) {
   try {
-    // Fetch data from database
-    const monthlyBalances = await fetchMonthlyBalances();
-    const financialSummaries = await fetchFinancialSummaries(12);
+    // Step 1: Fetch comprehensive historical data
+    const { data: allTransactions, total: totalTransactions } = await fetchHistoricalTransactions(1000, 0);
+    const monthlyBalances = await fetchMonthlyBalances(48);
+    const financialSummaries = await fetchFinancialSummaries(24);
     const availableMonths = await fetchAvailableCacheMonths();
     
-    // Calculate comparisons for current period
-    const comparisons = calculateComparisons(financialSummaries);
+    console.log(`Fetched ${allTransactions.length} transactions out of ${totalTransactions} total`);
     
-    // Get recent transactions for analysis
-    let recentTransactions = [];
-    if (availableMonths && availableMonths.length > 0) {
-      // Get the most recent month's transactions
-      const recentMonth = availableMonths[0];
-      recentTransactions = await fetchMonthTransactions(recentMonth.source, recentMonth.year, recentMonth.month);
-    }
+    // Step 2: Process and analyze historical data
+    const monthlyData = await analyzeMonthlyTransactionData(allTransactions);
+    const quarterlyData = await analyzeQuarterlyData(monthlyData);
+    const yearlyData = await analyzeYearlyData(monthlyData);
     
-    // Detect trends in financial data
-    const trends = detectTrends(financialSummaries, recentTransactions);
+    // Step 3: Calculate comparisons and detect patterns
+    const comparisons = calculateComparisons(financialSummaries, monthlyData);
+    const trends = detectTrends(financialSummaries, allTransactions, monthlyData, yearlyData);
+    const anomalies = detectAnomalies(monthlyData, allTransactions);
     
-    console.log('Financial data from database:', { 
+    console.log('Financial data and analysis prepared:', { 
       summaries: financialSummaries?.length || 0,
       balances: monthlyBalances?.length || 0,
       availableMonths: availableMonths?.length || 0,
-      recentTransactions: recentTransactions?.length || 0,
-      trends: trends?.length || 0
+      transactions: allTransactions?.length || 0,
+      monthlyDataPoints: monthlyData?.length || 0,
+      quarterlyDataPoints: quarterlyData?.length || 0,
+      yearlyDataPoints: yearlyData?.length || 0,
+      trends: trends?.length || 0,
+      anomalies: anomalies?.length || 0
     });
     
     // Format the context data for the system prompt
-    let financialContext = "Financial Summaries:\n";
+    let financialContext = "Historical Financial Data:\n\n";
     
-    if (financialSummaries && financialSummaries.length > 0) {
-      financialSummaries.forEach(summary => {
-        financialContext += `Period: ${summary.date_range_start} to ${summary.date_range_end}\n`;
-        financialContext += `- Income: ${formatCurrency(summary.total_income)}\n`;
-        financialContext += `- Total Expenses: ${formatCurrency(summary.total_expense)}\n`;
-        financialContext += `- Collaborator Expenses: ${formatCurrency(summary.collaborator_expense)}\n`;
-        financialContext += `- Other Expenses: ${formatCurrency(summary.other_expense)}\n`;
-        financialContext += `- Profit: ${formatCurrency(summary.profit)}\n`;
-        financialContext += `- Profit Margin: ${summary.profit_margin.toFixed(2)}%\n\n`;
+    // 1. Add yearly summary
+    if (yearlyData && yearlyData.length > 0) {
+      financialContext += "Yearly Financial Performance:\n";
+      
+      yearlyData.forEach(year => {
+        financialContext += `Year: ${year.year} (data from ${year.months} months)\n`;
+        financialContext += `- Total Income: ${formatCurrency(year.income)}\n`;
+        financialContext += `- Total Expenses: ${formatCurrency(year.expense)}\n`;
+        financialContext += `- Profit: ${formatCurrency(year.profit)}\n`;
+        financialContext += `- Profit Margin: ${year.profitMargin.toFixed(2)}%\n`;
+        financialContext += `- Top Categories: ${year.categories.slice(0, 3).map(c => `${c.category} (${formatCurrency(c.net)})`).join(', ')}\n\n`;
       });
     } else {
-      financialContext += "No recent financial summaries available.\n\n";
+      financialContext += "No yearly financial data available.\n\n";
     }
     
-    financialContext += "Monthly Balances:\n";
+    // 2. Add quarterly summary
+    if (quarterlyData && quarterlyData.length > 0) {
+      financialContext += "Quarterly Financial Performance:\n";
+      
+      quarterlyData.slice(0, 4).forEach(quarter => {
+        financialContext += `Quarter: ${quarter.quarter}\n`;
+        financialContext += `- Income: ${formatCurrency(quarter.income)}\n`;
+        financialContext += `- Expenses: ${formatCurrency(quarter.expense)}\n`;
+        financialContext += `- Profit: ${formatCurrency(quarter.profit)}\n`;
+        financialContext += `- Profit Margin: ${quarter.profitMargin.toFixed(2)}%\n`;
+        financialContext += `- Top Categories: ${quarter.categories.slice(0, 3).map(c => `${c.category} (${formatCurrency(c.net)})`).join(', ')}\n\n`;
+      });
+    } else {
+      financialContext += "No quarterly financial data available.\n\n";
+    }
     
+    // 3. Add monthly details
+    if (monthlyData && monthlyData.length > 0) {
+      financialContext += "Monthly Financial Performance:\n";
+      
+      monthlyData.slice(0, 6).forEach(month => {
+        financialContext += `Month: ${month.month}\n`;
+        financialContext += `- Income: ${formatCurrency(month.income)}\n`;
+        financialContext += `- Expenses: ${formatCurrency(month.expense)}\n`;
+        financialContext += `- Profit: ${formatCurrency(month.profit)}\n`;
+        financialContext += `- Profit Margin: ${month.profitMargin.toFixed(2)}%\n`;
+        financialContext += `- Transactions: ${month.transactionCount}\n\n`;
+      });
+    } else {
+      financialContext += "No monthly financial data available.\n\n";
+    }
+    
+    // 4. Add monthly balances
     if (monthlyBalances && monthlyBalances.length > 0) {
+      financialContext += "Monthly Account Balances:\n";
+      
       monthlyBalances.forEach(balance => {
         financialContext += `Month: ${balance.month_year}\n`;
         financialContext += `- Balance: ${formatCurrency(balance.balance)}\n`;
@@ -310,52 +1056,106 @@ async function generateSystemPrompt(dateRange, uiData = null, conversationContex
         if (balance.itbm_amount !== null) {
           financialContext += `- ITBM Amount: ${formatCurrency(balance.itbm_amount)}\n`;
         }
-        financialContext += `- Profit Percentage: ${balance.profit_percentage.toFixed(2)}%\n\n`;
+        if (balance.profit_percentage !== null) {
+          financialContext += `- Profit Percentage: ${balance.profit_percentage.toFixed(2)}%\n`;
+        }
+        financialContext += '\n';
       });
     } else {
-      financialContext += "No monthly balances available.\n\n";
+      financialContext += "No monthly balance data available.\n\n";
     }
     
-    // Add comparison data if available
-    if (comparisons.mom || comparisons.yoy) {
-      financialContext += "Performance Comparisons:\n";
+    // 5. Add detailed recent financial summaries
+    if (financialSummaries && financialSummaries.length > 0) {
+      financialContext += "Recent Financial Period Summaries:\n";
       
-      if (comparisons.mom) {
-        financialContext += "Month-over-Month Changes:\n";
-        financialContext += `- Profit: ${formatCurrency(comparisons.mom.profit.current)} vs ${formatCurrency(comparisons.mom.profit.previous)} (${comparisons.mom.profit.percentChange > 0 ? '+' : ''}${comparisons.mom.profit.percentChange.toFixed(2)}%)\n`;
-        financialContext += `- Income: ${formatCurrency(comparisons.mom.income.current)} vs ${formatCurrency(comparisons.mom.income.previous)} (${comparisons.mom.income.percentChange > 0 ? '+' : ''}${comparisons.mom.income.percentChange.toFixed(2)}%)\n`;
-        financialContext += `- Expenses: ${formatCurrency(comparisons.mom.expenses.current)} vs ${formatCurrency(comparisons.mom.expenses.previous)} (${comparisons.mom.expenses.percentChange > 0 ? '+' : ''}${comparisons.mom.expenses.percentChange.toFixed(2)}%)\n`;
-        financialContext += `- Profit Margin: ${comparisons.mom.profitMargin.current.toFixed(2)}% vs ${comparisons.mom.profitMargin.previous.toFixed(2)}% (${comparisons.mom.profitMargin.change > 0 ? '+' : ''}${comparisons.mom.profitMargin.change.toFixed(2)}%)\n\n`;
-      }
-      
-      if (comparisons.yoy) {
-        financialContext += "Year-over-Year Changes:\n";
-        financialContext += `- Profit: ${formatCurrency(comparisons.yoy.profit.current)} vs ${formatCurrency(comparisons.yoy.profit.previous)} (${comparisons.yoy.profit.percentChange > 0 ? '+' : ''}${comparisons.yoy.profit.percentChange.toFixed(2)}%)\n`;
-        financialContext += `- Income: ${formatCurrency(comparisons.yoy.income.current)} vs ${formatCurrency(comparisons.yoy.income.previous)} (${comparisons.yoy.income.percentChange > 0 ? '+' : ''}${comparisons.yoy.income.percentChange.toFixed(2)}%)\n`;
-        financialContext += `- Expenses: ${formatCurrency(comparisons.yoy.expenses.current)} vs ${formatCurrency(comparisons.yoy.expenses.previous)} (${comparisons.yoy.expenses.percentChange > 0 ? '+' : ''}${comparisons.yoy.expenses.percentChange.toFixed(2)}%)\n`;
-        financialContext += `- Profit Margin: ${comparisons.yoy.profitMargin.current.toFixed(2)}% vs ${comparisons.yoy.profitMargin.previous.toFixed(2)}% (${comparisons.yoy.profitMargin.change > 0 ? '+' : ''}${comparisons.yoy.profitMargin.change.toFixed(2)}%)\n\n`;
-      }
+      financialSummaries.slice(0, 6).forEach(summary => {
+        financialContext += `Period: ${summary.date_range_start} to ${summary.date_range_end}\n`;
+        financialContext += `- Total Income: ${formatCurrency(summary.total_income)}\n`;
+        financialContext += `- Total Expenses: ${formatCurrency(summary.total_expense)}\n`;
+        financialContext += `- Collaborator Expenses: ${formatCurrency(summary.collaborator_expense)}\n`;
+        financialContext += `- Other Expenses: ${formatCurrency(summary.other_expense)}\n`;
+        financialContext += `- Profit: ${formatCurrency(summary.profit)}\n`;
+        financialContext += `- Profit Margin: ${summary.profit_margin.toFixed(2)}%\n`;
+        financialContext += `- Starting Balance: ${formatCurrency(summary.starting_balance || 0)}\n\n`;
+      });
+    } else {
+      financialContext += "No recent financial summaries available.\n\n";
     }
     
-    // Add trends if detected
+    // 6. Add comparison data (MoM, QoQ, YoY)
+    financialContext += "Performance Comparisons:\n";
+    
+    if (comparisons.mom) {
+      financialContext += "Month-over-Month Changes:\n";
+      financialContext += `- Profit: ${formatCurrency(comparisons.mom.profit.current)} vs ${formatCurrency(comparisons.mom.profit.previous)} (${comparisons.mom.profit.percentChange > 0 ? '+' : ''}${comparisons.mom.profit.percentChange.toFixed(2)}%)\n`;
+      financialContext += `- Income: ${formatCurrency(comparisons.mom.income.current)} vs ${formatCurrency(comparisons.mom.income.previous)} (${comparisons.mom.income.percentChange > 0 ? '+' : ''}${comparisons.mom.income.percentChange.toFixed(2)}%)\n`;
+      financialContext += `- Expenses: ${formatCurrency(comparisons.mom.expenses.current)} vs ${formatCurrency(comparisons.mom.expenses.previous)} (${comparisons.mom.expenses.percentChange > 0 ? '+' : ''}${comparisons.mom.expenses.percentChange.toFixed(2)}%)\n`;
+      financialContext += `- Profit Margin: ${comparisons.mom.profitMargin.current.toFixed(2)}% vs ${comparisons.mom.profitMargin.previous.toFixed(2)}% (${comparisons.mom.profitMargin.change > 0 ? '+' : ''}${comparisons.mom.profitMargin.change.toFixed(2)}%)\n\n`;
+    } else {
+      financialContext += "Month-over-Month comparison not available.\n\n";
+    }
+    
+    if (comparisons.quarterly) {
+      financialContext += "Quarter-over-Quarter Changes:\n";
+      financialContext += `- Comparing ${comparisons.quarterly.current} vs ${comparisons.quarterly.previous}\n`;
+      financialContext += `- Profit: ${formatCurrency(comparisons.quarterly.profit.current)} vs ${formatCurrency(comparisons.quarterly.profit.previous)} (${comparisons.quarterly.profit.percentChange > 0 ? '+' : ''}${comparisons.quarterly.profit.percentChange.toFixed(2)}%)\n`;
+      financialContext += `- Income: ${formatCurrency(comparisons.quarterly.income.current)} vs ${formatCurrency(comparisons.quarterly.income.previous)} (${comparisons.quarterly.income.percentChange > 0 ? '+' : ''}${comparisons.quarterly.income.percentChange.toFixed(2)}%)\n`;
+      financialContext += `- Expenses: ${formatCurrency(comparisons.quarterly.expense.current)} vs ${formatCurrency(comparisons.quarterly.expense.previous)} (${comparisons.quarterly.expense.percentChange > 0 ? '+' : ''}${comparisons.quarterly.expense.percentChange.toFixed(2)}%)\n`;
+      financialContext += `- Profit Margin: ${comparisons.quarterly.profitMargin.current.toFixed(2)}% vs ${comparisons.quarterly.profitMargin.previous.toFixed(2)}% (${comparisons.quarterly.profitMargin.change > 0 ? '+' : ''}${comparisons.quarterly.profitMargin.change.toFixed(2)}%)\n\n`;
+    } else {
+      financialContext += "Quarter-over-Quarter comparison not available.\n\n";
+    }
+    
+    if (comparisons.yoy) {
+      financialContext += "Year-over-Year Changes:\n";
+      financialContext += `- Profit: ${formatCurrency(comparisons.yoy.profit.current)} vs ${formatCurrency(comparisons.yoy.profit.previous)} (${comparisons.yoy.profit.percentChange > 0 ? '+' : ''}${comparisons.yoy.profit.percentChange.toFixed(2)}%)\n`;
+      financialContext += `- Income: ${formatCurrency(comparisons.yoy.income.current)} vs ${formatCurrency(comparisons.yoy.income.previous)} (${comparisons.yoy.income.percentChange > 0 ? '+' : ''}${comparisons.yoy.income.percentChange.toFixed(2)}%)\n`;
+      financialContext += `- Expenses: ${formatCurrency(comparisons.yoy.expenses.current)} vs ${formatCurrency(comparisons.yoy.expenses.previous)} (${comparisons.yoy.expenses.percentChange > 0 ? '+' : ''}${comparisons.yoy.expenses.percentChange.toFixed(2)}%)\n`;
+      financialContext += `- Profit Margin: ${comparisons.yoy.profitMargin.current.toFixed(2)}% vs ${comparisons.yoy.profitMargin.previous.toFixed(2)}% (${comparisons.yoy.profitMargin.change > 0 ? '+' : ''}${comparisons.yoy.profitMargin.change.toFixed(2)}%)\n\n`;
+    } else {
+      financialContext += "Year-over-Year comparison not available.\n\n";
+    }
+    
+    // 7. Add detected trends
     if (trends && trends.length > 0) {
       financialContext += "Detected Financial Trends:\n";
       trends.forEach(trend => {
         financialContext += `- ${trend.description} (${trend.significance} significance)\n`;
       });
       financialContext += "\n";
+    } else {
+      financialContext += "No significant financial trends detected.\n\n";
     }
     
-    // Add information about available historical data
+    // 8. Add detected anomalies
+    if (anomalies && anomalies.length > 0) {
+      financialContext += "Detected Anomalies:\n";
+      anomalies.forEach(anomaly => {
+        financialContext += `- ${anomaly.description} (${anomaly.significance} significance)\n`;
+      });
+      financialContext += "\n";
+    } else {
+      financialContext += "No significant anomalies detected in the financial data.\n\n";
+    }
+    
+    // 9. Add information about available historical data
+    financialContext += "Historical Data Coverage:\n";
+    financialContext += `- Total Historical Transactions: ${totalTransactions}\n`;
+    financialContext += `- Monthly Data Points: ${monthlyData?.length || 0}\n`;
+    financialContext += `- Quarterly Data Points: ${quarterlyData?.length || 0}\n`;
+    financialContext += `- Yearly Data Points: ${yearlyData?.length || 0}\n`;
+    
     if (availableMonths && availableMonths.length > 0) {
       const sources = [...new Set(availableMonths.map(m => m.source))];
       const earliestMonth = availableMonths[availableMonths.length - 1];
       const latestMonth = availableMonths[0];
       
-      financialContext += "Historical Data Coverage:\n";
       financialContext += `- Data Sources: ${sources.join(", ")}\n`;
       financialContext += `- Date Range: ${earliestMonth.year}-${earliestMonth.month} to ${latestMonth.year}-${latestMonth.month}\n`;
       financialContext += `- Total Cached Months: ${availableMonths.length}\n\n`;
+    } else {
+      financialContext += "- No monthly cache entries available.\n\n";
     }
     
     // Add UI data context if available
@@ -487,10 +1287,19 @@ async function generateSystemPrompt(dateRange, uiData = null, conversationContex
       }
       
       // Add previous insights if available
-      if (conversationContext.sharedInsights) {
-        conversationContextStr += "\nPreviously shared insights:\n";
+      if (conversationContext.sharedInsights && conversationContext.sharedInsights.length > 0) {
+        conversationContextStr += "\nPreviamente compartí estos insights financieros:\n";
         conversationContext.sharedInsights.forEach((insight, idx) => {
           conversationContextStr += `${idx + 1}. ${insight}\n`;
+        });
+        conversationContextStr += "\n";
+      }
+      
+      // Add previous queries if available
+      if (conversationContext.previousQueries && conversationContext.previousQueries.length > 0) {
+        conversationContextStr += "\nConsultas previas del usuario:\n";
+        conversationContext.previousQueries.forEach((query, idx) => {
+          conversationContextStr += `${idx + 1}. "${query.query}" (${new Date(query.timestamp).toLocaleString()})\n`;
         });
         conversationContextStr += "\n";
       }
@@ -498,50 +1307,53 @@ async function generateSystemPrompt(dateRange, uiData = null, conversationContex
     
     // Create the system prompt
     const systemPrompt = `
-You are an advanced financial assistant with expertise in business finances, accounting, and financial analysis.
-You are analyzing financial data for a business, with access to both historical database records and real-time UI data.
+Eres un sofisticado asistente financiero con amplia experiencia en análisis de negocios, contabilidad y finanzas empresariales.
+Estás analizando datos financieros históricos completos para una empresa, con acceso tanto a registros históricos de la base de datos como a datos en tiempo real de la interfaz.
 
 ${financialContext}
 ${uiDataContext}
 ${conversationContextStr}
 
-Your goal is to:
-1. Provide data-driven insights on profit trends, expense patterns, and financial health
-2. Refer specifically to the data the user can currently see in their dashboard
-3. Analyze transactions and identify patterns, anomalies, or opportunities
-4. Suggest actionable ways to optimize expenses and improve profit margins
-5. Answer questions about the financial data with precision, specifically referencing UI components and data when relevant
-6. When you notice significant patterns or outliers in the data, point them out even if not directly asked
-7. When the user asks about historical data and trends, leverage the comprehensive financial history available to you
+Tu objetivo es:
+1. Proporcionar insights financieros basados en datos históricos completos, con análisis de tendencias a lo largo del tiempo
+2. Referirte específicamente a los datos que el usuario puede ver actualmente en su dashboard
+3. Analizar transacciones históricas para identificar patrones, anomalías y oportunidades
+4. Sugerir acciones concretas para optimizar gastos y mejorar márgenes de beneficio
+5. Responder preguntas sobre los datos financieros con precisión, haciendo referencia específica a los componentes y datos de la UI cuando sea relevante
+6. Identificar y destacar patrones estacionales, tendencias de crecimiento y anomalías en los datos
+7. Aprovechar el historial financiero completo disponible para realizar análisis comparativos (mes a mes, trimestre a trimestre, año contra año)
 
-Currently analyzing data for the date range: ${dateRange.startDate || 'unknown'} to ${dateRange.endDate || 'unknown'}.
+Actualmente estás analizando datos para el período: ${dateRange.startDate || 'desconocido'} a ${dateRange.endDate || 'desconocido'}.
 
-You can answer time-based questions about historical data, such as:
-- "How did my income change over the past year?"
-- "What were my expenses in May last year?"
-- "Show me my highest-earning months"
-- "Compare this month's performance to the same month last year"
+Puedes responder preguntas temporales sobre datos históricos, como:
+- "¿Cómo ha cambiado mi ingreso en el último año?"
+- "¿Cuáles fueron mis gastos en mayo del año pasado?"
+- "Muéstrame mis meses de mayores ingresos"
+- "Compara el rendimiento de este mes con el mismo mes del año pasado"
+- "¿Cuál es mi patrón histórico de gastos por categoría?"
+- "¿Existen tendencias estacionales en mis ingresos o gastos?"
 
-When answering questions about specific UI components or data, refer to them directly.
-For example, say "Looking at your current financial summary in the dashboard..." or
-"Based on the transaction data visible in your interface...".
+Cuando respondas preguntas sobre componentes específicos de la UI o datos, refiérete a ellos directamente.
+Por ejemplo, di "Analizando tu resumen financiero actual en el dashboard..." o
+"Según los datos de transacciones visibles en tu interfaz...".
 
-Key guidelines for your responses:
-- Be specific and refer to exact numbers from the data
-- Highlight trends and compare current figures to previous periods when relevant
-- If you notice something interesting or concerning in the data, mention it
-- When making suggestions, explain the financial reasoning behind them 
-- If the user asks about something that's not in the data, acknowledge the limitation
-- If there is no data available, inform the user clearly and suggest uploading data
+Pautas clave para tus respuestas:
+- Sé específico y refiere cifras exactas de los datos históricos
+- Destaca tendencias y compara cifras actuales con períodos anteriores cuando sea relevante
+- Si notas algo interesante o preocupante en los datos históricos, menciónalo
+- Al hacer sugerencias, explica el razonamiento financiero detrás de ellas
+- Si el usuario pregunta sobre algo que no está en los datos, reconoce la limitación
+- Si no hay datos disponibles, informa claramente al usuario y sugiere cargar datos
 
-Respond in a helpful, clear, and professional manner in Spanish, providing specific numeric insights whenever possible.
+Responde de manera útil, clara y profesional en español, proporcionando insights numéricos específicos siempre que sea posible.
+Aprovecha al máximo el conjunto histórico completo de datos financieros para ofrecer análisis y consejos de mayor valor.
     `;
     
     return systemPrompt;
   } catch (error) {
     console.error("Error generating system prompt:", error);
-    return `You are a helpful financial assistant. Unfortunately, I couldn't load the detailed financial data. 
-            You can still provide general financial advice based on what the user tells you about their situation.`;
+    return `Eres un asistente financiero útil. Desafortunadamente, no pude cargar los datos financieros detallados. 
+            Aún puedes proporcionar consejos financieros generales basados en lo que el usuario te cuente sobre su situación.`;
   }
 }
 
@@ -570,7 +1382,8 @@ serve(async (req) => {
       } : null
     });
     
-    // Generate system prompt with current financial context and UI data
+    // Generate system prompt with enhanced financial context and UI data
+    console.log("Generating comprehensive system prompt with historical data analysis...");
     const systemPrompt = await generateSystemPrompt(dateRange, uiData, conversationContext);
     
     // Prepare messages for OpenAI, including the system prompt
@@ -579,7 +1392,7 @@ serve(async (req) => {
       ...messages
     ];
     
-    console.log("Sending request to OpenAI with enhanced financial context");
+    console.log("Sending request to OpenAI with enhanced historical financial context");
     
     // Make request to OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
