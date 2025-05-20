@@ -1,5 +1,26 @@
 
-import { FinanceContextType } from '@/contexts/FinanceContext';
+import { useFinance } from '@/contexts/FinanceContext';
+
+// Define the interface locally to avoid circular dependencies
+interface FinanceContextType {
+  summary: {
+    totalIncome: number;
+    totalExpense: number;
+    collaboratorExpense: number;
+    otherExpense: number;
+    profit: number;
+    profitMargin: number;
+    grossProfit: number;
+    grossProfitMargin: number;
+  };
+  stripeIncome: number;
+  regularIncome: number;
+  collaboratorExpenses: Array<{
+    category: string;
+    amount: number;
+    count: number;
+  }>;
+}
 
 /**
  * Generates suggested questions based on financial context

@@ -2,7 +2,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useFinance } from '@/contexts/FinanceContext';
-import { captureUIData, optimizeUIData, registerInteraction } from '@/utils/uiCapture';
+import { captureUIData, registerInteraction } from '@/utils/uiCapture';
 import { ChatMessage, ConversationMemory } from '@/types/chat';
 import { extractInsights } from '@/utils/insightExtraction';
 import { generateSuggestedQuestions } from '@/utils/suggestionGenerator';
@@ -67,7 +67,6 @@ export const useFinancialAssistant = () => {
       // Capture current UI data with detailed logging
       console.log('Capturing enhanced UI data for financial assistant...');
       const uiData = captureUIData(financeContext);
-      const optimizedUIData = optimizeUIData(uiData);
       
       console.log('Enhanced UI data captured:', {
         activeComponents: uiData.activeComponents,
@@ -101,7 +100,7 @@ export const useFinancialAssistant = () => {
         messages,
         userMessage,
         financeContext.dateRange,
-        optimizedUIData,
+        uiData,
         updatedContext
       );
       

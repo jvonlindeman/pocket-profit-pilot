@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useFinancialAssistant, ChatMessage } from '@/hooks/useFinancialAssistant';
+import { useFinancialAssistant } from '@/hooks/useFinancialAssistant';
+import { ChatMessage } from '@/types/chat';
 import { 
   Dialog, 
   DialogContent, 
