@@ -155,13 +155,25 @@ const StripeService = {
       
       // Ensure all transaction dates are in Panama timezone format
       if (response.transactions && Array.isArray(response.transactions)) {
-        response.transactions.forEach(tx => {
-          if (tx.date) {
+        console.log(`StripeService: Processing ${response.transactions.length} transactions for cache storage`);
+        
+        // Validate and prepare transaction data
+        response.transactions.forEach((tx, index) => {
+          if (!tx.id) {
+            console.error(`StripeService: Transaction at index ${index} is missing id`, tx);
+            tx.id = `stripe-missing-id-${Date.now()}-${index}`;
+          }
+          
+          if (!tx.date) {
+            console.error(`StripeService: Transaction ${tx.id} is missing date`, tx);
+            tx.date = formatDateYYYYMMDD_Panama(new Date());
+          } else {
             try {
               // Convert existing date to Panama timezone format
               tx.date = formatDateYYYYMMDD_Panama(toPanamaTime(new Date(tx.date)));
             } catch (e) {
               console.error(`Error converting transaction date to Panama timezone: ${tx.date}`, e);
+              tx.date = formatDateYYYYMMDD_Panama(new Date());
             }
           }
           
@@ -169,6 +181,29 @@ const StripeService = {
           if (tx.fees && !tx.metadata) {
             tx.metadata = { feeType: 'transaction' };
           }
+          
+          // Ensure external_id is set
+          if (!tx.external_id) {
+            tx.external_id = tx.id;
+          }
+          
+          // Ensure required fields are present
+          if (!tx.amount) {
+            console.error(`StripeService: Transaction ${tx.id} is missing amount`, tx);
+            tx.amount = 0;
+          }
+          
+          if (!tx.type) {
+            console.error(`StripeService: Transaction ${tx.id} is missing type`, tx);
+            tx.type = 'unknown';
+          }
+          
+          if (!tx.source) {
+            tx.source = 'Stripe';
+          }
+          
+          // Log transaction validation status
+          console.log(`StripeService: Validated transaction ${tx.id}: date=${tx.date}, amount=${tx.amount}, type=${tx.type}`);
         });
         
         // Store transactions in cache using the monthly approach
@@ -200,7 +235,31 @@ const StripeService = {
             const month = parseInt(monthStr);
             
             console.log(`StripeService: Storing ${transactions.length} transactions for ${year}-${month}`);
-            await CacheService.storeMonthTransactions('Stripe', new Date(year, month - 1, 1), transactions);
+            
+            try {
+              const success = await CacheService.storeMonthTransactions('Stripe', new Date(year, month - 1, 1), transactions);
+              console.log(`StripeService: Cache storage for ${year}-${month} success:`, success);
+              
+              if (!success) {
+                // Log a sample transaction for debugging
+                if (transactions.length > 0) {
+                  console.error("StripeService: Sample transaction that failed to cache:", JSON.stringify(transactions[0], null, 2));
+                }
+              }
+            } catch (err) {
+              console.error(`StripeService: Error storing transactions for ${year}-${month}:`, err);
+            }
+          }
+          
+          // Verify the transactions were stored correctly
+          try {
+            const startOfMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+            const endOfMonth = new Date(endDate.getFullYear(), endDate.getMonth() + 1, 0);
+            
+            const verificationCheck = await CacheService.checkCache('Stripe', startOfMonth, endOfMonth);
+            console.log(`StripeService: Verification check - cached=${verificationCheck.cached}, count=${verificationCheck.data?.length || 0}`);
+          } catch (err) {
+            console.error("StripeService: Error verifying cache storage:", err);
           }
         }
       }
@@ -267,7 +326,69 @@ const StripeService = {
       console.error("StripeService: API connectivity check failed:", error);
       return false;
     }
+  },
+  
+  // Debug function to diagnose transaction caching issues
+  debugCacheProcess: async (startDate: Date, endDate: Date): Promise<any> => {
+    try {
+      // Get transactions directly from API
+      const panamaStartDate = toPanamaTime(startDate);
+      const panamaEndDate = toPanamaTime(endDate);
+      const formattedStartDate = formatDateYYYYMMDD_Panama(panamaStartDate);
+      const formattedEndDate = formatDateYYYYMMDD_Panama(panamaEndDate);
+      
+      const { data, error } = await supabase.functions.invoke('stripe-balance', {
+        body: {
+          startDate: formattedStartDate,
+          endDate: formattedEndDate
+        }
+      });
+      
+      if (error) {
+        return { 
+          status: 'error', 
+          message: 'Failed to fetch from API',
+          error: error.message
+        };
+      }
+      
+      const response = data as StripeTransactionResponse;
+      
+      if (!response.transactions || !Array.isArray(response.transactions) || response.transactions.length === 0) {
+        return {
+          status: 'warning',
+          message: 'No transactions returned from API',
+          apiResponse: response
+        };
+      }
+      
+      // Check first 3 transactions for required fields
+      const sampleTransactions = response.transactions.slice(0, 3);
+      const transactionValidation = sampleTransactions.map(tx => ({
+        id: tx.id || 'MISSING',
+        external_id: tx.external_id || 'MISSING',
+        amount: tx.amount !== undefined ? 'OK' : 'MISSING',
+        date: tx.date || 'MISSING',
+        type: tx.type || 'MISSING',
+        source: tx.source || 'MISSING',
+        metadata: tx.metadata ? 'OK' : 'MISSING'
+      }));
+      
+      return {
+        status: 'success',
+        transactionCount: response.transactions.length,
+        sampleValidation: transactionValidation,
+        apiResponse: response
+      };
+    } catch (err) {
+      return {
+        status: 'error',
+        message: 'Exception during debug',
+        error: err instanceof Error ? err.message : 'Unknown error'
+      };
+    }
   }
 };
 
 export default StripeService;
+

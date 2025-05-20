@@ -82,35 +82,80 @@ export class MonthlyRepository extends CacheDbClient {
     transactions: Transaction[]
   ): Promise<boolean> {
     try {
-      console.log(`Storing ${transactions.length} transactions for ${source} ${year}-${month}...`);
+      console.log(`MonthlyRepository: Storing ${transactions.length} transactions for ${source} ${year}-${month}...`);
+      console.log(`Transaction validation before storage: First transaction sample:`, 
+        transactions.length > 0 ? JSON.stringify(transactions[0], null, 2) : "No transactions");
       
       // Format transactions for the database, ensuring year and month are set
-      const dbTransactions = transactions.map(t => {
-        const transactionDate = new Date(t.date);
-        return {
-          external_id: t.id,
-          date: t.date.split('T')[0], // Ensure we just get the date part
-          year: year,
-          month: month,
-          amount: t.amount,
-          description: t.description,
-          category: t.category,
-          type: t.type,
-          source: t.source,
-          fees: t.fees || null,
-          gross: t.gross || null,
-          metadata: t.metadata || {},
-          fetched_at: new Date().toISOString()
-        };
+      const dbTransactions = transactions.map((t, index) => {
+        try {
+          // Validate and assign default values for required fields
+          if (!t.id) {
+            console.error(`Missing ID for transaction at index ${index}`);
+            t.id = `generated-${Date.now()}-${index}`;
+          }
+          
+          if (!t.external_id) {
+            console.error(`Missing external_id for transaction ${t.id}`);
+            t.external_id = t.id; // Use id as a fallback for external_id
+          }
+          
+          if (!t.date) {
+            console.error(`Missing date for transaction ${t.id}`);
+            t.date = new Date(year, month - 1, 1).toISOString().split('T')[0];
+          }
+          
+          if (t.amount === undefined || t.amount === null) {
+            console.error(`Missing amount for transaction ${t.id}`);
+            t.amount = 0;
+          }
+          
+          if (!t.type) {
+            console.error(`Missing type for transaction ${t.id}`);
+            t.type = 'unknown';
+          }
+          
+          if (!t.source) {
+            console.error(`Missing source for transaction ${t.id}`);
+            t.source = source;
+          }
+
+          const transactionDate = new Date(t.date);
+          
+          return {
+            external_id: t.external_id,
+            date: t.date.split('T')[0], // Ensure we just get the date part
+            year: year,
+            month: month,
+            amount: t.amount,
+            description: t.description || null,
+            category: t.category || null,
+            type: t.type,
+            source: t.source,
+            fees: t.fees || null,
+            gross: t.gross || null,
+            metadata: t.metadata || {},
+            fetched_at: new Date().toISOString()
+          };
+        } catch (err) {
+          console.error(`Error formatting transaction ${t.id || index}:`, err);
+          throw err; // Re-throw to stop the process
+        }
       });
       
+      console.log(`MonthlyRepository: Formatted ${dbTransactions.length} transactions for database`);
+      
       // Store transactions in batches to avoid payload limits
-      const batchSize = 100;
+      const batchSize = 50; // Reduced batch size for better error tracking
       let totalStored = 0;
       let successfulBatches = 0;
       
       for (let i = 0; i < dbTransactions.length; i += batchSize) {
         const batch = dbTransactions.slice(i, i + batchSize);
+        
+        console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(dbTransactions.length/batchSize)} with ${batch.length} transactions`);
+        console.log(`First transaction in batch:`, JSON.stringify(batch[0], null, 2));
+        
         const { error } = await supabase
           .from('cached_transactions')
           .upsert(batch, { 
@@ -120,6 +165,7 @@ export class MonthlyRepository extends CacheDbClient {
           
         if (error) {
           this.logError(`Error storing batch ${i/batchSize + 1}`, error);
+          console.error(`Failed transaction sample:`, JSON.stringify(batch[0], null, 2));
         } else {
           totalStored += batch.length;
           successfulBatches++;
@@ -149,12 +195,18 @@ export class MonthlyRepository extends CacheDbClient {
         }
         
         console.log(`Successfully stored ${totalStored} transactions for ${source} ${year}-${month}`);
+        
+        // Verify the transactions were stored
+        const verificationCheck = await this.getMonthTransactions(source, year, month);
+        console.log(`Verification check: Found ${verificationCheck.length} transactions in database after storage`);
+        
         return true;
       }
       
       return false;
     } catch (err) {
       this.logError("Exception storing monthly transactions", err);
+      console.error("Stack trace:", err instanceof Error ? err.stack : 'Unknown error');
       return false;
     }
   }
@@ -299,3 +351,4 @@ export class MonthlyRepository extends CacheDbClient {
 }
 
 export const monthlyRepository = new MonthlyRepository();
+
