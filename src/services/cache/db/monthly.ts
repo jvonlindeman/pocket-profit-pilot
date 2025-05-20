@@ -1,4 +1,3 @@
-
 import { CacheDbClient } from "./client";
 import { CacheSource } from "../types";
 import { Transaction } from "../../../types/financial";
@@ -95,10 +94,8 @@ export class MonthlyRepository extends CacheDbClient {
             t.id = `generated-${Date.now()}-${index}`;
           }
           
-          if (!t.external_id) {
-            console.error(`Missing external_id for transaction ${t.id}`);
-            t.external_id = t.id; // Use id as a fallback for external_id
-          }
+          // Handle external_id (now in the Transaction type as optional)
+          const external_id = t.external_id || t.id;
           
           if (!t.date) {
             console.error(`Missing date for transaction ${t.id}`);
@@ -112,18 +109,20 @@ export class MonthlyRepository extends CacheDbClient {
           
           if (!t.type) {
             console.error(`Missing type for transaction ${t.id}`);
-            t.type = 'unknown';
+            // Use a type-safe value that matches the expected union type
+            t.type = 'income' as 'income' | 'expense';
           }
           
           if (!t.source) {
             console.error(`Missing source for transaction ${t.id}`);
-            t.source = source;
+            // Cast source to the correct type
+            t.source = source as 'Zoho' | 'Stripe';
           }
 
           const transactionDate = new Date(t.date);
           
           return {
-            external_id: t.external_id,
+            external_id: external_id, // Use the validated external_id
             date: t.date.split('T')[0], // Ensure we just get the date part
             year: year,
             month: month,
@@ -351,4 +350,3 @@ export class MonthlyRepository extends CacheDbClient {
 }
 
 export const monthlyRepository = new MonthlyRepository();
-

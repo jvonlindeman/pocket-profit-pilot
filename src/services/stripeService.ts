@@ -1,4 +1,3 @@
-
 import { Transaction } from "../types/financial";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateYYYYMMDD_Panama, toPanamaTime, PANAMA_TIMEZONE } from "@/utils/timezoneUtils";
@@ -164,6 +163,12 @@ const StripeService = {
             tx.id = `stripe-missing-id-${Date.now()}-${index}`;
           }
           
+          // Set external_id if missing
+          if (!tx.external_id) {
+            console.log(`StripeService: Setting external_id for transaction ${tx.id}`);
+            tx.external_id = tx.id;
+          }
+          
           if (!tx.date) {
             console.error(`StripeService: Transaction ${tx.id} is missing date`, tx);
             tx.date = formatDateYYYYMMDD_Panama(new Date());
@@ -182,11 +187,6 @@ const StripeService = {
             tx.metadata = { feeType: 'transaction' };
           }
           
-          // Ensure external_id is set
-          if (!tx.external_id) {
-            tx.external_id = tx.id;
-          }
-          
           // Ensure required fields are present
           if (!tx.amount) {
             console.error(`StripeService: Transaction ${tx.id} is missing amount`, tx);
@@ -195,11 +195,12 @@ const StripeService = {
           
           if (!tx.type) {
             console.error(`StripeService: Transaction ${tx.id} is missing type`, tx);
-            tx.type = 'unknown';
+            // Use type-safe assignment
+            tx.type = 'income' as 'income' | 'expense';
           }
           
           if (!tx.source) {
-            tx.source = 'Stripe';
+            tx.source = 'Stripe' as 'Stripe';
           }
           
           // Log transaction validation status
@@ -391,4 +392,3 @@ const StripeService = {
 };
 
 export default StripeService;
-

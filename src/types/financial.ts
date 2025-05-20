@@ -1,6 +1,7 @@
 
 export interface Transaction {
   id: string;
+  external_id?: string; // Added external_id as optional field
   date: string;
   amount: number;
   description: string;
