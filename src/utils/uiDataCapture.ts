@@ -1,3 +1,4 @@
+
 import { interactionStore } from "./uiDataStore";
 
 // Function to get active components in the UI
@@ -13,7 +14,7 @@ function getActiveComponents() {
   
   return components.filter(component => {
     const element = document.querySelector(`[data-component="${component}"]`);
-    return element !== null && element.offsetParent !== null; // offsetParent checks for visibility
+    return element !== null && element.getBoundingClientRect().height > 0; // Use getBoundingClientRect instead of offsetParent
   });
 }
 
@@ -29,8 +30,15 @@ function getVisibleSections() {
   
   return sections.filter(section => {
     const element = document.getElementById(section);
-    return element !== null && element.offsetParent !== null;
+    return element !== null && element.getBoundingClientRect().height > 0; // Use getBoundingClientRect instead of offsetParent
   });
+}
+
+// Register a section as visible in the UI
+export function registerVisibleSection(section: string) {
+  // Register this section as visible for UI data capture
+  console.log(`Section registered as visible: ${section}`);
+  // We could store this in the interactionStore if needed
 }
 
 // Function to get the currently focused element

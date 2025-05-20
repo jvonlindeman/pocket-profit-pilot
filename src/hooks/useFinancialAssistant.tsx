@@ -228,7 +228,7 @@ export const useFinancialAssistant = () => {
     // Context-aware suggestions
     const contextQuestions: string[] = [];
     
-    if (financeContext.financialData?.profitMargin < 15) {
+    if (financeContext.summary.profitMargin < 15) {
       contextQuestions.push("¿Cómo puedo mejorar mi margen de beneficio?");
     }
     
