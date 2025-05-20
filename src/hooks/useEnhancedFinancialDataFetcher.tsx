@@ -1,8 +1,9 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { toast } from "@/hooks/use-toast";
 import { Transaction } from '@/types/financial';
 import { useFinancialDataFetcher } from '@/hooks/useFinancialDataFetcher';
+import { useSearchParams } from 'react-router-dom';
 
 /**
  * Enhanced hook to handle fetching of financial data with transaction management
@@ -11,8 +12,8 @@ export const useEnhancedFinancialDataFetcher = () => {
   // States
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [dataInitialized, setDataInitialized] = useState<boolean>(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   
-  // Use the base data fetcher
   const { 
     loading, 
     error, 
@@ -23,6 +24,15 @@ export const useEnhancedFinancialDataFetcher = () => {
     apiConnectivity,
     checkApiConnectivity
   } = useFinancialDataFetcher();
+
+  // Remove refresh parameter from URL if present
+  useEffect(() => {
+    if (searchParams.has('refresh')) {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('refresh');
+      setSearchParams(newParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   // Function to fetch data
   const fetchData = useCallback(async (
@@ -48,19 +58,26 @@ export const useEnhancedFinancialDataFetcher = () => {
     
     if (success && transactions.length > 0) {
       toast({
-        title: "Datos financieros actualizados",
-        description: `Se procesaron ${transactions.length} transacciones`
+        title: usingCachedData ? "Datos financieros cargados desde caché" : "Datos financieros actualizados",
+        description: `Se procesaron ${transactions.length} transacciones${usingCachedData ? " (desde caché)" : ""}`
       });
     }
     
     return success;
   }, [
     fetchFinancialData, 
-    transactions.length
+    transactions.length,
+    usingCachedData
   ]);
   
   // Public function to refresh data
   const refreshData = useCallback((force = false) => {
+    if (force) {
+      toast({
+        title: "Forzando actualización",
+        description: "Obteniendo datos frescos desde la API"
+      });
+    }
     return fetchData; // Return the fetchData function for later use
   }, [fetchData]);
 
