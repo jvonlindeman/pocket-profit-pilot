@@ -1,3 +1,4 @@
+
 import { CacheSource, CacheClearOptions, DetailedCacheStats } from "./types";
 import { Transaction } from "../../types/financial";
 import { segmentRepository } from "./db/segments";
@@ -202,6 +203,14 @@ export class CacheStorage {
       console.error("Exception clearing cache:", err);
       return false;
     }
+  }
+
+  /**
+   * Fix transactions with missing year/month values
+   * Added to support the cache migration process
+   */
+  async fixLegacyTransactions(source?: CacheSource): Promise<number> {
+    return monthlyRepository.fixLegacyTransactions(source);
   }
 }
 

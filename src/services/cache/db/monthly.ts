@@ -250,6 +250,8 @@ export class MonthlyRepository extends CacheDbClient {
       // Fix each transaction
       let fixedCount = 0;
       const batchSize = 100;
+      
+      // Create properly formatted update objects with all required fields
       const updates = data.map(tx => {
         if (!tx.date) return null;
         
@@ -257,7 +259,19 @@ export class MonthlyRepository extends CacheDbClient {
         return {
           id: tx.id,
           year: txDate.getFullYear(),
-          month: txDate.getMonth() + 1 // Convert to 1-indexed month
+          month: txDate.getMonth() + 1, // Convert to 1-indexed month
+          // Include all required fields from the original record
+          external_id: tx.external_id,
+          date: tx.date,
+          amount: tx.amount,
+          type: tx.type,
+          source: tx.source,
+          // Optional fields
+          description: tx.description,
+          category: tx.category,
+          fees: tx.fees,
+          gross: tx.gross,
+          metadata: tx.metadata || {}
         };
       }).filter(Boolean);
       

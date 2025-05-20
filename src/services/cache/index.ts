@@ -3,6 +3,7 @@ import { Transaction } from "../../types/financial";
 import { cacheOperations } from "./operations";
 import { cacheMetrics } from "./metrics";
 import { cacheStorage } from "./storage";
+import { supabase } from "../../integrations/supabase/client";
 import type { CacheResponse, CacheResult, CacheStats, DetailedCacheStats, CacheClearOptions, CacheSource } from "./types";
 
 /**
@@ -147,72 +148,8 @@ const CacheService = {
     console.log("CacheService: Attempting to fix cached transactions with missing year/month values");
     
     try {
-      // Get transactions with null year/month values
-      const { data, error } = await cacheStorage.getClient()
-        .from('cached_transactions')
-        .select('*')
-        .is('year', null)
-        .is('month', null)
-        .order('date', { ascending: false })
-        .limit(1000);
-        
-      if (error) {
-        console.error("Error fetching transactions with null year/month:", error);
-        return 0;
-      }
-      
-      if (!data || data.length === 0) {
-        console.log("No transactions found with missing year/month values");
-        return 0;
-      }
-      
-      console.log(`Found ${data.length} transactions with missing year/month values`);
-      
-      // Group transactions by month for batched updates
-      const transactionsByMonth = new Map<string, any[]>();
-      
-      data.forEach(tx => {
-        if (!tx.date) return;
-        
-        const txDate = new Date(tx.date);
-        const year = txDate.getFullYear();
-        const month = txDate.getMonth() + 1;
-        const key = `${year}-${month}`;
-        
-        if (!transactionsByMonth.has(key)) {
-          transactionsByMonth.set(key, []);
-        }
-        
-        transactionsByMonth.get(key)!.push({
-          id: tx.id,
-          year,
-          month
-        });
-      });
-      
-      // Update transactions in batches by month
-      let totalFixed = 0;
-      
-      for (const [key, transactions] of transactionsByMonth.entries()) {
-        const batchSize = 100;
-        
-        for (let i = 0; i < transactions.length; i += batchSize) {
-          const batch = transactions.slice(i, i + batchSize);
-          const { error } = await cacheStorage.getClient()
-            .from('cached_transactions')
-            .upsert(batch, { onConflict: 'id' });
-            
-          if (error) {
-            console.error(`Error updating batch ${Math.floor(i/batchSize) + 1}:`, error);
-          } else {
-            console.log(`Successfully updated batch ${Math.floor(i/batchSize) + 1} (${batch.length} transactions)`);
-            totalFixed += batch.length;
-          }
-        }
-      }
-      
-      console.log(`Fixed ${totalFixed} transactions with missing year/month values`);
-      return totalFixed;
+      // Use the repository method directly instead of accessing supabase client
+      return await cacheStorage.fixLegacyTransactions(source);
     } catch (err) {
       console.error("Error fixing missing year/month values:", err);
       return 0;
