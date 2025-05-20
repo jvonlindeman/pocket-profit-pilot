@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useFinancialAssistant, ChatMessage } from '@/hooks/useFinancialAssistant';
 import { 
@@ -13,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SendIcon, RefreshCcwIcon, MessageCircleIcon, SearchIcon } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { registerInteraction } from '@/utils/uiDataCapture';
+import { registerInteraction } from '@/utils/uiCapture'; // Updated import path
 
 interface FinancialAssistantDialogProps {
   isOpen: boolean;
