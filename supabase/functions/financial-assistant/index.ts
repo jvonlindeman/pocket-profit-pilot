@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { format, subMonths, parseISO } from 'https://esm.sh/date-fns@3.6.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,30 +16,266 @@ const GPT_API_KEY = Deno.env.get('GPT_API_KEY') ?? '';
 // Initialize the Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Helper function to generate system prompt with context
-async function generateSystemPrompt(dateRange, uiData = null, conversationContext = null) {
+// Helper function to format data for better display
+const formatCurrency = (value: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2
+  }).format(value);
+};
+
+// Function to fetch all available monthly cache entries
+async function fetchAvailableCacheMonths() {
   try {
-    // Fetch recent financial summaries
-    const { data: financialSummaries, error: summariesError } = await supabase
+    const { data: monthlyCache, error } = await supabase
+      .from('monthly_cache')
+      .select('*')
+      .order('year', { ascending: false })
+      .order('month', { ascending: false });
+    
+    if (error) throw error;
+    
+    console.log(`Found ${monthlyCache?.length || 0} monthly cache entries`);
+    return monthlyCache || [];
+  } catch (err) {
+    console.error('Error fetching monthly cache:', err);
+    return [];
+  }
+}
+
+// Function to fetch transactions for a specific month and source
+async function fetchMonthTransactions(source: string, year: number, month: number) {
+  try {
+    const { data, error } = await supabase
+      .from('cached_transactions')
+      .select('*')
+      .eq('source', source)
+      .eq('year', year)
+      .eq('month', month)
+      .order('date', { ascending: true });
+    
+    if (error) throw error;
+    
+    console.log(`Retrieved ${data?.length || 0} transactions for ${source} ${year}-${month}`);
+    return data || [];
+  } catch (err) {
+    console.error(`Error fetching transactions for ${source} ${year}-${month}:`, err);
+    return [];
+  }
+}
+
+// Helper function to fetch financial summaries
+async function fetchFinancialSummaries(limit = 12) {
+  try {
+    const { data, error } = await supabase
       .from('financial_summaries')
       .select('*')
-      .order('date_range_start', { ascending: false })
-      .limit(5);
-      
-    if (summariesError) throw summariesError;
+      .order('date_range_end', { ascending: false })
+      .limit(limit);
     
-    // Fetch monthly balances
-    const { data: monthlyBalances, error: balancesError } = await supabase
+    if (error) throw error;
+    
+    console.log(`Retrieved ${data?.length || 0} financial summaries`);
+    return data || [];
+  } catch (err) {
+    console.error('Error fetching financial summaries:', err);
+    return [];
+  }
+}
+
+// Helper function to fetch monthly balances
+async function fetchMonthlyBalances(limit = 12) {
+  try {
+    const { data, error } = await supabase
       .from('monthly_balances')
       .select('*')
       .order('month_year', { ascending: false })
-      .limit(5);
-      
-    if (balancesError) throw balancesError;
+      .limit(limit);
+    
+    if (error) throw error;
+    
+    console.log(`Retrieved ${data?.length || 0} monthly balances`);
+    return data || [];
+  } catch (err) {
+    console.error('Error fetching monthly balances:', err);
+    return [];
+  }
+}
+
+// Helper to calculate year-over-year and month-over-month comparisons
+function calculateComparisons(summaries) {
+  if (!summaries || summaries.length < 2) return { yoy: null, mom: null };
+  
+  // Most recent two months for MoM comparison
+  const currentMonth = summaries[0];
+  const previousMonth = summaries[1];
+  
+  // Find same month last year for YoY comparison
+  const currentMonthDate = new Date(currentMonth.date_range_start);
+  const sameMonthLastYearDate = new Date(currentMonthDate);
+  sameMonthLastYearDate.setFullYear(sameMonthLastYearDate.getFullYear() - 1);
+  
+  const sameMonthLastYear = summaries.find(s => {
+    const startDate = new Date(s.date_range_start);
+    return startDate.getMonth() === sameMonthLastYearDate.getMonth() &&
+           startDate.getFullYear() === sameMonthLastYearDate.getFullYear();
+  });
+  
+  return {
+    mom: previousMonth ? {
+      profit: {
+        current: currentMonth.profit,
+        previous: previousMonth.profit,
+        change: currentMonth.profit - previousMonth.profit,
+        percentChange: previousMonth.profit !== 0 ? ((currentMonth.profit - previousMonth.profit) / Math.abs(previousMonth.profit) * 100) : 0
+      },
+      income: {
+        current: currentMonth.total_income,
+        previous: previousMonth.total_income,
+        change: currentMonth.total_income - previousMonth.total_income,
+        percentChange: previousMonth.total_income !== 0 ? ((currentMonth.total_income - previousMonth.total_income) / previousMonth.total_income * 100) : 0
+      },
+      expenses: {
+        current: currentMonth.total_expense,
+        previous: previousMonth.total_expense,
+        change: currentMonth.total_expense - previousMonth.total_expense,
+        percentChange: previousMonth.total_expense !== 0 ? ((currentMonth.total_expense - previousMonth.total_expense) / previousMonth.total_expense * 100) : 0
+      },
+      profitMargin: {
+        current: currentMonth.profit_margin,
+        previous: previousMonth.profit_margin,
+        change: currentMonth.profit_margin - previousMonth.profit_margin
+      }
+    } : null,
+    
+    yoy: sameMonthLastYear ? {
+      profit: {
+        current: currentMonth.profit,
+        previous: sameMonthLastYear.profit,
+        change: currentMonth.profit - sameMonthLastYear.profit,
+        percentChange: sameMonthLastYear.profit !== 0 ? ((currentMonth.profit - sameMonthLastYear.profit) / Math.abs(sameMonthLastYear.profit) * 100) : 0
+      },
+      income: {
+        current: currentMonth.total_income,
+        previous: sameMonthLastYear.total_income,
+        change: currentMonth.total_income - sameMonthLastYear.total_income,
+        percentChange: sameMonthLastYear.total_income !== 0 ? ((currentMonth.total_income - sameMonthLastYear.total_income) / sameMonthLastYear.total_income * 100) : 0
+      },
+      expenses: {
+        current: currentMonth.total_expense,
+        previous: sameMonthLastYear.total_expense,
+        change: currentMonth.total_expense - sameMonthLastYear.total_expense,
+        percentChange: sameMonthLastYear.total_expense !== 0 ? ((currentMonth.total_expense - sameMonthLastYear.total_expense) / sameMonthLastYear.total_expense * 100) : 0
+      },
+      profitMargin: {
+        current: currentMonth.profit_margin,
+        previous: sameMonthLastYear.profit_margin,
+        change: currentMonth.profit_margin - sameMonthLastYear.profit_margin
+      }
+    } : null
+  };
+}
+
+// Helper function to detect trends in financial data
+function detectTrends(summaries, transactions) {
+  if (!summaries || summaries.length < 3) return [];
+  
+  const trends = [];
+  
+  // Detect profit margin trend
+  const profitMargins = summaries.slice(0, 6).map(s => s.profit_margin);
+  const isIncreasing = profitMargins.every((val, i) => i === 0 || val >= profitMargins[i - 1]);
+  const isDecreasing = profitMargins.every((val, i) => i === 0 || val <= profitMargins[i - 1]);
+  
+  if (isIncreasing && profitMargins[0] > profitMargins[profitMargins.length - 1] + 5) {
+    trends.push({
+      type: 'profit_margin',
+      description: `Profit margin has been steadily increasing over the last ${profitMargins.length} months, from ${profitMargins[profitMargins.length - 1].toFixed(2)}% to ${profitMargins[0].toFixed(2)}%`,
+      significance: 'high'
+    });
+  } else if (isDecreasing && profitMargins[0] < profitMargins[profitMargins.length - 1] - 5) {
+    trends.push({
+      type: 'profit_margin',
+      description: `Profit margin has been declining over the last ${profitMargins.length} months, from ${profitMargins[profitMargins.length - 1].toFixed(2)}% to ${profitMargins[0].toFixed(2)}%`,
+      significance: 'high'
+    });
+  }
+  
+  // Detect expense categories with significant increases
+  if (transactions && transactions.length > 0) {
+    // Group by category and sum amounts
+    const categorySums = {};
+    const currentMonthTransactions = transactions.filter(t => 
+      t.type === 'expense' || t.amount < 0
+    );
+    
+    currentMonthTransactions.forEach(tx => {
+      const category = tx.category || 'Uncategorized';
+      if (!categorySums[category]) {
+        categorySums[category] = 0;
+      }
+      categorySums[category] += Math.abs(tx.amount);
+    });
+    
+    // Find the top expense categories
+    const topCategories = Object.entries(categorySums)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+    
+    if (topCategories.length > 0) {
+      trends.push({
+        type: 'top_expenses',
+        description: `Top expense categories: ${topCategories.map(([cat, amount]) => `${cat} (${formatCurrency(amount)})`).join(', ')}`,
+        significance: 'medium'
+      });
+    }
+  }
+  
+  // Detect income trend
+  const incomes = summaries.slice(0, 3).map(s => s.total_income);
+  const incomeChange = incomes.length > 1 ? 
+    ((incomes[0] - incomes[incomes.length - 1]) / incomes[incomes.length - 1] * 100) : 0;
+    
+  if (Math.abs(incomeChange) > 20) {
+    trends.push({
+      type: 'income',
+      description: `Income has ${incomeChange > 0 ? 'increased' : 'decreased'} by ${Math.abs(incomeChange).toFixed(2)}% over the last ${incomes.length} months`,
+      significance: incomeChange > 0 ? 'positive' : 'warning'
+    });
+  }
+  
+  return trends;
+}
+
+// Helper function to generate system prompt with context
+async function generateSystemPrompt(dateRange, uiData = null, conversationContext = null) {
+  try {
+    // Fetch data from database
+    const monthlyBalances = await fetchMonthlyBalances();
+    const financialSummaries = await fetchFinancialSummaries(12);
+    const availableMonths = await fetchAvailableCacheMonths();
+    
+    // Calculate comparisons for current period
+    const comparisons = calculateComparisons(financialSummaries);
+    
+    // Get recent transactions for analysis
+    let recentTransactions = [];
+    if (availableMonths && availableMonths.length > 0) {
+      // Get the most recent month's transactions
+      const recentMonth = availableMonths[0];
+      recentTransactions = await fetchMonthTransactions(recentMonth.source, recentMonth.year, recentMonth.month);
+    }
+    
+    // Detect trends in financial data
+    const trends = detectTrends(financialSummaries, recentTransactions);
     
     console.log('Financial data from database:', { 
       summaries: financialSummaries?.length || 0,
-      balances: monthlyBalances?.length || 0
+      balances: monthlyBalances?.length || 0,
+      availableMonths: availableMonths?.length || 0,
+      recentTransactions: recentTransactions?.length || 0,
+      trends: trends?.length || 0
     });
     
     // Format the context data for the system prompt
@@ -47,12 +284,12 @@ async function generateSystemPrompt(dateRange, uiData = null, conversationContex
     if (financialSummaries && financialSummaries.length > 0) {
       financialSummaries.forEach(summary => {
         financialContext += `Period: ${summary.date_range_start} to ${summary.date_range_end}\n`;
-        financialContext += `- Income: $${summary.total_income}\n`;
-        financialContext += `- Total Expenses: $${summary.total_expense}\n`;
-        financialContext += `- Collaborator Expenses: $${summary.collaborator_expense}\n`;
-        financialContext += `- Other Expenses: $${summary.other_expense}\n`;
-        financialContext += `- Profit: $${summary.profit}\n`;
-        financialContext += `- Profit Margin: ${summary.profit_margin}%\n\n`;
+        financialContext += `- Income: ${formatCurrency(summary.total_income)}\n`;
+        financialContext += `- Total Expenses: ${formatCurrency(summary.total_expense)}\n`;
+        financialContext += `- Collaborator Expenses: ${formatCurrency(summary.collaborator_expense)}\n`;
+        financialContext += `- Other Expenses: ${formatCurrency(summary.other_expense)}\n`;
+        financialContext += `- Profit: ${formatCurrency(summary.profit)}\n`;
+        financialContext += `- Profit Margin: ${summary.profit_margin.toFixed(2)}%\n\n`;
       });
     } else {
       financialContext += "No recent financial summaries available.\n\n";
@@ -63,20 +300,62 @@ async function generateSystemPrompt(dateRange, uiData = null, conversationContex
     if (monthlyBalances && monthlyBalances.length > 0) {
       monthlyBalances.forEach(balance => {
         financialContext += `Month: ${balance.month_year}\n`;
-        financialContext += `- Balance: $${balance.balance}\n`;
+        financialContext += `- Balance: ${formatCurrency(balance.balance)}\n`;
         if (balance.stripe_override !== null) {
-          financialContext += `- Stripe Override: $${balance.stripe_override}\n`;
+          financialContext += `- Stripe Override: ${formatCurrency(balance.stripe_override)}\n`;
         }
         if (balance.opex_amount !== null) {
-          financialContext += `- OPEX Amount: $${balance.opex_amount}\n`;
+          financialContext += `- OPEX Amount: ${formatCurrency(balance.opex_amount)}\n`;
         }
         if (balance.itbm_amount !== null) {
-          financialContext += `- ITBM Amount: $${balance.itbm_amount}\n`;
+          financialContext += `- ITBM Amount: ${formatCurrency(balance.itbm_amount)}\n`;
         }
-        financialContext += `- Profit Percentage: ${balance.profit_percentage}%\n\n`;
+        financialContext += `- Profit Percentage: ${balance.profit_percentage.toFixed(2)}%\n\n`;
       });
     } else {
       financialContext += "No monthly balances available.\n\n";
+    }
+    
+    // Add comparison data if available
+    if (comparisons.mom || comparisons.yoy) {
+      financialContext += "Performance Comparisons:\n";
+      
+      if (comparisons.mom) {
+        financialContext += "Month-over-Month Changes:\n";
+        financialContext += `- Profit: ${formatCurrency(comparisons.mom.profit.current)} vs ${formatCurrency(comparisons.mom.profit.previous)} (${comparisons.mom.profit.percentChange > 0 ? '+' : ''}${comparisons.mom.profit.percentChange.toFixed(2)}%)\n`;
+        financialContext += `- Income: ${formatCurrency(comparisons.mom.income.current)} vs ${formatCurrency(comparisons.mom.income.previous)} (${comparisons.mom.income.percentChange > 0 ? '+' : ''}${comparisons.mom.income.percentChange.toFixed(2)}%)\n`;
+        financialContext += `- Expenses: ${formatCurrency(comparisons.mom.expenses.current)} vs ${formatCurrency(comparisons.mom.expenses.previous)} (${comparisons.mom.expenses.percentChange > 0 ? '+' : ''}${comparisons.mom.expenses.percentChange.toFixed(2)}%)\n`;
+        financialContext += `- Profit Margin: ${comparisons.mom.profitMargin.current.toFixed(2)}% vs ${comparisons.mom.profitMargin.previous.toFixed(2)}% (${comparisons.mom.profitMargin.change > 0 ? '+' : ''}${comparisons.mom.profitMargin.change.toFixed(2)}%)\n\n`;
+      }
+      
+      if (comparisons.yoy) {
+        financialContext += "Year-over-Year Changes:\n";
+        financialContext += `- Profit: ${formatCurrency(comparisons.yoy.profit.current)} vs ${formatCurrency(comparisons.yoy.profit.previous)} (${comparisons.yoy.profit.percentChange > 0 ? '+' : ''}${comparisons.yoy.profit.percentChange.toFixed(2)}%)\n`;
+        financialContext += `- Income: ${formatCurrency(comparisons.yoy.income.current)} vs ${formatCurrency(comparisons.yoy.income.previous)} (${comparisons.yoy.income.percentChange > 0 ? '+' : ''}${comparisons.yoy.income.percentChange.toFixed(2)}%)\n`;
+        financialContext += `- Expenses: ${formatCurrency(comparisons.yoy.expenses.current)} vs ${formatCurrency(comparisons.yoy.expenses.previous)} (${comparisons.yoy.expenses.percentChange > 0 ? '+' : ''}${comparisons.yoy.expenses.percentChange.toFixed(2)}%)\n`;
+        financialContext += `- Profit Margin: ${comparisons.yoy.profitMargin.current.toFixed(2)}% vs ${comparisons.yoy.profitMargin.previous.toFixed(2)}% (${comparisons.yoy.profitMargin.change > 0 ? '+' : ''}${comparisons.yoy.profitMargin.change.toFixed(2)}%)\n\n`;
+      }
+    }
+    
+    // Add trends if detected
+    if (trends && trends.length > 0) {
+      financialContext += "Detected Financial Trends:\n";
+      trends.forEach(trend => {
+        financialContext += `- ${trend.description} (${trend.significance} significance)\n`;
+      });
+      financialContext += "\n";
+    }
+    
+    // Add information about available historical data
+    if (availableMonths && availableMonths.length > 0) {
+      const sources = [...new Set(availableMonths.map(m => m.source))];
+      const earliestMonth = availableMonths[availableMonths.length - 1];
+      const latestMonth = availableMonths[0];
+      
+      financialContext += "Historical Data Coverage:\n";
+      financialContext += `- Data Sources: ${sources.join(", ")}\n`;
+      financialContext += `- Date Range: ${earliestMonth.year}-${earliestMonth.month} to ${latestMonth.year}-${latestMonth.month}\n`;
+      financialContext += `- Total Cached Months: ${availableMonths.length}\n\n`;
     }
     
     // Add UI data context if available
@@ -108,13 +387,13 @@ async function generateSystemPrompt(dateRange, uiData = null, conversationContex
       // Add summary information
       if (uiData.summary) {
         uiDataContext += "Financial Summary:\n";
-        uiDataContext += `- Total Income: $${uiData.summary.totalIncome || 0}\n`;
-        uiDataContext += `- Total Expenses: $${uiData.summary.totalExpense || 0}\n`;
-        uiDataContext += `- Collaborator Expenses: $${uiData.summary.collaboratorExpense || 0}\n`;
-        uiDataContext += `- Other Expenses: $${uiData.summary.otherExpense || 0}\n`;
-        uiDataContext += `- Profit: $${uiData.summary.profit || 0}\n`;
+        uiDataContext += `- Total Income: ${formatCurrency(uiData.summary.totalIncome || 0)}\n`;
+        uiDataContext += `- Total Expenses: ${formatCurrency(uiData.summary.totalExpense || 0)}\n`;
+        uiDataContext += `- Collaborator Expenses: ${formatCurrency(uiData.summary.collaboratorExpense || 0)}\n`;
+        uiDataContext += `- Other Expenses: ${formatCurrency(uiData.summary.otherExpense || 0)}\n`;
+        uiDataContext += `- Profit: ${formatCurrency(uiData.summary.profit || 0)}\n`;
         uiDataContext += `- Profit Margin: ${uiData.summary.profitMargin || 0}%\n`;
-        uiDataContext += `- Starting Balance: $${uiData.summary.startingBalance || 0}\n\n`;
+        uiDataContext += `- Starting Balance: ${formatCurrency(uiData.summary.startingBalance || 0)}\n\n`;
       } else {
         uiDataContext += "No financial summary available in the UI.\n\n";
       }
@@ -123,10 +402,10 @@ async function generateSystemPrompt(dateRange, uiData = null, conversationContex
       const hasIncomeData = uiData.regularIncome || uiData.stripeIncome;
       uiDataContext += "Income Breakdown:\n";
       if (hasIncomeData) {
-        uiDataContext += `- Regular Income: $${uiData.regularIncome || 0}\n`;
-        uiDataContext += `- Stripe Income: $${uiData.stripeIncome || 0}\n`;
-        uiDataContext += `- Stripe Fees: $${uiData.stripeFees || 0}\n`;
-        uiDataContext += `- Stripe Net: $${uiData.stripeNet || 0}\n`;
+        uiDataContext += `- Regular Income: ${formatCurrency(uiData.regularIncome || 0)}\n`;
+        uiDataContext += `- Stripe Income: ${formatCurrency(uiData.stripeIncome || 0)}\n`;
+        uiDataContext += `- Stripe Fees: ${formatCurrency(uiData.stripeFees || 0)}\n`;
+        uiDataContext += `- Stripe Net: ${formatCurrency(uiData.stripeNet || 0)}\n`;
         uiDataContext += `- Stripe Fee Percentage: ${uiData.stripeFeePercentage || 0}%\n\n`;
       } else {
         uiDataContext += "No income data currently visible in UI.\n\n";
@@ -136,7 +415,7 @@ async function generateSystemPrompt(dateRange, uiData = null, conversationContex
       if (uiData.collaboratorExpenses && uiData.collaboratorExpenses.length > 0) {
         uiDataContext += "Collaborator Expenses:\n";
         uiData.collaboratorExpenses.forEach(expense => {
-          uiDataContext += `- ${expense.category}: $${expense.amount || 0}\n`;
+          uiDataContext += `- ${expense.category}: ${formatCurrency(expense.amount || 0)}\n`;
         });
         uiDataContext += "\n";
       } else {
@@ -171,7 +450,7 @@ async function generateSystemPrompt(dateRange, uiData = null, conversationContex
         uiData.transactions.forEach((tx, index) => {
           const date = tx.date ? new Date(tx.date).toISOString().split('T')[0] : 'No date';
           const category = tx.category || 'Uncategorized';
-          uiDataContext += `${index + 1}. [${date}] ${tx.description || 'No description'} - $${tx.amount} (${tx.type}) - Category: ${category}\n`;
+          uiDataContext += `${index + 1}. [${date}] ${tx.description || 'No description'} - ${formatCurrency(tx.amount)} (${tx.type}) - Category: ${category}\n`;
         });
         uiDataContext += "\n";
       } else {
@@ -233,8 +512,15 @@ Your goal is to:
 4. Suggest actionable ways to optimize expenses and improve profit margins
 5. Answer questions about the financial data with precision, specifically referencing UI components and data when relevant
 6. When you notice significant patterns or outliers in the data, point them out even if not directly asked
+7. When the user asks about historical data and trends, leverage the comprehensive financial history available to you
 
 Currently analyzing data for the date range: ${dateRange.startDate || 'unknown'} to ${dateRange.endDate || 'unknown'}.
+
+You can answer time-based questions about historical data, such as:
+- "How did my income change over the past year?"
+- "What were my expenses in May last year?"
+- "Show me my highest-earning months"
+- "Compare this month's performance to the same month last year"
 
 When answering questions about specific UI components or data, refer to them directly.
 For example, say "Looking at your current financial summary in the dashboard..." or
@@ -293,7 +579,7 @@ serve(async (req) => {
       ...messages
     ];
     
-    console.log("Sending request to OpenAI with context, UI data, and messages");
+    console.log("Sending request to OpenAI with enhanced financial context");
     
     // Make request to OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {

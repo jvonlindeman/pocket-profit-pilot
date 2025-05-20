@@ -19,6 +19,10 @@ interface ConversationMemory {
     focusedElement: string | null;
   };
   sharedInsights: string[];
+  previousQueries: Array<{
+    query: string;
+    timestamp: string;
+  }>;
 }
 
 export const useFinancialAssistant = () => {
@@ -26,7 +30,7 @@ export const useFinancialAssistant = () => {
     {
       id: 'welcome',
       role: 'assistant',
-      content: '¡Hola! Soy tu asistente financiero. ¿En qué puedo ayudarte hoy? Puedo analizar tus datos financieros actuales, identificar tendencias o responder preguntas específicas sobre tus finanzas.',
+      content: '¡Hola! Soy tu asistente financiero con acceso completo a tu historial de datos. ¿En qué puedo ayudarte hoy? Puedo analizar tus datos financieros, identificar tendencias a lo largo del tiempo o responder preguntas específicas sobre tus finanzas.',
       timestamp: new Date(),
     },
   ]);
@@ -38,7 +42,8 @@ export const useFinancialAssistant = () => {
       visibleComponents: [],
       focusedElement: null
     },
-    sharedInsights: []
+    sharedInsights: [],
+    previousQueries: []
   });
 
   // Helper to extract key insights from assistant responses
@@ -53,7 +58,8 @@ export const useFinancialAssistant = () => {
       if (
         (paragraph.includes('$') || paragraph.includes('%')) && 
         (paragraph.includes('aumentado') || paragraph.includes('disminuido') || 
-         paragraph.includes('tendencia') || paragraph.includes('comparación'))
+         paragraph.includes('tendencia') || paragraph.includes('comparación') ||
+         paragraph.includes('histórico') || paragraph.includes('análisis'))
       ) {
         insights.push(paragraph.trim());
       }
@@ -89,8 +95,8 @@ export const useFinancialAssistant = () => {
       console.log('UI data captured:', {
         activeComponents: uiData.activeComponents,
         hasSummary: Boolean(uiData.summary),
-        transactionCount: uiData.transactions.length,
-        expenseCount: uiData.collaboratorExpenses.length
+        transactionCount: uiData.transactions?.length || 0,
+        expenseCount: uiData.collaboratorExpenses?.length || 0
       });
       
       // Prepare messages for the API (exclude 'system' messages)
@@ -100,14 +106,23 @@ export const useFinancialAssistant = () => {
         .map(({ role, content }) => ({ role, content }));
       
       // Track which UI elements were visible for this question
-      setConversationContext(prev => ({
-        ...prev,
+      const updatedContext = {
+        ...conversationContext,
         lastQuery: {
           timestamp: new Date().toISOString(),
-          visibleComponents: uiData.activeComponents,
+          visibleComponents: uiData.activeComponents || [],
           focusedElement: uiData.focusedElement
-        }
-      }));
+        },
+        previousQueries: [
+          ...conversationContext.previousQueries,
+          {
+            query: content,
+            timestamp: new Date().toISOString()
+          }
+        ].slice(-5) // Keep last 5 queries
+      };
+      
+      setConversationContext(updatedContext);
       
       console.log('Sending request to financial-assistant edge function...');
       
@@ -120,7 +135,7 @@ export const useFinancialAssistant = () => {
             endDate: financeContext.dateRange.endDate?.toISOString() || null,
           },
           uiData: optimizedUIData, // Send the optimized UI data to the edge function
-          conversationContext // Send additional context about the conversation
+          conversationContext: updatedContext // Send additional context about the conversation
         },
       });
       
@@ -186,7 +201,7 @@ export const useFinancialAssistant = () => {
       {
         id: 'welcome',
         role: 'assistant',
-        content: '¡Hola! Soy tu asistente financiero. ¿En qué puedo ayudarte hoy? Puedo analizar tus datos financieros actuales, identificar tendencias o responder preguntas específicas sobre tus finanzas.',
+        content: '¡Hola! Soy tu asistente financiero con acceso completo a tu historial de datos. ¿En qué puedo ayudarte hoy? Puedo analizar tus datos financieros, identificar tendencias a lo largo del tiempo o responder preguntas específicas sobre tus finanzas.',
         timestamp: new Date(),
       },
     ]);
@@ -196,15 +211,45 @@ export const useFinancialAssistant = () => {
         visibleComponents: [],
         focusedElement: null
       },
-      sharedInsights: []
+      sharedInsights: [],
+      previousQueries: []
     }); 
   }, []);
+
+  // Suggest questions based on the current financial context
+  const getSuggestedQuestions = useCallback((): string[] => {
+    // Basic suggestions always available
+    const basicQuestions = [
+      "¿Cómo están mis finanzas este mes comparado con el mes anterior?",
+      "¿Cuáles son mis mayores gastos?",
+      "¿Cómo ha evolucionado mi margen de beneficio en el último año?"
+    ];
+    
+    // Context-aware suggestions
+    const contextQuestions: string[] = [];
+    
+    if (financeContext.financialData?.profitMargin < 15) {
+      contextQuestions.push("¿Cómo puedo mejorar mi margen de beneficio?");
+    }
+    
+    if (financeContext.stripeIncome > 0) {
+      contextQuestions.push("¿Cómo puedo reducir mis comisiones de Stripe?");
+    }
+    
+    if (financeContext.collaboratorExpenses.length > 3) {
+      contextQuestions.push("¿Cuál es la tendencia de gastos en colaboradores durante el último año?");
+    }
+    
+    // Return a mix of basic and context questions, up to 5 total
+    return [...contextQuestions, ...basicQuestions].slice(0, 5);
+  }, [financeContext]);
 
   return {
     messages,
     isLoading,
     sendMessage,
     resetChat,
-    conversationContext
+    conversationContext,
+    getSuggestedQuestions
   };
 };

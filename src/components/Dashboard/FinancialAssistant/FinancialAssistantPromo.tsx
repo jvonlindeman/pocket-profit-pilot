@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MessageCircleIcon } from "lucide-react";
+import { MessageCircleIcon, TrendingUpIcon, CalendarIcon, BarChart3Icon } from "lucide-react";
 import { FinancialAssistantDialog } from '@/components/FinancialAssistant/FinancialAssistantDialog';
 
 export const FinancialAssistantPromo: React.FC = () => {
@@ -19,17 +19,33 @@ export const FinancialAssistantPromo: React.FC = () => {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground mb-4">
-            Habla con tu asistente de IA para analizar tus finanzas, recibir recomendaciones
-            o hacer preguntas sobre tus datos financieros.
+            Habla con tu asistente de IA para analizar tus finanzas actuales e históricas,
+            identificar tendencias y recibir recomendaciones personalizadas.
           </p>
+          
+          <div className="grid grid-cols-1 gap-3 mb-4">
+            <div className="flex items-start">
+              <TrendingUpIcon className="h-4 w-4 mr-2 mt-0.5 text-muted-foreground" />
+              <p className="text-xs">Análisis de tendencias en todo tu histórico de datos</p>
+            </div>
+            <div className="flex items-start">
+              <CalendarIcon className="h-4 w-4 mr-2 mt-0.5 text-muted-foreground" />
+              <p className="text-xs">Comparaciones mes a mes y año contra año</p>
+            </div>
+            <div className="flex items-start">
+              <BarChart3Icon className="h-4 w-4 mr-2 mt-0.5 text-muted-foreground" />
+              <p className="text-xs">Detección de patrones y anomalías en transacciones</p>
+            </div>
+          </div>
+          
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">Prueba preguntas como:</p>
             <div className="bg-muted p-2 rounded-md text-xs">
               <ul className="list-disc list-inside space-y-1">
-                <li>¿Cuál es mi margen de beneficio actual?</li>
-                <li>¿Cómo puedo reducir mis gastos?</li>
-                <li>¿Hay tendencias en mis ingresos recientes?</li>
-                <li>¿Qué categorías de gastos han aumentado más?</li>
+                <li>¿Cómo ha evolucionado mi negocio en el último año?</li>
+                <li>¿Cuáles fueron mis mejores meses en términos de beneficio?</li>
+                <li>¿Hay tendencias estacionales en mis ingresos?</li>
+                <li>¿Cómo se compara este mes con el mismo mes del año pasado?</li>
               </ul>
             </div>
           </div>

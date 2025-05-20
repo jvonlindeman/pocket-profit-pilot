@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { SendIcon, RefreshCcwIcon, MessageCircleIcon } from 'lucide-react';
+import { SendIcon, RefreshCcwIcon, MessageCircleIcon, SearchIcon } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { registerInteraction } from '@/utils/uiDataCapture';
 
@@ -48,14 +48,32 @@ const MessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
   );
 };
 
+const SuggestedQuestion: React.FC<{ question: string; onClick: (question: string) => void }> = ({ 
+  question, 
+  onClick 
+}) => {
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="mb-2 text-xs text-left justify-start h-auto py-2 px-3 whitespace-normal"
+      onClick={() => onClick(question)}
+    >
+      <SearchIcon className="h-3 w-3 mr-2 flex-shrink-0" />
+      <span>{question}</span>
+    </Button>
+  );
+};
+
 export const FinancialAssistantDialog: React.FC<FinancialAssistantDialogProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { messages, isLoading, sendMessage, resetChat } = useFinancialAssistant();
+  const { messages, isLoading, sendMessage, resetChat, getSuggestedQuestions } = useFinancialAssistant();
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const suggestedQuestions = getSuggestedQuestions();
   
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -91,6 +109,14 @@ export const FinancialAssistantDialog: React.FC<FinancialAssistantDialogProps> =
     }
   };
   
+  // Handle suggested question click
+  const handleSuggestedQuestionClick = (question: string) => {
+    if (!isLoading) {
+      registerInteraction('financial-assistant-suggestion', 'click', { query: question });
+      sendMessage(question);
+    }
+  };
+  
   // Handle reset chat
   const handleResetChat = () => {
     registerInteraction('financial-assistant-reset', 'click');
@@ -114,7 +140,7 @@ export const FinancialAssistantDialog: React.FC<FinancialAssistantDialogProps> =
             Asistente Financiero
           </DialogTitle>
           <DialogDescription>
-            Habla con tu asistente para analizar tus finanzas
+            Habla con tu asistente para analizar tus finanzas y descubrir insights históricos
           </DialogDescription>
         </DialogHeader>
         
@@ -128,6 +154,22 @@ export const FinancialAssistantDialog: React.FC<FinancialAssistantDialogProps> =
             {isLoading && (
               <div className="flex justify-center my-4">
                 <RefreshCcwIcon className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            )}
+            
+            {/* Show suggested questions only when there's more than just the welcome message */}
+            {messages.length === 1 && !isLoading && (
+              <div className="mt-6 space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">Preguntas sugeridas:</p>
+                <div className="flex flex-col gap-2 mt-2">
+                  {suggestedQuestions.map((question, index) => (
+                    <SuggestedQuestion
+                      key={`suggested-${index}`}
+                      question={question}
+                      onClick={handleSuggestedQuestionClick}
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -171,4 +213,3 @@ export const FinancialAssistantDialog: React.FC<FinancialAssistantDialogProps> =
     </Dialog>
   );
 };
-
