@@ -34,6 +34,20 @@ const CacheService = {
   },
   
   /**
+   * Store transactions in monthly cache (preferred method)
+   */
+  storeMonthTransactions: async (
+    source: CacheSource,
+    date: Date,
+    transactions: Transaction[]
+  ): Promise<boolean> => {
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1; // JavaScript months are 0-indexed
+    console.log(`CacheService: Storing ${transactions.length} transactions for ${source} ${year}-${month}`);
+    return cacheStorage.storeMonthTransactions(source, year, month, transactions);
+  },
+  
+  /**
    * Get the last cache check result (useful for debugging)
    */
   getLastCacheCheckResult: (): CacheResponse | null => {
@@ -123,6 +137,86 @@ const CacheService = {
     transactionCount?: number
   ): Promise<boolean> => {
     return cacheMetrics.recordCacheAccess(source, startDate, endDate, isCacheHit, isPartial, transactionCount);
+  },
+  
+  /**
+   * Fix cache entries with missing year/month values
+   * Helps migrate legacy cached data to the new format
+   */
+  fixMissingYearMonthValues: async (source?: CacheSource): Promise<number> => {
+    console.log("CacheService: Attempting to fix cached transactions with missing year/month values");
+    
+    try {
+      // Get transactions with null year/month values
+      const { data, error } = await cacheStorage.getClient()
+        .from('cached_transactions')
+        .select('*')
+        .is('year', null)
+        .is('month', null)
+        .order('date', { ascending: false })
+        .limit(1000);
+        
+      if (error) {
+        console.error("Error fetching transactions with null year/month:", error);
+        return 0;
+      }
+      
+      if (!data || data.length === 0) {
+        console.log("No transactions found with missing year/month values");
+        return 0;
+      }
+      
+      console.log(`Found ${data.length} transactions with missing year/month values`);
+      
+      // Group transactions by month for batched updates
+      const transactionsByMonth = new Map<string, any[]>();
+      
+      data.forEach(tx => {
+        if (!tx.date) return;
+        
+        const txDate = new Date(tx.date);
+        const year = txDate.getFullYear();
+        const month = txDate.getMonth() + 1;
+        const key = `${year}-${month}`;
+        
+        if (!transactionsByMonth.has(key)) {
+          transactionsByMonth.set(key, []);
+        }
+        
+        transactionsByMonth.get(key)!.push({
+          id: tx.id,
+          year,
+          month
+        });
+      });
+      
+      // Update transactions in batches by month
+      let totalFixed = 0;
+      
+      for (const [key, transactions] of transactionsByMonth.entries()) {
+        const batchSize = 100;
+        
+        for (let i = 0; i < transactions.length; i += batchSize) {
+          const batch = transactions.slice(i, i + batchSize);
+          const { error } = await cacheStorage.getClient()
+            .from('cached_transactions')
+            .upsert(batch, { onConflict: 'id' });
+            
+          if (error) {
+            console.error(`Error updating batch ${Math.floor(i/batchSize) + 1}:`, error);
+          } else {
+            console.log(`Successfully updated batch ${Math.floor(i/batchSize) + 1} (${batch.length} transactions)`);
+            totalFixed += batch.length;
+          }
+        }
+      }
+      
+      console.log(`Fixed ${totalFixed} transactions with missing year/month values`);
+      return totalFixed;
+    } catch (err) {
+      console.error("Error fixing missing year/month values:", err);
+      return 0;
+    }
   }
 };
 

@@ -171,10 +171,37 @@ const StripeService = {
           }
         });
         
-        // Store transactions in cache
+        // Store transactions in cache using the monthly approach
         if (response.transactions.length > 0) {
-          console.log("StripeService: Storing", response.transactions.length, "transactions in cache");
-          CacheService.storeTransactions('Stripe', startDate, endDate, response.transactions);
+          console.log("StripeService: Storing", response.transactions.length, "transactions in monthly cache");
+          
+          // Group transactions by month for proper storage
+          const groupedByMonth = new Map<string, Transaction[]>();
+          
+          response.transactions.forEach(tx => {
+            if (!tx.date) return;
+            
+            const txDate = new Date(tx.date);
+            const year = txDate.getFullYear();
+            const month = txDate.getMonth() + 1; // JavaScript months are 0-indexed
+            const key = `${year}-${month}`;
+            
+            if (!groupedByMonth.has(key)) {
+              groupedByMonth.set(key, []);
+            }
+            
+            groupedByMonth.get(key)!.push(tx);
+          });
+          
+          // Store each month's transactions separately
+          for (const [key, transactions] of groupedByMonth.entries()) {
+            const [yearStr, monthStr] = key.split('-');
+            const year = parseInt(yearStr);
+            const month = parseInt(monthStr);
+            
+            console.log(`StripeService: Storing ${transactions.length} transactions for ${year}-${month}`);
+            await CacheService.storeMonthTransactions('Stripe', new Date(year, month - 1, 1), transactions);
+          }
         }
       }
       

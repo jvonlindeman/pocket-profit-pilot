@@ -107,6 +107,7 @@ export class MonthlyRepository extends CacheDbClient {
       // Store transactions in batches to avoid payload limits
       const batchSize = 100;
       let totalStored = 0;
+      let successfulBatches = 0;
       
       for (let i = 0; i < dbTransactions.length; i += batchSize) {
         const batch = dbTransactions.slice(i, i + batchSize);
@@ -119,34 +120,39 @@ export class MonthlyRepository extends CacheDbClient {
           
         if (error) {
           this.logError(`Error storing batch ${i/batchSize + 1}`, error);
+        } else {
+          totalStored += batch.length;
+          successfulBatches++;
+          console.log(`Stored batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(dbTransactions.length/batchSize)} (${batch.length} transactions)`);
+        }
+      }
+      
+      // Only create/update monthly cache entry if at least some transactions were stored successfully
+      if (successfulBatches > 0) {
+        // Create or update monthly cache entry
+        const { error: monthlyError } = await supabase
+          .from('monthly_cache')
+          .upsert({
+            source: source,
+            year: year,
+            month: month,
+            transaction_count: transactions.length,
+            status: 'complete',
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'source,year,month'
+          });
+        
+        if (monthlyError) {
+          this.logError("Error updating monthly cache", monthlyError);
           return false;
         }
         
-        totalStored += batch.length;
-        console.log(`Stored batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(dbTransactions.length/batchSize)} (${batch.length} transactions)`);
+        console.log(`Successfully stored ${totalStored} transactions for ${source} ${year}-${month}`);
+        return true;
       }
       
-      // Create or update monthly cache entry
-      const { error: monthlyError } = await supabase
-        .from('monthly_cache')
-        .upsert({
-          source: source,
-          year: year,
-          month: month,
-          transaction_count: transactions.length,
-          status: 'complete',
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'source,year,month'
-        });
-      
-      if (monthlyError) {
-        this.logError("Error updating monthly cache", monthlyError);
-        return false;
-      }
-      
-      console.log(`Successfully stored ${totalStored} transactions for ${source} ${year}-${month}`);
-      return true;
+      return false;
     } catch (err) {
       this.logError("Exception storing monthly transactions", err);
       return false;
@@ -209,6 +215,71 @@ export class MonthlyRepository extends CacheDbClient {
     } catch (err) {
       console.error("Exception getting month cache info:", err);
       return null;
+    }
+  }
+
+  /**
+   * Fix legacy transactions with missing year/month values
+   */
+  async fixLegacyTransactions(source?: CacheSource): Promise<number> {
+    try {
+      // First, fetch all transactions with null year/month values
+      let query = supabase
+        .from('cached_transactions')
+        .select('*')
+        .is('year', null)
+        .is('month', null);
+        
+      if (source) {
+        query = query.eq('source', source);
+      }
+      
+      const { data, error } = await query.limit(1000);
+      
+      if (error) {
+        this.logError("Error fetching transactions with null year/month", error);
+        return 0;
+      }
+      
+      if (!data || data.length === 0) {
+        return 0;
+      }
+      
+      console.log(`Found ${data.length} transactions with null year/month values${source ? ' for ' + source : ''}`);
+      
+      // Fix each transaction
+      let fixedCount = 0;
+      const batchSize = 100;
+      const updates = data.map(tx => {
+        if (!tx.date) return null;
+        
+        const txDate = new Date(tx.date);
+        return {
+          id: tx.id,
+          year: txDate.getFullYear(),
+          month: txDate.getMonth() + 1 // Convert to 1-indexed month
+        };
+      }).filter(Boolean);
+      
+      // Update in batches
+      for (let i = 0; i < updates.length; i += batchSize) {
+        const batch = updates.slice(i, i + batchSize);
+        
+        const { error: updateError } = await supabase
+          .from('cached_transactions')
+          .upsert(batch);
+          
+        if (updateError) {
+          this.logError(`Error updating batch ${Math.floor(i/batchSize) + 1}`, updateError);
+        } else {
+          fixedCount += batch.length;
+        }
+      }
+      
+      return fixedCount;
+    } catch (err) {
+      this.logError("Exception fixing legacy transactions", err);
+      return 0;
     }
   }
 }
