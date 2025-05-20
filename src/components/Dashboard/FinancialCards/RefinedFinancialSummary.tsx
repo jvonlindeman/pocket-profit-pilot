@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import SummaryCardSection from './SummaryCardSection';
 import RefinedExpensesSection from './RefinedExpensesSection';
@@ -6,14 +7,14 @@ import FinancialDebugHelper from '../DebugTools/FinancialDebugHelper';
 import FinancialHistorySummary from '../FinancialHistory/FinancialHistorySummary';
 import { FinancialAssistantPromo } from '../FinancialAssistant/FinancialAssistantPromo';
 import { useFinance } from '@/contexts/FinanceContext';
-import { registerVisibleSection } from '@/utils/uiCapture';
+import { registerInteraction } from '@/utils/uiCapture';
 
 const RefinedFinancialSummary: React.FC = () => {
   const { dateRange } = useFinance();
   
   // Register components as visible
   useEffect(() => {
-    registerVisibleSection('financial-summary');
+    registerInteraction('visible-section', 'view', { section: 'financial-summary' });
     return () => {}; // No need to unregister as component unmount will take care of it
   }, []);
   

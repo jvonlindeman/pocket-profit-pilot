@@ -80,12 +80,11 @@ export const useFinancialAssistant = () => {
   // Effect to monitor for changes in finance context that would require re-analysis
   useEffect(() => {
     // This is used to trigger a data refresh when key financial data changes
-    const financialDataVersion = financeContext.financialData 
-      ? `${financeContext.financialData.summary?.totalIncome || 0}-${financeContext.financialData.transactions?.length || 0}`
-      : 'no-data';
+    const financialDataVersion = 
+      `${financeContext.summary?.totalIncome || 0}-${financeContext.transactions?.length || 0}`;
     
     // We're just tracking changes, not doing anything with the version string itself
-  }, [financeContext.financialData]);
+  }, [financeContext.summary, financeContext.transactions]);
 
   // Send a message and get a response from the assistant
   const sendMessage = useCallback(async (content: string) => {
@@ -256,10 +255,10 @@ export const useFinancialAssistant = () => {
     const contextQuestions: string[] = [];
     
     // Profit margin suggestions
-    if (financeContext.financialData && financeContext.financialData.summary) {
-      if (financeContext.financialData.summary.profitMargin < 15) {
+    if (financeContext.summary) {
+      if (financeContext.summary.profitMargin < 15) {
         contextQuestions.push("¿Qué estrategias puedo implementar para mejorar mi margen de beneficio?");
-      } else if (financeContext.financialData.summary.profitMargin > 40) {
+      } else if (financeContext.summary.profitMargin > 40) {
         contextQuestions.push("¿Cómo puedo mantener mi alto margen de beneficio en los próximos meses?");
       }
     }

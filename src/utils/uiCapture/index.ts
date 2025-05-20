@@ -1,8 +1,14 @@
 
-import { getRecentInteractions } from './interactionStore';
+import { getRecentInteractions, registerInteraction } from './interactionStore';
 import { calculateTransactionInsights, calculateMetricComparisons } from './dataAnalysis';
 import { optimizeUIData } from './dataOptimization';
 import { getVisibleComponents } from './domUtils';
+
+// Function to register a visible section in the UI
+export function registerVisibleSection(sectionName: string) {
+  registerInteraction('visible-section', 'view', { section: sectionName });
+  console.log(`Section registered as visible: ${sectionName}`);
+}
 
 // Main function to capture UI data for the financial assistant
 export function captureUIData(financeContext: any) {
@@ -117,4 +123,4 @@ function isElementInViewport(el: Element) {
 }
 
 // Register a UI interaction
-export { registerInteraction } from './interactionStore';
+export { registerInteraction, getRecentInteractions, optimizeUIData };
