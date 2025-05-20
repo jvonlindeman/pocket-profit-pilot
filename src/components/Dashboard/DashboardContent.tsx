@@ -20,7 +20,7 @@ interface DashboardContentProps {
   currentMonthDate: Date;
   startingBalance: number;
   refreshData: (force: boolean) => void;
-  handleBalanceChange: (balance: number) => void;
+  handleBalanceChange: (balance: number, opexAmount?: number, itbmAmount?: number, profitPercentage?: number) => void;
   handleRefresh: () => void;
   loading: boolean;
   stripeIncome: number;
@@ -60,6 +60,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   const opexAmount = monthlyBalance?.opex_amount !== null ? monthlyBalance?.opex_amount || 35 : 35;
   const itbmAmount = monthlyBalance?.itbm_amount !== null ? monthlyBalance?.itbm_amount || 0 : 0;
   const profitPercentage = monthlyBalance?.profit_percentage !== null ? monthlyBalance?.profit_percentage || 1 : 1;
+  
+  console.log("DashboardContent: Using values for calculator:", { opexAmount, itbmAmount, profitPercentage });
 
   return (
     <>

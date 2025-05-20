@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
@@ -34,6 +35,7 @@ const Index = () => {
     regularIncome,
     collaboratorExpenses,
     startingBalance,
+    updateStartingBalance,
     setStartingBalance,
     usingCachedData,
     cacheStatus
@@ -99,20 +101,41 @@ const Index = () => {
   };
 
   // Improved handler for balance changes in the MonthlyBalanceEditor
-  const handleBalanceChange = (balance: number) => {
-    console.log("Balance changed in editor:", balance);
-    
-    // Immediately update local state for faster UI feedback
-    setStartingBalance(balance);
-    
-    // Force a refresh to ensure all components get the updated data
-    toast({
-      title: 'Balance inicial actualizado',
-      description: 'Actualizando datos financieros...',
+  const handleBalanceChange = (
+    balance: number, 
+    opexAmount: number = 35, 
+    itbmAmount: number = 0, 
+    profitPercentage: number = 1
+  ) => {
+    console.log("Balance changed in editor:", {
+      balance,
+      opexAmount,
+      itbmAmount,
+      profitPercentage
     });
     
-    // Refresh data from backend but without showing the loading state
-    refreshData(false);
+    // Call the updateStartingBalance function with all parameters
+    updateStartingBalance(
+      balance, 
+      currentMonthDate, 
+      opexAmount,
+      itbmAmount,
+      profitPercentage
+    ).then(success => {
+      if (success) {
+        // Immediately update local state for faster UI feedback
+        setStartingBalance(balance);
+        
+        // Force a refresh to ensure all components get the updated data
+        toast({
+          title: 'Balance inicial actualizado',
+          description: 'Actualizando datos financieros...',
+        });
+        
+        // Refresh data from backend but without showing the loading state
+        refreshData(false);
+      }
+    });
   };
 
   // Handler for data refresh

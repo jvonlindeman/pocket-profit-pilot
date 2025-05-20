@@ -38,12 +38,16 @@ export const useMonthlyBalanceManager = () => {
   const updateStartingBalance = useCallback(async (
     balance: number, 
     date: Date, 
-    opexAmount: number = 35, // Changed from opexPercentage to opexAmount
+    opexAmount: number = 35,
     itbmAmount: number = 0,
     profitPercentage: number = 1,
     notes?: string
   ) => {
     try {
+      console.log("Updating monthly balance with values:", {
+        balance, date, opexAmount, itbmAmount, profitPercentage, notes
+      });
+      
       const monthYear = formatDate(date, 'yyyy-MM');
       
       // Check if a record already exists
@@ -55,7 +59,7 @@ export const useMonthlyBalanceManager = () => {
       
       const updateData: any = {
         balance,
-        opex_amount: opexAmount, // Store as direct amount, not percentage
+        opex_amount: opexAmount, 
         itbm_amount: itbmAmount,
         profit_percentage: profitPercentage,
         notes: notes || (existingData?.notes || null),
