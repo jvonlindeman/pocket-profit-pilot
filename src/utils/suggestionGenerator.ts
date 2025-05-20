@@ -1,5 +1,6 @@
 
 import { useFinance } from '@/contexts/FinanceContext';
+import { CategorySummary } from '@/types/financial';
 
 // Define the interface locally to avoid circular dependencies
 interface FinanceContextType {
@@ -15,11 +16,7 @@ interface FinanceContextType {
   };
   stripeIncome: number;
   regularIncome: number;
-  collaboratorExpenses: Array<{
-    category: string;
-    amount: number;
-    count: number;
-  }>;
+  collaboratorExpenses: CategorySummary[]; // Use the imported CategorySummary type
 }
 
 /**
@@ -53,7 +50,7 @@ export const generateSuggestedQuestions = (financeContext: FinanceContextType): 
   }
   
   // Collaborator expense suggestions
-  if (financeContext.collaboratorExpenses.length > 3) {
+  if (financeContext.collaboratorExpenses?.length > 3) {
     contextQuestions.push("¿Cuál es la tendencia de gastos en colaboradores durante el último año?");
   }
   
