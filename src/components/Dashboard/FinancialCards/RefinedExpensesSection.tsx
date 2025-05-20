@@ -1,11 +1,10 @@
-
 import React, { useEffect } from 'react';
 import { ArrowDownIcon, Users } from 'lucide-react';
 import SummaryCard from './SummaryCard';
 import { useFinance } from '@/contexts/FinanceContext';
 import { useFinanceFormatter } from '@/hooks/useFinanceFormatter';
 import { validateFinancialValue } from '@/utils/financialUtils';
-import { registerVisibleSection } from '@/utils/uiDataCapture';
+import { registerVisibleSection } from '@/utils/uiCapture';
 
 const RefinedExpensesSection: React.FC = () => {
   const { 

@@ -1,9 +1,12 @@
-
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useFinance } from '@/contexts/FinanceContext';
-import { captureUIData, optimizeUIData, registerInteraction } from '@/utils/uiDataCapture';
+import { 
+  captureUIData, 
+  optimizeUIData, 
+  registerInteraction 
+} from '@/utils/uiCapture';
 
 export interface ChatMessage {
   id: string;
