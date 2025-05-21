@@ -5,6 +5,7 @@ import { Transaction } from '@/types/financial';
 import { useFinancialDataFetcher } from '@/hooks/useFinancialDataFetcher';
 import { useSearchParams } from 'react-router-dom';
 import CacheService from '@/services/cache';
+import StripeService from '@/services/stripeService';
 
 /**
  * Enhanced hook to handle fetching of financial data with transaction management
@@ -57,6 +58,31 @@ export const useEnhancedFinancialDataFetcher = () => {
     
     fixLegacyCacheEntries();
   }, []);
+
+  // Function to debug Stripe transactions caching
+  const debugStripeCaching = async (dateRange: { startDate: Date; endDate: Date }) => {
+    try {
+      const result = await StripeService.debugCacheProcess(dateRange.startDate, dateRange.endDate);
+      
+      console.log("Stripe Cache Debug Results:", result);
+      
+      toast({
+        title: "Stripe Cache Debugging Complete",
+        description: `Found ${result.transactionCount || 0} transactions. Check console for details.`,
+        variant: result.status === 'error' ? 'destructive' : 'default'
+      });
+      
+      return result;
+    } catch (err) {
+      console.error("Error debugging Stripe cache:", err);
+      toast({
+        title: "Stripe Cache Debug Error",
+        description: err instanceof Error ? err.message : "Unknown error occurred",
+        variant: "destructive"
+      });
+      return { status: 'error', error: err };
+    }
+  };
 
   // Function to fetch data
   const fetchData = useCallback(async (
@@ -153,6 +179,7 @@ export const useEnhancedFinancialDataFetcher = () => {
     checkApiConnectivity,
     fetchData,
     refreshData,
-    cleanupCache
+    cleanupCache,
+    debugStripeCaching
   };
 };
