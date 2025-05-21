@@ -1,10 +1,11 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { MonthlyBalance } from '@/types/financial';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { formatDateYYYYMMDD } from '@/utils/dateUtils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface UseMonthlyBalanceProps {
   currentDate: Date;
@@ -15,9 +16,10 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
   const [error, setError] = useState<string | null>(null);
   const [monthlyBalance, setMonthlyBalance] = useState<MonthlyBalance | null>(null);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   // Format the month_year for database queries (YYYY-MM)
-  const formatMonthYear = (date: Date) => {
+  const formatMonthYear = useCallback((date: Date) => {
     try {
       // Ensure we have a valid date
       if (!date || isNaN(date.getTime())) {
@@ -30,13 +32,13 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       console.error("Error formatting month-year:", err);
       return format(new Date(), 'yyyy-MM');
     }
-  };
+  }, []);
 
   // Get the current month-year string
   const currentMonthYear = formatMonthYear(currentDate);
 
   // Fetch the monthly balance for the given date
-  const fetchMonthlyBalance = async () => {
+  const fetchMonthlyBalance = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -51,6 +53,20 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
 
       if (error) {
         console.error("Error fetching monthly balance:", error);
+        
+        if (isMobile) {
+          toast({
+            title: "Error",
+            description: "No se pudo cargar el balance mensual. Intentando de nuevo...",
+            variant: "destructive"
+          });
+          
+          // Auto-retry once on mobile devices after a short delay
+          setTimeout(() => {
+            fetchMonthlyBalance();
+          }, 2000);
+        }
+        
         throw error;
       }
 
@@ -64,10 +80,10 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentMonthYear, toast, isMobile]);
 
   // Check if a balance exists for the current month
-  const checkBalanceExists = async (): Promise<boolean> => {
+  const checkBalanceExists = useCallback(async (): Promise<boolean> => {
     try {
       const { data, error } = await supabase
         .from('monthly_balances')
@@ -85,10 +101,10 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       console.error("Error in checkBalanceExists:", err);
       return false;
     }
-  };
+  }, [currentMonthYear]);
 
   // Set or update the monthly balance
-  const updateMonthlyBalance = async (
+  const updateMonthlyBalance = useCallback(async (
     balance: number, 
     opexAmount: number = 35,
     itbmAmount: number = 0, 
@@ -175,12 +191,14 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [checkBalanceExists, currentDate, currentMonthYear, toast]);
 
   // Fetch the balance when the current date changes
   useEffect(() => {
-    fetchMonthlyBalance();
-  }, [currentMonthYear]);
+    if (currentDate && !isNaN(currentDate.getTime())) {
+      fetchMonthlyBalance();
+    }
+  }, [currentMonthYear, fetchMonthlyBalance, currentDate]);
 
   return {
     loading,

@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { ArrowDownIcon, Users } from 'lucide-react';
 import SummaryCard from './SummaryCard';
@@ -6,6 +5,7 @@ import { useFinance } from '@/contexts/FinanceContext';
 import { useFinanceFormatter } from '@/hooks/useFinanceFormatter';
 import { validateFinancialValue } from '@/utils/financialUtils';
 import { registerInteraction } from '@/utils/uiCapture';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const RefinedExpensesSection: React.FC = () => {
   const { 
@@ -14,6 +14,7 @@ const RefinedExpensesSection: React.FC = () => {
   } = useFinance();
   
   const { formatCurrency } = useFinanceFormatter();
+  const isMobile = useIsMobile();
   
   // Ensure all values are valid numbers
   const collaboratorExpense = validateFinancialValue(summary.collaboratorExpense);
@@ -41,7 +42,7 @@ const RefinedExpensesSection: React.FC = () => {
   }, [summary, collaboratorExpenses, collaboratorExpense, otherExpense, totalExpense]);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6" data-component="expenses">
+    <div className={`grid grid-cols-1 ${isMobile ? 'gap-3' : 'md:grid-cols-3 gap-6'}`} data-component="expenses">
       {/* Collaborator Expenses */}
       <SummaryCard
         title="Gastos Colaboradores"
@@ -49,6 +50,7 @@ const RefinedExpensesSection: React.FC = () => {
         icon={Users}
         iconColor="text-amber-500"
         iconBgColor="bg-amber-50"
+        valueSize={isMobile ? 'small' : 'medium'}
       />
 
       {/* Other Expenses */}
@@ -58,6 +60,7 @@ const RefinedExpensesSection: React.FC = () => {
         icon={ArrowDownIcon}
         iconColor="text-red-500"
         iconBgColor="bg-red-50"
+        valueSize={isMobile ? 'small' : 'medium'}
       />
 
       {/* Total Expenses */}
@@ -67,6 +70,7 @@ const RefinedExpensesSection: React.FC = () => {
         icon={ArrowDownIcon}
         iconColor="text-red-500"
         iconBgColor="bg-red-50"
+        valueSize={isMobile ? 'small' : 'medium'}
       />
     </div>
   );
