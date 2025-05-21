@@ -9,7 +9,7 @@ import { es } from 'date-fns/locale';
 
 interface MonthlyBalanceEditorProps {
   currentDate: Date;
-  onBalanceChange: (balance: number, opexAmount?: number, itbmAmount?: number, profitPercentage?: number) => void;
+  onBalanceChange: (balance: number, opexAmount?: number, itbmAmount?: number, profitPercentage?: number, notes?: string) => void;
 }
 
 const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({ 
@@ -50,14 +50,15 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
     balance: number, 
     opexAmount: number = 35,
     itbmAmount: number = 0,
-    profitPercentage: number = 1
+    profitPercentage: number = 1,
+    notes?: string
   ) => {
     console.log("MonthlyBalanceEditor: Balance saved with values:", {
-      balance, opexAmount, itbmAmount, profitPercentage
+      balance, opexAmount, itbmAmount, profitPercentage, notes
     });
     
     // Pass all values to the parent component
-    onBalanceChange(balance, opexAmount, itbmAmount, profitPercentage);
+    onBalanceChange(balance, opexAmount, itbmAmount, profitPercentage, notes);
     setShowBalanceDialog(false);
   };
 
@@ -75,11 +76,18 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
               "No establecido"}
           </p>
           {monthlyBalance && (
-            <p className="text-xs text-gray-400">
-              ITBM: ${monthlyBalance.itbm_amount?.toFixed(2) || "0.00"} | 
-              OPEX: ${monthlyBalance.opex_amount?.toFixed(2) || "0.00"} | 
-              Profit: {monthlyBalance.profit_percentage?.toFixed(1) || "0.0"}%
-            </p>
+            <div className="space-y-0.5">
+              <p className="text-xs text-gray-400">
+                ITBM: ${monthlyBalance.itbm_amount?.toFixed(2) || "0.00"} | 
+                OPEX: ${monthlyBalance.opex_amount?.toFixed(2) || "0.00"} | 
+                Profit: {monthlyBalance.profit_percentage?.toFixed(1) || "0.0"}%
+              </p>
+              {monthlyBalance.notes && (
+                <p className="text-xs text-gray-500 italic">
+                  "{monthlyBalance.notes}"
+                </p>
+              )}
+            </div>
           )}
         </div>
       </div>

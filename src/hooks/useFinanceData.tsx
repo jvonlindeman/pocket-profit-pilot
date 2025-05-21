@@ -11,7 +11,7 @@ import { getCurrentMonthRange } from '@/utils/dateUtils';
 
 export const useFinanceData = () => {
   // Import functionality from smaller hooks
-  const { startingBalance, fetchMonthlyBalance, updateStartingBalance, setStartingBalance } = useMonthlyBalanceManager();
+  const { startingBalance, fetchMonthlyBalance, updateStartingBalance, setStartingBalance, notes, setNotes } = useMonthlyBalanceManager();
   const { collaboratorExpenses, processCollaboratorData } = useCollaboratorProcessor();
   const { 
     stripeIncome, stripeFees, 
@@ -81,8 +81,10 @@ export const useFinanceData = () => {
     regularIncome,
     collaboratorExpenses,
     startingBalance,
+    notes,
     updateStartingBalance,
-    setStartingBalance, 
+    setStartingBalance,
+    setNotes,
     usingCachedData,
     cacheStatus,
     apiConnectivity,

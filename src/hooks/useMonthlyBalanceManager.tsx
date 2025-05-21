@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export const useMonthlyBalanceManager = () => {
   const [startingBalance, setStartingBalance] = useState<number | undefined>(undefined);
+  const [notes, setNotes] = useState<string | undefined>(undefined);
 
   // Fetch monthly balance for the selected month
   const fetchMonthlyBalance = useCallback(async (date: Date) => {
@@ -23,11 +24,13 @@ export const useMonthlyBalanceManager = () => {
 
       if (data) {
         console.log("Fetched monthly balance:", data);
-        // Update the local state with the balance from the database
+        // Update the local state with the balance and notes from the database
         setStartingBalance(data.balance);
+        setNotes(data.notes || undefined);
       } else {
         console.log("No monthly balance found for:", monthYear);
         setStartingBalance(undefined);
+        setNotes(undefined);
       }
     } catch (err) {
       console.error("Error in fetchMonthlyBalance:", err);
@@ -90,6 +93,7 @@ export const useMonthlyBalanceManager = () => {
       
       // Immediately update local state for faster UI feedback
       setStartingBalance(balance);
+      setNotes(notes);
       console.log("Starting balance updated to:", balance);
       return true;
     } catch (err) {
@@ -100,8 +104,10 @@ export const useMonthlyBalanceManager = () => {
 
   return {
     startingBalance,
+    notes,
     fetchMonthlyBalance,
     updateStartingBalance,
-    setStartingBalance // Export this function to allow direct state updates
+    setStartingBalance, // Export this function to allow direct state updates
+    setNotes // Export this function to allow direct state updates
   };
 };

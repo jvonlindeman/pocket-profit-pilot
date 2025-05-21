@@ -20,7 +20,7 @@ interface DashboardContentProps {
   currentMonthDate: Date;
   startingBalance: number;
   refreshData: (force: boolean) => void;
-  handleBalanceChange: (balance: number, opexAmount?: number, itbmAmount?: number, profitPercentage?: number) => void;
+  handleBalanceChange: (balance: number, opexAmount?: number, itbmAmount?: number, profitPercentage?: number, notes?: string) => void;
   handleRefresh: () => void;
   loading: boolean;
   stripeIncome: number;
