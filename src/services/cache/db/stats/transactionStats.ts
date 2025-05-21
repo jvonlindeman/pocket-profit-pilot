@@ -15,7 +15,8 @@ export class TransactionStatsRepository extends StatsBaseRepository {
       const { data, error } = await this.getClient()
         .from('cached_transactions')
         .select('source, count(*)')
-        .groupBy('source');
+        // Use .select() instead of .groupBy() which isn't available in this version
+        // The grouping will be handled by the select statement itself
       
       if (error) {
         this.logStatError("Error getting transaction counts", error);
@@ -46,9 +47,9 @@ export class TransactionStatsRepository extends StatsBaseRepository {
       const { data, error } = await this.getClient()
         .from('cached_transactions')
         .select('source, year, month, count(*)')
-        .isNot('year', null)
-        .isNot('month', null)
-        .groupBy('source, year, month');
+        .not('year', 'is', null)    // Use .not() instead of .isNot()
+        .not('month', 'is', null)   // Use .not() instead of .isNot()
+        // Grouping is handled by the select statement with count(*)
       
       if (error) {
         this.logStatError("Error getting transaction counts by month", error);
