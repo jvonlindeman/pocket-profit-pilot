@@ -14,7 +14,9 @@ export class TransactionStatsRepository extends StatsBaseRepository {
       // Get count of transactions by source
       const { data, error } = await this.getClient()
         .from('cached_transactions')
-        .select('source, count(*)');
+        .select('source, count')
+        .select('source, count(*)', { count: 'exact', head: false })
+        .group('source');
       
       if (error) {
         this.logStatError("Error getting transaction counts", error);
@@ -46,7 +48,8 @@ export class TransactionStatsRepository extends StatsBaseRepository {
         .from('cached_transactions')
         .select('source, year, month, count(*)')
         .not('year', 'is', null)
-        .not('month', 'is', null);
+        .not('month', 'is', null)
+        .group('source, year, month');
       
       if (error) {
         this.logStatError("Error getting transaction counts by month", error);
