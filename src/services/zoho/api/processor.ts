@@ -1,3 +1,4 @@
+
 import { Transaction } from "../../../types/financial";
 import { parseToPanamaTime, formatDateYYYYMMDD_Panama } from "@/utils/timezoneUtils";
 import { ZohoTransactionResponse } from "./types";
@@ -70,12 +71,15 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
               collaboratorDate = formatDateYYYYMMDD_Panama(new Date());
             }
           } else {
-            console.log(`No date provided for collaborator ${item.vendor_name}, using current date in Panama timezone`);
+            console.log(`No date provided for collaborator ${item.vendor_name}, using current date`);
             collaboratorDate = formatDateYYYYMMDD_Panama(new Date());
           }
           
+          const externalId = `colaborador-${item.vendor_name.replace(/\s/g, '-')}-${collaboratorDate}-${amount}`;
+          
           result.push({
-            id: `colaborador-${item.vendor_name.replace(/\s/g, '-')}-${collaboratorDate}-${amount}`,
+            id: externalId,
+            external_id: externalId,
             date: collaboratorDate,
             amount,
             description: `Pago a colaborador: ${item.vendor_name}`,
@@ -88,34 +92,27 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
     });
   }
   
-  // Process regular expenses with Panama timezone handling
+  // Process regular expenses (ignoring "Impuestos" category)
   if (Array.isArray(data.expenses)) {
     data.expenses.forEach((item: any, index: number) => {
-      // Skip expenses with account_name "Impuestos"
       if (item && typeof item.total !== 'undefined' && item.account_name !== "Impuestos") {
+        // Skip expenses from excluded vendors
+        if (item.vendor_name && excludedVendors.includes(item.vendor_name)) {
+          console.log(`Skipping expense from excluded vendor: ${item.vendor_name}`);
+          return;
+        }
+
         const amount = Number(item.total);
         if (amount > 0) {
-          // Handle date in Panama timezone
-          let expenseDate: string;
-          try {
-            if (item.date) {
-              expenseDate = formatDateYYYYMMDD_Panama(parseToPanamaTime(item.date));
-            } else {
-              expenseDate = formatDateYYYYMMDD_Panama(new Date());
-            }
-          } catch (err) {
-            console.error(`Error processing expense date:`, err);
-            expenseDate = formatDateYYYYMMDD_Panama(new Date());
-          }
-          
+          const expenseDate = item.date || formatDateYYYYMMDD_Panama(new Date());
           const vendorName = item.vendor_name || '';
           const accountName = item.account_name || 'Gastos generales';
           
-          // Create a unique ID to avoid duplication issues
-          const uniqueId = `zoho-expense-${expenseDate}-${vendorName ? vendorName.replace(/\s/g, '-') : 'unknown'}-${accountName.replace(/\s/g, '-')}-${expenseDate}-${amount}-${index}`;
+          const externalId = `expense-${(vendorName || accountName || '').replace(/\s/g, '-')}-${expenseDate}-${amount}-${index}`;
           
           result.push({
-            id: uniqueId,
+            id: externalId,
+            external_id: externalId,
             date: expenseDate,
             amount,
             description: vendorName 
@@ -130,33 +127,21 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
     });
   }
   
-  // Process payments (income) with Panama timezone handling
+  // Process payments (income)
   if (Array.isArray(data.payments)) {
     data.payments.forEach((item: any, index: number) => {
-      if (item && typeof item.amount !== 'undefined' && item.customer_name) {
+      if (item && typeof item.amount !== 'undefined') {
         const amount = Number(item.amount);
         if (amount > 0) {
-          // Process date in Panama timezone
-          let paymentDate: string;
-          try {
-            if (item.date) {
-              paymentDate = formatDateYYYYMMDD_Panama(parseToPanamaTime(item.date));
-            } else {
-              paymentDate = formatDateYYYYMMDD_Panama(new Date());
-            }
-          } catch (err) {
-            console.error(`Error processing payment date:`, err);
-            paymentDate = formatDateYYYYMMDD_Panama(new Date());
-          }
-          
-          const customerName = item.customer_name;
+          const paymentDate = item.date || formatDateYYYYMMDD_Panama(new Date());
+          const customerName = item.customer_name || 'Cliente';
           const invoiceId = item.invoice_id || '';
           
-          // Create a unique ID to avoid duplication issues
-          const uniqueId = `income-${customerName.replace(/\s/g, '-')}-${paymentDate}-${invoiceId || index}-${amount}`;
+          const externalId = `income-${customerName.replace(/\s/g, '-')}-${paymentDate}-${invoiceId || index}`;
           
           result.push({
-            id: uniqueId,
+            id: externalId,
+            external_id: externalId,
             date: paymentDate,
             amount,
             description: `Ingreso de ${customerName}`,
@@ -169,20 +154,40 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
     });
   }
   
-  // Sort by date (newer first)
-  return result.sort((a, b) => parseToPanamaTime(b.date).getTime() - parseToPanamaTime(a.date).getTime());
+  console.log(`Processed ${result.length} transactions from Zoho data:`, {
+    incomes: result.filter(tx => tx.type === 'income').length,
+    expenses: result.filter(tx => tx.type === 'expense').length
+  });
+  
+  return result;
 };
 
-// Filter transactions to exclude specific vendors
+// Function to filter excluded vendors from any transaction array
 export const filterExcludedVendors = (transactions: Transaction[]): Transaction[] => {
-  return transactions.filter(tx => {
-    if (tx.type === 'expense' && tx.category === 'Pagos a colaboradores' && tx.description) {
-      // Extract vendor name from description (format: "Pago a colaborador: Vendor Name")
-      const vendorNameMatch = tx.description.match(/Pago a colaborador: (.*)/);
-      if (vendorNameMatch && excludedVendors.includes(vendorNameMatch[1])) {
-        return false;
-      }
+  if (!Array.isArray(transactions)) {
+    console.warn("filterExcludedVendors received non-array input:", transactions);
+    return [];
+  }
+  
+  const filteredTransactions = transactions.filter(transaction => {
+    // Extract vendor name from description if it exists
+    let vendorName = '';
+    
+    if (transaction.description && transaction.description.startsWith('Pago a ')) {
+      vendorName = transaction.description.substring(8); // Remove "Pago a " prefix
+    } else if (transaction.description && transaction.description.startsWith('Pago a colaborador: ')) {
+      vendorName = transaction.description.substring(20); // Remove "Pago a colaborador: " prefix
     }
+    
+    // Check if vendor is in excluded list
+    if (vendorName && excludedVendors.includes(vendorName)) {
+      console.log(`Filtering excluded vendor transaction: ${vendorName}`);
+      return false;
+    }
+    
     return true;
   });
+  
+  console.log(`Filtered ${transactions.length - filteredTransactions.length} excluded vendor transactions`);
+  return filteredTransactions;
 };

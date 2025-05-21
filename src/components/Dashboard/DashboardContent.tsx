@@ -62,6 +62,10 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   const profitPercentage = monthlyBalance?.profit_percentage !== null ? monthlyBalance?.profit_percentage || 1 : 1;
   
   console.log("DashboardContent: Using values for calculator:", { opexAmount, itbmAmount, profitPercentage });
+  console.log("DashboardContent: Transaction count:", financialData.transactions.length);
+  console.log("DashboardContent: Zoho income transactions:", 
+    financialData.transactions.filter(tx => tx.type === 'income' && tx.source === 'Zoho').length
+  );
 
   return (
     <>
@@ -110,6 +114,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
         stripeNet={stripeNet}
         stripeFeePercentage={stripeFeePercentage}
         regularIncome={regularIncome}
+        dateRange={dateRange}
+        transactions={financialData.transactions}
       />
 
       {/* Listado de transacciones */}

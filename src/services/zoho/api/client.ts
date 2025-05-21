@@ -98,7 +98,13 @@ export const fetchTransactionsFromWebhook = async (
       return returnRawResponse ? { message: "No data returned", data: null, raw_response: null } : getMockTransactions(panamaStartDate, panamaEndDate);
     }
     
-    console.log("ZohoService: Received data from Supabase function");
+    console.log("ZohoService: Received data from Supabase function", {
+      isArray: Array.isArray(data),
+      hasPayments: data.payments && Array.isArray(data.payments),
+      hasExpenses: data.expenses && Array.isArray(data.expenses),
+      hasCollaborators: data.colaboradores && Array.isArray(data.colaboradores),
+      hasCachedTransactions: data.cached_transactions && Array.isArray(data.cached_transactions)
+    });
     
     // Return raw response for debugging if requested
     if (returnRawResponse) {
@@ -107,18 +113,20 @@ export const fetchTransactionsFromWebhook = async (
     
     // If we received processed transactions directly, use those
     if (Array.isArray(data) && data.length > 0 && 'type' in data[0] && 'source' in data[0]) {
-      console.log("Received processed transactions directly from Supabase");
+      console.log(`Received ${data.length} processed transactions directly from Supabase`);
       return filterExcludedVendors(data);
     }
     
     // If we received the processed webhook response, use the cached_transactions field
     if (data.cached_transactions && Array.isArray(data.cached_transactions)) {
-      console.log("Using processed transactions from response");
+      console.log(`Using ${data.cached_transactions.length} processed transactions from response`);
       return filterExcludedVendors(data.cached_transactions);
     }
     
     // Otherwise, process the raw webhook response
-    return processRawTransactions(data);
+    const transactions = processRawTransactions(data);
+    console.log(`Processed ${transactions.length} transactions from raw webhook data`);
+    return transactions;
   } catch (err) {
     handleApiError(err, 'Failed to connect to Supabase function');
     // Fall back to mock data
