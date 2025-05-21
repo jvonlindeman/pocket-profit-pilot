@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -305,7 +306,10 @@ serve(async (req: Request) => {
     // Call the make.com webhook directly
     if (!makeWebhookUrl) {
       return new Response(
-        JSON.stringify({ error: "Make webhook URL is not configured" }),
+        JSON.stringify({ 
+          error: "Make webhook URL is not configured",
+          details: "The MAKE_WEBHOOK_URL environment variable is not set in the Supabase function configuration"
+        }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -332,7 +336,9 @@ serve(async (req: Request) => {
         JSON.stringify({ 
           error: "Failed to fetch data from make.com webhook", 
           details: errorText,
-          raw_response: errorText
+          raw_response: errorText,
+          webhook_url_configured: !!makeWebhookUrl,
+          webhook_status: webhookResponse.status
         }),
         { status: webhookResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -412,9 +418,11 @@ serve(async (req: Request) => {
           // As a fallback, return a structured response with the raw text
           return new Response(
             JSON.stringify({ 
-              raw_response: "Response data could not be parsed",
+              raw_response: responseText,
               error: "Could not parse webhook response",
-              details: "The response from make.com could not be parsed as valid JSON."
+              details: "The response from make.com could not be parsed as valid JSON.",
+              webhook_url_configured: !!makeWebhookUrl,
+              webhook_status: webhookResponse.status
             }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
@@ -425,13 +433,27 @@ serve(async (req: Request) => {
         // As a fallback, return a structured response with the raw text
         return new Response(
           JSON.stringify({ 
-            raw_response: "Error processing response",
+            raw_response: responseText,
             error: "Could not process webhook response",
-            details: fixError instanceof Error ? fixError.message : "Unknown error"
+            details: fixError instanceof Error ? fixError.message : "Unknown error",
+            webhook_url_configured: !!makeWebhookUrl,
+            webhook_status: webhookResponse.status
           }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+    }
+    
+    // Check if we have empty data
+    const hasData = (
+      (Array.isArray(webhookData.colaboradores) && webhookData.colaboradores.length > 0) ||
+      (Array.isArray(webhookData.expenses) && webhookData.expenses.length > 0) ||
+      (Array.isArray(webhookData.payments) && webhookData.payments.length > 0)
+    );
+    
+    if (!hasData) {
+      console.warn("Webhook returned empty data arrays");
+      webhookData.warning = "The webhook returned empty data arrays. This could indicate no data for the period or an issue with the Make.com scenario.";
     }
     
     // Process the data into transactions
@@ -444,6 +466,7 @@ serve(async (req: Request) => {
     
     // Process collaborator expenses - Ahora incluyendo fechas y excluyendo proveedores específicos
     if (Array.isArray(webhookData.colaboradores)) {
+      console.log(`Processing ${webhookData.colaboradores.length} collaborator records`);
       webhookData.colaboradores.forEach((item: any, index: number) => {
         if (item && typeof item.total !== 'undefined' && item.vendor_name) {
           // Excluir proveedores especificados
@@ -480,10 +503,13 @@ serve(async (req: Request) => {
           }
         }
       });
+    } else {
+      console.log("No collaborator data found in webhook response");
     }
     
     // Process regular expenses (ignoring "Impuestos" category)
     if (Array.isArray(webhookData.expenses)) {
+      console.log(`Processing ${webhookData.expenses.length} expense records`);
       webhookData.expenses.forEach((item: any, index: number) => {
         if (item && typeof item.total !== 'undefined' && item.account_name !== "Impuestos") {
           const amount = Number(item.total);
@@ -517,16 +543,19 @@ serve(async (req: Request) => {
           }
         }
       });
+    } else {
+      console.log("No expense data found in webhook response");
     }
     
     // Process payments (income)
     if (Array.isArray(webhookData.payments)) {
+      console.log(`Processing ${webhookData.payments.length} payment records`);
       webhookData.payments.forEach((item: any, index: number) => {
-        if (item && typeof item.amount !== 'undefined' && item.customer_name) {
+        if (item && typeof item.amount !== 'undefined') {
           const amount = Number(item.amount);
           if (amount > 0) {
             const paymentDate = item.date || new Date().toISOString().split('T')[0];
-            const customerName = item.customer_name;
+            const customerName = item.customer_name || 'Cliente';
             const invoiceId = item.invoice_id || '';
             
             const incomeTransaction = {
@@ -552,14 +581,17 @@ serve(async (req: Request) => {
           }
         }
       });
+    } else {
+      console.log("No payment data found in webhook response");
     }
     
-    console.log(`Processed ${transactions.length} transactions`);
+    console.log(`Processed ${transactions.length} transactions from webhook data`);
     
     // Store the transactions in cache directly from the edge function
+    let cacheResult = false;
     if (transactions.length > 0) {
       console.log(`Storing ${transactions.length} transactions in cache`);
-      const cacheResult = await storeTransactionsInCache(transactions, 'Zoho', startDate, endDate);
+      cacheResult = await storeTransactionsInCache(transactions, 'Zoho', startDate, endDate);
       console.log(`Transaction caching result: ${cacheResult ? 'Success' : 'Failed'}`);
     }
     
@@ -567,6 +599,10 @@ serve(async (req: Request) => {
     const responseData = {
       ...webhookData,
       cached_transactions: transactions,
+      cache_result: cacheResult,
+      transaction_count: transactions.length,
+      income_count: transactions.filter(tx => tx.type === 'income').length,
+      expense_count: transactions.filter(tx => tx.type === 'expense').length
     };
     
     console.log("Successfully fetched and processed data");
@@ -580,7 +616,8 @@ serve(async (req: Request) => {
     return new Response(
       JSON.stringify({ 
         error: "Internal server error", 
-        details: err instanceof Error ? err.message : "Unknown error" 
+        details: err instanceof Error ? err.message : "Unknown error",
+        webhook_url_configured: !!makeWebhookUrl
       }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

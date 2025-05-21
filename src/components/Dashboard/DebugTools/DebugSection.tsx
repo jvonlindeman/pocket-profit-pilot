@@ -23,17 +23,17 @@ const DebugSection: React.FC<DebugSectionProps> = ({
         Herramientas de depuración
       </h2>
       
-      {/* Nuevo componente de depuración de Stripe */}
-      <StripeDebug 
-        dateRange={dateRange} 
-        refreshDataFunction={refreshData}
-      />
-      
-      {/* Componente de depuración de Webhook Zoho */}
+      {/* Componente de depuración de Webhook Zoho - Passing rawResponse */}
       <WebhookDebug 
         dateRange={dateRange} 
         refreshDataFunction={refreshData}
         rawResponse={rawResponse}
+      />
+      
+      {/* Nuevo componente de depuración de Stripe */}
+      <StripeDebug 
+        dateRange={dateRange} 
+        refreshDataFunction={refreshData}
       />
       
       {/* Componente de depuración de solicitud al webhook */}

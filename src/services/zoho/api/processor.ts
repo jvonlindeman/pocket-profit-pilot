@@ -41,6 +41,56 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
     }
   }
   
+  // Log array details if available for debugging
+  if (Array.isArray(data.colaboradores)) {
+    console.log(`Processing ${data.colaboradores.length} collaborator records`);
+  } else {
+    console.log("No collaborator records found in data");
+  }
+  
+  if (Array.isArray(data.expenses)) {
+    console.log(`Processing ${data.expenses.length} expense records`);
+  } else {
+    console.log("No expense records found in data");
+  }
+  
+  if (Array.isArray(data.payments)) {
+    console.log(`Processing ${data.payments.length} payment records`);
+  } else {
+    console.log("No payment records found in data");
+  }
+  
+  if (Array.isArray(data.cached_transactions)) {
+    console.log(`Using ${data.cached_transactions.length} pre-processed cached transactions`);
+    
+    // If we have cached transactions, use them directly
+    return data.cached_transactions.filter(tx => {
+      // Basic data validation
+      if (!tx || !tx.type || !tx.source) {
+        console.log("Filtering invalid transaction:", tx);
+        return false;
+      }
+      
+      // Additional vendor filtering for expenses
+      if (tx.type === 'expense' && tx.description) {
+        let vendorName = '';
+        
+        if (tx.description.startsWith('Pago a ')) {
+          vendorName = tx.description.substring(8); // Remove "Pago a " prefix
+        } else if (tx.description.startsWith('Pago a colaborador: ')) {
+          vendorName = tx.description.substring(20); // Remove "Pago a colaborador: " prefix
+        }
+        
+        if (vendorName && excludedVendors.includes(vendorName)) {
+          console.log(`Filtering excluded vendor transaction: ${vendorName}`);
+          return false;
+        }
+      }
+      
+      return true;
+    });
+  }
+  
   // Process collaborator expenses with Panama timezone handling
   if (Array.isArray(data.colaboradores)) {
     data.colaboradores.forEach((item: any, index: number) => {
@@ -127,31 +177,67 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
     });
   }
   
-  // Process payments (income)
+  // Process payments (income) - Extra logging and validation
   if (Array.isArray(data.payments)) {
+    console.log(`Processing ${data.payments.length} payment/income records`);
+    let validCount = 0;
+    let invalidCount = 0;
+    
     data.payments.forEach((item: any, index: number) => {
-      if (item && typeof item.amount !== 'undefined') {
-        const amount = Number(item.amount);
-        if (amount > 0) {
-          const paymentDate = item.date || formatDateYYYYMMDD_Panama(new Date());
-          const customerName = item.customer_name || 'Cliente';
-          const invoiceId = item.invoice_id || '';
+      // Detailed logging for payment data
+      console.log(`Payment item ${index}:`, JSON.stringify(item));
+      
+      if (item) {
+        // Validate the amount field with detailed logging
+        if (typeof item.amount !== 'undefined') {
+          console.log(`Payment ${index} has amount:`, item.amount, typeof item.amount);
           
-          const externalId = `income-${customerName.replace(/\s/g, '-')}-${paymentDate}-${invoiceId || index}`;
+          // Ensure it's a number by explicitly parsing
+          let amount: number;
+          if (typeof item.amount === 'string') {
+            amount = parseFloat(item.amount.replace(/,/g, ''));
+            console.log(`Parsed string amount to number:`, amount);
+          } else {
+            amount = Number(item.amount);
+          }
           
-          result.push({
-            id: externalId,
-            external_id: externalId,
-            date: paymentDate,
-            amount,
-            description: `Ingreso de ${customerName}`,
-            category: 'Ingresos',
-            source: 'Zoho',
-            type: 'income'
-          });
+          if (!isNaN(amount) && amount > 0) {
+            const paymentDate = item.date || formatDateYYYYMMDD_Panama(new Date());
+            const customerName = item.customer_name || 'Cliente';
+            const invoiceId = item.invoice_id || '';
+            
+            console.log(`Creating income transaction for ${customerName}, amount: ${amount}, date: ${paymentDate}`);
+            
+            const externalId = `income-${customerName.replace(/\s/g, '-')}-${paymentDate}-${invoiceId || index}`;
+            
+            result.push({
+              id: externalId,
+              external_id: externalId,
+              date: paymentDate,
+              amount,
+              description: `Ingreso de ${customerName}`,
+              category: 'Ingresos',
+              source: 'Zoho',
+              type: 'income'
+            });
+            validCount++;
+          } else {
+            console.log(`Payment ${index} has invalid or non-positive amount:`, amount);
+            invalidCount++;
+          }
+        } else {
+          console.log(`Payment ${index} missing amount field`);
+          invalidCount++;
         }
+      } else {
+        console.log(`Payment ${index} is null or undefined`);
+        invalidCount++;
       }
     });
+    
+    console.log(`Payment processing completed: ${validCount} valid, ${invalidCount} invalid`);
+  } else {
+    console.log("No payments array found in data");
   }
   
   console.log(`Processed ${result.length} transactions from Zoho data:`, {
