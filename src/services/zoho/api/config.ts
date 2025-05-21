@@ -4,5 +4,7 @@ export const excludedVendors = [
   "Johan von Lindeman", 
   "DFC Panama", 
   "Bottom Consulting",
-  "Mr. Analytics LLC"
+  "Mr. Analytics LLC",
+  "Data Research Group",
+  "Analytics Partners Inc"
 ];

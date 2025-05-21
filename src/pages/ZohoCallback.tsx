@@ -23,17 +23,25 @@ const ZohoCallback = () => {
       }
       
       try {
-        // Use the provided refresh token directly
-        const refreshToken = '1000.eb48f34e6d317f6fc913c79bdbc5f7fd.4b86095542b7e1303a3e4ec62b083e1b';
+        // Exchange the code for a token through our edge function
+        const { data, error: exchangeError } = await supabase.functions.invoke("zoho-tokens", {
+          body: { 
+            action: "exchange-code", 
+            code: code 
+          }
+        });
         
-        // Store the refresh token and proceed to configure Zoho
+        if (exchangeError || !data || !data.refresh_token) {
+          throw new Error(exchangeError?.message || 'Failed to exchange authorization code for refresh token');
+        }
+        
         toast({
           title: 'Zoho OAuth Successful',
           description: 'Refresh token received. Please complete the configuration.',
         });
         
-        // Navigate to settings page
-        navigate('/settings?refreshToken=' + encodeURIComponent(refreshToken));
+        // Navigate to settings page with the newly received refresh token
+        navigate('/settings?refreshToken=' + encodeURIComponent(data.refresh_token));
       } catch (err: any) {
         console.error('Error in OAuth callback:', err);
         setError(err.message || 'An error occurred during OAuth process');

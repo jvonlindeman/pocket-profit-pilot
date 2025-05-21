@@ -2,9 +2,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// CORS headers for browser requests
+// CORS headers with restricted origin
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") || "*", // Preferably set to specific origin
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -13,8 +13,12 @@ const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as stri
 
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-// The make.com webhook URL
-const makeWebhookUrl = "https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihlmx22";
+// Get make.com webhook URL from environment variable
+const makeWebhookUrl = Deno.env.get("MAKE_WEBHOOK_URL") as string;
+
+if (!makeWebhookUrl) {
+  console.error("MAKE_WEBHOOK_URL environment variable is not set");
+}
 
 interface ZohoConfigRequest {
   clientId: string;
@@ -125,8 +129,17 @@ serve(async (req: Request) => {
         }
       }
 
+      // Make sure webhook URL is available
+      if (!makeWebhookUrl) {
+        console.error("Make webhook URL is not configured");
+        return new Response(
+          JSON.stringify({ error: "Integration service is not properly configured" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       // Call make.com webhook to validate the configuration
-      console.log("Calling make.com webhook to validate Zoho configuration:", makeWebhookUrl);
+      console.log("Calling service to validate Zoho configuration");
       const webhookResponse = await fetch(makeWebhookUrl, {
         method: "POST",
         headers: {
@@ -141,11 +154,11 @@ serve(async (req: Request) => {
         })
       });
       
-      console.log(`make.com webhook validation response status: ${webhookResponse.status}`);
+      console.log(`Validation service response status: ${webhookResponse.status}`);
       
       if (!webhookResponse.ok) {
         const errorText = await webhookResponse.text();
-        console.error("Zoho configuration validation failed via make.com:", errorText);
+        console.error("Zoho configuration validation failed:", errorText);
         
         return new Response(
           JSON.stringify({ 
@@ -160,10 +173,10 @@ serve(async (req: Request) => {
       let validationData;
       try {
         const responseText = await webhookResponse.text();
-        console.log(`make.com webhook validation response: ${responseText}`);
+        console.log("Validation response received");
         validationData = JSON.parse(responseText);
       } catch (e) {
-        console.error("Failed to parse make.com webhook validation response:", e);
+        console.error("Failed to parse validation response:", e);
         return new Response(
           JSON.stringify({ error: "Failed to parse validation response" }),
           { 
@@ -251,7 +264,7 @@ serve(async (req: Request) => {
         return new Response(
           JSON.stringify({ 
             success: true, 
-            message: "Zoho configuration saved and verified successfully via make.com",
+            message: "Zoho configuration saved and verified successfully",
             id: data[0].id
           }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }

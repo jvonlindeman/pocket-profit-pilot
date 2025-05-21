@@ -1,4 +1,3 @@
-
 import { Transaction } from "../../../types/financial";
 import { handleApiError } from "../utils";
 import { getMockTransactions } from "../mockData";
