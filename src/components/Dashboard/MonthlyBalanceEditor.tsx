@@ -20,7 +20,9 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
   const { 
     loading, 
     monthlyBalance, 
-    fetchMonthlyBalance 
+    fetchMonthlyBalance,
+    updateMonthlyBalance,
+    error
   } = useMonthlyBalance({ currentDate });
 
   // Ensure we have the latest balance when currentDate changes

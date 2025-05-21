@@ -41,16 +41,20 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     setError(null);
 
     try {
+      console.log("Fetching monthly balance for:", currentMonthYear);
+      
       const { data, error } = await supabase
         .from('monthly_balances')
         .select('*')
         .eq('month_year', currentMonthYear)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
+      if (error) {
+        console.error("Error fetching monthly balance:", error);
         throw error;
       }
 
+      console.log("Monthly balance data received:", data);
       setMonthlyBalance(data || null);
       return data || null;
     } catch (err: any) {
@@ -95,6 +99,11 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     setError(null);
 
     try {
+      console.log("Updating monthly balance with values:", {
+        balance, opexAmount, itbmAmount, profitPercentage, notes,
+        currentMonthYear
+      });
+      
       const updateData: any = {
         balance,
         opex_amount: opexAmount,
@@ -104,7 +113,10 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       };
       
       // Check if we're updating or inserting
-      if (monthlyBalance) {
+      const existsResult = await checkBalanceExists();
+      console.log("Balance exists check:", existsResult);
+      
+      if (existsResult) {
         // Update existing record
         const { data, error } = await supabase
           .from('monthly_balances')
@@ -112,7 +124,12 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
           .eq('month_year', currentMonthYear)
           .select();
 
-        if (error) throw error;
+        if (error) {
+          console.error("Error updating monthly balance:", error);
+          throw error;
+        }
+        
+        console.log("Monthly balance updated:", data);
         setMonthlyBalance(data[0] || null);
         
         toast({
@@ -129,7 +146,12 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
           })
           .select();
 
-        if (error) throw error;
+        if (error) {
+          console.error("Error creating monthly balance:", error);
+          throw error;
+        }
+        
+        console.log("New monthly balance created:", data);
         setMonthlyBalance(data[0] || null);
         
         toast({

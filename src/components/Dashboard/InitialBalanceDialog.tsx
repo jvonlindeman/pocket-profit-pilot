@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { es } from 'date-fns/locale';
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/hooks/use-toast";
 
 interface InitialBalanceDialogProps {
   open: boolean;
@@ -44,30 +45,46 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
   
   // Update form values when the dialog opens or currentBalance changes
   useEffect(() => {
-    if (currentBalance) {
-      setBalance(currentBalance.balance.toString());
-      setOpexAmount(currentBalance.opex_amount !== undefined ? currentBalance.opex_amount.toString() : "35");
-      setItbmAmount(currentBalance.itbm_amount !== undefined ? currentBalance.itbm_amount.toString() : "0");
-      setProfitPercentage(currentBalance.profit_percentage !== undefined ? currentBalance.profit_percentage.toString() : "1");
-      setNotes(currentBalance.notes || "");
-    } else {
-      // Reset to defaults if no current balance
-      setBalance("");
-      setOpexAmount("35");
-      setItbmAmount("0");
-      setProfitPercentage("1");
-      setNotes("");
+    if (open) {
+      console.log("Dialog opened, current balance:", currentBalance);
+      
+      if (currentBalance) {
+        setBalance(currentBalance.balance.toString());
+        setOpexAmount(currentBalance.opex_amount !== undefined ? currentBalance.opex_amount.toString() : "35");
+        setItbmAmount(currentBalance.itbm_amount !== undefined ? currentBalance.itbm_amount.toString() : "0");
+        setProfitPercentage(currentBalance.profit_percentage !== undefined ? currentBalance.profit_percentage.toString() : "1");
+        setNotes(currentBalance.notes || "");
+      } else {
+        // Reset to defaults if no current balance
+        setBalance("");
+        setOpexAmount("35");
+        setItbmAmount("0");
+        setProfitPercentage("1");
+        setNotes("");
+      }
     }
   }, [currentBalance, open]);
 
   const handleSave = () => {
+    console.log("Attempting to save with values:", {
+      balance,
+      opexAmount,
+      itbmAmount,
+      profitPercentage,
+      notes
+    });
+    
     const numericBalance = parseFloat(balance);
     const numericOpexAmount = parseFloat(opexAmount || "35");
     const numericItbmAmount = parseFloat(itbmAmount || "0");
     const numericProfitPercentage = parseFloat(profitPercentage || "1");
     
     if (isNaN(numericBalance)) {
-      alert("Por favor ingrese un valor numérico válido para el balance");
+      toast({
+        title: "Error",
+        description: "Por favor ingrese un valor numérico válido para el balance",
+        variant: "destructive"
+      });
       return;
     }
     
@@ -78,6 +95,8 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
       numericProfitPercentage,
       notes || undefined
     );
+    
+    onOpenChange(false);
   };
 
   // Format month name in Spanish
