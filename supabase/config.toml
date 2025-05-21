@@ -2,7 +2,7 @@
 # rstexocnpvtxfhqbnetn
 [[functions]]
 name = "zoho-config"
-verify_jwt = false
+verify_jwt = true
 
 [[functions]]
 name = "zoho-tokens"
@@ -26,4 +26,4 @@ verify_jwt = true
 
 [[functions]]
 name = "exchange-rates"
-verify_jwt = false
+verify_jwt = true

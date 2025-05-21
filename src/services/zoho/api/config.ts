@@ -1,10 +1,11 @@
 
 // List of vendors that should be excluded - this prevents exposure of internal company data
+// Names are anonymized for security
 export const excludedVendors = [
-  "Anonymous Vendor 1", 
-  "Anonymous Vendor 2", 
-  "Anonymous Vendor 3",
-  "Anonymous Vendor 4",
-  "Anonymous Vendor 5",
-  "Anonymous Vendor 6"
+  "Private Vendor 1", 
+  "Private Vendor 2", 
+  "Private Vendor 3",
+  "Private Vendor 4",
+  "Private Vendor 5",
+  "Private Vendor 6"
 ];

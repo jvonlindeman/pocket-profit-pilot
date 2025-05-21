@@ -31,8 +31,8 @@ const ZohoCallback = () => {
           }
         });
         
-        if (exchangeError || !data || !data.refresh_token) {
-          throw new Error(exchangeError?.message || 'Failed to exchange authorization code for refresh token');
+        if (exchangeError || !data || !data.success) {
+          throw new Error(exchangeError?.message || 'Failed to exchange authorization code');
         }
         
         toast({
@@ -40,19 +40,8 @@ const ZohoCallback = () => {
           description: 'Configuration successful. Please wait while we complete the setup.',
         });
         
-        // Store the refresh token directly via another edge function call
-        const { error: configError } = await supabase.functions.invoke("zoho-config", {
-          body: {
-            refreshToken: data.refresh_token,
-            // Include any other required fields for configuration
-            organizationId: data.organization_id || '',
-            clientId: searchParams.get('state') || '' // Using state parameter for clientId if needed
-          }
-        });
-        
-        if (configError) {
-          throw new Error(configError.message || 'Failed to save configuration');
-        }
+        // Configuration is handled securely on the server side
+        // No sensitive tokens are exposed to the frontend or in URLs
         
         // Navigate to settings page without sensitive data in URL
         navigate('/settings?setup=complete');
