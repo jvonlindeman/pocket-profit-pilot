@@ -37,11 +37,25 @@ const ZohoCallback = () => {
         
         toast({
           title: 'Zoho OAuth Successful',
-          description: 'Refresh token received. Please complete the configuration.',
+          description: 'Configuration successful. Please wait while we complete the setup.',
         });
         
-        // Navigate to settings page with the newly received refresh token
-        navigate('/settings?refreshToken=' + encodeURIComponent(data.refresh_token));
+        // Store the refresh token directly via another edge function call
+        const { error: configError } = await supabase.functions.invoke("zoho-config", {
+          body: {
+            refreshToken: data.refresh_token,
+            // Include any other required fields for configuration
+            organizationId: data.organization_id || '',
+            clientId: searchParams.get('state') || '' // Using state parameter for clientId if needed
+          }
+        });
+        
+        if (configError) {
+          throw new Error(configError.message || 'Failed to save configuration');
+        }
+        
+        // Navigate to settings page without sensitive data in URL
+        navigate('/settings?setup=complete');
       } catch (err: any) {
         console.error('Error in OAuth callback:', err);
         setError(err.message || 'An error occurred during OAuth process');

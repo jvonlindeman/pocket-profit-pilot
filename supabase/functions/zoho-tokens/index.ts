@@ -33,9 +33,25 @@ serve(async (req: Request) => {
     if (req.method === "POST") {
       const requestBody = await req.json();
       
+      // Input validation
+      if (!requestBody || typeof requestBody !== 'object') {
+        return new Response(
+          JSON.stringify({ error: "Invalid request format" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
       // Handle code exchange action
       if (requestBody.action === "exchange-code" && requestBody.code) {
         console.log("Exchanging authorization code for tokens");
+        
+        // Validate code parameter
+        if (typeof requestBody.code !== 'string' || requestBody.code.length < 5) {
+          return new Response(
+            JSON.stringify({ error: "Invalid authorization code format" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
         
         try {
           // Get the client configuration from database
@@ -83,7 +99,7 @@ serve(async (req: Request) => {
           
           // Return the refresh token to the client
           return new Response(
-            JSON.stringify({ refresh_token: tokenData.refresh_token }),
+            JSON.stringify({ refresh_token: tokenData.refresh_token, organization_id: tokenData.organization_id }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         } catch (err) {
@@ -94,6 +110,12 @@ serve(async (req: Request) => {
           );
         }
       }
+
+      // Invalid action
+      return new Response(
+        JSON.stringify({ error: "Invalid action specified" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
     
     // Get the current integration record

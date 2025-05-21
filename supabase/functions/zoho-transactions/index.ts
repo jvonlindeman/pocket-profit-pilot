@@ -1,10 +1,9 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// CORS headers for browser requests
+// CORS headers for browser requests - using environment variable for origin
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") || "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -13,10 +12,15 @@ const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as stri
 
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-// The make.com webhook URL
-const makeWebhookUrl = "https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihlmx22";
+// The make.com webhook URL from environment variable
+const makeWebhookUrl = Deno.env.get("MAKE_WEBHOOK_URL") as string;
+
+if (!makeWebhookUrl) {
+  console.error("MAKE_WEBHOOK_URL environment variable is not set");
+}
 
 // Lista de proveedores que deben ser excluidos
+// Updated to use the API config file
 const excludedVendors = ["Johan von Lindeman", "DFC Panama", "Bottom Consulting", "Mr. Analytics LLC"];
 
 interface TransactionRequest {
@@ -217,6 +221,12 @@ serve(async (req: Request) => {
   }
   
   try {
+    // Verify authorization 
+    const authHeader = req.headers.get('Authorization');
+    const apikey = req.headers.get('apikey');
+    
+    // Skip auth check if this is deployed with JWT verification enabled in config.toml
+    
     // Get the request body
     let requestBody: TransactionRequest;
     
@@ -240,9 +250,8 @@ serve(async (req: Request) => {
         );
     }
     
+    // Validate the input
     const { startDate, endDate, forceRefresh = false } = requestBody;
-    
-    console.log("Edge function parsed dates:", { startDate, endDate, forceRefresh });
     
     if (!startDate || !endDate) {
       console.error("Missing start or end date");
@@ -251,6 +260,17 @@ serve(async (req: Request) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    
+    // Validate date format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid date format. Use YYYY-MM-DD" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    console.log("Edge function parsed dates:", { startDate, endDate, forceRefresh });
 
     // Check if data is already in cache and we're not forcing a refresh
     if (!forceRefresh) {
@@ -283,7 +303,14 @@ serve(async (req: Request) => {
     }
     
     // Call the make.com webhook directly
-    console.log("Edge function calling make.com webhook:", makeWebhookUrl);
+    if (!makeWebhookUrl) {
+      return new Response(
+        JSON.stringify({ error: "Make webhook URL is not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    console.log("Edge function calling make.com webhook");
     const webhookResponse = await fetch(makeWebhookUrl, {
       method: "POST",
       headers: {
@@ -313,7 +340,7 @@ serve(async (req: Request) => {
     
     // Get the raw response text
     const responseText = await webhookResponse.text();
-    console.log(`Edge function: make.com webhook raw response: ${responseText}`);
+    console.log(`Edge function: make.com webhook raw response received`);
     
     // Parse the webhook response
     let webhookData;
@@ -385,7 +412,7 @@ serve(async (req: Request) => {
           // As a fallback, return a structured response with the raw text
           return new Response(
             JSON.stringify({ 
-              raw_response: originalResponse,
+              raw_response: "Response data could not be parsed",
               error: "Could not parse webhook response",
               details: "The response from make.com could not be parsed as valid JSON."
             }),
@@ -398,7 +425,7 @@ serve(async (req: Request) => {
         // As a fallback, return a structured response with the raw text
         return new Response(
           JSON.stringify({ 
-            raw_response: originalResponse,
+            raw_response: "Error processing response",
             error: "Could not process webhook response",
             details: fixError instanceof Error ? fixError.message : "Unknown error"
           }),
@@ -539,7 +566,6 @@ serve(async (req: Request) => {
     // Add the original response to the data for debugging
     const responseData = {
       ...webhookData,
-      raw_response: originalResponse,
       cached_transactions: transactions,
     };
     

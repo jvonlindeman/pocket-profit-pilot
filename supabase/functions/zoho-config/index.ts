@@ -35,7 +35,7 @@ serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Handle GET request to fetch current config
+  // Handle GET request to fetch current config (sanitized)
   if (req.method === "GET") {
     try {
       console.log("Processing GET request to fetch Zoho configuration");
@@ -69,7 +69,7 @@ serve(async (req: Request) => {
     } catch (err) {
       console.error("Error in zoho-config GET:", err);
       return new Response(
-        JSON.stringify({ error: "Internal server error", details: err.message }),
+        JSON.stringify({ error: "Internal server error", details: err instanceof Error ? err.message : "Unknown error" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -101,29 +101,43 @@ serve(async (req: Request) => {
       
       const { clientId, clientSecret, refreshToken, organizationId } = body;
 
-      if (!clientId || !refreshToken || !organizationId) {
-        console.error("Missing required fields in request body");
+      // Input validation
+      if (!refreshToken) {
+        console.error("Missing required refreshToken in request body");
         return new Response(
-          JSON.stringify({ error: "Client ID, Refresh Token, and Organization ID are required" }),
+          JSON.stringify({ error: "Refresh Token is required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      // Additional validation for refreshToken format
+      if (typeof refreshToken !== 'string' || refreshToken.length < 10) {
+        return new Response(
+          JSON.stringify({ error: "Invalid refresh token format" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // First check if we're just updating and need to get the existing client secret
+      // First check if we're just updating and need to get existing data
+      let finalClientId = clientId;
       let finalClientSecret = clientSecret;
-      if (!clientSecret) {
-        console.log("No client secret provided, checking if we're updating an existing configuration");
+      let finalOrganizationId = organizationId;
+      
+      if (!clientId || !organizationId || !clientSecret) {
+        console.log("Missing some fields, checking if we're updating an existing configuration");
         const { data: existingConfig } = await supabase
           .from("zoho_integration")
-          .select("client_secret")
+          .select("client_id, client_secret, organization_id")
           .limit(1);
           
         if (existingConfig && existingConfig.length > 0) {
-          finalClientSecret = existingConfig[0].client_secret;
-          console.log("Using existing client secret");
-        } else {
+          finalClientId = clientId || existingConfig[0].client_id;
+          finalClientSecret = clientSecret || existingConfig[0].client_secret;
+          finalOrganizationId = organizationId || existingConfig[0].organization_id;
+          console.log("Using existing configuration values for missing fields");
+        } else if (!clientId || !clientSecret || !organizationId) {
           return new Response(
-            JSON.stringify({ error: "Client Secret is required for initial configuration" }),
+            JSON.stringify({ error: "Missing required fields for initial configuration" }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
@@ -147,17 +161,23 @@ serve(async (req: Request) => {
         },
         body: JSON.stringify({
           action: "validateConfig",
-          clientId: clientId,
+          clientId: finalClientId,
           clientSecret: finalClientSecret,
           refreshToken: refreshToken,
-          organizationId: organizationId
+          organizationId: finalOrganizationId
         })
       });
       
       console.log(`Validation service response status: ${webhookResponse.status}`);
       
       if (!webhookResponse.ok) {
-        const errorText = await webhookResponse.text();
+        let errorText = "Unknown error";
+        try {
+          errorText = await webhookResponse.text();
+        } catch (e) {
+          console.error("Error getting webhook response text:", e);
+        }
+        
         console.error("Zoho configuration validation failed:", errorText);
         
         return new Response(
@@ -215,19 +235,17 @@ serve(async (req: Request) => {
         if (existingConfig && existingConfig.length > 0) {
           // Update existing configuration
           console.log("Updating existing Zoho configuration");
-          const updateData = {
-            client_id: clientId,
+          const updateData: Record<string, any> = {
             refresh_token: refreshToken,
-            organization_id: organizationId,
             access_token: validationData.access_token,
             token_expires_at: expiryDate.toISOString(),
             updated_at: new Date().toISOString()
           };
           
-          // Only update client_secret if a new one was provided
-          if (clientSecret) {
-            updateData.client_secret = clientSecret;
-          }
+          // Only add these fields if they're provided
+          if (finalClientId) updateData.client_id = finalClientId;
+          if (finalClientSecret) updateData.client_secret = finalClientSecret;
+          if (finalOrganizationId) updateData.organization_id = finalOrganizationId;
           
           result = await supabase
             .from("zoho_integration")
@@ -240,10 +258,10 @@ serve(async (req: Request) => {
           result = await supabase
             .from("zoho_integration")
             .insert({
-              client_id: clientId,
+              client_id: finalClientId,
               client_secret: finalClientSecret,
               refresh_token: refreshToken,
-              organization_id: organizationId,
+              organization_id: finalOrganizationId,
               access_token: validationData.access_token,
               token_expires_at: expiryDate.toISOString()
             })
@@ -272,14 +290,14 @@ serve(async (req: Request) => {
       } catch (dbError) {
         console.error("Database error:", dbError);
         return new Response(
-          JSON.stringify({ error: "Database error", details: dbError.message }),
+          JSON.stringify({ error: "Database error", details: dbError instanceof Error ? dbError.message : "Unknown error" }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
     } catch (err) {
       console.error("Error in zoho-config POST:", err);
       return new Response(
-        JSON.stringify({ error: "Internal server error", details: err.message }),
+        JSON.stringify({ error: "Internal server error", details: err instanceof Error ? err.message : "Unknown error" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

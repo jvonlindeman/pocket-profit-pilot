@@ -10,16 +10,20 @@ verify_jwt = false
 
 [[functions]]
 name = "zoho-transactions"
-verify_jwt = false
+verify_jwt = true
 
 [[functions]]
 name = "stripe-balance"
-verify_jwt = false
+verify_jwt = true
 
 [[functions]]
 name = "cache-manager"
-verify_jwt = false
+verify_jwt = true
 
 [[functions]]
 name = "financial-assistant"
+verify_jwt = true
+
+[[functions]]
+name = "exchange-rates"
 verify_jwt = false
