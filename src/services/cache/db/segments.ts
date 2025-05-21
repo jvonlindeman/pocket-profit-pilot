@@ -1,6 +1,6 @@
 
 import { CacheDbClient } from "./client";
-import { CacheSegmentInfo, CacheSource } from "../types";
+import { CacheSource, CacheSegmentInfo } from "../types";
 
 /**
  * SegmentRepository handles all segment-specific database operations

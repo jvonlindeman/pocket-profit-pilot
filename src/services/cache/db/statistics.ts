@@ -26,20 +26,20 @@ export class StatsRepository extends CacheDbClient {
       if (zohoError || stripeError) {
         this.logError("Error getting transaction stats", zohoError || stripeError);
         return { 
-          transactions: [], 
-          segments: [], 
-          recentMetrics: [], 
-          hitRate: 'N/A', 
-          hits: 0, 
-          misses: 0, 
+          totalTransactions: 0, 
+          transactionsBySource: {}, 
+          monthlyCache: {}, 
+          segments: {}, 
+          transactionsByMonth: {},
+          sourcesStats: [],
           lastUpdated: new Date().toISOString() 
         };
       }
       
       // Format transaction counts
       const transactions: CacheSourceStats[] = [
-        { source: 'Zoho', count: zohoCount || 0 },
-        { source: 'Stripe', count: stripeCount || 0 }
+        { source: 'Zoho', count: zohoCount || 0, monthlyData: [], segments: [] },
+        { source: 'Stripe', count: stripeCount || 0, monthlyData: [], segments: [] }
       ];
       
       // Get count of monthly cache entries for Zoho
@@ -57,20 +57,20 @@ export class StatsRepository extends CacheDbClient {
       if (zohoMonthlyError || stripeMonthlyError) {
         this.logError("Error getting monthly cache stats", zohoMonthlyError || stripeMonthlyError);
         return { 
-          transactions, 
-          segments: [], 
-          recentMetrics: [], 
-          hitRate: 'N/A', 
-          hits: 0, 
-          misses: 0, 
+          totalTransactions: 0, 
+          transactionsBySource: {}, 
+          monthlyCache: {}, 
+          segments: {}, 
+          transactionsByMonth: {},
+          sourcesStats: [],
           lastUpdated: new Date().toISOString() 
         };
       }
       
       // Format monthly cache counts
       const segments: CacheSourceStats[] = [
-        { source: 'Zoho', count: zohoMonthlyData?.length || 0 },
-        { source: 'Stripe', count: stripeMonthlyData?.length || 0 }
+        { source: 'Zoho', count: zohoMonthlyData?.length || 0, monthlyData: [], segments: [] },
+        { source: 'Stripe', count: stripeMonthlyData?.length || 0, monthlyData: [], segments: [] }
       ];
       
       // Get recent cache metrics
@@ -108,24 +108,37 @@ export class StatsRepository extends CacheDbClient {
       
       const hitRate = hits + misses > 0 ? (hits / (hits + misses) * 100).toFixed(1) + '%' : 'N/A';
       
+      // Convert sourcesStats array to record format for the DetailedCacheStats interface
+      const monthlyBySource: Record<string, any[]> = {};
+      const segmentsBySource: Record<string, any[]> = {};
+      
+      // Initialize with empty arrays
+      monthlyBySource['Zoho'] = zohoMonthlyData || [];
+      monthlyBySource['Stripe'] = stripeMonthlyData || [];
+      segmentsBySource['Zoho'] = [];
+      segmentsBySource['Stripe'] = [];
+      
       return {
-        transactions,
-        segments,
-        recentMetrics: metrics || [],
-        hitRate,
-        hits,
-        misses,
+        totalTransactions: (zohoCount || 0) + (stripeCount || 0),
+        transactionsBySource: {
+          'Zoho': zohoCount || 0,
+          'Stripe': stripeCount || 0
+        },
+        monthlyCache: monthlyBySource,
+        segments: segmentsBySource,
+        transactionsByMonth: {},
+        sourcesStats: transactions,
         lastUpdated: new Date().toISOString()
       };
     } catch (err) {
       this.logError("Exception getting cache stats", err);
       return {
-        transactions: [],
-        segments: [],
-        recentMetrics: [],
-        hitRate: 'N/A',
-        hits: 0,
-        misses: 0,
+        totalTransactions: 0,
+        transactionsBySource: {},
+        monthlyCache: {},
+        segments: {},
+        transactionsByMonth: {},
+        sourcesStats: [],
         lastUpdated: new Date().toISOString()
       };
     }

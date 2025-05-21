@@ -4,7 +4,7 @@ import { cacheOperations } from "./operations";
 import { cacheMetrics } from "./metrics";
 import { cacheStorage } from "./storage";
 import { supabase } from "../../integrations/supabase/client";
-import type { CacheResponse, CacheResult, CacheStats, DetailedCacheStats, CacheClearOptions, CacheSource } from "./types";
+import type { CacheResponse, CacheResult, DetailedCacheStats, CacheClearOptions, CacheSource, CacheStats } from "./types";
 
 /**
  * CacheService provides a unified API for working with the transaction cache
@@ -159,4 +159,4 @@ const CacheService = {
 
 export default CacheService;
 // Use export type for types to fix the isolatedModules issue
-export type { CacheClearOptions, CacheResponse, CacheResult, CacheStats, DetailedCacheStats, CacheSource };
+export type { CacheClearOptions, CacheResponse, CacheResult, DetailedCacheStats, CacheSource, CacheStats };

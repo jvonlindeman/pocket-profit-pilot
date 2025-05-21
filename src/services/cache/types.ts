@@ -1,3 +1,4 @@
+
 import { Json } from "../../integrations/supabase/types";
 import { Transaction } from "../../types/financial";
 
@@ -80,4 +81,25 @@ export interface CacheIntegrityResult {
   isConsistent: boolean;
   segmentCount: number;
   transactionCount: number;
+}
+
+/**
+ * Cache segment information
+ */
+export interface CacheSegmentInfo {
+  id: string;
+  transaction_count: number;
+}
+
+/**
+ * Cache statistics
+ */
+export interface CacheStats {
+  transactionCount?: number;
+  segments?: Array<{ source: string; count: number; total: number }>;
+  recentMetrics?: any[];
+  hitRate?: string;
+  hits?: number;
+  misses?: number;
+  lastUpdated: string;
 }
