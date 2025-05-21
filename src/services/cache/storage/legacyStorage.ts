@@ -96,24 +96,31 @@ export const legacyStorage = {
           source,
           segment_id: segmentId,
           year: txDate.getFullYear(),
-          month: txDate.getMonth() + 1
+          month: txDate.getMonth() + 1,
+          // Ensure external_id is not undefined
+          external_id: tx.external_id || tx.id || `${source}-${tx.date}-${tx.amount}`
         };
       });
       
-      // Insert the transactions
-      const { error } = await supabase
-        .from('cached_transactions')
-        .upsert(
-          preparedTransactions,
-          { 
-            onConflict: 'source,external_id',
-            ignoreDuplicates: false
-          }
-        );
-      
-      if (error) {
-        console.error("Error storing transactions:", error);
-        return false;
+      // Insert the transactions in batches
+      const batchSize = 100;
+      for (let i = 0; i < preparedTransactions.length; i += batchSize) {
+        const batch = preparedTransactions.slice(i, i + batchSize);
+        
+        const { error } = await supabase
+          .from('cached_transactions')
+          .upsert(
+            batch,
+            { 
+              onConflict: 'source,external_id',
+              ignoreDuplicates: false
+            }
+          );
+        
+        if (error) {
+          console.error(`Error storing transactions batch ${i / batchSize + 1}:`, error);
+          return false;
+        }
       }
       
       return true;

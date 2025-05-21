@@ -29,9 +29,7 @@ export const checkCache = async (
   source: CacheSource,
   startDate: Date,
   endDate: Date,
-  forceRefresh = false,
-  lastCacheCheckResult: CacheResponse | null,
-  setLastCacheCheckResult: (result: CacheResponse) => void
+  forceRefresh = false
 ): Promise<CacheResponse> => {
   // Format dates for API
   const formattedStartDate = formatDate(startDate);
@@ -74,11 +72,13 @@ export const checkCache = async (
       endDate.getDate() === new Date(endInfo.year, endInfo.month, 0).getDate()
     ) {
       // This is a request for exactly one month, which is our optimized case
-      const isCached = await cacheStorage.isMonthCached(
+      const result = await cacheStorage.isMonthCached(
         source, 
         startInfo.year, 
         startInfo.month
       );
+      
+      const isCached = result;
       
       if (isCached) {
         // Get transactions for this month
@@ -113,7 +113,6 @@ export const checkCache = async (
           }
         };
         
-        setLastCacheCheckResult(result);
         return result;
       } else {
         // Record the cache miss
@@ -139,7 +138,6 @@ export const checkCache = async (
           }
         };
         
-        setLastCacheCheckResult(result);
         return result;
       }
     } 
@@ -173,9 +171,6 @@ export const checkCache = async (
         missingRanges: data.missingRanges,
         metrics: data.metrics
       };
-      
-      // Store the cache check result
-      setLastCacheCheckResult(cacheResponse);
       
       return cacheResponse;
     }

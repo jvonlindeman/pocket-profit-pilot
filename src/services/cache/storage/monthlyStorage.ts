@@ -14,7 +14,7 @@ export const monthlyStorage = {
     source: CacheSource | string,
     year: number,
     month: number
-  ): Promise<{ isCached: boolean, transaction_count?: number }> {
+  ): Promise<boolean> {
     try {
       const { data, error } = await supabase.rpc('is_month_cached', {
         p_source: source,
@@ -24,16 +24,13 @@ export const monthlyStorage = {
       
       if (error) {
         console.error("Error checking if month is cached:", error);
-        return { isCached: false };
+        return false;
       }
       
-      return { 
-        isCached: data?.[0]?.is_cached || false,
-        transaction_count: data?.[0]?.transaction_count
-      };
+      return data?.[0]?.is_cached || false;
     } catch (err) {
       console.error("Error in isMonthCached:", err);
-      return { isCached: false };
+      return false;
     }
   },
 
@@ -85,27 +82,36 @@ export const monthlyStorage = {
         .single();
       
       // Prepare transactions with year and month
-      const preparedTransactions = transactions.map(tx => ({
-        ...tx,
-        year,
-        month,
-        source
-      }));
+      const preparedTransactions = transactions.map(tx => {
+        return {
+          ...tx,
+          year,
+          month,
+          source,
+          // Ensure external_id is not undefined
+          external_id: tx.external_id || tx.id || `${source}-${tx.date}-${tx.amount}`
+        };
+      });
       
-      // Insert the transactions
-      const { error: transactionError } = await supabase
-        .from('cached_transactions')
-        .upsert(
-          preparedTransactions,
-          { 
-            onConflict: 'source,external_id',
-            ignoreDuplicates: false
-          }
-        );
-      
-      if (transactionError) {
-        console.error("Error storing month transactions:", transactionError);
-        return false;
+      // Insert the transactions in batches
+      const batchSize = 100;
+      for (let i = 0; i < preparedTransactions.length; i += batchSize) {
+        const batch = preparedTransactions.slice(i, i + batchSize);
+        
+        const { error: transactionError } = await supabase
+          .from('cached_transactions')
+          .upsert(
+            batch,
+            { 
+              onConflict: 'source,external_id',
+              ignoreDuplicates: false
+            }
+          );
+        
+        if (transactionError) {
+          console.error(`Error storing month transactions batch ${i / batchSize + 1}:`, transactionError);
+          return false;
+        }
       }
       
       // Create or update the monthly_cache entry
@@ -198,7 +204,8 @@ export const monthlyStorage = {
         return {
           id: tx.id,
           year: txDate.getFullYear(),
-          month: txDate.getMonth() + 1
+          month: txDate.getMonth() + 1,
+          // Since we're doing a partial update, external_id is not required here
         };
       });
       
@@ -211,7 +218,9 @@ export const monthlyStorage = {
         
         const { error: updateError } = await supabase
           .from('cached_transactions')
-          .upsert(batch);
+          .upsert(batch, {
+            onConflict: 'id'
+          });
         
         if (updateError) {
           console.error(`Error updating batch ${i / batchSize + 1}:`, updateError);

@@ -29,7 +29,7 @@ export class CacheOperations {
    * Check cache for transactions
    */
   async checkCache(...args: Parameters<typeof checkCache>): ReturnType<typeof checkCache> {
-    return checkCache(...args, this.lastCacheCheckResult, this.setLastCacheCheckResult.bind(this));
+    return checkCache(...args);
   }
 
   /**
