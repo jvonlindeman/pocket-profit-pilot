@@ -59,52 +59,48 @@ export const statsOperations = {
       }
       
       // Get cached transaction counts by source
-      const { data: txCounts, error: txError } = await supabase
+      const { data: sourceCountData, error: txError } = await supabase
         .from('cached_transactions')
-        .select('source, count')
-        .select('source, count(*)')
-        .then(result => {
-          // Process the result manually to extract counts
-          return {
-            ...result,
-            data: result.data?.map(item => ({
-              source: item.source,
-              count: parseInt(String(item.count))
-            }))
-          };
+        .select('source')
+        .limit(1000000); // Use high limit to get all (or at least most) records
+      
+      // Process the data to count by source manually
+      const sourceCounts: Record<string, number> = {};
+      if (sourceCountData) {
+        sourceCountData.forEach(item => {
+          if (!sourceCounts[item.source]) {
+            sourceCounts[item.source] = 0;
+          }
+          sourceCounts[item.source]++;
         });
+      }
       
       if (txError) {
         console.error("Error getting transaction counts:", txError);
       }
       
-      // Get transaction counts by month
-      const { data: txByMonth, error: txByMonthError } = await supabase
+      // Get transaction counts by month - this needs to be processed manually
+      const { data: monthlyTransactions, error: txByMonthError } = await supabase
         .from('cached_transactions')
         .select('source, year, month')
-        .then(async (result) => {
-          // Process the data to get counts manually
-          if (result.data) {
-            const countsByMonthAndSource: Record<string, Record<string, number>> = {};
-            
-            for (const item of result.data) {
-              const key = `${item.year}-${String(item.month).padStart(2, '0')}`;
-              if (!countsByMonthAndSource[key]) {
-                countsByMonthAndSource[key] = {};
-              }
-              if (!countsByMonthAndSource[key][item.source]) {
-                countsByMonthAndSource[key][item.source] = 0;
-              }
-              countsByMonthAndSource[key][item.source]++;
+        .limit(1000000); // Use high limit
+      
+      // Process monthly transactions
+      const countsByMonthAndSource: Record<string, Record<string, number>> = {};
+      if (monthlyTransactions) {
+        for (const item of monthlyTransactions) {
+          if (item.year && item.month) {
+            const key = `${item.year}-${String(item.month).padStart(2, '0')}`;
+            if (!countsByMonthAndSource[key]) {
+              countsByMonthAndSource[key] = {};
             }
-            
-            return {
-              ...result,
-              data: countsByMonthAndSource
-            };
+            if (!countsByMonthAndSource[key][item.source]) {
+              countsByMonthAndSource[key][item.source] = 0;
+            }
+            countsByMonthAndSource[key][item.source]++;
           }
-          return result;
-        });
+        }
+      }
       
       if (txByMonthError) {
         console.error("Error getting transaction counts by month:", txByMonthError);
@@ -112,16 +108,13 @@ export const statsOperations = {
       
       // Calculate size metrics
       let totalTransactions = 0;
-      let sourceCounts: Record<string, number> = {};
       
-      if (txCounts?.data) {
-        txCounts.data.forEach(item => {
-          sourceCounts[item.source] = item.count;
-          totalTransactions += item.count;
-        });
-      }
+      // Sum up the counts from our manually processed data
+      Object.values(sourceCounts).forEach(count => {
+        totalTransactions += count;
+      });
       
-      // Group monthly cache by source and month
+      // Group monthly cache by source
       const monthlyBySource: Record<string, any[]> = {};
       if (monthlyData) {
         monthlyData.forEach(item => {
@@ -143,10 +136,7 @@ export const statsOperations = {
         });
       }
       
-      // Process transaction counts by month from our manually processed data
-      const txByMonthAndSource = txByMonth?.data || {};
-      
-      // Create the cache stats result object with the correct data structure
+      // Create the source stats array with the correct structure
       const sourceStats: CacheSourceStats[] = Object.entries(sourceCounts).map(([source, count]) => {
         return {
           source,
@@ -161,7 +151,7 @@ export const statsOperations = {
         transactionsBySource: sourceCounts,
         monthlyCache: monthlyBySource,
         segments: segmentsBySource,
-        transactionsByMonth: txByMonthAndSource,
+        transactionsByMonth: countsByMonthAndSource,
         sourcesStats: sourceStats,
         lastUpdated: new Date().toISOString()
       };
