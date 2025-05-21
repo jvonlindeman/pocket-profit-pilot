@@ -72,13 +72,11 @@ export const checkCache = async (
       endDate.getDate() === new Date(endInfo.year, endInfo.month, 0).getDate()
     ) {
       // This is a request for exactly one month, which is our optimized case
-      const result = await cacheStorage.isMonthCached(
+      const isCached = await cacheStorage.isMonthCached(
         source, 
         startInfo.year, 
         startInfo.month
       );
-      
-      const isCached = result;
       
       if (isCached) {
         // Get transactions for this month

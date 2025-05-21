@@ -19,8 +19,13 @@ export class CacheStorage {
     year: number,
     month: number
   ): Promise<boolean> {
-    const result = await monthlyStorage.isMonthCached(source, year, month);
-    return result.isCached;
+    try {
+      const result = await monthlyStorage.isMonthCached(source, year, month);
+      return result;
+    } catch (err) {
+      console.error("Error checking if month is cached:", err);
+      return false;
+    }
   }
 
   /**

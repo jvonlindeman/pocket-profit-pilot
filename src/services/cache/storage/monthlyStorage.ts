@@ -205,7 +205,12 @@ export const monthlyStorage = {
           id: tx.id,
           year: txDate.getFullYear(),
           month: txDate.getMonth() + 1,
-          // Since we're doing a partial update, external_id is not required here
+          // Add required fields for upsert
+          date: tx.date,
+          amount: 0, // Placeholder, will be preserved by upsert onConflict
+          external_id: '', // Placeholder, will be preserved by upsert onConflict
+          source: '', // Placeholder, will be preserved by upsert onConflict
+          type: '' // Placeholder, will be preserved by upsert onConflict
         };
       });
       

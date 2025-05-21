@@ -29,7 +29,9 @@ export class CacheOperations {
    * Check cache for transactions
    */
   async checkCache(...args: Parameters<typeof checkCache>): ReturnType<typeof checkCache> {
-    return checkCache(...args);
+    const result = await checkCache(...args);
+    this.setLastCacheCheckResult(result);
+    return result;
   }
 
   /**

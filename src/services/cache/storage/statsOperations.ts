@@ -1,5 +1,5 @@
 
-import { DetailedCacheStats, CacheSource } from "../types";
+import { DetailedCacheStats, CacheSource, CacheSourceStats } from "../types";
 import { supabase } from "../../../integrations/supabase/client";
 
 /**
@@ -61,9 +61,8 @@ export const statsOperations = {
       // Get cached transaction counts by source
       const { data: txCounts, error: txError } = await supabase
         .from('cached_transactions')
-        .select('source, count')
-        .select('source, count(*)', { count: 'exact' })
-        .group('source');
+        .select('source, count(*)')
+        .groupBy('source');
       
       if (txError) {
         console.error("Error getting transaction counts:", txError);
@@ -73,7 +72,7 @@ export const statsOperations = {
       const { data: txByMonth, error: txByMonthError } = await supabase
         .from('cached_transactions')
         .select('source, year, month, count(*)')
-        .group('source, year, month')
+        .groupBy('source, year, month')
         .order('year', { ascending: false })
         .order('month', { ascending: false });
       
@@ -126,22 +125,35 @@ export const statsOperations = {
         });
       }
       
+      // Create the cache stats result object with the correct array types
+      const sourceStats: CacheSourceStats[] = Object.entries(sourceCounts).map(([source, count]) => {
+        return {
+          source,
+          count,
+          monthlyData: monthlyBySource[source] || [],
+          segments: segmentsBySource[source] || []
+        };
+      });
+      
       return {
         totalTransactions,
         transactionsBySource: sourceCounts,
         monthlyCache: monthlyBySource,
         segments: segmentsBySource,
         transactionsByMonth: txByMonthAndSource,
+        sourcesStats: sourceStats,
         lastUpdated: new Date().toISOString()
       };
     } catch (err) {
       console.error("Error getting detailed cache stats:", err);
+      // Return empty stats with the correct structure
       return {
         totalTransactions: 0,
         transactionsBySource: {},
         monthlyCache: {},
         segments: {},
         transactionsByMonth: {},
+        sourcesStats: [],
         lastUpdated: new Date().toISOString()
       };
     }

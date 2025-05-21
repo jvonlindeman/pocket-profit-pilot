@@ -1,126 +1,83 @@
+import { Json } from "../../integrations/supabase/types";
+import { Transaction } from "../../types/financial";
 
 /**
- * Core cache types used throughout the cache system
+ * Cache source.
+ * Defines the possible sources for cached data.
  */
+export type CacheSource = "Zoho" | "Stripe";
 
-// Valid cache sources
-export type CacheSource = 'Zoho' | 'Stripe';
+/**
+ * Cache result.
+ * Defines the possible results of a cache operation.
+ */
+export type CacheResult = "hit" | "miss" | "partial" | "error" | "force_refresh";
 
-// Base cache response from edge function
+/**
+ * Cache response.
+ * Defines the structure of a cache response, including whether the data was cached,
+ * the status of the cache, any data returned, and any missing ranges.
+ */
 export interface CacheResponse {
   cached: boolean;
   status: string;
   data?: Transaction[];
-  partial?: boolean;
-  missingRanges?: {
-    startDate: string | null;
-    endDate: string | null;
-  };
-  metrics?: {
-    source: string;
-    startDate: string;
-    endDate: string;
-    transactionCount?: number;
-    fetchDuration?: number;
-    cacheHit: boolean;
-    partialHit?: boolean;
-  };
+  partial: boolean;
+  missingRanges?: { startDate: string; endDate: string }[];
+  metrics?: CacheMetrics;
 }
 
-// Result of cache operations provided to consumers
-export interface CacheResult {
-  transactions: Transaction[];
-  isCached: boolean;
-  isPartialCache: boolean;
-  missingRanges?: {
-    startDate: string | null;
-    endDate: string | null;
-  };
-  metrics?: {
-    source: string;
-    startDate: string;
-    endDate: string;
-    transactionCount: number;
-    fetchDuration: number;
-  };
+/**
+ * Cache metrics.
+ * Defines the structure for cache metrics, including the source, start and end dates,
+ * transaction count, and cache hit status.
+ */
+export interface CacheMetrics {
+  source: CacheSource;
+  startDate: string;
+  endDate: string;
+  transactionCount?: number;
+  cacheHit: boolean;
+  partialHit: boolean;
 }
 
-// Cache integrity verification result
-export interface CacheIntegrityResult {
-  isConsistent: boolean;
-  segmentCount: number;
-  transactionCount: number;
+/**
+ * Detailed cache statistics
+ */
+export interface DetailedCacheStats {
+  totalTransactions: number;
+  transactionsBySource: Record<string, number>;
+  monthlyCache: Record<string, any[]>;
+  segments: Record<string, any[]>;
+  transactionsByMonth: Record<string, Record<string, number>>;
+  sourcesStats?: CacheSourceStats[];
+  lastUpdated: string;
 }
 
-// Cache segment information
-export interface CacheSegmentInfo {
-  id: string;
-  transaction_count: number;
-}
-
-// Monthly cache information 
-export interface MonthlyCacheInfo {
-  id: string;
-  year: number;
-  month: number;
-  transaction_count: number;
-  status: string;
-}
-
-// Cache clear options
+/**
+ * Cache clear options
+ */
 export interface CacheClearOptions {
   source?: CacheSource | 'all';
   startDate?: Date;
   endDate?: Date;
 }
 
-// Cache segment statistics by source
+/**
+ * Cache source statistics
+ */
 export interface CacheSourceStats {
   source: string;
   count: number;
+  monthlyData: any[];
+  segments: any[];
 }
 
-// Detailed cache statistics
-export interface DetailedCacheStats {
-  transactions: CacheSourceStats[];
-  segments: CacheSourceStats[];
-  recentMetrics: any[]; 
-  hitRate: string;
-  hits: number;
-  misses: number;
-  lastUpdated: string;
-}
-
-// Cache statistics used in admin dashboard
-export interface CacheStats {
+/**
+ * Cache integrity check result
+ */
+export interface CacheIntegrityResult {
+  isConsistent: boolean;
+  segmentCount: number;
   transactionCount: number;
-  segments: {
-    source: string;
-    count: number;
-    total: number;
-  }[];
-  recentMetrics: any[];
-  hitRate: string;
-  hits: number;
-  misses: number;
-  lastUpdated: string;
 }
-
-// Cache status for UI components
-export interface CacheStatus {
-  zoho: { hit: boolean; partial: boolean };
-  stripe: { hit: boolean; partial: boolean };
-}
-
-// Cache access record
-export interface CacheAccessRecord {
-  source: string;
-  startDate: string;
-  endDate: string;
-  cacheHit: boolean;
-  partialHit: boolean;
-  transactionCount?: number;
-}
-
-// Import Transaction type from the financial types
-import { Transaction } from "../../types/financial";
