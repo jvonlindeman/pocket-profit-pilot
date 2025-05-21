@@ -1,7 +1,9 @@
 
 /**
- * Log an error with context
+ * Log error with context
+ * @param message Error message
+ * @param error Error object
  */
-export function logError(context: string, message: string, error: any): void {
-  console.error(`[${context}] ${message}:`, error);
+export function logError(message: string, error: any): void {
+  console.error(`Error: ${message}:`, error);
 }
