@@ -1,6 +1,6 @@
 
 import { CacheDbClient } from "../client";
-import { logError } from "../../../utils/logging";
+import { logError } from "../../utils/logging";
 
 /**
  * Base class for statistics repositories

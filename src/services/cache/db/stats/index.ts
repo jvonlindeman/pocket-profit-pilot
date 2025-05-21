@@ -1,5 +1,5 @@
 
-import { CacheSource, CacheSourceStats, DetailedCacheStats } from "../../../types";
+import { CacheSource, CacheSourceStats, DetailedCacheStats } from "../../types";
 import { transactionStatsRepository } from "./transactionStats";
 import { monthlyStatsRepository } from "./monthlyStats";
 import { segmentStatsRepository } from "./segmentStats";

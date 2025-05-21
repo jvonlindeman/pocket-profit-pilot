@@ -3,7 +3,7 @@ import { CacheSource, CacheClearOptions, DetailedCacheStats } from "./types";
 import { Transaction } from "../../types/financial";
 import { segmentRepository } from "./db/segments";
 import { transactionRepository } from "./db/transactions";
-import { statsRepository } from "./db/statistics";
+import { statsRepository } from "./db/stats";
 import { monthlyRepository } from "./db/monthly";
 import { supabase } from "../../integrations/supabase/client";
 

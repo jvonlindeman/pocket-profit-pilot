@@ -1,5 +1,5 @@
 
-import { CacheSource } from "../../../types";
+import { CacheSource } from "../../types";
 import { StatsBaseRepository } from "./statsBase";
 
 /**
@@ -15,7 +15,7 @@ export class TransactionStatsRepository extends StatsBaseRepository {
       const { data, error } = await this.getClient()
         .from('cached_transactions')
         .select('source, count(*)')
-        .group('source');
+        .groupBy('source');
       
       if (error) {
         this.logStatError("Error getting transaction counts", error);
@@ -48,7 +48,7 @@ export class TransactionStatsRepository extends StatsBaseRepository {
         .select('source, year, month, count(*)')
         .not('year', 'is', null)
         .not('month', 'is', null)
-        .group('source, year, month');
+        .groupBy('source, year, month');
       
       if (error) {
         this.logStatError("Error getting transaction counts by month", error);

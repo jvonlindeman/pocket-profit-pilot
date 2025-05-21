@@ -1,5 +1,5 @@
 
-import { CacheSource } from "../../../types";
+import { CacheSource } from "../../types";
 import { StatsBaseRepository } from "./statsBase";
 
 /**
