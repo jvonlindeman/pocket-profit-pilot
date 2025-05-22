@@ -1,17 +1,17 @@
 
 # WebhookDebug Component Tests
 
-This directory contains tests for the WebhookDebug component and its sub-components.
+This directory contains test documentation for the WebhookDebug component and its sub-components. These are not executable tests but serve as documentation for the expected behavior of each component.
 
-## Test Structure
+## Test Documentation Structure
 
-Tests are organized by component, with each component having its own test file:
+Tests are documented by component:
 
-- `WebhookRawData.test.tsx`: Tests for the raw data display component
-- `WebhookConfigAlert.test.tsx`: Tests for the configuration alert component
-- `WebhookFormattedData.test.tsx`: Tests for the formatted data display component
-- `WebhookDataSummary.test.tsx`: Tests for the data summary component
-- `WebhookTroubleshootingGuide.test.tsx`: Tests for the troubleshooting guide component
+- `WebhookRawData.test.tsx`: Documentation for the raw data display component
+- `WebhookConfigAlert.test.tsx`: Documentation for the configuration alert component
+- `WebhookFormattedData.test.tsx`: Documentation for the formatted data display component
+- `WebhookDataSummary.test.tsx`: Documentation for the data summary component
+- `WebhookTroubleshootingGuide.test.tsx`: Documentation for the troubleshooting guide component
 
 ## Mock Data
 
@@ -21,20 +21,27 @@ Mock data for testing is stored in `mockData.ts` and includes:
 - `mockEmptyData`: Example of webhook data with empty arrays
 - `mockErrorData`: Example of an error response from the webhook
 
-## Running Tests
+## How to Implement Actual Tests
 
-To run these tests, you'll need to use the testing commands configured in your project. These tests assume the presence of:
+To implement actual tests, you would need to:
 
-- React Testing Library
-- Jest
+1. Add testing libraries to your project:
+   ```
+   npm install --save-dev @testing-library/react @testing-library/jest-dom jest
+   ```
 
-## Test Helpers
+2. Add TypeScript types for these libraries:
+   ```
+   npm install --save-dev @types/jest @types/testing-library__react
+   ```
 
-The `setup.ts` file contains helper functions and common setup for the tests.
+3. Configure Jest in your project by adding a jest.config.js file
 
-## Test Coverage
+4. Update the package.json to include test scripts
 
-These tests aim to verify:
+## Expected Test Coverage
+
+These test documents describe how to verify:
 
 1. Components render correctly with valid data
 2. Components handle edge cases (null, undefined, empty data)
