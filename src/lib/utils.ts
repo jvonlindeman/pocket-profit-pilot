@@ -1,7 +1,7 @@
 
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { parseToPanamaTime, formatDateForPanamaDisplay } from "@/utils/timezoneUtils"
+import { convertToPanamaTimezone, formatDateForPanamaDisplay } from "@/utils/timezoneUtils"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -19,7 +19,7 @@ export function parseDate(dateString: string | Date): Date {
   
   try {
     // Use our Panama timezone parser
-    return parseToPanamaTime(dateString);
+    return convertToPanamaTimezone(new Date(dateString));
   } catch (error) {
     console.error(`Error parsing date: ${dateString}`, error);
     return new Date(); // Fallback to current date
@@ -32,7 +32,8 @@ export function parseDate(dateString: string | Date): Date {
  */
 export function formatDisplayDate(date: Date | string): string {
   try {
-    return formatDateForPanamaDisplay(date);
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return formatDateForPanamaDisplay(dateObj);
   } catch (error) {
     console.error(`Error formatting date: ${date}`, error);
     return 'Invalid date';

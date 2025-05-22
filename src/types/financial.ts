@@ -14,6 +14,7 @@ export interface Transaction {
   fees?: number;
   gross?: number;
   metadata?: Record<string, any>;
+  external_id?: string; // Added to fix TypeScript errors
 }
 
 /**
@@ -27,6 +28,36 @@ export interface FinancialSummary {
   profitMargin: number;
   startDate: Date;
   endDate: Date;
+  collaboratorExpense: number; // Added missing property
+  otherExpense: number; // Added missing property
+  grossProfit: number; // Added missing property
+  grossProfitMargin: number; // Added missing property
+  startingBalance?: number; // Added missing property
+}
+
+/**
+ * Financial data type for processed transactions
+ */
+export interface FinancialData {
+  summary: FinancialSummary;
+  incomeBySource: CategorySummary[];
+  expenseByCategory: CategorySummary[];
+}
+
+/**
+ * Monthly Balance type for tracking monthly financial data
+ */
+export interface MonthlyBalance {
+  id?: number;
+  month_year: string;
+  balance: number;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+  stripe_override?: number;
+  itbm_amount?: number;
+  opex_amount?: number;
+  profit_percentage?: number;
 }
 
 /**
@@ -58,6 +89,7 @@ export interface CategorySummary {
   category: string;
   amount: number;
   percentage: number;
+  count?: number; // Added missing property
 }
 
 /**

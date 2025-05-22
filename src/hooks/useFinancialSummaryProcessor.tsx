@@ -1,6 +1,6 @@
 
 import { useMemo } from 'react';
-import { Transaction, CategorySummary, FinancialData } from '@/types/financial';
+import { Transaction, CategorySummary, FinancialSummary } from '@/types/financial';
 import { isCollaboratorExpense, validateFinancialValue } from '@/utils/financialUtils';
 
 /**
@@ -61,7 +61,7 @@ export const useFinancialSummaryProcessor = (
     const grossProfitMargin = totalIncome > 0 ? 100 : 0;
     
     // Create financial summary
-    const summary = {
+    const summary: FinancialSummary = {
       totalIncome,
       totalExpense,
       collaboratorExpense: finalCollaboratorExpense,
@@ -70,7 +70,9 @@ export const useFinancialSummaryProcessor = (
       profitMargin,
       grossProfit,
       grossProfitMargin,
-      startingBalance: validateFinancialValue(startingBalance)
+      startingBalance: validateFinancialValue(startingBalance),
+      startDate: new Date(),  // These will be updated by the caller
+      endDate: new Date()     // These will be updated by the caller
     };
     
     console.log("useFinancialSummaryProcessor - Final summary:", summary);
@@ -105,20 +107,22 @@ export const useFinancialSummaryProcessor = (
     
     // Convert expense categories to array with proper validation
     Object.entries(expenseCategories).forEach(([category, data]) => {
+      const percentage = totalExpense > 0 ? (data.amount / totalExpense) * 100 : 0;
       expenseByCategory.push({
         category,
         amount: data.amount,
-        percentage: totalExpense > 0 ? (data.amount / totalExpense) * 100 : 0,
+        percentage,
         count: data.count
       });
     });
     
     // Convert income categories to array with proper validation
     Object.entries(incomeCategories).forEach(([category, data]) => {
+      const percentage = totalIncome > 0 ? (data.amount / totalIncome) * 100 : 0;
       incomeBySource.push({
         category,
         amount: data.amount,
-        percentage: totalIncome > 0 ? (data.amount / totalIncome) * 100 : 0,
+        percentage,
         count: data.count
       });
     });

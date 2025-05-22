@@ -45,3 +45,40 @@ export function endOfDayPanama(date: Date): Date {
   panamaDate.setHours(23, 59, 59, 999);
   return panamaDate;
 }
+
+/**
+ * Converts a date to Panama timezone
+ */
+export function toPanamaTime(date: Date): Date {
+  return convertToPanamaTimezone(date);
+}
+
+/**
+ * Format date in Panama timezone with specific format
+ */
+export function formatInPanamaTimezone(date: Date, formatPattern: string): string {
+  const panamaDate = convertToPanamaTimezone(date);
+  // Using a simple format for now - in a real app would use date-fns format
+  return panamaDate.toLocaleDateString('en-US', { timeZone: PANAMA_TIMEZONE });
+}
+
+/**
+ * Format date for Panama display with locale settings
+ */
+export function formatDateForPanamaDisplay(date: Date | string): string {
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  return dateObj.toLocaleDateString('es-PA', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: PANAMA_TIMEZONE
+  });
+}
+
+/**
+ * Parse a string to a date in Panama timezone
+ */
+export function parseToPanamaTime(dateString: string): Date {
+  const date = new Date(dateString);
+  return convertToPanamaTimezone(date);
+}

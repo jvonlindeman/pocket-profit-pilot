@@ -30,8 +30,6 @@ export const useFinanceData = () => {
     loading, 
     error, 
     rawResponse, 
-    usingCachedData, 
-    cacheStatus, 
     apiConnectivity, 
     checkApiConnectivity, 
     fetchData, 
@@ -85,8 +83,6 @@ export const useFinanceData = () => {
     updateStartingBalance,
     setStartingBalance,
     setNotes,
-    usingCachedData,
-    cacheStatus,
     apiConnectivity,
     checkApiConnectivity
   };
