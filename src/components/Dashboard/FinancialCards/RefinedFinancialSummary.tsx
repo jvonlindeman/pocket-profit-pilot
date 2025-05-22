@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import SummaryCardSection from './SummaryCardSection';
 import RefinedExpensesSection from './RefinedExpensesSection';
@@ -6,6 +5,7 @@ import ProfitSection from './ProfitSection';
 import FinancialDebugHelper from '../DebugTools/FinancialDebugHelper';
 import FinancialHistorySummary from '../FinancialHistory/FinancialHistorySummary';
 import { FinancialAssistantPromo } from '../FinancialAssistant/FinancialAssistantPromo';
+import IncomeTabs from './IncomeTabs';
 import { useFinance } from '@/contexts/FinanceContext';
 import { registerInteraction } from '@/utils/uiCapture';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -23,6 +23,9 @@ const RefinedFinancialSummary: React.FC = () => {
   
   return (
     <div className="space-y-4">
+      {/* Income Tabs Section - Re-added */}
+      <IncomeTabs />
+      
       <SummaryCardSection title="Resumen Financiero" data-component="financial-summary" className="financial-summary-section">
         {/* Refined Expenses Section */}
         <RefinedExpensesSection />

@@ -85,8 +85,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
         {/* Initial Balance Section */}
         <InitialBalanceSection startingBalance={refinedSummary.startingBalance || 0} />
 
-        {/* Income Sources Section with Tabs */}
-        <IncomeTabs />
+        {/* Removed duplicate IncomeTabs as it's now part of RefinedFinancialSummary */}
 
         {/* Financial Summary Section - Using our refined component */}
         <RefinedFinancialSummary />

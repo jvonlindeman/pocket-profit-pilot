@@ -1,8 +1,10 @@
+
 import React, { useEffect } from 'react';
 import { ArrowDownIcon, Users } from 'lucide-react';
 import SummaryCard from './SummaryCard';
 import { useFinance } from '@/contexts/FinanceContext';
 import { useFinanceFormatter } from '@/hooks/useFinanceFormatter';
+import { useFinanceMetrics } from '@/hooks/useFinanceMetrics';
 import { validateFinancialValue } from '@/utils/financialUtils';
 import { registerInteraction } from '@/utils/uiCapture';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -14,12 +16,16 @@ const RefinedExpensesSection: React.FC = () => {
   } = useFinance();
   
   const { formatCurrency } = useFinanceFormatter();
+  const { calculateCollaboratorExpense } = useFinanceMetrics();
   const isMobile = useIsMobile();
   
+  // Calculate collaborator expense using the finance metrics hook
+  const collaboratorExpense = calculateCollaboratorExpense(collaboratorExpenses);
+  
   // Ensure all values are valid numbers
-  const collaboratorExpense = validateFinancialValue(summary.collaboratorExpense);
-  const otherExpense = validateFinancialValue(summary.otherExpense);
+  const validCollaboratorExpense = validateFinancialValue(collaboratorExpense);
   const totalExpense = validateFinancialValue(summary.totalExpense);
+  const otherExpense = totalExpense - validCollaboratorExpense;
   
   // Register this component as visible
   useEffect(() => {
@@ -31,22 +37,20 @@ const RefinedExpensesSection: React.FC = () => {
   useEffect(() => {
     console.log("RefinedExpensesSection - Summary:", summary);
     console.log("RefinedExpensesSection - Collaborator expenses:", collaboratorExpenses);
-    console.log("RefinedExpensesSection - Validated values:", {
-      collaboratorExpense,
-      otherExpense,
-      totalExpense
-    });
+    console.log("RefinedExpensesSection - Calculated collaborator expense:", validCollaboratorExpense);
+    console.log("RefinedExpensesSection - Calculated other expense:", otherExpense);
+    console.log("RefinedExpensesSection - Total expense:", totalExpense);
     // Verify that the calculated values add up correctly
     console.log("RefinedExpensesSection - Sum check:", 
-      collaboratorExpense + otherExpense, "should equal", totalExpense);
-  }, [summary, collaboratorExpenses, collaboratorExpense, otherExpense, totalExpense]);
+      validCollaboratorExpense + otherExpense, "should equal", totalExpense);
+  }, [summary, collaboratorExpenses, validCollaboratorExpense, otherExpense, totalExpense]);
 
   return (
     <div className={`grid grid-cols-1 ${isMobile ? 'gap-3' : 'md:grid-cols-3 gap-6'}`} data-component="expenses">
       {/* Collaborator Expenses */}
       <SummaryCard
         title="Gastos Colaboradores"
-        value={formatCurrency(collaboratorExpense)}
+        value={formatCurrency(validCollaboratorExpense)}
         icon={Users}
         iconColor="text-amber-500"
         iconBgColor="bg-amber-50"
