@@ -1,161 +1,140 @@
 
 import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, RefreshCw, Bug } from 'lucide-react';
-import * as ZohoService from '@/services/zohoService';
-import { DateRange } from 'react-day-picker';
-import { toFinancialDateRange } from '@/utils/dateRangeAdapter';
-import { toast } from '@/components/ui/use-toast';
-import FormattedDataTab from './FormattedDataTab';
-import CollaboratorsTab from './CollaboratorsTab';
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "@/hooks/use-toast";
+import { Webhook, RefreshCcw, FileText } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { zohoRepository } from '@/repositories/zohoRepository';
 import InvoicesTab from './InvoicesTab';
-import RawDataTab from './RawDataTab';
 
 interface WebhookDebugProps {
-  dateRange: DateRange;
-  refreshDataFunction?: (forceRefresh: boolean) => void;
+  dateRange: { startDate: Date; endDate: Date };
+  refreshDataFunction: (force: boolean) => void;
+  rawResponse: any;
 }
 
-export default function WebhookDebug({ dateRange, refreshDataFunction }: WebhookDebugProps) {
+const WebhookDebug: React.FC<WebhookDebugProps> = ({ 
+  dateRange, 
+  refreshDataFunction,
+  rawResponse
+}) => {
   const [loading, setLoading] = useState(false);
-  const [rawData, setRawData] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [dataLoaded, setDataLoaded] = useState(false);
-
-  // Auto-load data on component mount
-  useEffect(() => {
-    if (!dataLoaded && !loading) {
-      console.log("WebhookDebug/index.tsx: Auto-loading data on mount");
-      fetchDebugData();
-    }
-  }, []);
-
-  // Function to fetch raw webhook data
+  const [activeTab, setActiveTab] = useState("summary");
+  const [unpaidInvoices, setUnpaidInvoices] = useState([]);
+  
+  // Fetch debug data from Zoho
   const fetchDebugData = async () => {
     setLoading(true);
-    setError(null);
-    
     try {
-      // First update data using the global refresh function
-      if (refreshDataFunction) {
-        console.log("Using global refresh function to load data");
-        refreshDataFunction(true);
-        
-        // Wait a brief moment for the update to complete
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
+      // Get raw data for debugging purposes
+      const data = await zohoRepository.getRawResponse(dateRange.startDate, dateRange.endDate);
       
-      // Convert from DayPicker format to our Financial format
-      const financialDateRange = toFinancialDateRange(dateRange);
-      
-      // Get raw data to show in the debug UI
-      const data = await ZohoService.getRawResponse(
-        financialDateRange.startDate, 
-        financialDateRange.endDate
-      );
-      
-      if (data) {
-        console.log("Debug data received:", data);
-        setRawData(data);
-        setDataLoaded(true);
+      if (data && data.facturas_sin_pagar && Array.isArray(data.facturas_sin_pagar)) {
+        console.log("WebhookDebug: Received unpaid invoices:", data.facturas_sin_pagar.length);
+        setUnpaidInvoices(data.facturas_sin_pagar);
         toast({
           title: "Datos cargados",
-          description: "Los datos del webhook se han cargado correctamente",
-          variant: "success",
+          description: `Se encontraron ${data.facturas_sin_pagar.length} facturas sin pagar`,
         });
       } else {
-        setError("No se recibieron datos del webhook");
+        console.warn("WebhookDebug: No unpaid invoices found in response");
+        setUnpaidInvoices([]);
+        toast({
+          title: "Advertencia",
+          description: "No se encontraron facturas sin pagar en la respuesta",
+          variant: "destructive"
+        });
       }
-    } catch (err: any) {
-      setError(err.message || "Error desconocido");
-      console.error("Failed to fetch debug data:", err);
+
+    } catch (error) {
+      console.error("Error fetching debug data:", error);
       toast({
         title: "Error",
-        description: `Error al cargar los datos: ${err.message || "Error desconocido"}`,
-        variant: "destructive",
+        description: "Error al cargar datos del webhook",
+        variant: "destructive"
       });
+      setUnpaidInvoices([]);
     } finally {
       setLoading(false);
     }
   };
 
+  // Load data from the existing rawResponse prop if available
+  useEffect(() => {
+    if (rawResponse && rawResponse.facturas_sin_pagar && Array.isArray(rawResponse.facturas_sin_pagar)) {
+      console.log("WebhookDebug: Using facturas_sin_pagar from rawResponse:", rawResponse.facturas_sin_pagar.length);
+      setUnpaidInvoices(rawResponse.facturas_sin_pagar);
+    } else {
+      console.log("WebhookDebug: No unpaid invoices in rawResponse, fetching...");
+      fetchDebugData();
+    }
+  }, [rawResponse]);
+
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Bug className="h-5 w-5 text-amber-500" />
-          Depuración de Webhook
-        </CardTitle>
-        <CardDescription>
-          Ver la respuesta cruda del webhook para detectar problemas
-        </CardDescription>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <div>
+          <CardTitle className="text-sm font-medium">
+            <div className="flex items-center">
+              <Webhook className="h-4 w-4 mr-1 text-blue-500" />
+              Webhook Zoho
+            </div>
+          </CardTitle>
+          <CardDescription className="text-xs text-muted-foreground">
+            Datos recibidos del webhook de integración
+          </CardDescription>
+        </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={fetchDebugData} 
+          disabled={loading}
+        >
+          <RefreshCcw className={`h-3 w-3 mr-1 ${loading ? 'animate-spin' : ''}`} />
+          Cargar Datos
+        </Button>
       </CardHeader>
       <CardContent>
-        <div className="flex justify-between items-center mb-4">
-          <p className="text-sm text-muted-foreground">
-            Esta herramienta te permite ver la respuesta sin procesar del webhook
-          </p>
-          <Button 
-            onClick={fetchDebugData} 
-            variant="outline" 
-            disabled={loading}
-          >
-            {loading ? (
-              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Cargando...</>
-            ) : (
-              <><RefreshCw className="h-4 w-4 mr-2" /> Cargar Datos</>
-            )}
-          </Button>
-        </div>
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-4 mb-4">
-            <p className="font-medium">Error</p>
-            <p className="text-sm">{error}</p>
-          </div>
-        )}
-
-        {loading && (
-          <div className="flex justify-center items-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-          </div>
-        )}
-
-        {!dataLoaded && !loading && !error && (
-          <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-lg p-4 mb-4 text-center">
-            <p className="text-sm">Esperando datos del webhook. Haz clic en "Cargar Datos" para comenzar.</p>
-          </div>
-        )}
-
-        {rawData && !loading && (
-          <Tabs defaultValue="formatted" className="w-full">
-            <TabsList className="grid grid-cols-4 w-full md:w-[400px]">
-              <TabsTrigger value="formatted">Formateado</TabsTrigger>
-              <TabsTrigger value="collaborators">Colaboradores</TabsTrigger>
-              <TabsTrigger value="invoices">Facturas Pendientes</TabsTrigger>
-              <TabsTrigger value="raw">JSON Crudo</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="formatted">
-              <FormattedDataTab rawData={rawData} />
-            </TabsContent>
-            
-            <TabsContent value="collaborators">
-              <CollaboratorsTab collaborators={rawData?.colaboradores || []} />
-            </TabsContent>
-            
-            <TabsContent value="invoices">
-              <InvoicesTab invoices={rawData?.facturas_sin_pagar || []} />
-            </TabsContent>
-            
-            <TabsContent value="raw">
-              <RawDataTab rawData={rawData} />
-            </TabsContent>
-          </Tabs>
-        )}
+        <Tabs 
+          value={activeTab} 
+          onValueChange={setActiveTab}
+          className="space-y-4"
+        >
+          <TabsList>
+            <TabsTrigger value="summary">
+              Resumen
+            </TabsTrigger>
+            <TabsTrigger 
+              value="invoices" 
+              className="flex items-center"
+            >
+              <FileText className="h-3 w-3 mr-1" />
+              Facturas sin Pagar
+              {unpaidInvoices.length > 0 && (
+                <span className="ml-1 bg-amber-100 text-amber-800 rounded-full px-1.5 py-0.5 text-xs">
+                  {unpaidInvoices.length}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="summary" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="rounded-lg bg-blue-50 border border-blue-100 p-3">
+                <div className="text-xs text-blue-700 font-medium">Facturas sin pagar</div>
+                <div className="text-lg font-bold text-blue-900">{unpaidInvoices.length}</div>
+              </div>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="invoices">
+            <InvoicesTab invoices={unpaidInvoices} />
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );
-}
+};
+
+export default WebhookDebug;

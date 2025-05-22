@@ -1,19 +1,17 @@
 import { Transaction } from "../types/financial";
 import * as zohoApiClient from "../services/zoho/apiClient";
-import CacheService from "../services/cache";
-import { formatDateYYYYMMDD } from "../utils/dateUtils";
 import { UnpaidInvoice } from "../services/zoho/api/types";
 
 /**
- * ZohoRepository handles all data access related to Zoho,
- * including fetching data from API and cache management
+ * ZohoRepository handles all data access related to Zoho directly from the API
+ * without any caching or intermediate storage
  */
 export class ZohoRepository {
   private lastRawResponse: any = null;
   private unpaidInvoices: UnpaidInvoice[] = [];
   
   /**
-   * Get transactions for a date range with automatic cache handling
+   * Get transactions for a date range directly from the source
    */
   async getTransactions(
     startDate: Date,
@@ -21,7 +19,9 @@ export class ZohoRepository {
     forceRefresh = false
   ): Promise<Transaction[]> {
     try {
-      return await this.fetchTransactionsFromSource(startDate, endDate, forceRefresh);
+      console.log("ZohoRepository: Getting transactions from", startDate, "to", endDate);
+      const transactions = await this.fetchTransactionsFromSource(startDate, endDate, forceRefresh);
+      return transactions;
     } catch (error) {
       console.error("Error in getTransactions:", error);
       return []; 
@@ -29,7 +29,7 @@ export class ZohoRepository {
   }
 
   /**
-   * Implementation of fetching transactions with cache integration
+   * Implementation of fetching transactions directly from API
    */
   async fetchTransactionsFromSource(
     startDate: Date,
@@ -37,7 +37,7 @@ export class ZohoRepository {
     forceRefresh = false
   ): Promise<Transaction[]> {
     try {
-      console.log("ZohoService: Fetching transactions from", startDate, "to", endDate);
+      console.log("ZohoRepository: Fetching transactions from", startDate, "to", endDate);
       const response = await zohoApiClient.fetchTransactionsFromWebhook(startDate, endDate, forceRefresh);
       
       // Store the raw response for debugging
@@ -46,25 +46,26 @@ export class ZohoRepository {
         
         // Store unpaid invoices if available
         if (response.facturas_sin_pagar && Array.isArray(response.facturas_sin_pagar)) {
+          console.log("ZohoRepository: Storing unpaid invoices:", response.facturas_sin_pagar.length);
           this.unpaidInvoices = response.facturas_sin_pagar;
         }
       }
       
       // If the response is already an array of Transaction objects, return it
       if (Array.isArray(response) && response.length > 0 && 'type' in response[0] && 'source' in response[0]) {
-        console.log(`Received ${response.length} processed Zoho transactions`);
+        console.log(`ZohoRepository: Received ${response.length} processed Zoho transactions`);
         return response;
       } 
       
       // If we received a structured response with transactions inside
       if (response && typeof response === 'object') {
         if (response.cached_transactions && Array.isArray(response.cached_transactions)) {
-          console.log(`Received ${response.cached_transactions.length} cached Zoho transactions`);
+          console.log(`ZohoRepository: Received ${response.cached_transactions.length} transactions`);
           return response.cached_transactions;
         }
       }
       
-      console.log("No valid Zoho transactions found in response");
+      console.log("ZohoRepository: No valid Zoho transactions found in response");
       return [];
     } catch (error) {
       console.error("Error fetching transactions from Zoho:", error);
@@ -84,7 +85,7 @@ export class ZohoRepository {
    */
   async getRawResponse(startDate: Date, endDate: Date): Promise<any> {
     try {
-      const rawData = await zohoApiClient.fetchTransactionsFromWebhook(startDate, endDate, false, true);
+      const rawData = await zohoApiClient.fetchTransactionsFromWebhook(startDate, endDate, true, true);
       this.lastRawResponse = rawData;
       
       // Store unpaid invoices if available
@@ -132,7 +133,7 @@ export class ZohoRepository {
   }
 
   /**
-   * Force refresh to repair the cache
+   * Force refresh to get new data
    */
   async repairCache(startDate: Date, endDate: Date): Promise<boolean> {
     try {
@@ -144,16 +145,16 @@ export class ZohoRepository {
   }
 
   /**
-   * Trigger a background refresh of the cache
+   * Compatibility method for legacy code
    */
   async checkAndRefreshCache(startDate: Date, endDate: Date): Promise<void> {
     try {
-      console.log("Background refresh of Zoho cache initiated");
+      console.log("Background refresh of Zoho data initiated");
       zohoApiClient.fetchTransactionsFromWebhook(startDate, endDate, true)
-        .then(() => console.log("Background Zoho cache refresh completed"))
-        .catch(err => console.error("Background Zoho cache refresh failed:", err));
+        .then(() => console.log("Background Zoho data refresh completed"))
+        .catch(err => console.error("Background Zoho data refresh failed:", err));
     } catch (error) {
-      console.error("Error checking/refreshing Zoho cache:", error);
+      console.error("Error refreshing Zoho data:", error);
     }
   }
 }
