@@ -11,11 +11,10 @@ export class TransactionStatsRepository extends StatsBaseRepository {
    */
   async getTransactionCounts(): Promise<Record<string, number>> {
     try {
-      // Get count of transactions by source using SQL aggregation
-      // Note: we're using a raw count query with group by since the groupBy method isn't available
+      // Get count of transactions by source
       const { data, error } = await this.getClient()
         .from('cached_transactions')
-        .select('source, count(*)', { count: 'exact' })
+        .select('source')
         .not('source', 'is', null);
       
       if (error) {
@@ -23,11 +22,13 @@ export class TransactionStatsRepository extends StatsBaseRepository {
         return {};
       }
       
-      // Format the counts
+      // Format the counts manually
       const counts: Record<string, number> = {};
       if (data) {
+        // Group by source and count
         data.forEach(item => {
-          counts[item.source] = parseInt(String(item.count));
+          const source = item.source;
+          counts[source] = (counts[source] || 0) + 1;
         });
       }
       
@@ -44,10 +45,9 @@ export class TransactionStatsRepository extends StatsBaseRepository {
   async getTransactionCountsByMonth(): Promise<Record<string, Record<string, number>>> {
     try {
       // Get transactions grouped by year, month and source
-      // Note: we're using a raw query since the groupBy method isn't available
       const { data, error } = await this.getClient()
         .from('cached_transactions')
-        .select('source, year, month, count(*)', { count: 'exact' })
+        .select('source, year, month')
         .not('year', 'is', null)
         .not('month', 'is', null);
       
@@ -56,15 +56,20 @@ export class TransactionStatsRepository extends StatsBaseRepository {
         return {};
       }
       
-      // Format the counts
+      // Format the counts manually
       const countsByMonth: Record<string, Record<string, number>> = {};
       if (data) {
         data.forEach(item => {
-          const key = `${item.year}-${String(item.month).padStart(2, '0')}`;
+          // Convert to string for consistent typing
+          const year = String(item.year);
+          const month = String(item.month).padStart(2, '0');
+          const key = `${year}-${month}`;
+          const source = item.source;
+          
           if (!countsByMonth[key]) {
             countsByMonth[key] = {};
           }
-          countsByMonth[key][item.source] = parseInt(String(item.count));
+          countsByMonth[key][source] = (countsByMonth[key][source] || 0) + 1;
         });
       }
       
