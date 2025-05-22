@@ -1,13 +1,12 @@
-
-import { Transaction } from "@/types/financial";
+import { Transaction } from "../../types/financial";
 import { handleApiError } from "./utils";
 import { getMockTransactions, getMockZohoWebhookResponse } from "./mockData";
-import { supabase } from "@/integrations/supabase/client";
-import { PANAMA_TIMEZONE } from "@/utils/timezoneUtils";
+import { supabase } from "../../integrations/supabase/client";
+import { PANAMA_TIMEZONE } from "../../utils/timezoneUtils";
 import { processRawTransactions, filterExcludedVendors } from "./api/processor";
 import { preparePanamaDates } from "./api/formatter";
 
-// Function to call the Supabase edge function which handles caching
+// Function to call the Supabase edge function which handles requests
 export const fetchTransactionsFromWebhook = async (
   startDate: Date, 
   endDate: Date, 
@@ -40,42 +39,6 @@ export const fetchTransactionsFromWebhook = async (
       timezone: PANAMA_TIMEZONE
     });
     
-    // First, check the cache via cache-manager
-    if (!forceRefresh) {
-      console.log("ZohoService: Checking cache via cache-manager");
-      
-      const { data: cacheData, error: cacheError } = await supabase.functions.invoke("cache-manager", {
-        body: {
-          source: "Zoho",
-          startDate: formattedStartDate,
-          endDate: formattedEndDate,
-          forceRefresh: false
-        }
-      });
-      
-      if (cacheError) {
-        console.error("Error checking cache via cache-manager:", cacheError);
-      } else if (cacheData?.cached && cacheData?.data) {
-        console.log("ZohoService: Cache hit via cache-manager");
-        
-        // Return the cached data
-        if (returnRawResponse) {
-          return { 
-            cached: true, 
-            source: "cache", 
-            data: cacheData.data,
-            raw_response: cacheData
-          };
-        }
-        
-        return filterExcludedVendors(cacheData.data);
-      }
-      
-      console.log("ZohoService: Cache miss or error, proceeding to fetch from zoho-transactions");
-    } else {
-      console.log("ZohoService: Force refresh requested");
-    }
-    
     // Call the Supabase edge function to get transactions
     const { data, error } = await supabase.functions.invoke("zoho-transactions", {
       body: {
@@ -89,7 +52,7 @@ export const fetchTransactionsFromWebhook = async (
       console.error("Failed to fetch data from Supabase function:", error);
       
       // If we get an error, use mock data
-      const errorMessage = handleApiError({details: error.message}, 'Failed to fetch Zoho transactions from Supabase cache');
+      const errorMessage = handleApiError({details: error.message}, 'Failed to fetch Zoho transactions');
       console.warn('Falling back to mock data due to error');
       
       // Use more complete mock data that includes facturas_sin_pagar

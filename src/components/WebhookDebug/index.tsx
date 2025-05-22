@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
@@ -60,14 +60,11 @@ const WebhookDebug: React.FC<WebhookDebugProps> = ({
     }
   };
 
-  // Load data from the existing rawResponse prop if available
-  useEffect(() => {
+  // Use rawResponse if provided, but don't auto-fetch
+  React.useEffect(() => {
     if (rawResponse && rawResponse.facturas_sin_pagar && Array.isArray(rawResponse.facturas_sin_pagar)) {
       console.log("WebhookDebug: Using facturas_sin_pagar from rawResponse:", rawResponse.facturas_sin_pagar.length);
       setUnpaidInvoices(rawResponse.facturas_sin_pagar);
-    } else {
-      console.log("WebhookDebug: No unpaid invoices in rawResponse, fetching...");
-      fetchDebugData();
     }
   }, [rawResponse]);
 

@@ -1,9 +1,7 @@
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { financialService } from '@/services/financialService';
 import { zohoRepository } from '@/repositories/zohoRepository';
-import { useCacheSegments } from '@/hooks/cache/useCacheSegments';
-import CacheService from '@/services/cache';
 
 /**
  * Base hook for fetching financial data
@@ -13,14 +11,6 @@ export const useFinancialDataFetcher = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [rawResponse, setRawResponse] = useState<any>(null);
-  const [usingCachedData, setUsingCachedData] = useState<boolean>(false);
-  const [cacheStatus, setCacheStatus] = useState<{
-    zoho: { hit: boolean, partial: boolean },
-    stripe: { hit: boolean, partial: boolean }
-  }>({
-    zoho: { hit: false, partial: false },
-    stripe: { hit: false, partial: false }
-  });
   const [apiConnectivity, setApiConnectivity] = useState<{
     zoho: boolean,
     stripe: boolean
@@ -28,47 +18,6 @@ export const useFinancialDataFetcher = () => {
     zoho: true,
     stripe: true
   });
-
-  // Get cache segments helper
-  const { checkSourceCache } = useCacheSegments();
-
-  // Check cache status
-  const checkCacheStatus = useCallback(async (
-    dateRange: { startDate: Date; endDate: Date }
-  ) => {
-    if (!dateRange.startDate || !dateRange.endDate) return;
-
-    try {
-      // Check Zoho cache
-      const zohoCache = await checkSourceCache('Zoho', dateRange);
-      
-      // Check Stripe cache
-      const stripeCache = await checkSourceCache('Stripe', dateRange);
-      
-      // Update cache status
-      setCacheStatus({
-        zoho: { 
-          hit: zohoCache.cached, 
-          partial: zohoCache.partial || false 
-        },
-        stripe: { 
-          hit: stripeCache.cached, 
-          partial: stripeCache.partial || false 
-        }
-      });
-      
-      // Determine if we're using cached data
-      setUsingCachedData(zohoCache.cached || stripeCache.cached);
-      
-      return {
-        zoho: zohoCache,
-        stripe: stripeCache
-      };
-    } catch (err) {
-      console.error("Error checking cache status:", err);
-      return null;
-    }
-  }, [checkSourceCache]);
 
   // Check API connectivity
   const checkApiConnectivity = useCallback(async () => {
@@ -90,9 +39,6 @@ export const useFinancialDataFetcher = () => {
     setLoading(true);
     setError(null);
     
-    // Check cache status first
-    await checkCacheStatus(dateRange);
-    
     try {
       // Check connectivity first
       await checkApiConnectivity();
@@ -110,9 +56,6 @@ export const useFinancialDataFetcher = () => {
         setRawResponse(rawData);
       }
       
-      // Check cache status again after fetch to update the UI
-      await checkCacheStatus(dateRange);
-      
       setLoading(false);
       return success;
     } catch (err: any) {
@@ -121,27 +64,14 @@ export const useFinancialDataFetcher = () => {
       setLoading(false);
       return false;
     }
-  }, [checkApiConnectivity, checkCacheStatus]);
-
-  // Check cache status on mount
-  useEffect(() => {
-    // This will run once on mount
-    const currentDate = new Date();
-    const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-    
-    checkCacheStatus({ startDate, endDate });
-  }, [checkCacheStatus]);
+  }, [checkApiConnectivity]);
 
   return {
     loading,
     error,
     rawResponse,
-    usingCachedData,
     fetchFinancialData,
-    cacheStatus,
     apiConnectivity,
-    checkApiConnectivity,
-    checkCacheStatus
+    checkApiConnectivity
   };
 };

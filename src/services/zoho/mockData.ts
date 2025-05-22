@@ -1,6 +1,6 @@
 
-import { Transaction } from "@/types/financial";
-import { formatDateYYYYMMDD_Panama } from "@/utils/timezoneUtils";
+import { Transaction } from "../../types/financial";
+import { formatDateYYYYMMDD_Panama } from "../../utils/timezoneUtils";
 import { ZohoTransactionResponse } from "./api/types";
 
 // Mock data for development and testing purposes

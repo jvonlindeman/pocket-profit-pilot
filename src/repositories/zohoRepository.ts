@@ -4,7 +4,7 @@ import { UnpaidInvoice } from "../services/zoho/api/types";
 
 /**
  * ZohoRepository handles all data access related to Zoho directly from the API
- * without any caching or intermediate storage
+ * without any intermediate storage
  */
 export class ZohoRepository {
   private lastRawResponse: any = null;
@@ -131,33 +131,6 @@ export class ZohoRepository {
       return false;
     }
   }
-
-  /**
-   * Force refresh to get new data
-   */
-  async repairCache(startDate: Date, endDate: Date): Promise<boolean> {
-    try {
-      await zohoApiClient.fetchTransactionsFromWebhook(startDate, endDate, true);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Compatibility method for legacy code
-   */
-  async checkAndRefreshCache(startDate: Date, endDate: Date): Promise<void> {
-    try {
-      console.log("Background refresh of Zoho data initiated");
-      zohoApiClient.fetchTransactionsFromWebhook(startDate, endDate, true)
-        .then(() => console.log("Background Zoho data refresh completed"))
-        .catch(err => console.error("Background Zoho data refresh failed:", err));
-    } catch (error) {
-      console.error("Error refreshing Zoho data:", error);
-    }
-  }
 }
 
-// Export a singleton instance
 export const zohoRepository = new ZohoRepository();
