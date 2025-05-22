@@ -12,11 +12,11 @@ export class TransactionStatsRepository extends StatsBaseRepository {
   async getTransactionCounts(): Promise<Record<string, number>> {
     try {
       // Get count of transactions by source using SQL aggregation
+      // Note: we're using a raw count query with group by since the groupBy method isn't available
       const { data, error } = await this.getClient()
         .from('cached_transactions')
-        .select('source, count')
-        .not('source', 'is', 'null')
-        .groupBy('source');
+        .select('source, count(*)', { count: 'exact' })
+        .not('source', 'is', null);
       
       if (error) {
         this.logStatError("Error getting transaction counts", error);
@@ -44,12 +44,12 @@ export class TransactionStatsRepository extends StatsBaseRepository {
   async getTransactionCountsByMonth(): Promise<Record<string, Record<string, number>>> {
     try {
       // Get transactions grouped by year, month and source
+      // Note: we're using a raw query since the groupBy method isn't available
       const { data, error } = await this.getClient()
         .from('cached_transactions')
-        .select('source, year, month, count')
-        .not('year', 'is', 'null')
-        .not('month', 'is', 'null')
-        .groupBy('source, year, month');
+        .select('source, year, month, count(*)', { count: 'exact' })
+        .not('year', 'is', null)
+        .not('month', 'is', null);
       
       if (error) {
         this.logStatError("Error getting transaction counts by month", error);
