@@ -300,4 +300,5 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
         </div>
       </CardContent>
     </Card>
-  </div>
+  );
+}
