@@ -11,11 +11,19 @@ export class TransactionStatsRepository extends StatsBaseRepository {
    */
   async getTransactionCounts(): Promise<Record<string, number>> {
     try {
-      // Get count of transactions by source
+      // Get count of transactions by source using SQL
       const { data, error } = await this.getClient()
         .from('cached_transactions')
-        .select('source, count')
-        .groupBy('source');
+        .select('source, count(*)')
+        .filter('source', 'is', 'not.null')
+        .then(result => {
+          // Process the result to extract sources and counts
+          const processedData = (result.data || []).map(row => ({
+            source: row.source,
+            count: parseInt(row.count || '0')
+          }));
+          return { data: processedData, error: result.error };
+        });
       
       if (error) {
         this.logStatError("Error getting transaction counts", error);
@@ -26,7 +34,7 @@ export class TransactionStatsRepository extends StatsBaseRepository {
       const counts: Record<string, number> = {};
       if (data) {
         data.forEach(item => {
-          counts[item.source] = parseInt(item.count);
+          counts[item.source] = parseInt(item.count.toString());
         });
       }
       
@@ -42,13 +50,22 @@ export class TransactionStatsRepository extends StatsBaseRepository {
    */
   async getTransactionCountsByMonth(): Promise<Record<string, Record<string, number>>> {
     try {
-      // Get transactions grouped by year, month and source
+      // Get transactions grouped by year, month and source using SQL
       const { data, error } = await this.getClient()
         .from('cached_transactions')
-        .select('source, year, month, count')
+        .select('source, year, month, count(*)')
         .filter('year', 'not.is.null')
         .filter('month', 'not.is.null')
-        .groupBy('source, year, month');
+        .then(result => {
+          // Process the result to extract year, month, source and counts
+          const processedData = (result.data || []).map(row => ({
+            source: row.source,
+            year: row.year,
+            month: row.month,
+            count: parseInt(row.count || '0')
+          }));
+          return { data: processedData, error: result.error };
+        });
       
       if (error) {
         this.logStatError("Error getting transaction counts by month", error);
@@ -63,7 +80,7 @@ export class TransactionStatsRepository extends StatsBaseRepository {
           if (!countsByMonth[key]) {
             countsByMonth[key] = {};
           }
-          countsByMonth[key][item.source] = parseInt(item.count);
+          countsByMonth[key][item.source] = parseInt(item.count.toString());
         });
       }
       

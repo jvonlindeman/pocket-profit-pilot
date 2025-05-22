@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, RefreshCw, Bug, Calendar, FileInvoice } from 'lucide-react';
+import { Loader2, RefreshCw, Bug, Calendar, FileText } from 'lucide-react';
 import * as ZohoService from '@/services/zohoService';
 import { formatDateYYYYMMDD } from '@/utils/dateUtils';
 
@@ -342,7 +341,7 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
                 <div className="mb-4 p-2 bg-blue-50 border border-blue-100 rounded">
                   <p className="text-sm text-blue-800 font-medium">Facturas Sin Pagar</p>
                   <p className="text-xs text-blue-700 mt-1 flex items-center">
-                    <FileInvoice className="h-3 w-3 mr-1" />
+                    <FileText className="h-3 w-3 mr-1" />
                     Facturas pendientes de cobro
                   </p>
                 </div>
