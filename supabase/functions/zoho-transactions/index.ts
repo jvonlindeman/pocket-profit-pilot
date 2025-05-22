@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -287,6 +286,7 @@ serve(async (req: Request) => {
           colaboradores: [],  // Empty placeholders since we're using cached data
           expenses: [],
           payments: [],
+          facturas_sin_pagar: [], // Add empty array for unpaid invoices when using cache
           cached: true,
           cached_transactions: cacheResult.data,
           cache_hit: true
@@ -378,7 +378,7 @@ serve(async (req: Request) => {
         }
         
         // Handle specific fields that might be strings instead of arrays
-        const arrayFields = ["colaboradores", "expenses", "payments"];
+        const arrayFields = ["colaboradores", "expenses", "payments", "facturas_sin_pagar"];
         for (const field of arrayFields) {
           if (fixedJson.includes(`"${field}": "`)) {
             fixedJson = fixedJson.replace(
@@ -448,7 +448,8 @@ serve(async (req: Request) => {
     const hasData = (
       (Array.isArray(webhookData.colaboradores) && webhookData.colaboradores.length > 0) ||
       (Array.isArray(webhookData.expenses) && webhookData.expenses.length > 0) ||
-      (Array.isArray(webhookData.payments) && webhookData.payments.length > 0)
+      (Array.isArray(webhookData.payments) && webhookData.payments.length > 0) ||
+      (Array.isArray(webhookData.facturas_sin_pagar) && webhookData.facturas_sin_pagar.length > 0)
     );
     
     if (!hasData) {
@@ -585,6 +586,14 @@ serve(async (req: Request) => {
       console.log("No payment data found in webhook response");
     }
     
+    // Process unpaid invoices (facturas_sin_pagar) - keep as is, don't convert to transactions
+    if (Array.isArray(webhookData.facturas_sin_pagar)) {
+      console.log(`Found ${webhookData.facturas_sin_pagar.length} unpaid invoices`);
+    } else if (!webhookData.facturas_sin_pagar) {
+      console.log("No unpaid invoices data found, adding empty array");
+      webhookData.facturas_sin_pagar = [];
+    }
+    
     console.log(`Processed ${transactions.length} transactions from webhook data`);
     
     // Store the transactions in cache directly from the edge function
@@ -602,7 +611,8 @@ serve(async (req: Request) => {
       cache_result: cacheResult,
       transaction_count: transactions.length,
       income_count: transactions.filter(tx => tx.type === 'income').length,
-      expense_count: transactions.filter(tx => tx.type === 'expense').length
+      expense_count: transactions.filter(tx => tx.type === 'expense').length,
+      unpaid_invoices_count: webhookData.facturas_sin_pagar?.length || 0
     };
     
     console.log("Successfully fetched and processed data");

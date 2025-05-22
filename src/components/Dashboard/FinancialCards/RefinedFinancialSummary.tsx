@@ -10,9 +10,10 @@ import { useFinance } from '@/contexts/FinanceContext';
 import { registerInteraction } from '@/utils/uiCapture';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import OverdueInvoicesSection from '../OverdueInvoices/OverdueInvoicesSection';
 
 const RefinedFinancialSummary: React.FC = () => {
-  const { dateRange } = useFinance();
+  const { dateRange, unpaidInvoices } = useFinance();
   const isMobile = useIsMobile();
   
   // Register components as visible
@@ -21,10 +22,16 @@ const RefinedFinancialSummary: React.FC = () => {
     return () => {}; // No need to unregister as component unmount will take care of it
   }, []);
   
+  // Check if we have any unpaid invoices to determine layout
+  const hasUnpaidInvoices = unpaidInvoices && unpaidInvoices.length > 0;
+  
   return (
     <div className="space-y-4">
-      {/* Income Tabs Section - Re-added */}
+      {/* Income Tabs Section */}
       <IncomeTabs />
+      
+      {/* Unpaid Invoices Section */}
+      {hasUnpaidInvoices && <OverdueInvoicesSection />}
       
       <SummaryCardSection title="Resumen Financiero" data-component="financial-summary" className="financial-summary-section">
         {/* Refined Expenses Section */}
