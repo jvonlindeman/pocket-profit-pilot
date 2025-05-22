@@ -1,6 +1,7 @@
+
 import React from 'react';
 import ZohoDebug from '@/components/ZohoDebug';
-import WebhookDebug from '@/components/WebhookDebug/index';
+import WebhookDebug from '@/components/WebhookDebug';
 import StripeDebug from '@/components/StripeDebug';
 import CacheClearTool from '@/components/Dashboard/CacheClearTool';
 import CacheMonitor from '@/components/Dashboard/CacheMonitor';
