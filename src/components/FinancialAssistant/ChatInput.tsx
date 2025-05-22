@@ -3,6 +3,7 @@ import React, { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SendIcon } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface ChatInputProps {
   value: string;
@@ -19,6 +20,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   isLoading,
   inputRef
 }) => {
+  const isMobile = useIsMobile();
+  
   // Handle Enter key press
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -34,10 +37,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyPress}
-        placeholder="Escribe tu pregunta..."
+        placeholder={isMobile ? "Escribe..." : "Escribe tu pregunta..."}
         disabled={isLoading}
         className="pr-10"
         maxLength={1000}
+        size={isMobile ? "sm" : "default"}
       />
       <Button
         size="icon"
