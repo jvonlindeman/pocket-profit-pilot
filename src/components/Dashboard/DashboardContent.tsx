@@ -102,7 +102,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
         />
       </div>
 
-      {/* Financial Summary with improved organization - Using RefinedFinancialSummary instead */}
+      {/* Financial Summary with improved organization */}
       <RefinedFinancialSummary />
 
       {/* Listado de transacciones */}
