@@ -6,6 +6,7 @@ import { Settings } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { DateRange as DayPickerDateRange } from 'react-day-picker';
 import { DateRange as FinancialDateRange } from '@/types/financial';
+import { toDayPickerDateRange } from '@/utils/dateRangeAdapter';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface DashboardHeaderProps {
