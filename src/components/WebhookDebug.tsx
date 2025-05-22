@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,7 +7,7 @@ import { Loader2, RefreshCw, Bug } from 'lucide-react';
 import * as ZohoService from '@/services/zohoService';
 import { formatDateYYYYMMDD } from '@/utils/dateUtils';
 
-// Import our new components
+// Import our components
 import FormattedDataTab from './WebhookDebug/FormattedDataTab';
 import CollaboratorsTab from './WebhookDebug/CollaboratorsTab';
 import InvoicesTab from './WebhookDebug/InvoicesTab';

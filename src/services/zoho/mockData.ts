@@ -1,5 +1,6 @@
 
 import { Transaction } from "../../types/financial";
+import { UnpaidInvoice } from "./api/types";
 import { getCurrentYear } from "./utils";
 
 // Mock data for fallback when API fails or for development
@@ -85,4 +86,83 @@ export const getMockTransactions = async (startDate: Date, endDate: Date): Promi
   console.log("ZohoService mock: Found transactions:", filtered.length);
   
   return filtered;
+};
+
+// New: Mock data for unpaid invoices
+export const getMockUnpaidInvoices = (): UnpaidInvoice[] => {
+  return [
+    {
+      balance: 1066.79,
+      company_name: "CLINICA DE ESPECIALIDADES ORTOPEDICAS SA",
+      customer_name: "CLINICA DE ESPECIALIDADES ORTOPEDICAS SA"
+    },
+    {
+      balance: 1712,
+      company_name: "TRANSPORTES AMBIENTALES VERDES, S.A (Voltranc)",
+      customer_name: "TRANSPORTES AMBIENTALES VERDES, S.A"
+    },
+    {
+      balance: 856,
+      company_name: "CREMACIONES LA GLORIA DIVINA, S.A.",
+      customer_name: "CREMACIONES LA GLORIA DIVINA, S.A."
+    },
+    {
+      balance: 642,
+      company_name: "ARMANDO RAMZANY GARDELLINI CEDEÑO",
+      customer_name: "ARMANDO RAMZANY GARDELLINI CEDEÑO"
+    },
+    {
+      balance: 1155.53,
+      company_name: "FIBROSCAN CORP, S.A.",
+      customer_name: "FIBROSCAN CORP, S.A."
+    }
+  ];
+};
+
+// New: Combined mock data for all Zoho webhook data
+export const getMockZohoWebhookResponse = async (startDate: Date, endDate: Date) => {
+  return {
+    colaboradores: [
+      {
+        vendor_name: "Maria Fernanda",
+        date: `${getCurrentYear()}-05-14`,
+        total: 400,
+        status: "paid"
+      },
+      {
+        vendor_name: "Jorge Martinez",
+        date: `${getCurrentYear()}-05-01`,
+        total: 500,
+        status: "paid"
+      }
+    ],
+    expenses: [
+      {
+        date: `${getCurrentYear()}-05-15`,
+        total: 209.40,
+        vendor_name: "SE Rankings",
+        account_name: "SEO Tools"
+      },
+      {
+        date: `${getCurrentYear()}-05-08`,
+        total: 574.04,
+        vendor_name: "Clickup",
+        account_name: "Softwares Especiales"
+      }
+    ],
+    payments: [
+      {
+        date: `${getCurrentYear()}-05-21`,
+        amount: 479.9,
+        customer_name: "CLINICA DENTAL OBARRIO"
+      },
+      {
+        date: `${getCurrentYear()}-05-15`,
+        amount: 321,
+        customer_name: "ARMANDO RAMZANY GARDELLINI CEDEÑO"
+      }
+    ],
+    facturas_sin_pagar: getMockUnpaidInvoices(),
+    cached_transactions: await getMockTransactions(startDate, endDate)
+  };
 };

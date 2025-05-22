@@ -1,7 +1,7 @@
 
 import { Transaction } from "../../../types/financial";
 import { handleApiError } from "../utils";
-import { getMockTransactions } from "../mockData";
+import { getMockTransactions, getMockZohoWebhookResponse } from "../mockData";
 import { supabase } from "@/integrations/supabase/client";
 import { PANAMA_TIMEZONE } from "@/utils/timezoneUtils";
 import { processRawTransactions, filterExcludedVendors } from "./processor";
@@ -91,12 +91,18 @@ export const fetchTransactionsFromWebhook = async (
       // If we get an error, use mock data
       const errorMessage = handleApiError({details: error.message}, 'Failed to fetch Zoho transactions from Supabase cache');
       console.warn('Falling back to mock data due to error');
-      return returnRawResponse ? { error: error.message, raw_response: null } : getMockTransactions(panamaStartDate, panamaEndDate);
+      
+      // Use more complete mock data that includes facturas_sin_pagar
+      const mockData = await getMockZohoWebhookResponse(panamaStartDate, panamaEndDate);
+      return returnRawResponse ? mockData : processRawTransactions(mockData);
     }
     
     if (!data) {
       console.log("No transactions returned from Supabase function, using mock data");
-      return returnRawResponse ? { message: "No data returned", data: null, raw_response: null } : getMockTransactions(panamaStartDate, panamaEndDate);
+      
+      // Use more complete mock data that includes facturas_sin_pagar
+      const mockData = await getMockZohoWebhookResponse(panamaStartDate, panamaEndDate);
+      return returnRawResponse ? mockData : processRawTransactions(mockData);
     }
     
     console.log("ZohoService: Received data from Supabase function");
@@ -124,6 +130,9 @@ export const fetchTransactionsFromWebhook = async (
     handleApiError(err, 'Failed to connect to Supabase function');
     // Fall back to mock data
     console.warn('Falling back to mock data due to exception');
-    return returnRawResponse ? { error: err instanceof Error ? err.message : 'Unknown error', raw_response: null } : getMockTransactions(startDate, endDate);
+    
+    // Use more complete mock data that includes facturas_sin_pagar
+    const mockData = await getMockZohoWebhookResponse(startDate, endDate);
+    return returnRawResponse ? mockData : processRawTransactions(mockData);
   }
 };

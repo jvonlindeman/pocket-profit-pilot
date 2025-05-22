@@ -1,8 +1,8 @@
-
 import { Transaction } from "../types/financial";
 import * as zohoApiClient from "../services/zoho/apiClient";
 import CacheService from "../services/cache";
 import { formatDateYYYYMMDD } from "../utils/dateUtils";
+import { UnpaidInvoice } from "../services/zoho/api/types";
 
 /**
  * ZohoRepository handles all data access related to Zoho,
@@ -10,6 +10,7 @@ import { formatDateYYYYMMDD } from "../utils/dateUtils";
  */
 export class ZohoRepository {
   private lastRawResponse: any = null;
+  private unpaidInvoices: UnpaidInvoice[] = [];
   
   /**
    * Get transactions for a date range with automatic cache handling
@@ -42,6 +43,11 @@ export class ZohoRepository {
       // Store the raw response for debugging
       if (response && typeof response === 'object') {
         this.lastRawResponse = response;
+        
+        // Store unpaid invoices if available
+        if (response.facturas_sin_pagar && Array.isArray(response.facturas_sin_pagar)) {
+          this.unpaidInvoices = response.facturas_sin_pagar;
+        }
       }
       
       // If the response is already an array of Transaction objects, return it
@@ -80,6 +86,12 @@ export class ZohoRepository {
     try {
       const rawData = await zohoApiClient.fetchTransactionsFromWebhook(startDate, endDate, false, true);
       this.lastRawResponse = rawData;
+      
+      // Store unpaid invoices if available
+      if (rawData && rawData.facturas_sin_pagar && Array.isArray(rawData.facturas_sin_pagar)) {
+        this.unpaidInvoices = rawData.facturas_sin_pagar;
+      }
+      
       return rawData;
     } catch (error) {
       console.error("Error fetching raw Zoho response:", error);
@@ -90,12 +102,15 @@ export class ZohoRepository {
   /**
    * Get unpaid invoices from the last response
    */
-  getUnpaidInvoices(): any[] {
+  getUnpaidInvoices(): UnpaidInvoice[] {
+    // First try to get from the last raw response
     if (this.lastRawResponse && this.lastRawResponse.facturas_sin_pagar && 
         Array.isArray(this.lastRawResponse.facturas_sin_pagar)) {
       return this.lastRawResponse.facturas_sin_pagar;
     }
-    return [];
+    
+    // Otherwise return the stored unpaid invoices
+    return this.unpaidInvoices;
   }
 
   /**

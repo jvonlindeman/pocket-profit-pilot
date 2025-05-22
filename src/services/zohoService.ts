@@ -9,3 +9,4 @@ export const getRawResponse = zohoRepository.getRawResponse.bind(zohoRepository)
 export const checkApiConnectivity = zohoRepository.checkApiConnectivity.bind(zohoRepository);
 export const repairCache = zohoRepository.repairCache.bind(zohoRepository);
 export const checkAndRefreshCache = zohoRepository.checkAndRefreshCache.bind(zohoRepository);
+export const getUnpaidInvoices = zohoRepository.getUnpaidInvoices.bind(zohoRepository);
