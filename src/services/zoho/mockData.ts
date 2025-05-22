@@ -88,7 +88,7 @@ export const getMockTransactions = async (startDate: Date, endDate: Date): Promi
   return filtered;
 };
 
-// New: Mock data for unpaid invoices
+// Mock data for unpaid invoices
 export const getMockUnpaidInvoices = (): UnpaidInvoice[] => {
   return [
     {
@@ -115,12 +115,49 @@ export const getMockUnpaidInvoices = (): UnpaidInvoice[] => {
       balance: 1155.53,
       company_name: "FIBROSCAN CORP, S.A.",
       customer_name: "FIBROSCAN CORP, S.A."
+    },
+    {
+      balance: 107,
+      company_name: "TECNOSERVICIOS HIDROMATICOS PTY S A",
+      customer_name: "TECNOSERVICIOS HIDROMATICOS PTY S A"
+    },
+    {
+      balance: 1262.6,
+      company_name: "ARCOM INC",
+      customer_name: "ARCOM INC"
+    },
+    {
+      balance: 856,
+      company_name: "ADMINISTRADORES EMPRESARIALES S A",
+      customer_name: "ADMINISTRADORES EMPRESARIALES S A"
+    },
+    {
+      balance: 856,
+      company_name: "LAB CENTER S A",
+      customer_name: "LAB CENTER S A"
+    },
+    {
+      balance: 321,
+      company_name: "Nova Respiración",
+      customer_name: "Nova Respiración"
+    },
+    {
+      balance: 214,
+      company_name: "CENTRO DE IMAGENES DOCATI LOS ANDES, S.A.",
+      customer_name: "CENTRO DE IMAGENES DOCATI LOS ANDES, S.A."
+    },
+    {
+      balance: 856,
+      company_name: "ARCE AVICOLA S A",
+      customer_name: "ARCE AVICOLA S A"
     }
   ];
 };
 
-// New: Combined mock data for all Zoho webhook data
+// Combined mock data for all Zoho webhook data
 export const getMockZohoWebhookResponse = async (startDate: Date, endDate: Date) => {
+  console.log("getMockZohoWebhookResponse: Generating mock webhook response data");
+  
   return {
     colaboradores: [
       {

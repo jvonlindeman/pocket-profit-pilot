@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -6,6 +7,11 @@ import { Loader2, RefreshCw, Bug } from 'lucide-react';
 import * as ZohoService from '@/services/zohoService';
 import { DateRange } from 'react-day-picker';
 import { toFinancialDateRange } from '@/utils/dateRangeAdapter';
+import { toast } from '@/components/ui/use-toast';
+import FormattedDataTab from './FormattedDataTab';
+import CollaboratorsTab from './CollaboratorsTab';
+import InvoicesTab from './InvoicesTab';
+import RawDataTab from './RawDataTab';
 
 interface WebhookDebugProps {
   dateRange: DateRange;
@@ -16,6 +22,15 @@ export default function WebhookDebug({ dateRange, refreshDataFunction }: Webhook
   const [loading, setLoading] = useState(false);
   const [rawData, setRawData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [dataLoaded, setDataLoaded] = useState(false);
+
+  // Auto-load data on component mount
+  useEffect(() => {
+    if (!dataLoaded && !loading) {
+      console.log("WebhookDebug/index.tsx: Auto-loading data on mount");
+      fetchDebugData();
+    }
+  }, []);
 
   // Function to fetch raw webhook data
   const fetchDebugData = async () => {
@@ -40,11 +55,27 @@ export default function WebhookDebug({ dateRange, refreshDataFunction }: Webhook
         financialDateRange.startDate, 
         financialDateRange.endDate
       );
-      setRawData(data);
-      console.log("Debug data received:", data);
+      
+      if (data) {
+        console.log("Debug data received:", data);
+        setRawData(data);
+        setDataLoaded(true);
+        toast({
+          title: "Datos cargados",
+          description: "Los datos del webhook se han cargado correctamente",
+          variant: "success",
+        });
+      } else {
+        setError("No se recibieron datos del webhook");
+      }
     } catch (err: any) {
       setError(err.message || "Error desconocido");
       console.error("Failed to fetch debug data:", err);
+      toast({
+        title: "Error",
+        description: `Error al cargar los datos: ${err.message || "Error desconocido"}`,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -92,61 +123,35 @@ export default function WebhookDebug({ dateRange, refreshDataFunction }: Webhook
           </div>
         )}
 
+        {!dataLoaded && !loading && !error && (
+          <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-lg p-4 mb-4 text-center">
+            <p className="text-sm">Esperando datos del webhook. Haz clic en "Cargar Datos" para comenzar.</p>
+          </div>
+        )}
+
         {rawData && !loading && (
           <Tabs defaultValue="formatted" className="w-full">
-            <TabsList className="grid grid-cols-2 w-[200px]">
+            <TabsList className="grid grid-cols-4 w-full md:w-[400px]">
               <TabsTrigger value="formatted">Formateado</TabsTrigger>
+              <TabsTrigger value="collaborators">Colaboradores</TabsTrigger>
+              <TabsTrigger value="invoices">Facturas Pendientes</TabsTrigger>
               <TabsTrigger value="raw">JSON Crudo</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="formatted" className="p-0">
-              <div className="border rounded-md p-4 mt-2 bg-gray-50 max-h-[400px] overflow-auto">
-                <div className="mb-4 p-2 bg-blue-50 border border-blue-100 rounded">
-                  <p className="text-sm text-blue-800 font-medium">Resumen de la Estructura</p>
-                  <p className="text-xs text-blue-700 mt-1">
-                    {Array.isArray(rawData) 
-                      ? `Array con ${rawData.length} elementos` 
-                      : 'Los datos no están en el formato esperado (array)'}
-                  </p>
-                </div>
-
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="p-2 text-left border-b">Clave</th>
-                      <th className="p-2 text-left border-b">Valor</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {typeof rawData === 'object' && rawData !== null ? (
-                      Object.entries(rawData).map(([key, value]) => (
-                        <tr key={key}>
-                          <td className="p-2 border-b font-medium">{key}</td>
-                          <td className="p-2 border-b">
-                            {typeof value === 'object' 
-                              ? JSON.stringify(value).substring(0, 100) + (JSON.stringify(value).length > 100 ? '...' : '')
-                              : String(value)}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={2} className="p-2 border-b">
-                          {String(rawData)}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+            <TabsContent value="formatted">
+              <FormattedDataTab rawData={rawData} />
             </TabsContent>
             
-            <TabsContent value="raw" className="p-0">
-              <div className="border rounded-md p-4 mt-2 bg-gray-50 max-h-[400px] overflow-auto">
-                <pre className="text-xs whitespace-pre-wrap break-words">
-                  {JSON.stringify(rawData, null, 2)}
-                </pre>
-              </div>
+            <TabsContent value="collaborators">
+              <CollaboratorsTab collaborators={rawData?.colaboradores || []} />
+            </TabsContent>
+            
+            <TabsContent value="invoices">
+              <InvoicesTab invoices={rawData?.facturas_sin_pagar || []} />
+            </TabsContent>
+            
+            <TabsContent value="raw">
+              <RawDataTab rawData={rawData} />
             </TabsContent>
           </Tabs>
         )}

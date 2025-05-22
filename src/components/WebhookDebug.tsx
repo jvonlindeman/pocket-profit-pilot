@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, RefreshCw, Bug } from 'lucide-react';
 import * as ZohoService from '@/services/zohoService';
 import { formatDateYYYYMMDD } from '@/utils/dateUtils';
+import { toast } from '@/components/ui/use-toast';
 
 // Import our components
 import FormattedDataTab from './WebhookDebug/FormattedDataTab';
@@ -26,14 +27,24 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
   const [loading, setLoading] = useState(false);
   const [rawData, setRawData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   // When rawResponse changes from the parent component, update our local state
   useEffect(() => {
     if (rawResponse) {
       setRawData(rawResponse);
+      setDataLoaded(true);
       console.log("WebhookDebug: Received rawResponse from parent:", rawResponse);
     }
   }, [rawResponse]);
+
+  // Auto-load data on component mount if we don't already have it from parent
+  useEffect(() => {
+    if (!rawResponse && !dataLoaded && !loading) {
+      console.log("WebhookDebug: Auto-loading data on mount");
+      fetchDebugData();
+    }
+  }, []);
 
   // Function to fetch raw webhook data
   const fetchDebugData = async () => {
@@ -52,6 +63,7 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
         // Check if we already have data via the rawResponse prop
         if (rawResponse) {
           setRawData(rawResponse);
+          setDataLoaded(true);
           setLoading(false);
           return;
         }
@@ -59,11 +71,27 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
       
       // Otherwise, get raw data directly to show in the debug UI
       const data = await ZohoService.getRawResponse(dateRange.startDate, dateRange.endDate);
-      setRawData(data);
       console.log("Debug data received:", data);
+      
+      if (data) {
+        setRawData(data);
+        setDataLoaded(true);
+        toast({
+          title: "Datos cargados",
+          description: "Los datos del webhook se han cargado correctamente",
+          variant: "success",
+        });
+      } else {
+        setError("No se recibieron datos del webhook");
+      }
     } catch (err: any) {
       setError(err.message || "Error desconocido");
       console.error("Failed to fetch debug data:", err);
+      toast({
+        title: "Error",
+        description: `Error al cargar los datos: ${err.message || "Error desconocido"}`,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -111,9 +139,15 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
           </div>
         )}
 
+        {!dataLoaded && !loading && !error && (
+          <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-lg p-4 mb-4 text-center">
+            <p className="text-sm">Esperando datos del webhook. Haz clic en "Cargar Datos" para comenzar.</p>
+          </div>
+        )}
+
         {rawData && !loading && (
           <Tabs defaultValue="formatted" className="w-full">
-            <TabsList className="grid grid-cols-4 w-[400px]">
+            <TabsList className="grid grid-cols-4 w-full md:w-[400px]">
               <TabsTrigger value="formatted">Formateado</TabsTrigger>
               <TabsTrigger value="collaborators">Colaboradores</TabsTrigger>
               <TabsTrigger value="invoices">Facturas Pendientes</TabsTrigger>
