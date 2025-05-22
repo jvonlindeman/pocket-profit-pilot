@@ -14,7 +14,7 @@ export interface Transaction {
   fees?: number;
   gross?: number;
   metadata?: Record<string, any>;
-  external_id?: string; // Added to fix TypeScript errors
+  external_id?: string;
 }
 
 /**
@@ -28,11 +28,11 @@ export interface FinancialSummary {
   profitMargin: number;
   startDate: Date;
   endDate: Date;
-  collaboratorExpense: number; // Added missing property
-  otherExpense: number; // Added missing property
-  grossProfit: number; // Added missing property
-  grossProfitMargin: number; // Added missing property
-  startingBalance?: number; // Added missing property
+  collaboratorExpense: number;
+  otherExpense: number;
+  grossProfit: number;
+  grossProfitMargin: number;
+  startingBalance?: number;
 }
 
 /**
@@ -42,6 +42,7 @@ export interface FinancialData {
   summary: FinancialSummary;
   incomeBySource: CategorySummary[];
   expenseByCategory: CategorySummary[];
+  transactions: Transaction[];
 }
 
 /**
@@ -89,7 +90,7 @@ export interface CategorySummary {
   category: string;
   amount: number;
   percentage: number;
-  count?: number; // Added missing property
+  count?: number;
 }
 
 /**

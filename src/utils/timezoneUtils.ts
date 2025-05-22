@@ -47,7 +47,7 @@ export function endOfDayPanama(date: Date): Date {
 }
 
 /**
- * Converts a date to Panama timezone
+ * Converts a date to Panama timezone (renamed from utcToZonedTime for date-fns-tz v3 compatibility)
  */
 export function toPanamaTime(date: Date): Date {
   return convertToPanamaTimezone(date);
@@ -76,7 +76,7 @@ export function formatDateForPanamaDisplay(date: Date | string): string {
 }
 
 /**
- * Parse a string to a date in Panama timezone
+ * Parse a string to a date in Panama timezone (renamed from zonedTimeToUtc for date-fns-tz v3 compatibility)
  */
 export function parseToPanamaTime(dateString: string): Date {
   const date = new Date(dateString);

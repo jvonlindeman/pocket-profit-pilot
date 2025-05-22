@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useFinancialDataFetcher } from '@/hooks/useFinancialDataFetcher';
 import { Transaction } from '@/types/financial';
 

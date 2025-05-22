@@ -1,7 +1,6 @@
 
 import { fetchTransactionsFromWebhook } from '@/services/zoho/apiClient';
 import { Transaction } from '@/types/financial';
-import { isDateWithinMonth } from '@/utils/dateUtils';
 
 class ZohoRepository {
   private lastFetchedData: {
@@ -44,6 +43,21 @@ class ZohoRepository {
   }
   
   /**
+   * Get raw response data for a specific date range
+   * Added for WebhookDebug component
+   */
+  async getRawResponse(startDate: Date, endDate: Date): Promise<any> {
+    try {
+      // We'll just reuse the fetchTransactions method but return the raw data
+      await this.fetchTransactions(startDate, endDate, true);
+      return this.getLastRawResponse();
+    } catch (error) {
+      console.error("Error getting raw response:", error);
+      return null;
+    }
+  }
+  
+  /**
    * Check if the API can connect successfully
    */
   async checkConnectivity(): Promise<boolean> {
@@ -56,6 +70,24 @@ class ZohoRepository {
       console.error("ZohoRepository: Connectivity check failed", error);
       return false;
     }
+  }
+
+  // Method stubs for compatibility
+  getTransactions = this.fetchTransactions;
+  checkApiConnectivity = this.checkConnectivity;
+  getUnpaidInvoices(): any[] {
+    return this.lastFetchedData?.raw?.facturas_sin_pagar || [];
+  }
+  
+  // Dummy methods to satisfy interface
+  repairCache(): Promise<boolean> {
+    console.log("Cache repair no longer supported");
+    return Promise.resolve(true);
+  }
+  
+  checkAndRefreshCache(): Promise<boolean> {
+    console.log("Cache refresh no longer supported");
+    return Promise.resolve(true);
   }
 }
 

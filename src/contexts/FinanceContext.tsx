@@ -49,6 +49,8 @@ export const FinanceContext = createContext<FinanceContextType>({
     profitMargin: 0,
     grossProfit: 0,
     grossProfitMargin: 0,
+    startDate: new Date(),
+    endDate: new Date(),
   },
   transactions: [],
   dateRange: {

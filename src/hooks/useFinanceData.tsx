@@ -47,8 +47,8 @@ export const useFinanceData = () => {
 
   // Save financial summary when data changes
   useMemo(() => {
-    saveFinancialData(financialData, dateRange, transactions.length, loading);
-  }, [financialData, dateRange, transactions.length, loading, saveFinancialData]);
+    saveFinancialData(financialData);
+  }, [financialData, saveFinancialData]);
 
   // Function to refresh data with the callbacks prepared
   const refreshData = useCallback((force = false) => {
