@@ -2,7 +2,6 @@
 import React, { ReactNode } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { LucideIcon } from 'lucide-react';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 interface SummaryCardProps {
   title: string;
@@ -31,25 +30,21 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
   animate = true,
   tooltip
 }) => {
-  const isMobile = useIsMobile();
-  
-  // Determine text size based on the valueSize prop and mobile state
-  const textSizeClass = isMobile
-    ? valueSize === 'large' ? 'text-2xl' : 'text-xl'
-    : valueSize === 'small' 
-      ? 'text-xl' 
-      : valueSize === 'large' 
-        ? 'text-3xl' 
-        : 'text-2xl';
+  // Determine text size based on the valueSize prop
+  const textSizeClass = valueSize === 'small' 
+    ? 'text-xl' 
+    : valueSize === 'large' 
+      ? 'text-3xl' 
+      : 'text-2xl';
 
   // Use prop-based color or default based on icon color
   const finalValueColor = valueColor || iconColor;
 
   return (
     <Card className="finance-card" title={tooltip}>
-      <CardContent className={isMobile ? "p-4" : "p-6"}>
+      <CardContent className="p-6">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-medium text-gray-500 truncate pr-2">{title}</h3>
+          <h3 className="text-sm font-medium text-gray-500">{title}</h3>
           <div className={`p-2 ${iconBgColor} rounded-full`}>
             <Icon className={`h-4 w-4 ${iconColor}`} />
           </div>

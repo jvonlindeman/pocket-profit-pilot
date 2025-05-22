@@ -4,19 +4,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StripeIncomeTab from './StripeTabs/StripeIncomeTab';
 import ZohoIncomeTab from './StripeTabs/ZohoIncomeTab';
 import CombinedFinanceTab from './StripeTabs/CombinedFinanceTab';
-import { useFinance } from '@/contexts/FinanceContext';
 
 const IncomeTabs: React.FC = () => {
   // Track active tab for possible performance optimizations
   const [activeTab, setActiveTab] = useState('stripe');
-  
-  // Access the finance context to ensure data is available
-  const finance = useFinance();
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
-    // Log tab changes for analytics
-    console.log(`IncomeTabs - Tab changed to: ${value}`);
   };
 
   return (

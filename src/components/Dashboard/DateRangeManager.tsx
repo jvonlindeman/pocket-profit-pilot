@@ -1,13 +1,12 @@
 
 import React from 'react';
 import { DateRange as DayPickerDateRange } from 'react-day-picker';
-import { DateRange as FinancialDateRange } from '@/types/financial';
 import { toDayPickerDateRange, toFinancialDateRange } from '@/utils/dateRangeAdapter';
 
 interface DateRangeManagerProps {
-  dateRange: FinancialDateRange;
-  updateDateRange: (newRange: FinancialDateRange) => void;
-  getCurrentMonthRange: () => FinancialDateRange;
+  dateRange: { startDate: Date; endDate: Date };
+  updateDateRange: (newRange: { startDate: Date; endDate: Date }) => void;
+  getCurrentMonthRange: () => { startDate: Date; endDate: Date };
   children: (helpers: {
     handleDateRangeChange: (newRange: DayPickerDateRange) => void;
     getDatePickerCurrentMonthRange: () => DayPickerDateRange;

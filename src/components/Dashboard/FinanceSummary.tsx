@@ -1,6 +1,6 @@
 
 import React, { useEffect } from 'react';
-import { FinancialSummary, CategorySummary, Transaction } from '@/types/financial';
+import { FinancialSummary, CategorySummary } from '@/types/financial';
 import InitialBalanceSection from './FinancialCards/InitialBalanceSection';
 import IncomeTabs from './FinancialCards/IncomeTabs';
 import { FinanceProvider } from '@/contexts/FinanceContext';
@@ -20,7 +20,6 @@ interface FinanceSummaryProps {
   stripeFeePercentage?: number;
   regularIncome?: number;
   dateRange?: { startDate: Date | null; endDate: Date | null };
-  transactions?: Transaction[];
 }
 
 const FinanceSummary: React.FC<FinanceSummaryProps> = ({
@@ -34,8 +33,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
   stripeNet = 0,
   stripeFeePercentage = 0,
   regularIncome = 0,
-  dateRange = { startDate: null, endDate: null },
-  transactions = []
+  dateRange = { startDate: null, endDate: null }
 }) => {
   // Filter collaborator expenses using our utility function
   const collaboratorExpenses = expenseCategories.filter(
@@ -43,7 +41,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
   );
   
   // Use the processor hook to get a more accurate financial summary
-  const processedData = useFinancialSummaryProcessor(transactions, summary.startingBalance || 0, collaboratorExpenses);
+  const processedData = useFinancialSummaryProcessor([], summary.startingBalance || 0, collaboratorExpenses);
   
   // Create an improved summary that includes both original and processed data
   const refinedSummary = {
@@ -60,16 +58,12 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
     console.log("FinanceSummary - Refined summary:", refinedSummary);
     console.log("FinanceSummary - Processed data:", processedData);
     console.log("FinanceSummary - Date range:", dateRange);
-    console.log("FinanceSummary - Transactions count:", transactions.length);
-    console.log("FinanceSummary - Zoho income transactions:", 
-      transactions.filter(tx => tx.type === 'income' && tx.source === 'Zoho').length
-    );
-  }, [expenseCategories, collaboratorExpenses, summary, refinedSummary, processedData, dateRange, transactions]);
+  }, [expenseCategories, collaboratorExpenses, summary, refinedSummary, processedData, dateRange]);
 
   return (
     <FinanceProvider
       summary={refinedSummary}
-      transactions={transactions}
+      transactions={[]} // We don't need transactions in this component tree
       dateRange={dateRange}
       stripeIncome={stripeIncome}
       stripeFees={stripeFees}
@@ -85,7 +79,8 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
         {/* Initial Balance Section */}
         <InitialBalanceSection startingBalance={refinedSummary.startingBalance || 0} />
 
-        {/* Removed duplicate IncomeTabs as it's now part of RefinedFinancialSummary */}
+        {/* Income Sources Section with Tabs */}
+        <IncomeTabs />
 
         {/* Financial Summary Section - Using our refined component */}
         <RefinedFinancialSummary />

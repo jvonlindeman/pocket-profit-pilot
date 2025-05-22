@@ -2,9 +2,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// CORS headers for browser requests - using environment variable for origin
+// CORS headers for browser requests
 const corsHeaders = {
-  "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") || "*",
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -13,15 +13,10 @@ const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as stri
 
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-// The make.com webhook URL from environment variable
-const makeWebhookUrl = Deno.env.get("MAKE_WEBHOOK_URL") as string;
-
-if (!makeWebhookUrl) {
-  console.error("MAKE_WEBHOOK_URL environment variable is not set");
-}
+// The make.com webhook URL
+const makeWebhookUrl = "https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihlmx22";
 
 // Lista de proveedores que deben ser excluidos
-// Updated to use the API config file
 const excludedVendors = ["Johan von Lindeman", "DFC Panama", "Bottom Consulting", "Mr. Analytics LLC"];
 
 interface TransactionRequest {
@@ -222,12 +217,6 @@ serve(async (req: Request) => {
   }
   
   try {
-    // Verify authorization 
-    const authHeader = req.headers.get('Authorization');
-    const apikey = req.headers.get('apikey');
-    
-    // Skip auth check if this is deployed with JWT verification enabled in config.toml
-    
     // Get the request body
     let requestBody: TransactionRequest;
     
@@ -251,8 +240,9 @@ serve(async (req: Request) => {
         );
     }
     
-    // Validate the input
     const { startDate, endDate, forceRefresh = false } = requestBody;
+    
+    console.log("Edge function parsed dates:", { startDate, endDate, forceRefresh });
     
     if (!startDate || !endDate) {
       console.error("Missing start or end date");
@@ -261,17 +251,6 @@ serve(async (req: Request) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    
-    // Validate date format (YYYY-MM-DD)
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
-      return new Response(
-        JSON.stringify({ error: "Invalid date format. Use YYYY-MM-DD" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    
-    console.log("Edge function parsed dates:", { startDate, endDate, forceRefresh });
 
     // Check if data is already in cache and we're not forcing a refresh
     if (!forceRefresh) {
@@ -304,17 +283,7 @@ serve(async (req: Request) => {
     }
     
     // Call the make.com webhook directly
-    if (!makeWebhookUrl) {
-      return new Response(
-        JSON.stringify({ 
-          error: "Make webhook URL is not configured",
-          details: "The MAKE_WEBHOOK_URL environment variable is not set in the Supabase function configuration"
-        }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    
-    console.log("Edge function calling make.com webhook");
+    console.log("Edge function calling make.com webhook:", makeWebhookUrl);
     const webhookResponse = await fetch(makeWebhookUrl, {
       method: "POST",
       headers: {
@@ -336,9 +305,7 @@ serve(async (req: Request) => {
         JSON.stringify({ 
           error: "Failed to fetch data from make.com webhook", 
           details: errorText,
-          raw_response: errorText,
-          webhook_url_configured: !!makeWebhookUrl,
-          webhook_status: webhookResponse.status
+          raw_response: errorText
         }),
         { status: webhookResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -346,7 +313,7 @@ serve(async (req: Request) => {
     
     // Get the raw response text
     const responseText = await webhookResponse.text();
-    console.log(`Edge function: make.com webhook raw response received`);
+    console.log(`Edge function: make.com webhook raw response: ${responseText}`);
     
     // Parse the webhook response
     let webhookData;
@@ -418,11 +385,9 @@ serve(async (req: Request) => {
           // As a fallback, return a structured response with the raw text
           return new Response(
             JSON.stringify({ 
-              raw_response: responseText,
+              raw_response: originalResponse,
               error: "Could not parse webhook response",
-              details: "The response from make.com could not be parsed as valid JSON.",
-              webhook_url_configured: !!makeWebhookUrl,
-              webhook_status: webhookResponse.status
+              details: "The response from make.com could not be parsed as valid JSON."
             }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
@@ -433,27 +398,13 @@ serve(async (req: Request) => {
         // As a fallback, return a structured response with the raw text
         return new Response(
           JSON.stringify({ 
-            raw_response: responseText,
+            raw_response: originalResponse,
             error: "Could not process webhook response",
-            details: fixError instanceof Error ? fixError.message : "Unknown error",
-            webhook_url_configured: !!makeWebhookUrl,
-            webhook_status: webhookResponse.status
+            details: fixError instanceof Error ? fixError.message : "Unknown error"
           }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-    }
-    
-    // Check if we have empty data
-    const hasData = (
-      (Array.isArray(webhookData.colaboradores) && webhookData.colaboradores.length > 0) ||
-      (Array.isArray(webhookData.expenses) && webhookData.expenses.length > 0) ||
-      (Array.isArray(webhookData.payments) && webhookData.payments.length > 0)
-    );
-    
-    if (!hasData) {
-      console.warn("Webhook returned empty data arrays");
-      webhookData.warning = "The webhook returned empty data arrays. This could indicate no data for the period or an issue with the Make.com scenario.";
     }
     
     // Process the data into transactions
@@ -466,7 +417,6 @@ serve(async (req: Request) => {
     
     // Process collaborator expenses - Ahora incluyendo fechas y excluyendo proveedores específicos
     if (Array.isArray(webhookData.colaboradores)) {
-      console.log(`Processing ${webhookData.colaboradores.length} collaborator records`);
       webhookData.colaboradores.forEach((item: any, index: number) => {
         if (item && typeof item.total !== 'undefined' && item.vendor_name) {
           // Excluir proveedores especificados
@@ -503,13 +453,10 @@ serve(async (req: Request) => {
           }
         }
       });
-    } else {
-      console.log("No collaborator data found in webhook response");
     }
     
     // Process regular expenses (ignoring "Impuestos" category)
     if (Array.isArray(webhookData.expenses)) {
-      console.log(`Processing ${webhookData.expenses.length} expense records`);
       webhookData.expenses.forEach((item: any, index: number) => {
         if (item && typeof item.total !== 'undefined' && item.account_name !== "Impuestos") {
           const amount = Number(item.total);
@@ -543,19 +490,16 @@ serve(async (req: Request) => {
           }
         }
       });
-    } else {
-      console.log("No expense data found in webhook response");
     }
     
     // Process payments (income)
     if (Array.isArray(webhookData.payments)) {
-      console.log(`Processing ${webhookData.payments.length} payment records`);
       webhookData.payments.forEach((item: any, index: number) => {
-        if (item && typeof item.amount !== 'undefined') {
+        if (item && typeof item.amount !== 'undefined' && item.customer_name) {
           const amount = Number(item.amount);
           if (amount > 0) {
             const paymentDate = item.date || new Date().toISOString().split('T')[0];
-            const customerName = item.customer_name || 'Cliente';
+            const customerName = item.customer_name;
             const invoiceId = item.invoice_id || '';
             
             const incomeTransaction = {
@@ -581,28 +525,22 @@ serve(async (req: Request) => {
           }
         }
       });
-    } else {
-      console.log("No payment data found in webhook response");
     }
     
-    console.log(`Processed ${transactions.length} transactions from webhook data`);
+    console.log(`Processed ${transactions.length} transactions`);
     
     // Store the transactions in cache directly from the edge function
-    let cacheResult = false;
     if (transactions.length > 0) {
       console.log(`Storing ${transactions.length} transactions in cache`);
-      cacheResult = await storeTransactionsInCache(transactions, 'Zoho', startDate, endDate);
+      const cacheResult = await storeTransactionsInCache(transactions, 'Zoho', startDate, endDate);
       console.log(`Transaction caching result: ${cacheResult ? 'Success' : 'Failed'}`);
     }
     
     // Add the original response to the data for debugging
     const responseData = {
       ...webhookData,
+      raw_response: originalResponse,
       cached_transactions: transactions,
-      cache_result: cacheResult,
-      transaction_count: transactions.length,
-      income_count: transactions.filter(tx => tx.type === 'income').length,
-      expense_count: transactions.filter(tx => tx.type === 'expense').length
     };
     
     console.log("Successfully fetched and processed data");
@@ -616,8 +554,7 @@ serve(async (req: Request) => {
     return new Response(
       JSON.stringify({ 
         error: "Internal server error", 
-        details: err instanceof Error ? err.message : "Unknown error",
-        webhook_url_configured: !!makeWebhookUrl
+        details: err instanceof Error ? err.message : "Unknown error" 
       }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

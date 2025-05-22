@@ -2,9 +2,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// CORS headers with restricted origin
+// CORS headers for browser requests
 const corsHeaders = {
-  "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") || "*", // Preferably set to specific origin
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -13,12 +13,8 @@ const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as stri
 
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-// Get make.com webhook URL from environment variable
-const makeWebhookUrl = Deno.env.get("MAKE_WEBHOOK_URL") as string;
-
-if (!makeWebhookUrl) {
-  console.error("MAKE_WEBHOOK_URL environment variable is not set");
-}
+// The make.com webhook URL
+const makeWebhookUrl = "https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihlmx22";
 
 interface ZohoConfigRequest {
   clientId: string;
@@ -35,7 +31,7 @@ serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Handle GET request to fetch current config (sanitized)
+  // Handle GET request to fetch current config
   if (req.method === "GET") {
     try {
       console.log("Processing GET request to fetch Zoho configuration");
@@ -69,7 +65,7 @@ serve(async (req: Request) => {
     } catch (err) {
       console.error("Error in zoho-config GET:", err);
       return new Response(
-        JSON.stringify({ error: "Internal server error", details: err instanceof Error ? err.message : "Unknown error" }),
+        JSON.stringify({ error: "Internal server error", details: err.message }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -101,59 +97,36 @@ serve(async (req: Request) => {
       
       const { clientId, clientSecret, refreshToken, organizationId } = body;
 
-      // Input validation
-      if (!refreshToken) {
-        console.error("Missing required refreshToken in request body");
+      if (!clientId || !refreshToken || !organizationId) {
+        console.error("Missing required fields in request body");
         return new Response(
-          JSON.stringify({ error: "Refresh Token is required" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      
-      // Additional validation for refreshToken format
-      if (typeof refreshToken !== 'string' || refreshToken.length < 10) {
-        return new Response(
-          JSON.stringify({ error: "Invalid refresh token format" }),
+          JSON.stringify({ error: "Client ID, Refresh Token, and Organization ID are required" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // First check if we're just updating and need to get existing data
-      let finalClientId = clientId;
+      // First check if we're just updating and need to get the existing client secret
       let finalClientSecret = clientSecret;
-      let finalOrganizationId = organizationId;
-      
-      if (!clientId || !organizationId || !clientSecret) {
-        console.log("Missing some fields, checking if we're updating an existing configuration");
+      if (!clientSecret) {
+        console.log("No client secret provided, checking if we're updating an existing configuration");
         const { data: existingConfig } = await supabase
           .from("zoho_integration")
-          .select("client_id, client_secret, organization_id")
+          .select("client_secret")
           .limit(1);
           
         if (existingConfig && existingConfig.length > 0) {
-          finalClientId = clientId || existingConfig[0].client_id;
-          finalClientSecret = clientSecret || existingConfig[0].client_secret;
-          finalOrganizationId = organizationId || existingConfig[0].organization_id;
-          console.log("Using existing configuration values for missing fields");
-        } else if (!clientId || !clientSecret || !organizationId) {
+          finalClientSecret = existingConfig[0].client_secret;
+          console.log("Using existing client secret");
+        } else {
           return new Response(
-            JSON.stringify({ error: "Missing required fields for initial configuration" }),
+            JSON.stringify({ error: "Client Secret is required for initial configuration" }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
       }
 
-      // Make sure webhook URL is available
-      if (!makeWebhookUrl) {
-        console.error("Make webhook URL is not configured");
-        return new Response(
-          JSON.stringify({ error: "Integration service is not properly configured" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
       // Call make.com webhook to validate the configuration
-      console.log("Calling service to validate Zoho configuration");
+      console.log("Calling make.com webhook to validate Zoho configuration:", makeWebhookUrl);
       const webhookResponse = await fetch(makeWebhookUrl, {
         method: "POST",
         headers: {
@@ -161,24 +134,18 @@ serve(async (req: Request) => {
         },
         body: JSON.stringify({
           action: "validateConfig",
-          clientId: finalClientId,
+          clientId: clientId,
           clientSecret: finalClientSecret,
           refreshToken: refreshToken,
-          organizationId: finalOrganizationId
+          organizationId: organizationId
         })
       });
       
-      console.log(`Validation service response status: ${webhookResponse.status}`);
+      console.log(`make.com webhook validation response status: ${webhookResponse.status}`);
       
       if (!webhookResponse.ok) {
-        let errorText = "Unknown error";
-        try {
-          errorText = await webhookResponse.text();
-        } catch (e) {
-          console.error("Error getting webhook response text:", e);
-        }
-        
-        console.error("Zoho configuration validation failed:", errorText);
+        const errorText = await webhookResponse.text();
+        console.error("Zoho configuration validation failed via make.com:", errorText);
         
         return new Response(
           JSON.stringify({ 
@@ -193,10 +160,10 @@ serve(async (req: Request) => {
       let validationData;
       try {
         const responseText = await webhookResponse.text();
-        console.log("Validation response received");
+        console.log(`make.com webhook validation response: ${responseText}`);
         validationData = JSON.parse(responseText);
       } catch (e) {
-        console.error("Failed to parse validation response:", e);
+        console.error("Failed to parse make.com webhook validation response:", e);
         return new Response(
           JSON.stringify({ error: "Failed to parse validation response" }),
           { 
@@ -235,17 +202,19 @@ serve(async (req: Request) => {
         if (existingConfig && existingConfig.length > 0) {
           // Update existing configuration
           console.log("Updating existing Zoho configuration");
-          const updateData: Record<string, any> = {
+          const updateData = {
+            client_id: clientId,
             refresh_token: refreshToken,
+            organization_id: organizationId,
             access_token: validationData.access_token,
             token_expires_at: expiryDate.toISOString(),
             updated_at: new Date().toISOString()
           };
           
-          // Only add these fields if they're provided
-          if (finalClientId) updateData.client_id = finalClientId;
-          if (finalClientSecret) updateData.client_secret = finalClientSecret;
-          if (finalOrganizationId) updateData.organization_id = finalOrganizationId;
+          // Only update client_secret if a new one was provided
+          if (clientSecret) {
+            updateData.client_secret = clientSecret;
+          }
           
           result = await supabase
             .from("zoho_integration")
@@ -258,10 +227,10 @@ serve(async (req: Request) => {
           result = await supabase
             .from("zoho_integration")
             .insert({
-              client_id: finalClientId,
+              client_id: clientId,
               client_secret: finalClientSecret,
               refresh_token: refreshToken,
-              organization_id: finalOrganizationId,
+              organization_id: organizationId,
               access_token: validationData.access_token,
               token_expires_at: expiryDate.toISOString()
             })
@@ -282,7 +251,7 @@ serve(async (req: Request) => {
         return new Response(
           JSON.stringify({ 
             success: true, 
-            message: "Zoho configuration saved and verified successfully",
+            message: "Zoho configuration saved and verified successfully via make.com",
             id: data[0].id
           }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -290,14 +259,14 @@ serve(async (req: Request) => {
       } catch (dbError) {
         console.error("Database error:", dbError);
         return new Response(
-          JSON.stringify({ error: "Database error", details: dbError instanceof Error ? dbError.message : "Unknown error" }),
+          JSON.stringify({ error: "Database error", details: dbError.message }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
     } catch (err) {
       console.error("Error in zoho-config POST:", err);
       return new Response(
-        JSON.stringify({ error: "Internal server error", details: err instanceof Error ? err.message : "Unknown error" }),
+        JSON.stringify({ error: "Internal server error", details: err.message }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

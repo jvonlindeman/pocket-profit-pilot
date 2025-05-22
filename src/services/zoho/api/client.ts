@@ -1,3 +1,4 @@
+
 import { Transaction } from "../../../types/financial";
 import { handleApiError } from "../utils";
 import { getMockTransactions } from "../mockData";
@@ -87,48 +88,18 @@ export const fetchTransactionsFromWebhook = async (
     if (error) {
       console.error("Failed to fetch data from Supabase function:", error);
       
-      // If we're asked for raw response, return the error
-      if (returnRawResponse) {
-        return { 
-          error: error.message, 
-          raw_response: null,
-          webhook_error: true,
-          details: "Error invoking zoho-transactions function"
-        };
-      }
-      
       // If we get an error, use mock data
       const errorMessage = handleApiError({details: error.message}, 'Failed to fetch Zoho transactions from Supabase cache');
       console.warn('Falling back to mock data due to error');
-      return getMockTransactions(panamaStartDate, panamaEndDate);
+      return returnRawResponse ? { error: error.message, raw_response: null } : getMockTransactions(panamaStartDate, panamaEndDate);
     }
     
     if (!data) {
       console.log("No transactions returned from Supabase function, using mock data");
-      
-      if (returnRawResponse) {
-        return { 
-          message: "No data returned", 
-          data: null, 
-          raw_response: null,
-          webhook_empty: true
-        };
-      }
-      
-      return getMockTransactions(panamaStartDate, panamaEndDate);
+      return returnRawResponse ? { message: "No data returned", data: null, raw_response: null } : getMockTransactions(panamaStartDate, panamaEndDate);
     }
     
-    console.log("ZohoService: Received data from Supabase function", {
-      isArray: Array.isArray(data),
-      hasPayments: data.payments && Array.isArray(data.payments),
-      paymentCount: data.payments && Array.isArray(data.payments) ? data.payments.length : 0,
-      hasExpenses: data.expenses && Array.isArray(data.expenses),
-      expenseCount: data.expenses && Array.isArray(data.expenses) ? data.expenses.length : 0,
-      hasCollaborators: data.colaboradores && Array.isArray(data.colaboradores),
-      collaboratorCount: data.colaboradores && Array.isArray(data.colaboradores) ? data.colaboradores.length : 0,
-      hasCachedTransactions: data.cached_transactions && Array.isArray(data.cached_transactions),
-      cachedTransactionCount: data.cached_transactions && Array.isArray(data.cached_transactions) ? data.cached_transactions.length : 0
-    });
+    console.log("ZohoService: Received data from Supabase function");
     
     // Return raw response for debugging if requested
     if (returnRawResponse) {
@@ -137,40 +108,22 @@ export const fetchTransactionsFromWebhook = async (
     
     // If we received processed transactions directly, use those
     if (Array.isArray(data) && data.length > 0 && 'type' in data[0] && 'source' in data[0]) {
-      console.log(`Received ${data.length} processed transactions directly from Supabase`);
+      console.log("Received processed transactions directly from Supabase");
       return filterExcludedVendors(data);
     }
     
     // If we received the processed webhook response, use the cached_transactions field
     if (data.cached_transactions && Array.isArray(data.cached_transactions)) {
-      console.log(`Using ${data.cached_transactions.length} processed transactions from response`);
+      console.log("Using processed transactions from response");
       return filterExcludedVendors(data.cached_transactions);
     }
     
-    // Check if webhook has no data
-    const hasNoWebhookData = (
-      (!Array.isArray(data.payments) || data.payments.length === 0) &&
-      (!Array.isArray(data.expenses) || data.expenses.length === 0) &&
-      (!Array.isArray(data.colaboradores) || data.colaboradores.length === 0)
-    );
-    
-    if (hasNoWebhookData) {
-      console.warn("Webhook returned empty data arrays, falling back to mock data");
-      return getMockTransactions(panamaStartDate, panamaEndDate);
-    }
-    
     // Otherwise, process the raw webhook response
-    const transactions = processRawTransactions(data);
-    console.log(`Processed ${transactions.length} transactions from raw webhook data`);
-    return transactions;
+    return processRawTransactions(data);
   } catch (err) {
     handleApiError(err, 'Failed to connect to Supabase function');
     // Fall back to mock data
     console.warn('Falling back to mock data due to exception');
-    return returnRawResponse ? { 
-      error: err instanceof Error ? err.message : 'Unknown error', 
-      raw_response: null,
-      exception: true
-    } : getMockTransactions(startDate, endDate);
+    return returnRawResponse ? { error: err instanceof Error ? err.message : 'Unknown error', raw_response: null } : getMockTransactions(startDate, endDate);
   }
 };

@@ -1,11 +1,10 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { MonthlyBalance } from '@/types/financial';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { formatDateYYYYMMDD } from '@/utils/dateUtils';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 interface UseMonthlyBalanceProps {
   currentDate: Date;
@@ -16,10 +15,9 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
   const [error, setError] = useState<string | null>(null);
   const [monthlyBalance, setMonthlyBalance] = useState<MonthlyBalance | null>(null);
   const { toast } = useToast();
-  const isMobile = useIsMobile();
 
   // Format the month_year for database queries (YYYY-MM)
-  const formatMonthYear = useCallback((date: Date) => {
+  const formatMonthYear = (date: Date) => {
     try {
       // Ensure we have a valid date
       if (!date || isNaN(date.getTime())) {
@@ -32,45 +30,27 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       console.error("Error formatting month-year:", err);
       return format(new Date(), 'yyyy-MM');
     }
-  }, []);
+  };
 
   // Get the current month-year string
   const currentMonthYear = formatMonthYear(currentDate);
 
   // Fetch the monthly balance for the given date
-  const fetchMonthlyBalance = useCallback(async () => {
+  const fetchMonthlyBalance = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      console.log("Fetching monthly balance for:", currentMonthYear);
-      
       const { data, error } = await supabase
         .from('monthly_balances')
         .select('*')
         .eq('month_year', currentMonthYear)
-        .maybeSingle();
+        .single();
 
-      if (error) {
-        console.error("Error fetching monthly balance:", error);
-        
-        if (isMobile) {
-          toast({
-            title: "Error",
-            description: "No se pudo cargar el balance mensual. Intentando de nuevo...",
-            variant: "destructive"
-          });
-          
-          // Auto-retry once on mobile devices after a short delay
-          setTimeout(() => {
-            fetchMonthlyBalance();
-          }, 2000);
-        }
-        
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
         throw error;
       }
 
-      console.log("Monthly balance data received:", data);
       setMonthlyBalance(data || null);
       return data || null;
     } catch (err: any) {
@@ -80,10 +60,10 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     } finally {
       setLoading(false);
     }
-  }, [currentMonthYear, toast, isMobile]);
+  };
 
   // Check if a balance exists for the current month
-  const checkBalanceExists = useCallback(async (): Promise<boolean> => {
+  const checkBalanceExists = async (): Promise<boolean> => {
     try {
       const { data, error } = await supabase
         .from('monthly_balances')
@@ -101,10 +81,10 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       console.error("Error in checkBalanceExists:", err);
       return false;
     }
-  }, [currentMonthYear]);
+  };
 
   // Set or update the monthly balance
-  const updateMonthlyBalance = useCallback(async (
+  const updateMonthlyBalance = async (
     balance: number, 
     opexAmount: number = 35,
     itbmAmount: number = 0, 
@@ -115,11 +95,6 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     setError(null);
 
     try {
-      console.log("Updating monthly balance with values:", {
-        balance, opexAmount, itbmAmount, profitPercentage, notes,
-        currentMonthYear
-      });
-      
       const updateData: any = {
         balance,
         opex_amount: opexAmount,
@@ -129,10 +104,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       };
       
       // Check if we're updating or inserting
-      const existsResult = await checkBalanceExists();
-      console.log("Balance exists check:", existsResult);
-      
-      if (existsResult) {
+      if (monthlyBalance) {
         // Update existing record
         const { data, error } = await supabase
           .from('monthly_balances')
@@ -140,12 +112,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
           .eq('month_year', currentMonthYear)
           .select();
 
-        if (error) {
-          console.error("Error updating monthly balance:", error);
-          throw error;
-        }
-        
-        console.log("Monthly balance updated:", data);
+        if (error) throw error;
         setMonthlyBalance(data[0] || null);
         
         toast({
@@ -162,12 +129,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
           })
           .select();
 
-        if (error) {
-          console.error("Error creating monthly balance:", error);
-          throw error;
-        }
-        
-        console.log("New monthly balance created:", data);
+        if (error) throw error;
         setMonthlyBalance(data[0] || null);
         
         toast({
@@ -191,14 +153,12 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     } finally {
       setLoading(false);
     }
-  }, [checkBalanceExists, currentDate, currentMonthYear, toast]);
+  };
 
   // Fetch the balance when the current date changes
   useEffect(() => {
-    if (currentDate && !isNaN(currentDate.getTime())) {
-      fetchMonthlyBalance();
-    }
-  }, [currentMonthYear, fetchMonthlyBalance, currentDate]);
+    fetchMonthlyBalance();
+  }, [currentMonthYear]);
 
   return {
     loading,

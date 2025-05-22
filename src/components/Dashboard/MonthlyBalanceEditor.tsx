@@ -6,7 +6,6 @@ import InitialBalanceDialog from './InitialBalanceDialog';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 interface MonthlyBalanceEditorProps {
   currentDate: Date;
@@ -21,11 +20,8 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
   const { 
     loading, 
     monthlyBalance, 
-    fetchMonthlyBalance,
-    updateMonthlyBalance,
-    error
+    fetchMonthlyBalance 
   } = useMonthlyBalance({ currentDate });
-  const isMobile = useIsMobile();
 
   // Ensure we have the latest balance when currentDate changes
   useEffect(() => {
@@ -67,8 +63,8 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
   };
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white p-4 rounded-lg shadow mb-4">
-      <div className="flex items-center space-x-3 mb-3 sm:mb-0">
+    <div className="flex items-center justify-between bg-white p-4 rounded-lg shadow mb-4">
+      <div className="flex items-center space-x-3">
         <div className="bg-blue-100 p-2 rounded-full">
           <Wallet className="h-5 w-5 text-blue-600" />
         </div>
@@ -80,24 +76,14 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
               "No establecido"}
           </p>
           {monthlyBalance && (
-            <div className="space-y-0.5 text-xs">
-              <p className="text-xs text-gray-400 truncate">
-                {isMobile ? (
-                  <>
-                    ITBM: ${monthlyBalance.itbm_amount?.toFixed(2) || "0.00"}<br />
-                    OPEX: ${monthlyBalance.opex_amount?.toFixed(2) || "0.00"}<br />
-                    Profit: {monthlyBalance.profit_percentage?.toFixed(1) || "0.0"}%
-                  </>
-                ) : (
-                  <>
-                    ITBM: ${monthlyBalance.itbm_amount?.toFixed(2) || "0.00"} | 
-                    OPEX: ${monthlyBalance.opex_amount?.toFixed(2) || "0.00"} | 
-                    Profit: {monthlyBalance.profit_percentage?.toFixed(1) || "0.0"}%
-                  </>
-                )}
+            <div className="space-y-0.5">
+              <p className="text-xs text-gray-400">
+                ITBM: ${monthlyBalance.itbm_amount?.toFixed(2) || "0.00"} | 
+                OPEX: ${monthlyBalance.opex_amount?.toFixed(2) || "0.00"} | 
+                Profit: {monthlyBalance.profit_percentage?.toFixed(1) || "0.0"}%
               </p>
               {monthlyBalance.notes && (
-                <p className="text-xs text-gray-500 italic max-w-[280px] sm:max-w-full truncate">
+                <p className="text-xs text-gray-500 italic">
                   "{monthlyBalance.notes}"
                 </p>
               )}

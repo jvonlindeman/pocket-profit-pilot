@@ -1,6 +1,6 @@
 import React from 'react';
 import ZohoDebug from '@/components/ZohoDebug';
-import WebhookDebug from '@/components/WebhookDebug';
+import WebhookDebug from '@/components/WebhookDebug/index';
 import StripeDebug from '@/components/StripeDebug';
 import CacheClearTool from '@/components/Dashboard/CacheClearTool';
 import CacheMonitor from '@/components/Dashboard/CacheMonitor';
@@ -10,7 +10,6 @@ import { Link } from 'react-router-dom';
 import { endOfMonth, startOfMonth } from 'date-fns';
 import ZohoConfig from '@/components/ZohoConfig';
 import { toDayPickerDateRange } from '@/utils/dateRangeAdapter';
-import { DateRange } from 'react-day-picker';
 
 const Settings = () => {
   // Create a date range for the current month
@@ -21,12 +20,12 @@ const Settings = () => {
   };
   
   // Convert to DayPicker DateRange format for components that expect it
-  const dayPickerDateRange: DateRange = toDayPickerDateRange(financialDateRange);
+  const dayPickerDateRange = toDayPickerDateRange(financialDateRange);
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white shadow-sm">
+      <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
@@ -43,7 +42,7 @@ const Settings = () => {
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -75,7 +74,6 @@ const Settings = () => {
               <StripeDebug dateRange={financialDateRange} />
             </div>
             <div className="mt-6">
-              {/* Pass the correct date range format to WebhookDebug */}
               <WebhookDebug dateRange={dayPickerDateRange} />
             </div>
           </section>

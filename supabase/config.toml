@@ -2,7 +2,7 @@
 # rstexocnpvtxfhqbnetn
 [[functions]]
 name = "zoho-config"
-verify_jwt = true
+verify_jwt = false
 
 [[functions]]
 name = "zoho-tokens"
@@ -10,20 +10,16 @@ verify_jwt = false
 
 [[functions]]
 name = "zoho-transactions"
-verify_jwt = true
+verify_jwt = false
 
 [[functions]]
 name = "stripe-balance"
-verify_jwt = true
+verify_jwt = false
 
 [[functions]]
 name = "cache-manager"
-verify_jwt = true
+verify_jwt = false
 
 [[functions]]
 name = "financial-assistant"
-verify_jwt = true
-
-[[functions]]
-name = "exchange-rates"
-verify_jwt = true
+verify_jwt = false

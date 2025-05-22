@@ -5,7 +5,7 @@ import CacheMonitor from './CacheMonitor';
 import NoTransactionsWarning from './NoTransactionsWarning';
 import MonthlyBalanceEditor from './MonthlyBalanceEditor';
 import SalaryCalculator from './SalaryCalculator';
-import RefinedFinancialSummary from './FinancialCards/RefinedFinancialSummary';
+import FinanceSummary from './FinanceSummary';
 import TransactionList from './TransactionList';
 import { FinancialSummary, Transaction } from '@/types/financial';
 
@@ -62,10 +62,6 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   const profitPercentage = monthlyBalance?.profit_percentage !== null ? monthlyBalance?.profit_percentage || 1 : 1;
   
   console.log("DashboardContent: Using values for calculator:", { opexAmount, itbmAmount, profitPercentage });
-  console.log("DashboardContent: Transaction count:", financialData.transactions.length);
-  console.log("DashboardContent: Zoho income transactions:", 
-    financialData.transactions.filter(tx => tx.type === 'income' && tx.source === 'Zoho').length
-  );
 
   return (
     <>
@@ -103,7 +99,18 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
       </div>
 
       {/* Financial Summary with improved organization */}
-      <RefinedFinancialSummary />
+      <FinanceSummary 
+        summary={financialData.summary} 
+        expenseCategories={financialData.expenseByCategory}
+        stripeIncome={stripeIncome}
+        stripeFees={stripeFees}
+        stripeTransactionFees={stripeTransactionFees}
+        stripePayoutFees={stripePayoutFees}
+        stripeAdditionalFees={stripeAdditionalFees}
+        stripeNet={stripeNet}
+        stripeFeePercentage={stripeFeePercentage}
+        regularIncome={regularIncome}
+      />
 
       {/* Listado de transacciones */}
       <div className="mt-6">

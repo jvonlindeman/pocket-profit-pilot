@@ -1,43 +1,34 @@
 
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Copy, Check } from 'lucide-react';
+import React from 'react';
 
 interface WebhookRawDataProps {
   rawData: any;
 }
 
-const WebhookRawData = ({ rawData }: WebhookRawDataProps) => {
-  const [copied, setCopied] = useState(false);
-  const jsonString = JSON.stringify(rawData, null, 2);
+const WebhookRawData: React.FC<WebhookRawDataProps> = ({ rawData }) => {
+  if (!rawData) return null;
   
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(jsonString);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  // Check if there's a raw_response property
+  const displayContent = rawData.raw_response || rawData;
+  
+  // Handle different types of content
+  const getFormattedContent = () => {
+    if (typeof displayContent === 'string') {
+      return displayContent;
+    } else {
+      try {
+        return JSON.stringify(displayContent, null, 2);
+      } catch (error) {
+        return String(displayContent);
+      }
+    }
   };
   
   return (
-    <div className="border rounded-md p-4 mt-2 bg-gray-50 relative">
-      <div className="flex justify-end mb-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={copyToClipboard}
-          className="text-xs"
-        >
-          {copied ? (
-            <><Check className="h-3 w-3 mr-1" /> Copiado</>
-          ) : (
-            <><Copy className="h-3 w-3 mr-1" /> Copiar JSON</>
-          )}
-        </Button>
-      </div>
-      <div className="max-h-[400px] overflow-auto">
-        <pre className="text-xs whitespace-pre-wrap break-words font-mono">
-          {jsonString}
-        </pre>
-      </div>
+    <div className="border rounded-md p-4 mt-2 bg-gray-50 max-h-[400px] overflow-auto">
+      <pre className="text-xs whitespace-pre-wrap break-words">
+        {getFormattedContent()}
+      </pre>
     </div>
   );
 };
