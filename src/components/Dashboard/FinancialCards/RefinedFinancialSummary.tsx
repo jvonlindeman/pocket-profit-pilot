@@ -9,6 +9,7 @@ import { FinancialAssistantPromo } from '../FinancialAssistant/FinancialAssistan
 import { useFinance } from '@/contexts/FinanceContext';
 import { registerInteraction } from '@/utils/uiCapture';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 
 const RefinedFinancialSummary: React.FC = () => {
   const { dateRange } = useFinance();
@@ -34,10 +35,18 @@ const RefinedFinancialSummary: React.FC = () => {
         <div className={isMobile ? "" : "md:col-span-2"}>
           {/* Financial history section */}
           <SummaryCardSection title="Historial Financiero" data-component="financial-history" className="financial-history-summary">
-            <FinancialHistorySummary 
-              startDate={dateRange?.startDate}
-              endDate={dateRange?.endDate}
-            />
+            {dateRange?.startDate && dateRange?.endDate ? (
+              <FinancialHistorySummary 
+                startDate={dateRange.startDate}
+                endDate={dateRange.endDate}
+              />
+            ) : (
+              <Card className="bg-gray-50 border border-dashed">
+                <CardHeader>
+                  <CardTitle className="text-sm text-gray-500">Selecciona un rango de fechas para ver el historial financiero</CardTitle>
+                </CardHeader>
+              </Card>
+            )}
           </SummaryCardSection>
         </div>
         

@@ -5,7 +5,7 @@ import CacheMonitor from './CacheMonitor';
 import NoTransactionsWarning from './NoTransactionsWarning';
 import MonthlyBalanceEditor from './MonthlyBalanceEditor';
 import SalaryCalculator from './SalaryCalculator';
-import FinanceSummary from './FinanceSummary';
+import RefinedFinancialSummary from './FinancialCards/RefinedFinancialSummary';
 import TransactionList from './TransactionList';
 import { FinancialSummary, Transaction } from '@/types/financial';
 
@@ -102,21 +102,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
         />
       </div>
 
-      {/* Financial Summary with improved organization */}
-      <FinanceSummary 
-        summary={financialData.summary} 
-        expenseCategories={financialData.expenseByCategory}
-        stripeIncome={stripeIncome}
-        stripeFees={stripeFees}
-        stripeTransactionFees={stripeTransactionFees}
-        stripePayoutFees={stripePayoutFees}
-        stripeAdditionalFees={stripeAdditionalFees}
-        stripeNet={stripeNet}
-        stripeFeePercentage={stripeFeePercentage}
-        regularIncome={regularIncome}
-        dateRange={dateRange}
-        transactions={financialData.transactions}
-      />
+      {/* Financial Summary with improved organization - Using RefinedFinancialSummary instead */}
+      <RefinedFinancialSummary />
 
       {/* Listado de transacciones */}
       <div className="mt-6">

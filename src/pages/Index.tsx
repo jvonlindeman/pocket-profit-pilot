@@ -5,6 +5,7 @@ import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 import { useToast } from '@/hooks/use-toast';
 import { useDateRangeManager } from '@/hooks/useDateRangeManager';
 import { useDateFormatter } from '@/hooks/useDateFormatter';
+import { FinanceProvider } from '@/contexts/FinanceContext';
 
 // Component imports
 import DashboardHeader from '@/components/Dashboard/Header/DashboardHeader';
@@ -176,18 +177,12 @@ const Index = () => {
           onRetry={handleRefresh}
         />
         
-        {/* Dashboard content */}
+        {/* Dashboard content with Finance context provider */}
         {dataInitialized && !loading && !error && (
-          <DashboardContent 
-            periodTitle={periodTitle}
+          <FinanceProvider
+            summary={financialData.summary}
+            transactions={financialData.transactions}
             dateRange={dateRange}
-            financialData={financialData}
-            currentMonthDate={currentMonthDate}
-            startingBalance={startingBalance}
-            refreshData={refreshData}
-            handleBalanceChange={handleBalanceChange}
-            handleRefresh={handleRefresh}
-            loading={loading}
             stripeIncome={stripeIncome}
             stripeFees={stripeFees}
             stripeTransactionFees={stripeTransactionFees}
@@ -196,9 +191,30 @@ const Index = () => {
             stripeNet={stripeNet}
             stripeFeePercentage={stripeFeePercentage}
             regularIncome={regularIncome}
-            monthlyBalance={monthlyBalance}
-            totalZohoExpenses={totalZohoExpenses}
-          />
+            collaboratorExpenses={financialData.expenseByCategory.filter(cat => cat.category.includes('Colaborador'))}
+          >
+            <DashboardContent 
+              periodTitle={periodTitle}
+              dateRange={dateRange}
+              financialData={financialData}
+              currentMonthDate={currentMonthDate}
+              startingBalance={startingBalance}
+              refreshData={refreshData}
+              handleBalanceChange={handleBalanceChange}
+              handleRefresh={handleRefresh}
+              loading={loading}
+              stripeIncome={stripeIncome}
+              stripeFees={stripeFees}
+              stripeTransactionFees={stripeTransactionFees}
+              stripePayoutFees={stripePayoutFees}
+              stripeAdditionalFees={stripeAdditionalFees}
+              stripeNet={stripeNet}
+              stripeFeePercentage={stripeFeePercentage}
+              regularIncome={regularIncome}
+              monthlyBalance={monthlyBalance}
+              totalZohoExpenses={totalZohoExpenses}
+            />
+          </FinanceProvider>
         )}
 
         {/* Debug section */}
