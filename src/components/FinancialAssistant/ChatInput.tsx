@@ -41,7 +41,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         disabled={isLoading}
         className="pr-10"
         maxLength={1000}
-        size={isMobile ? "sm" : "default"}
       />
       <Button
         size="icon"
