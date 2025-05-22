@@ -36,7 +36,7 @@ export class ZohoRepository {
     forceRefresh = false
   ): Promise<Transaction[]> {
     try {
-      console.log("Fetching Zoho transactions from", startDate, "to", endDate);
+      console.log("ZohoService: Fetching transactions from", startDate, "to", endDate);
       const response = await zohoApiClient.fetchTransactionsFromWebhook(startDate, endDate, forceRefresh);
       
       // Store the raw response for debugging
@@ -85,6 +85,17 @@ export class ZohoRepository {
       console.error("Error fetching raw Zoho response:", error);
       return { error: error.message || "Unknown error" };
     }
+  }
+
+  /**
+   * Get unpaid invoices from the last response
+   */
+  getUnpaidInvoices(): any[] {
+    if (this.lastRawResponse && this.lastRawResponse.facturas_sin_pagar && 
+        Array.isArray(this.lastRawResponse.facturas_sin_pagar)) {
+      return this.lastRawResponse.facturas_sin_pagar;
+    }
+    return [];
   }
 
   /**

@@ -1,7 +1,7 @@
 
 import { Transaction } from "../../../types/financial";
 import { parseToPanamaTime, formatDateYYYYMMDD_Panama } from "@/utils/timezoneUtils";
-import { ZohoTransactionResponse } from "./types";
+import { ZohoTransactionResponse, UnpaidInvoice } from "./types";
 import { excludedVendors } from "./config";
 
 // Helper function to process raw transaction data from the API into the Transaction type
@@ -170,15 +170,13 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
     });
   }
   
-  // Process unpaid invoices (facturas sin pagar) - NEW SECTION
+  // Process unpaid invoices (facturas sin pagar)
   if (Array.isArray(data.facturas_sin_pagar)) {
     console.log(`Processing ${data.facturas_sin_pagar.length} unpaid invoices`);
     
     // We don't add these to transactions since they're not actual financial transactions yet
-    // But we can store this information in metadata for display in the UI
-    
-    // The processing code for these would depend on how you want to display/use this data
-    // For now, we're just logging their presence
+    // But we store this information in metadata for display in the UI
+    // The front-end will access this data via the raw_response field
   }
   
   // Sort by date (newer first)
