@@ -6,6 +6,7 @@ export interface ZohoTransactionResponse {
   colaboradores?: any[];
   expenses?: any[];
   payments?: any[];
+  facturas_sin_pagar?: any[]; // Added new field for unpaid invoices
   stripe?: string | number;
   raw_response?: any;
   cached_transactions?: Transaction[];

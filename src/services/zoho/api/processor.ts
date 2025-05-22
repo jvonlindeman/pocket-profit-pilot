@@ -1,3 +1,4 @@
+
 import { Transaction } from "../../../types/financial";
 import { parseToPanamaTime, formatDateYYYYMMDD_Panama } from "@/utils/timezoneUtils";
 import { ZohoTransactionResponse } from "./types";
@@ -13,7 +14,7 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
   const result: Transaction[] = [];
   
   // If we received a raw_response instead of structured data, log it but return empty array
-  if (data.raw_response && (!data.stripe && !data.colaboradores && !data.expenses && !data.payments)) {
+  if (data.raw_response && (!data.stripe && !data.colaboradores && !data.expenses && !data.payments && !data.facturas_sin_pagar)) {
     console.error("Received raw_response but no structured data:", data.raw_response);
     return [];
   }
@@ -167,6 +168,17 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
         }
       }
     });
+  }
+  
+  // Process unpaid invoices (facturas sin pagar) - NEW SECTION
+  if (Array.isArray(data.facturas_sin_pagar)) {
+    console.log(`Processing ${data.facturas_sin_pagar.length} unpaid invoices`);
+    
+    // We don't add these to transactions since they're not actual financial transactions yet
+    // But we can store this information in metadata for display in the UI
+    
+    // The processing code for these would depend on how you want to display/use this data
+    // For now, we're just logging their presence
   }
   
   // Sort by date (newer first)

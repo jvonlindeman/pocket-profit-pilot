@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, RefreshCw, Bug, Calendar } from 'lucide-react';
+import { Loader2, RefreshCw, Bug, Calendar, FileInvoice } from 'lucide-react';
 import * as ZohoService from '@/services/zohoService';
 import { formatDateYYYYMMDD } from '@/utils/dateUtils';
 
@@ -80,6 +80,15 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
            'vendor_name' in item[0] && 
            'total' in item[0];
   };
+
+  // Helper to check for unpaid invoices data
+  const isUnpaidInvoicesArray = (item: any): boolean => {
+    return Array.isArray(item) && 
+           item.length > 0 && 
+           typeof item[0] === 'object' && 
+           'balance' in item[0] && 
+           'customer_name' in item[0];
+  };
   
   // Helper to format a date for display
   const formatDateForDisplay = (dateString: string) => {
@@ -139,9 +148,10 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
 
         {rawData && !loading && (
           <Tabs defaultValue="formatted" className="w-full">
-            <TabsList className="grid grid-cols-3 w-[300px]">
+            <TabsList className="grid grid-cols-4 w-[400px]">
               <TabsTrigger value="formatted">Formateado</TabsTrigger>
               <TabsTrigger value="collaborators">Colaboradores</TabsTrigger>
+              <TabsTrigger value="invoices">Facturas Pendientes</TabsTrigger>
               <TabsTrigger value="raw">JSON Crudo</TabsTrigger>
             </TabsList>
             
@@ -172,11 +182,13 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
                           <td className="p-2 border-b font-medium">
                             {isIncomeArray(item) 
                               ? `Array de Ingresos (${Array.isArray(item) ? item.length : 0} elementos)` 
-                              : item && typeof item === 'object' && 'vendor_name' in item 
-                                ? `Gasto (${item.vendor_name || 'Sin proveedor'})` 
-                                : Array.isArray(item) && item.length > 0 && item[0].vendor_name
-                                  ? `Array de Facturas (${item.length} elementos)`
-                                  : 'Desconocido'}
+                              : isUnpaidInvoicesArray(item)
+                                ? `Facturas sin pagar (${Array.isArray(item) ? item.length : 0} elementos)`
+                                : item && typeof item === 'object' && 'vendor_name' in item 
+                                  ? `Gasto (${item.vendor_name || 'Sin proveedor'})` 
+                                  : Array.isArray(item) && item.length > 0 && item[0].vendor_name
+                                    ? `Array de Facturas (${item.length} elementos)`
+                                    : 'Desconocido'}
                           </td>
                           <td className="p-2 border-b">
                             {isIncomeArray(item) ? (
@@ -186,6 +198,22 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
                                   {Array.isArray(item) && item.slice(0, 3).map((income, idx) => (
                                     <li key={idx} className="text-sm">
                                       {income.customer_name}: {income.amount}
+                                    </li>
+                                  ))}
+                                  {Array.isArray(item) && item.length > 3 && (
+                                    <li className="text-xs text-gray-500">
+                                      ...y {item.length - 3} más
+                                    </li>
+                                  )}
+                                </ul>
+                              </div>
+                            ) : isUnpaidInvoicesArray(item) ? (
+                              <div>
+                                <p className="font-medium mb-1">Ejemplos de facturas sin pagar:</p>
+                                <ul className="list-disc pl-5">
+                                  {Array.isArray(item) && item.slice(0, 3).map((invoice, idx) => (
+                                    <li key={idx} className="text-sm">
+                                      {invoice.customer_name}: ${invoice.balance}
                                     </li>
                                   ))}
                                   {Array.isArray(item) && item.length > 3 && (
@@ -303,6 +331,56 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
                 ) : (
                   <div className="text-center py-8 text-gray-500">
                     No hay datos de colaboradores disponibles
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+            
+            {/* New tab for unpaid invoices */}
+            <TabsContent value="invoices" className="p-0">
+              <div className="border rounded-md p-4 mt-2 bg-gray-50 max-h-[400px] overflow-auto">
+                <div className="mb-4 p-2 bg-blue-50 border border-blue-100 rounded">
+                  <p className="text-sm text-blue-800 font-medium">Facturas Sin Pagar</p>
+                  <p className="text-xs text-blue-700 mt-1 flex items-center">
+                    <FileInvoice className="h-3 w-3 mr-1" />
+                    Facturas pendientes de cobro
+                  </p>
+                </div>
+
+                {rawData && rawData.facturas_sin_pagar && Array.isArray(rawData.facturas_sin_pagar) ? (
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="p-2 text-left border-b">Cliente</th>
+                        <th className="p-2 text-left border-b">Empresa</th>
+                        <th className="p-2 text-right border-b">Balance Pendiente</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rawData.facturas_sin_pagar.map((invoice: any, index: number) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="p-2 border-b font-medium">{invoice.customer_name || 'Sin nombre'}</td>
+                          <td className="p-2 border-b">{invoice.company_name || '-'}</td>
+                          <td className="p-2 border-b text-right font-medium text-amber-700">
+                            ${invoice.balance?.toLocaleString() || '0'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-amber-50">
+                      <tr>
+                        <td colSpan={2} className="p-2 border-t font-medium">Total Facturas Pendientes</td>
+                        <td className="p-2 border-t text-right font-medium text-amber-800">
+                          ${rawData.facturas_sin_pagar
+                            .reduce((sum: number, inv: any) => sum + (parseFloat(inv.balance) || 0), 0)
+                            .toLocaleString()}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    No hay datos de facturas sin pagar disponibles
                   </div>
                 )}
               </div>
