@@ -11,19 +11,12 @@ export class TransactionStatsRepository extends StatsBaseRepository {
    */
   async getTransactionCounts(): Promise<Record<string, number>> {
     try {
-      // Get count of transactions by source using SQL
+      // Get count of transactions by source using SQL aggregation
       const { data, error } = await this.getClient()
         .from('cached_transactions')
-        .select('source, count(*)')
-        .filter('source', 'is', 'not.null')
-        .then(result => {
-          // Process the result to extract sources and counts
-          const processedData = (result.data || []).map(row => ({
-            source: row.source,
-            count: parseInt(row.count || '0')
-          }));
-          return { data: processedData, error: result.error };
-        });
+        .select('source, count')
+        .not('source', 'is', 'null')
+        .groupBy('source');
       
       if (error) {
         this.logStatError("Error getting transaction counts", error);
@@ -34,7 +27,7 @@ export class TransactionStatsRepository extends StatsBaseRepository {
       const counts: Record<string, number> = {};
       if (data) {
         data.forEach(item => {
-          counts[item.source] = parseInt(item.count.toString());
+          counts[item.source] = parseInt(String(item.count));
         });
       }
       
@@ -50,22 +43,13 @@ export class TransactionStatsRepository extends StatsBaseRepository {
    */
   async getTransactionCountsByMonth(): Promise<Record<string, Record<string, number>>> {
     try {
-      // Get transactions grouped by year, month and source using SQL
+      // Get transactions grouped by year, month and source
       const { data, error } = await this.getClient()
         .from('cached_transactions')
-        .select('source, year, month, count(*)')
-        .filter('year', 'not.is.null')
-        .filter('month', 'not.is.null')
-        .then(result => {
-          // Process the result to extract year, month, source and counts
-          const processedData = (result.data || []).map(row => ({
-            source: row.source,
-            year: row.year,
-            month: row.month,
-            count: parseInt(row.count || '0')
-          }));
-          return { data: processedData, error: result.error };
-        });
+        .select('source, year, month, count')
+        .not('year', 'is', 'null')
+        .not('month', 'is', 'null')
+        .groupBy('source, year, month');
       
       if (error) {
         this.logStatError("Error getting transaction counts by month", error);
@@ -80,7 +64,7 @@ export class TransactionStatsRepository extends StatsBaseRepository {
           if (!countsByMonth[key]) {
             countsByMonth[key] = {};
           }
-          countsByMonth[key][item.source] = parseInt(item.count.toString());
+          countsByMonth[key][item.source] = parseInt(String(item.count));
         });
       }
       
