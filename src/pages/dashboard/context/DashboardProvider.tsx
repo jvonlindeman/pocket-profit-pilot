@@ -1,15 +1,16 @@
 
 import React, { createContext, useContext } from 'react';
-import { FinancialSummary, Transaction } from '@/types/financial';
+import { FinancialSummary, Transaction, DateRange } from '@/types/financial';
 import { FinanceProvider } from '@/contexts/FinanceContext';
 import InitialSetup from '@/components/Dashboard/InitialSetup';
 import DashboardHeader from '@/components/Dashboard/Header/DashboardHeader';
 import LoadingErrorState from '@/components/Dashboard/LoadingErrorState';
+import { DateRange as DayPickerDateRange } from 'react-day-picker';
 
 interface DashboardContextProps {
-  dateRange: { startDate: Date | null; endDate: Date | null };
-  onDateRangeChange: (range: { startDate: Date; endDate: Date }) => void;
-  getCurrentMonthRange: () => { startDate: Date; endDate: Date };
+  dateRange: DateRange;
+  onDateRangeChange: (newRange: DayPickerDateRange) => void;
+  getCurrentMonthRange: () => DayPickerDateRange;
   dataInitialized: boolean;
   onLoadData: () => void;
   showBalanceDialog: boolean;
@@ -95,9 +96,9 @@ const DashboardProvider: React.FC<DashboardProviderProps> = ({ children, ...cont
         onBalanceSaved={onBalanceSaved}
       />
       
-      {/* Header section */}
+      {/* Header section with updated props for proper type conversion */}
       <DashboardHeader 
-        dateRange={dateRange} 
+        dateRange={dateRange}
         onDateRangeChange={onDateRangeChange}
         getCurrentMonthRange={getCurrentMonthRange}
       />

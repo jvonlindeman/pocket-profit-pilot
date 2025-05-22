@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import DashboardLayout from './layout/DashboardLayout';
 import DashboardProvider from './context/DashboardProvider';
 import { useDateRangeManager } from '@/hooks/useDateRangeManager';
@@ -8,6 +7,7 @@ import { useFinanceData } from '@/hooks/useFinanceData';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 import { useToast } from '@/hooks/use-toast';
 import DashboardMain from './components/DashboardMain';
+import { DateRange as DayPickerDateRange } from 'react-day-picker';
 
 const DashboardPage = () => {
   const {
@@ -84,7 +84,7 @@ const DashboardPage = () => {
   };
 
   // Balance dialog state
-  const [showBalanceDialog, setShowBalanceDialog] = React.useState(false);
+  const [showBalanceDialog, setShowBalanceDialog] = useState(false);
 
   // Callback for when balance is saved
   const handleBalanceSaved = () => {

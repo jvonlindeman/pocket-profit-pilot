@@ -5,11 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Settings } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { DateRange as DayPickerDateRange } from 'react-day-picker';
-import { toDayPickerDateRange, toFinancialDateRange } from '@/utils/dateRangeAdapter';
+import { DateRange as FinancialDateRange } from '@/types/financial';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface DashboardHeaderProps {
-  dateRange: { startDate: Date; endDate: Date };
+  dateRange: FinancialDateRange;
   onDateRangeChange: (newRange: DayPickerDateRange) => void;
   getCurrentMonthRange: () => DayPickerDateRange;
 }
