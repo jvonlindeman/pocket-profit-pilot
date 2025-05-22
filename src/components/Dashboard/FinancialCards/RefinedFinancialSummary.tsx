@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import SummaryCardSection from './SummaryCardSection';
 import RefinedExpensesSection from './RefinedExpensesSection';
@@ -11,10 +12,25 @@ import { registerInteraction } from '@/utils/uiCapture';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import OverdueInvoicesSection from '../OverdueInvoices/OverdueInvoicesSection';
+import { UnpaidInvoice } from '@/services/zoho/api/types';
 
-const RefinedFinancialSummary: React.FC = () => {
-  const { dateRange, unpaidInvoices } = useFinance();
+interface RefinedFinancialSummaryProps {
+  unpaidInvoices?: UnpaidInvoice[];
+}
+
+const RefinedFinancialSummary: React.FC<RefinedFinancialSummaryProps> = ({ unpaidInvoices: propInvoices }) => {
+  const { dateRange, unpaidInvoices: contextInvoices } = useFinance();
   const isMobile = useIsMobile();
+  
+  // Use either prop invoices or context invoices
+  const invoices = propInvoices || contextInvoices;
+  
+  // Debug log
+  console.log("RefinedFinancialSummary - Unpaid invoices:", { 
+    propInvoices: propInvoices?.length, 
+    contextInvoices: contextInvoices?.length,
+    usingInvoices: invoices?.length
+  });
   
   // Register components as visible
   useEffect(() => {
@@ -23,7 +39,7 @@ const RefinedFinancialSummary: React.FC = () => {
   }, []);
   
   // Check if we have any unpaid invoices to determine layout
-  const hasUnpaidInvoices = unpaidInvoices && unpaidInvoices.length > 0;
+  const hasUnpaidInvoices = invoices && invoices.length > 0;
   
   return (
     <div className="space-y-4">
@@ -31,7 +47,9 @@ const RefinedFinancialSummary: React.FC = () => {
       <IncomeTabs />
       
       {/* Unpaid Invoices Section */}
-      {hasUnpaidInvoices && <OverdueInvoicesSection />}
+      {hasUnpaidInvoices && (
+        <OverdueInvoicesSection unpaidInvoices={invoices} />
+      )}
       
       <SummaryCardSection title="Resumen Financiero" data-component="financial-summary" className="financial-summary-section">
         {/* Refined Expenses Section */}

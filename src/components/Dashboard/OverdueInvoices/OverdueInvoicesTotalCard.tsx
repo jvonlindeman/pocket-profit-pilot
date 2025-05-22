@@ -4,14 +4,25 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle } from 'lucide-react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { useOverdueInvoices } from '@/hooks/useOverdueInvoices';
+import { UnpaidInvoice } from '@/services/zoho/api/types';
 
 interface OverdueInvoicesTotalCardProps {
   className?: string;
+  unpaidInvoices?: UnpaidInvoice[];
 }
 
-const OverdueInvoicesTotalCard: React.FC<OverdueInvoicesTotalCardProps> = ({ className }) => {
-  const { unpaidInvoices, formatCurrency } = useFinance();
-  const { summary, getUniqueCustomerCount } = useOverdueInvoices(unpaidInvoices);
+const OverdueInvoicesTotalCard: React.FC<OverdueInvoicesTotalCardProps> = ({ className, unpaidInvoices: propInvoices }) => {
+  const { unpaidInvoices: contextInvoices, formatCurrency } = useFinance();
+  const invoices = propInvoices || contextInvoices;
+  const { summary, getUniqueCustomerCount } = useOverdueInvoices(invoices);
+
+  // Debug log
+  console.log("OverdueInvoicesTotalCard - Summary:", { 
+    summary, 
+    uniqueCustomers: getUniqueCustomerCount(),
+    propInvoices: propInvoices?.length,
+    contextInvoices: contextInvoices?.length
+  });
 
   // No unpaid invoices case
   if (summary.count === 0) {

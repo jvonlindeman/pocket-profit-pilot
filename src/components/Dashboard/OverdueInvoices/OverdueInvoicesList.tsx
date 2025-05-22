@@ -5,25 +5,38 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useFinance } from '@/contexts/FinanceContext';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { UnpaidInvoice } from '@/services/zoho/api/types';
 
 interface OverdueInvoicesListProps {
   className?: string;
   limit?: number;
+  unpaidInvoices?: UnpaidInvoice[];
 }
 
 const OverdueInvoicesList: React.FC<OverdueInvoicesListProps> = ({ 
   className, 
-  limit = 5 
+  limit = 5,
+  unpaidInvoices: propInvoices
 }) => {
-  const { unpaidInvoices, formatCurrency } = useFinance();
+  const { unpaidInvoices: contextInvoices, formatCurrency } = useFinance();
   const [showAll, setShowAll] = useState(false);
+  
+  // Use either prop invoices or context invoices
+  const invoices = propInvoices || contextInvoices;
+  
+  // Debug log
+  console.log("OverdueInvoicesList - Rendering with:", {
+    propInvoices: propInvoices?.length,
+    contextInvoices: contextInvoices?.length,
+    usingInvoices: invoices?.length
+  });
 
-  if (!unpaidInvoices || unpaidInvoices.length === 0) {
+  if (!invoices || invoices.length === 0) {
     return null;
   }
 
   // Sort by highest balance first
-  const sortedInvoices = [...unpaidInvoices].sort((a, b) => b.balance - a.balance);
+  const sortedInvoices = [...invoices].sort((a, b) => b.balance - a.balance);
   
   // Determine which invoices to display based on the limit and showAll state
   const displayedInvoices = showAll ? sortedInvoices : sortedInvoices.slice(0, limit);
@@ -54,7 +67,7 @@ const OverdueInvoicesList: React.FC<OverdueInvoicesListProps> = ({
           </TableBody>
         </Table>
         
-        {unpaidInvoices.length > limit && (
+        {invoices.length > limit && (
           <div className="flex justify-center py-2">
             <Button
               variant="ghost"
@@ -68,7 +81,7 @@ const OverdueInvoicesList: React.FC<OverdueInvoicesListProps> = ({
                 </>
               ) : (
                 <>
-                  <ChevronDown className="h-4 w-4" /> Ver todas ({unpaidInvoices.length})
+                  <ChevronDown className="h-4 w-4" /> Ver todas ({invoices.length})
                 </>
               )}
             </Button>

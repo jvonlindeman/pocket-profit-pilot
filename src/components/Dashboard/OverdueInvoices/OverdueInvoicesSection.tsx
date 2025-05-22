@@ -6,14 +6,27 @@ import OverdueInvoicesList from './OverdueInvoicesList';
 import { useFinance } from '@/contexts/FinanceContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { registerInteraction } from '@/utils/uiCapture';
+import { UnpaidInvoice } from '@/services/zoho/api/types';
 
 interface OverdueInvoicesSectionProps {
   className?: string;
+  unpaidInvoices?: UnpaidInvoice[];
 }
 
-const OverdueInvoicesSection: React.FC<OverdueInvoicesSectionProps> = ({ className }) => {
-  const { unpaidInvoices } = useFinance();
+const OverdueInvoicesSection: React.FC<OverdueInvoicesSectionProps> = ({ className, unpaidInvoices: propInvoices }) => {
+  const { unpaidInvoices: contextInvoices } = useFinance();
   const isMobile = useIsMobile();
+  
+  // Use either prop invoices or context invoices
+  const invoices = propInvoices || contextInvoices;
+  
+  // Add debug console.log to track the invoice data
+  console.log("OverdueInvoicesSection - Rendering with invoices:", { 
+    propInvoices: propInvoices?.length,
+    contextInvoices: contextInvoices?.length,
+    usingInvoices: invoices?.length,
+    invoicesData: invoices
+  });
   
   // Register this section as viewed
   React.useEffect(() => {
@@ -22,7 +35,8 @@ const OverdueInvoicesSection: React.FC<OverdueInvoicesSectionProps> = ({ classNa
   }, []);
   
   // Don't render if there are no unpaid invoices
-  if (!unpaidInvoices || unpaidInvoices.length === 0) {
+  if (!invoices || invoices.length === 0) {
+    console.log("OverdueInvoicesSection - No invoices to display, not rendering");
     return null;
   }
 
@@ -35,11 +49,14 @@ const OverdueInvoicesSection: React.FC<OverdueInvoicesSectionProps> = ({ classNa
       <div className="space-y-4">
         <div className={`grid ${isMobile ? 'grid-cols-1' : 'md:grid-cols-2'} gap-4`}>
           {/* Summary card - total amount, count */}
-          <OverdueInvoicesTotalCard className={isMobile ? 'col-span-1' : 'md:col-span-2'} />
+          <OverdueInvoicesTotalCard 
+            className={isMobile ? 'col-span-1' : 'md:col-span-2'} 
+            unpaidInvoices={invoices}
+          />
         </div>
         
         {/* List of overdue invoices */}
-        <OverdueInvoicesList />
+        <OverdueInvoicesList unpaidInvoices={invoices} />
       </div>
     </SummaryCardSection>
   );
