@@ -10,14 +10,14 @@ import InvoicesTab from './InvoicesTab';
 
 interface WebhookDebugProps {
   dateRange: { startDate: Date; endDate: Date };
-  refreshDataFunction: (force: boolean) => void;
-  rawResponse: any;
+  refreshDataFunction?: (force: boolean) => void;
+  rawResponse?: any;
 }
 
 const WebhookDebug: React.FC<WebhookDebugProps> = ({ 
   dateRange, 
-  refreshDataFunction,
-  rawResponse
+  refreshDataFunction = () => {},
+  rawResponse = null
 }) => {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("summary");

@@ -1,6 +1,7 @@
-import { Transaction } from "../../../types/financial";
-import { handleApiError } from "../utils";
-import { getMockTransactions, getMockZohoWebhookResponse } from "../mockData";
+
+import { Transaction } from "@/types/financial";
+import { handleApiError } from "./utils";
+import { getMockTransactions, getMockZohoWebhookResponse } from "./mockData";
 import { supabase } from "@/integrations/supabase/client";
 import { PANAMA_TIMEZONE } from "@/utils/timezoneUtils";
 import { processRawTransactions, filterExcludedVendors } from "./api/processor";

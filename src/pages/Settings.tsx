@@ -19,8 +19,8 @@ const Settings = () => {
     endDate: endOfMonth(today),
   };
   
-  // Convert to DayPicker DateRange format for components that expect it
-  const dayPickerDateRange = toDayPickerDateRange(financialDateRange);
+  // Need to use financialDateRange directly for WebhookDebug instead of converting
+  // This provides the proper {startDate, endDate} structure that WebhookDebug expects
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -74,7 +74,8 @@ const Settings = () => {
               <StripeDebug dateRange={financialDateRange} />
             </div>
             <div className="mt-6">
-              <WebhookDebug dateRange={dayPickerDateRange} />
+              {/* Pass the financialDateRange directly instead of dayPickerDateRange */}
+              <WebhookDebug dateRange={financialDateRange} refreshDataFunction={() => {}} rawResponse={null} />
             </div>
           </section>
           

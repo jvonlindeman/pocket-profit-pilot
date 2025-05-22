@@ -1,205 +1,114 @@
 
-import { Transaction } from "../../types/financial";
-import { UnpaidInvoice } from "./api/types";
-import { getCurrentYear } from "./utils";
+import { Transaction } from "@/types/financial";
+import { formatDateYYYYMMDD_Panama } from "@/utils/timezoneUtils";
+import { ZohoTransactionResponse } from "./api/types";
 
-// Mock data for fallback when API fails or for development
-export const getMockTransactions = async (startDate: Date, endDate: Date): Promise<Transaction[]> => {
-  // Original mock data with updated years
-  const zohoMockData: Transaction[] = [
-    {
-      id: "zoho-1",
-      date: `${getCurrentYear()}-05-01`,
-      amount: 2500,
-      description: "Cliente ABC - Servicio de marketing",
-      category: "Ingresos por servicio",
-      source: "Zoho",
-      type: "income"
-    },
-    {
-      id: "zoho-2",
-      date: `${getCurrentYear()}-05-05`,
-      amount: 1200,
-      description: "Cliente XYZ - Consultoría",
-      category: "Ingresos por consultoría",
-      source: "Zoho",
-      type: "income"
-    },
-    {
-      id: "zoho-3",
-      date: `${getCurrentYear()}-05-07`,
-      amount: 350,
-      description: "Suscripción Adobe",
-      category: "software",
-      source: "Zoho",
-      type: "expense"
-    },
-    {
-      id: "zoho-4",
-      date: `${getCurrentYear()}-05-10`,
-      amount: 780,
-      description: "Pago a diseñador freelance",
-      category: "personal",
-      source: "Zoho",
-      type: "expense"
-    },
-    {
-      id: "zoho-5",
-      date: `${getCurrentYear()}-05-15`,
-      amount: 1500,
-      description: "Cliente DEF - Servicio mensual",
-      category: "Ingresos recurrentes",
-      source: "Zoho",
-      type: "income"
-    },
-    {
-      id: "zoho-6",
-      date: `${getCurrentYear()}-05-18`,
-      amount: 250,
-      description: "Suscripción herramientas de análisis",
-      category: "tools",
-      source: "Zoho",
-      type: "expense"
-    },
-    {
-      id: "zoho-7",
-      date: `${getCurrentYear()}-05-20`,
-      amount: 2000,
-      description: "Pago de salarios",
-      category: "personal",
-      source: "Zoho",
-      type: "expense"
-    }
-  ];
+// Mock data for development and testing purposes
+export const getMockTransactions = (startDate: Date, endDate: Date): Transaction[] => {
+  const formattedDate = formatDateYYYYMMDD_Panama(startDate);
   
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 800));
-
-  console.log("ZohoService mock: Filtering transactions from", startDate, "to", endDate);
-
-  // Filter the transactions by date
-  const filtered = zohoMockData.filter(tx => {
-    const txDate = new Date(tx.date);
-    return txDate >= startDate && txDate <= endDate;
-  });
-  
-  console.log("ZohoService mock: Found transactions:", filtered.length);
-  
-  return filtered;
-};
-
-// Mock data for unpaid invoices
-export const getMockUnpaidInvoices = (): UnpaidInvoice[] => {
   return [
     {
-      balance: 1066.79,
-      company_name: "CLINICA DE ESPECIALIDADES ORTOPEDICAS SA",
-      customer_name: "CLINICA DE ESPECIALIDADES ORTOPEDICAS SA"
+      id: `income-mock-${formattedDate}-1`,
+      date: formattedDate,
+      amount: 1500,
+      description: 'Pago de Cliente A',
+      category: 'Ingresos',
+      source: 'Zoho',
+      type: 'income'
     },
     {
-      balance: 1712,
-      company_name: "TRANSPORTES AMBIENTALES VERDES, S.A (Voltranc)",
-      customer_name: "TRANSPORTES AMBIENTALES VERDES, S.A"
+      id: `income-mock-${formattedDate}-2`,
+      date: formattedDate,
+      amount: 2500,
+      description: 'Pago de Cliente B',
+      category: 'Ingresos',
+      source: 'Zoho',
+      type: 'income'
     },
     {
-      balance: 856,
-      company_name: "CREMACIONES LA GLORIA DIVINA, S.A.",
-      customer_name: "CREMACIONES LA GLORIA DIVINA, S.A."
+      id: `expense-mock-${formattedDate}-1`,
+      date: formattedDate,
+      amount: 500,
+      description: 'Pago a colaborador: Juan Pérez',
+      category: 'Pagos a colaboradores',
+      source: 'Zoho',
+      type: 'expense'
     },
     {
-      balance: 642,
-      company_name: "ARMANDO RAMZANY GARDELLINI CEDEÑO",
-      customer_name: "ARMANDO RAMZANY GARDELLINI CEDEÑO"
-    },
-    {
-      balance: 1155.53,
-      company_name: "FIBROSCAN CORP, S.A.",
-      customer_name: "FIBROSCAN CORP, S.A."
-    },
-    {
-      balance: 107,
-      company_name: "TECNOSERVICIOS HIDROMATICOS PTY S A",
-      customer_name: "TECNOSERVICIOS HIDROMATICOS PTY S A"
-    },
-    {
-      balance: 1262.6,
-      company_name: "ARCOM INC",
-      customer_name: "ARCOM INC"
-    },
-    {
-      balance: 856,
-      company_name: "ADMINISTRADORES EMPRESARIALES S A",
-      customer_name: "ADMINISTRADORES EMPRESARIALES S A"
-    },
-    {
-      balance: 856,
-      company_name: "LAB CENTER S A",
-      customer_name: "LAB CENTER S A"
-    },
-    {
-      balance: 321,
-      company_name: "Nova Respiración",
-      customer_name: "Nova Respiración"
-    },
-    {
-      balance: 214,
-      company_name: "CENTRO DE IMAGENES DOCATI LOS ANDES, S.A.",
-      customer_name: "CENTRO DE IMAGENES DOCATI LOS ANDES, S.A."
-    },
-    {
-      balance: 856,
-      company_name: "ARCE AVICOLA S A",
-      customer_name: "ARCE AVICOLA S A"
+      id: `expense-mock-${formattedDate}-2`,
+      date: formattedDate,
+      amount: 250,
+      description: 'Servicios en la nube',
+      category: 'Servicios',
+      source: 'Zoho',
+      type: 'expense'
     }
   ];
 };
 
-// Combined mock data for all Zoho webhook data
-export const getMockZohoWebhookResponse = async (startDate: Date, endDate: Date) => {
-  console.log("getMockZohoWebhookResponse: Generating mock webhook response data");
+// More comprehensive mock response that includes facturas_sin_pagar
+export const getMockZohoWebhookResponse = async (startDate: Date, endDate: Date): Promise<ZohoTransactionResponse> => {
+  const formattedDate = formatDateYYYYMMDD_Panama(startDate);
   
   return {
     colaboradores: [
       {
-        vendor_name: "Maria Fernanda",
-        date: `${getCurrentYear()}-05-14`,
-        total: 400,
-        status: "paid"
+        vendor_name: "Juan Pérez",
+        total: 500,
+        date: formattedDate
       },
       {
-        vendor_name: "Jorge Martinez",
-        date: `${getCurrentYear()}-05-01`,
-        total: 500,
-        status: "paid"
+        vendor_name: "María Gómez",
+        total: 350,
+        date: formattedDate
       }
     ],
     expenses: [
       {
-        date: `${getCurrentYear()}-05-15`,
-        total: 209.40,
-        vendor_name: "SE Rankings",
-        account_name: "SEO Tools"
+        account_name: "Servicios",
+        vendor_name: "AWS",
+        total: 250,
+        date: formattedDate
       },
       {
-        date: `${getCurrentYear()}-05-08`,
-        total: 574.04,
-        vendor_name: "Clickup",
-        account_name: "Softwares Especiales"
+        account_name: "Gastos generales",
+        vendor_name: "Papelería",
+        total: 75,
+        date: formattedDate
       }
     ],
     payments: [
       {
-        date: `${getCurrentYear()}-05-21`,
-        amount: 479.9,
-        customer_name: "CLINICA DENTAL OBARRIO"
+        customer_name: "Cliente A",
+        amount: 1500,
+        date: formattedDate,
+        invoice_id: "INV-001"
       },
       {
-        date: `${getCurrentYear()}-05-15`,
-        amount: 321,
-        customer_name: "ARMANDO RAMZANY GARDELLINI CEDEÑO"
+        customer_name: "Cliente B",
+        amount: 2500,
+        date: formattedDate,
+        invoice_id: "INV-002"
       }
     ],
-    facturas_sin_pagar: getMockUnpaidInvoices(),
-    cached_transactions: await getMockTransactions(startDate, endDate)
+    facturas_sin_pagar: [
+      {
+        balance: 1200,
+        company_name: "Empresa XYZ",
+        customer_name: "Cliente C"
+      },
+      {
+        balance: 850,
+        company_name: "Empresa ABC",
+        customer_name: "Cliente D"
+      },
+      {
+        balance: 1500,
+        company_name: "Empresa UVW",
+        customer_name: "Cliente E"
+      }
+    ],
+    stripe: 3500
   };
 };
