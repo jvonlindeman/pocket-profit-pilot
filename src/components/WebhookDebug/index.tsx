@@ -1,8 +1,7 @@
 
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, RefreshCw, Bug } from 'lucide-react';
+import { Loader2, Bug } from 'lucide-react';
 import * as ZohoService from '@/services/zohoService';
 import { DateRange } from 'react-day-picker';
 import { toFinancialDateRange } from '@/utils/dateRangeAdapter';
@@ -11,6 +10,7 @@ import WebhookConfigAlert from './WebhookConfigAlert';
 import WebhookDataTabs from './WebhookDataTabs';
 import WebhookTroubleshootingGuide from './WebhookTroubleshootingGuide';
 import WebhookDataWarning from './WebhookDataWarning';
+import WebhookDebugHeader from './WebhookDebugHeader';
 
 interface WebhookDebugProps {
   dateRange: DateRange;
@@ -22,6 +22,43 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
   const [loading, setLoading] = useState(false);
   const [rawData, setRawData] = useState<any>(rawResponse || null);
   const [error, setError] = useState<string | null>(null);
+  const [configIssue, setConfigIssue] = useState(false);
+
+  // Detect if there's a raw response from the parent on mount or prop change
+  useEffect(() => {
+    if (rawResponse) {
+      setRawData(rawResponse);
+      // Check for webhook config issues
+      detectConfigurationIssues(rawResponse);
+      console.log("WebhookDebug: Received rawResponse from parent:", rawResponse);
+    }
+  }, [rawResponse]);
+
+  // Function to detect webhook configuration issues in the response
+  const detectConfigurationIssues = (data: any) => {
+    if (!data) return false;
+    
+    // Clear previous config issue status
+    let hasConfigIssue = false;
+    
+    // Check for common webhook configuration issues in the response
+    if (data.error && typeof data.error === 'string') {
+      const errorLower = data.error.toLowerCase();
+      hasConfigIssue = 
+        errorLower.includes('webhook url is not configured') || 
+        errorLower.includes('make webhook url') ||
+        errorLower.includes('environment variable is not set');
+    }
+    
+    // Check if webhook_url_configured flag is explicitly false
+    if (data.webhook_url_configured === false) {
+      hasConfigIssue = true;
+    }
+    
+    // Update state with the detected issue
+    setConfigIssue(hasConfigIssue);
+    return hasConfigIssue;
+  };
 
   // Function to fetch raw webhook data
   const fetchDebugData = async () => {
@@ -46,7 +83,9 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
         financialDateRange.startDate, 
         financialDateRange.endDate
       );
+      
       setRawData(data);
+      detectConfigurationIssues(data);
       console.log("Debug data received:", data);
     } catch (err: any) {
       setError(err.message || "Error desconocido");
@@ -70,9 +109,11 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
   };
 
   // Detect webhook configuration issue
-  const hasConfigIssue = rawData && rawData.error && (
-    rawData.error.includes("webhook URL") || 
-    rawData.error.includes("Make webhook URL is not configured")
+  const hasConfigIssue = configIssue || (
+    rawData && rawData.error && (
+      rawData.error.includes("webhook URL") || 
+      rawData.error.includes("Make webhook URL is not configured")
+    )
   );
 
   return (
@@ -87,22 +128,11 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex justify-between items-center mb-4">
-          <p className="text-sm text-muted-foreground">
-            Esta herramienta te permite verificar la conexión y datos del webhook
-          </p>
-          <Button 
-            onClick={fetchDebugData} 
-            variant="outline" 
-            disabled={loading}
-          >
-            {loading ? (
-              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Cargando...</>
-            ) : (
-              <><RefreshCw className="h-4 w-4 mr-2" /> Cargar Datos</>
-            )}
-          </Button>
-        </div>
+        <WebhookDebugHeader 
+          loading={loading} 
+          onFetchData={fetchDebugData}
+          configError={hasConfigIssue}
+        />
 
         {hasConfigIssue && <WebhookConfigAlert />}
 
