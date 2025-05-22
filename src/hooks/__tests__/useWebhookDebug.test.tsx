@@ -1,11 +1,13 @@
 
-import { renderHook, act } from '@testing-library/react-hooks';
+import React from 'react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { useWebhookDebug } from '../useWebhookDebug';
 import * as ZohoService from '@/services/zohoService';
+import { act } from 'react-dom/test-utils';
 
 // Mock the ZohoService module
-jest.mock('@/services/zohoService', () => ({
-  getRawResponse: jest.fn()
+vi.mock('@/services/zohoService', () => ({
+  getRawResponse: vi.fn()
 }));
 
 describe('useWebhookDebug hook', () => {
@@ -16,11 +18,11 @@ describe('useWebhookDebug hook', () => {
   };
 
   // Mock refresh function
-  const mockRefreshFunction = jest.fn();
+  const mockRefreshFunction = vi.fn();
 
   // Reset mocks before each test
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('should initialize with correct default state', () => {
@@ -77,9 +79,9 @@ describe('useWebhookDebug hook', () => {
     };
 
     // Mock the ZohoService.getRawResponse to return success
-    (ZohoService.getRawResponse as jest.Mock).mockResolvedValue(mockSuccessResponse);
+    (ZohoService.getRawResponse as vi.Mock).mockResolvedValue(mockSuccessResponse);
 
-    const { result, waitForNextUpdate } = renderHook(() => 
+    const { result } = renderHook(() => 
       useWebhookDebug({ 
         dateRange: mockDateRange,
       })
@@ -93,21 +95,21 @@ describe('useWebhookDebug hook', () => {
     // Initial state should show loading
     expect(result.current.loading).toBe(true);
     
-    await waitForNextUpdate();
-
-    // After update, we should have data and not loading
-    expect(result.current.loading).toBe(false);
-    expect(result.current.rawData).toEqual(mockSuccessResponse);
-    expect(result.current.error).toBeNull();
+    // Wait for the async operation to complete
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+      expect(result.current.rawData).toEqual(mockSuccessResponse);
+      expect(result.current.error).toBeNull();
+    });
   });
 
   it('should handle fetchDebugData error', async () => {
     const errorMessage = 'API Error';
     
     // Mock the ZohoService.getRawResponse to throw an error
-    (ZohoService.getRawResponse as jest.Mock).mockRejectedValue(new Error(errorMessage));
+    (ZohoService.getRawResponse as vi.Mock).mockRejectedValue(new Error(errorMessage));
 
-    const { result, waitForNextUpdate } = renderHook(() => 
+    const { result } = renderHook(() => 
       useWebhookDebug({ 
         dateRange: mockDateRange,
       })
@@ -124,13 +126,13 @@ describe('useWebhookDebug hook', () => {
     // Initial state should show loading
     expect(result.current.loading).toBe(true);
     
-    await waitForNextUpdate();
-
-    // After update, we should have error and not loading
-    expect(result.current.loading).toBe(false);
-    expect(result.current.rawData).toBeNull();
-    expect(result.current.error).toBe(errorMessage);
-    expect(caughtError).toBeDefined();
+    // Wait for the async operation to complete
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+      expect(result.current.rawData).toBeNull();
+      expect(result.current.error).toBe(errorMessage);
+      expect(caughtError).toBeDefined();
+    });
   });
 
   it('should correctly determine if data is usable', () => {

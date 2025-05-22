@@ -5,7 +5,7 @@ import StripeDebug from '@/components/StripeDebug';
 import WebhookDebug from '@/components/WebhookDebug';
 import WebhookRequestDebug from '@/components/WebhookRequestDebug';
 import { DateRange } from 'react-day-picker';
-import { toDayPickerDateRange } from '@/utils/dateRangeAdapter';
+import { toDayPickerDateRange, toFinancialDateRange } from '@/utils/dateRangeAdapter';
 
 interface DebugSectionProps {
   dateRange: { startDate: Date; endDate: Date };
@@ -18,7 +18,7 @@ const DebugSection: React.FC<DebugSectionProps> = ({
   refreshData,
   rawResponse
 }) => {
-  // Convert financial date range to day picker date range
+  // Convert financial date range to day picker date range for WebhookDebug
   const dayPickerDateRange: DateRange = toDayPickerDateRange(dateRange);
   
   return (

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import ZohoDebug from '@/components/ZohoDebug';
 import WebhookDebug from '@/components/WebhookDebug';
@@ -27,7 +26,7 @@ const Settings = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm">
+      <div className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
@@ -44,7 +43,7 @@ const Settings = () => {
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
