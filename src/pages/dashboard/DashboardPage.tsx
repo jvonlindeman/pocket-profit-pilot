@@ -8,7 +8,6 @@ import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 import { useToast } from '@/hooks/use-toast';
 import DashboardMain from './components/DashboardMain';
 import { DateRange as DayPickerDateRange } from 'react-day-picker';
-import { UnpaidInvoice } from '@/services/zoho/api/types';
 
 const DashboardPage = () => {
   const {
@@ -67,14 +66,6 @@ const DashboardPage = () => {
     createPeriodTitle(dateRange.startDate, dateRange.endDate),
     [createPeriodTitle, dateRange.startDate, dateRange.endDate]
   );
-
-  // Get unpaid invoices from the raw response - will add handling for the new field
-  const unpaidInvoices: UnpaidInvoice[] = React.useMemo(() => {
-    if (rawResponse && rawResponse.facturas_sin_pagar && Array.isArray(rawResponse.facturas_sin_pagar)) {
-      return rawResponse.facturas_sin_pagar;
-    }
-    return [];
-  }, [rawResponse]);
 
   // Handler for initial data loading
   const handleInitialLoad = async () => {
@@ -184,7 +175,6 @@ const DashboardPage = () => {
         monthlyBalance={monthlyBalance}
         totalZohoExpenses={totalZohoExpenses}
         collaboratorExpenses={collaboratorExpenses}
-        unpaidInvoices={unpaidInvoices}
       >
         <DashboardMain />
       </DashboardProvider>

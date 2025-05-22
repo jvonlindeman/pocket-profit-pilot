@@ -8,7 +8,6 @@ import SalaryCalculator from './SalaryCalculator';
 import RefinedFinancialSummary from './FinancialCards/RefinedFinancialSummary';
 import TransactionList from './TransactionList';
 import { FinancialSummary, Transaction } from '@/types/financial';
-import { UnpaidInvoice } from '@/services/zoho/api/types';
 
 interface DashboardContentProps {
   periodTitle: string;
@@ -34,7 +33,6 @@ interface DashboardContentProps {
   regularIncome: number;
   monthlyBalance: any;
   totalZohoExpenses: number;
-  unpaidInvoices?: UnpaidInvoice[]; // Add this prop
 }
 
 const DashboardContent: React.FC<DashboardContentProps> = ({
@@ -56,8 +54,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   stripeFeePercentage,
   regularIncome,
   monthlyBalance,
-  totalZohoExpenses,
-  unpaidInvoices = [] // Add default empty array
+  totalZohoExpenses
 }) => {
   // Get calculator values from the monthly balance
   const opexAmount = monthlyBalance?.opex_amount !== null ? monthlyBalance?.opex_amount || 35 : 35;
@@ -69,9 +66,6 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   console.log("DashboardContent: Zoho income transactions:", 
     financialData.transactions.filter(tx => tx.type === 'income' && tx.source === 'Zoho').length
   );
-  
-  // Add debug log for unpaid invoices
-  console.log("DashboardContent: Unpaid invoices:", unpaidInvoices?.length, unpaidInvoices);
 
   return (
     <>
@@ -108,8 +102,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
         />
       </div>
 
-      {/* Financial Summary with improved organization - Pass unpaid invoices */}
-      <RefinedFinancialSummary unpaidInvoices={unpaidInvoices} />
+      {/* Financial Summary with improved organization */}
+      <RefinedFinancialSummary />
 
       {/* Listado de transacciones */}
       <div className="mt-6">

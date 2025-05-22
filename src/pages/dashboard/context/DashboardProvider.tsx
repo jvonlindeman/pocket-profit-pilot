@@ -6,7 +6,6 @@ import InitialSetup from '@/components/Dashboard/InitialSetup';
 import DashboardHeader from '@/components/Dashboard/Header/DashboardHeader';
 import LoadingErrorState from '@/components/Dashboard/LoadingErrorState';
 import { DateRange as DayPickerDateRange } from 'react-day-picker';
-import { UnpaidInvoice } from '@/services/zoho/api/types';
 
 interface DashboardContextProps {
   dateRange: DateRange;
@@ -43,7 +42,6 @@ interface DashboardContextProps {
   monthlyBalance: any;
   totalZohoExpenses: number;
   collaboratorExpenses: any[];
-  unpaidInvoices: UnpaidInvoice[]; // Add this field
 }
 
 const DashboardContext = createContext<DashboardContextProps | null>(null);
@@ -84,7 +82,6 @@ const DashboardProvider: React.FC<DashboardProviderProps> = ({ children, ...cont
     stripeFeePercentage,
     regularIncome,
     collaboratorExpenses,
-    unpaidInvoices, // Add this field
   } = contextValues;
 
   return (
@@ -130,7 +127,6 @@ const DashboardProvider: React.FC<DashboardProviderProps> = ({ children, ...cont
             stripeFeePercentage={stripeFeePercentage}
             regularIncome={regularIncome}
             collaboratorExpenses={collaboratorExpenses}
-            unpaidInvoices={unpaidInvoices} // Add this field
           >
             {children}
           </FinanceProvider>

@@ -8,7 +8,6 @@ import { useIncomeProcessor } from '@/hooks/useIncomeProcessor';
 import { useMonthlyBalanceManager } from '@/hooks/useMonthlyBalanceManager';
 import { financialService } from '@/services/financialService';
 import { getCurrentMonthRange } from '@/utils/dateUtils';
-import { UnpaidInvoice } from '@/services/zoho/api/types';
 
 export const useFinanceData = () => {
   // Import functionality from smaller hooks
@@ -53,14 +52,6 @@ export const useFinanceData = () => {
     saveFinancialData(financialData, dateRange, transactions.length, loading);
   }, [financialData, dateRange, transactions.length, loading, saveFinancialData]);
 
-  // Extract unpaid invoices from raw response
-  const unpaidInvoices = useMemo<UnpaidInvoice[]>(() => {
-    if (rawResponse && rawResponse.facturas_sin_pagar && Array.isArray(rawResponse.facturas_sin_pagar)) {
-      return rawResponse.facturas_sin_pagar;
-    }
-    return [];
-  }, [rawResponse]);
-
   // Function to refresh data with the callbacks prepared
   const refreshData = useCallback((force = false) => {
     const fetchFunction = getRefreshFunction(force);
@@ -97,7 +88,6 @@ export const useFinanceData = () => {
     usingCachedData,
     cacheStatus,
     apiConnectivity,
-    checkApiConnectivity,
-    unpaidInvoices
+    checkApiConnectivity
   };
 };

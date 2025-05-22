@@ -26,11 +26,7 @@ const DashboardMain: React.FC = () => {
     monthlyBalance,
     totalZohoExpenses,
     rawResponse,
-    unpaidInvoices, // Make sure we're getting this
   } = useDashboard();
-
-  // Add console log to debug unpaid invoices
-  console.log("DashboardMain - unpaidInvoices:", unpaidInvoices);
 
   return (
     <>
@@ -54,7 +50,6 @@ const DashboardMain: React.FC = () => {
         regularIncome={regularIncome}
         monthlyBalance={monthlyBalance}
         totalZohoExpenses={totalZohoExpenses}
-        unpaidInvoices={unpaidInvoices} // Pass unpaid invoices to DashboardContent
       />
       
       {/* Debug section */}
