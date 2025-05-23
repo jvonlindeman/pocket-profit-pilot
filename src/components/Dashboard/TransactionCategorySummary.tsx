@@ -37,9 +37,7 @@ const TransactionCategorySummary: React.FC<TransactionCategorySummaryProps> = ({
               <div key={item.category} className="flex justify-between items-center text-sm">
                 <div className="flex items-center">
                   <span className="mr-2">{item.category}</span>
-                  {item.count !== undefined && (
-                    <span className="text-xs text-gray-500">({item.count})</span>
-                  )}
+                  <span className="text-xs text-gray-500">({item.count})</span>
                 </div>
                 <span className="font-medium text-red-600">{formatCurrency(item.amount)}</span>
               </div>
@@ -68,9 +66,7 @@ const TransactionCategorySummary: React.FC<TransactionCategorySummaryProps> = ({
               <div key={item.category} className="flex justify-between items-center text-sm">
                 <div className="flex items-center">
                   <span className="mr-2">{item.category}</span>
-                  {item.count !== undefined && (
-                    <span className="text-xs text-gray-500">({item.count})</span>
-                  )}
+                  <span className="text-xs text-gray-500">({item.count})</span>
                 </div>
                 <span className="font-medium text-green-600">{formatCurrency(item.amount)}</span>
               </div>

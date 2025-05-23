@@ -18,9 +18,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { 
-  convertToPanamaTimezone, 
-  formatDateForPanamaDisplay,
-  PANAMA_TIMEZONE 
+  toPanamaTime, 
+  formatInPanamaTimezone, 
+  PANAMA_TIMEZONE,
+  formatDateForPanamaDisplay
 } from '@/utils/timezoneUtils';
 import { DateRange as FinancialDateRange } from '@/types/financial';
 
@@ -70,10 +71,10 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
       console.log("DateRangePicker - Selected exact dates:", {
         startDate: startDate,
         startDateISO: startDate.toISOString(),
-        panamaStartDate: formatDateForPanamaDisplay(startDate),
+        panamaStartDate: formatInPanamaTimezone(startDate, 'yyyy-MM-dd HH:mm:ss'),
         endDate: endDate,
         endDateISO: endDate.toISOString(),
-        panamaEndDate: formatDateForPanamaDisplay(endDate),
+        panamaEndDate: formatInPanamaTimezone(endDate, 'yyyy-MM-dd HH:mm:ss'),
         timezone: PANAMA_TIMEZONE
       });
       
@@ -110,7 +111,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
   // Last month
   const setLastMonth = () => {
     const today = new Date();
-    const panamaNow = convertToPanamaTimezone(today);
+    const panamaNow = toPanamaTime(today);
     
     // Use date-fns operations but ensure we're working in Panama timezone
     const firstDayLastMonth = createStableDate(startOfMonth(subMonths(panamaNow, 1)));
@@ -128,7 +129,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
 
   // Last 30 days
   const setLast30Days = () => {
-    const today = createStableDate(convertToPanamaTimezone(new Date()));
+    const today = createStableDate(toPanamaTime(new Date()));
     const thirtyDaysAgo = createStableDate(subDays(today, 30));
     
     const newRange = {
@@ -143,7 +144,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
 
   // This year
   const setThisYear = () => {
-    const today = createStableDate(convertToPanamaTimezone(new Date()));
+    const today = createStableDate(toPanamaTime(new Date()));
     const firstDayOfYear = createStableDate(startOfYear(today));
     
     const newRange = {
@@ -158,7 +159,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
 
   // Last day of previous month to last day of current month
   const setPreviousMonthEndToCurrentMonthEnd = () => {
-    const today = convertToPanamaTimezone(new Date());
+    const today = toPanamaTime(new Date());
     const lastDayPreviousMonth = createStableDate(endOfMonth(subMonths(today, 1)));
     const lastDayCurrMonth = createStableDate(endOfMonth(today));
     
@@ -174,7 +175,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
 
   // Previous and current month
   const setPreviousAndCurrentMonth = () => {
-    const today = convertToPanamaTimezone(new Date());
+    const today = toPanamaTime(new Date());
     const firstDayLastMonth = createStableDate(startOfMonth(subMonths(today, 1)));
     const lastDayCurrentMonth = createStableDate(endOfMonth(today));
     

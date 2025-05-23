@@ -1,6 +1,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { startOfMonth, endOfMonth } from 'date-fns';
+import { zohoRepository } from '@/repositories/zohoRepository';
 
 /**
  * Hook to manage date ranges for financial data
@@ -32,6 +33,9 @@ export const useFinanceDateRange = (fetchMonthlyBalance: (date: Date) => void) =
 
     // Fetch monthly balance when date range changes
     fetchMonthlyBalance(preservedStartDate);
+    
+    // Check if we need to refresh the cache
+    zohoRepository.checkAndRefreshCache(preservedStartDate, preservedEndDate);
   }, [fetchMonthlyBalance]);
 
   // When dateRange changes, make sure we fetch monthly balance

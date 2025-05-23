@@ -156,9 +156,7 @@ export class FinancialSummaryService {
       profitMargin: Number(storedSummary.profit_margin),
       grossProfit: Number(storedSummary.total_income),
       grossProfitMargin: storedSummary.total_income > 0 ? 100 : 0,
-      startingBalance: storedSummary.starting_balance !== null ? Number(storedSummary.starting_balance) : undefined,
-      startDate: new Date(storedSummary.date_range_start),
-      endDate: new Date(storedSummary.date_range_end)
+      startingBalance: storedSummary.starting_balance !== null ? Number(storedSummary.starting_balance) : undefined
     };
   }
 }

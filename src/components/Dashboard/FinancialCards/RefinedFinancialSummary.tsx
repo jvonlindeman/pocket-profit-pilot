@@ -8,9 +8,11 @@ import FinancialHistorySummary from '../FinancialHistory/FinancialHistorySummary
 import { FinancialAssistantPromo } from '../FinancialAssistant/FinancialAssistantPromo';
 import { useFinance } from '@/contexts/FinanceContext';
 import { registerInteraction } from '@/utils/uiCapture';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const RefinedFinancialSummary: React.FC = () => {
   const { dateRange } = useFinance();
+  const isMobile = useIsMobile();
   
   // Register components as visible
   useEffect(() => {
@@ -28,8 +30,8 @@ const RefinedFinancialSummary: React.FC = () => {
         <ProfitSection />
       </SummaryCardSection>
       
-      <div className="grid md:grid-cols-3 gap-4">
-        <div className="md:col-span-2">
+      <div className={`grid ${isMobile ? 'grid-cols-1 gap-4' : 'md:grid-cols-3 gap-4'}`}>
+        <div className={isMobile ? "" : "md:col-span-2"}>
           {/* Financial history section */}
           <SummaryCardSection title="Historial Financiero" data-component="financial-history" className="financial-history-summary">
             <FinancialHistorySummary 
@@ -39,7 +41,7 @@ const RefinedFinancialSummary: React.FC = () => {
           </SummaryCardSection>
         </div>
         
-        <div className="md:col-span-1">
+        <div className={isMobile ? "mt-4" : "md:col-span-1"}>
           {/* Financial assistant promo section */}
           <FinancialAssistantPromo />
         </div>

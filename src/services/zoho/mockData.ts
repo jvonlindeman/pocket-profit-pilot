@@ -1,114 +1,88 @@
 
 import { Transaction } from "../../types/financial";
-import { formatDateYYYYMMDD_Panama } from "../../utils/timezoneUtils";
-import { ZohoTransactionResponse } from "./api/types";
+import { getCurrentYear } from "./utils";
 
-// Mock data for development and testing purposes
-export const getMockTransactions = (startDate: Date, endDate: Date): Transaction[] => {
-  const formattedDate = formatDateYYYYMMDD_Panama(startDate);
-  
-  return [
+// Mock data for fallback when API fails or for development
+export const getMockTransactions = async (startDate: Date, endDate: Date): Promise<Transaction[]> => {
+  // Original mock data with updated years
+  const zohoMockData: Transaction[] = [
     {
-      id: `income-mock-${formattedDate}-1`,
-      date: formattedDate,
-      amount: 1500,
-      description: 'Pago de Cliente A',
-      category: 'Ingresos',
-      source: 'Zoho',
-      type: 'income'
-    },
-    {
-      id: `income-mock-${formattedDate}-2`,
-      date: formattedDate,
+      id: "zoho-1",
+      date: `${getCurrentYear()}-05-01`,
       amount: 2500,
-      description: 'Pago de Cliente B',
-      category: 'Ingresos',
-      source: 'Zoho',
-      type: 'income'
+      description: "Cliente ABC - Servicio de marketing",
+      category: "Ingresos por servicio",
+      source: "Zoho",
+      type: "income"
     },
     {
-      id: `expense-mock-${formattedDate}-1`,
-      date: formattedDate,
-      amount: 500,
-      description: 'Pago a colaborador: Juan Pérez',
-      category: 'Pagos a colaboradores',
-      source: 'Zoho',
-      type: 'expense'
+      id: "zoho-2",
+      date: `${getCurrentYear()}-05-05`,
+      amount: 1200,
+      description: "Cliente XYZ - Consultoría",
+      category: "Ingresos por consultoría",
+      source: "Zoho",
+      type: "income"
     },
     {
-      id: `expense-mock-${formattedDate}-2`,
-      date: formattedDate,
+      id: "zoho-3",
+      date: `${getCurrentYear()}-05-07`,
+      amount: 350,
+      description: "Suscripción Adobe",
+      category: "software",
+      source: "Zoho",
+      type: "expense"
+    },
+    {
+      id: "zoho-4",
+      date: `${getCurrentYear()}-05-10`,
+      amount: 780,
+      description: "Pago a diseñador freelance",
+      category: "personal",
+      source: "Zoho",
+      type: "expense"
+    },
+    {
+      id: "zoho-5",
+      date: `${getCurrentYear()}-05-15`,
+      amount: 1500,
+      description: "Cliente DEF - Servicio mensual",
+      category: "Ingresos recurrentes",
+      source: "Zoho",
+      type: "income"
+    },
+    {
+      id: "zoho-6",
+      date: `${getCurrentYear()}-05-18`,
       amount: 250,
-      description: 'Servicios en la nube',
-      category: 'Servicios',
-      source: 'Zoho',
-      type: 'expense'
+      description: "Suscripción herramientas de análisis",
+      category: "tools",
+      source: "Zoho",
+      type: "expense"
+    },
+    {
+      id: "zoho-7",
+      date: `${getCurrentYear()}-05-20`,
+      amount: 2000,
+      description: "Pago de salarios",
+      category: "personal",
+      source: "Zoho",
+      type: "expense"
     }
   ];
-};
-
-// More comprehensive mock response that includes facturas_sin_pagar
-export const getMockZohoWebhookResponse = async (startDate: Date, endDate: Date): Promise<ZohoTransactionResponse> => {
-  const formattedDate = formatDateYYYYMMDD_Panama(startDate);
   
-  return {
-    colaboradores: [
-      {
-        vendor_name: "Juan Pérez",
-        total: 500,
-        date: formattedDate
-      },
-      {
-        vendor_name: "María Gómez",
-        total: 350,
-        date: formattedDate
-      }
-    ],
-    expenses: [
-      {
-        account_name: "Servicios",
-        vendor_name: "AWS",
-        total: 250,
-        date: formattedDate
-      },
-      {
-        account_name: "Gastos generales",
-        vendor_name: "Papelería",
-        total: 75,
-        date: formattedDate
-      }
-    ],
-    payments: [
-      {
-        customer_name: "Cliente A",
-        amount: 1500,
-        date: formattedDate,
-        invoice_id: "INV-001"
-      },
-      {
-        customer_name: "Cliente B",
-        amount: 2500,
-        date: formattedDate,
-        invoice_id: "INV-002"
-      }
-    ],
-    facturas_sin_pagar: [
-      {
-        balance: 1200,
-        company_name: "Empresa XYZ",
-        customer_name: "Cliente C"
-      },
-      {
-        balance: 850,
-        company_name: "Empresa ABC",
-        customer_name: "Cliente D"
-      },
-      {
-        balance: 1500,
-        company_name: "Empresa UVW",
-        customer_name: "Cliente E"
-      }
-    ],
-    stripe: 3500
-  };
+  // Simulate API delay
+  await new Promise(resolve => setTimeout(resolve, 800));
+
+  console.log("ZohoService mock: Filtering transactions from", startDate, "to", endDate);
+
+  // Filter the transactions by date
+  const filtered = zohoMockData.filter(tx => {
+    const txDate = new Date(tx.date);
+    return txDate >= startDate && txDate <= endDate;
+  });
+  
+  console.log("ZohoService mock: Found transactions:", filtered.length);
+  
+  return filtered;
 };

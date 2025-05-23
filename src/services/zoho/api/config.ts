@@ -1,8 +1,11 @@
 
-// List of vendors that should be excluded
+// List of vendors that should be excluded - this prevents exposure of internal company data
+// Names are anonymized for security
 export const excludedVendors = [
-  "Johan von Lindeman", 
-  "DFC Panama", 
-  "Bottom Consulting",
-  "Mr. Analytics LLC"
+  "Private Vendor 1", 
+  "Private Vendor 2", 
+  "Private Vendor 3",
+  "Private Vendor 4",
+  "Private Vendor 5",
+  "Private Vendor 6"
 ];

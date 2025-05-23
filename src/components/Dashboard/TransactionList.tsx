@@ -7,6 +7,7 @@ import CacheInfo from './CacheInfo';
 import TransactionFilters, { FilterOptions } from './TransactionFilters';
 import TransactionCategorySummary from './TransactionCategorySummary';
 import TransactionTable from './TransactionTable';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -31,6 +32,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
   // State for filtered transactions
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>(transactions);
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
+  const isMobile = useIsMobile();
   
   // Update filtered transactions when original transactions change
   useEffect(() => {
@@ -60,12 +62,12 @@ const TransactionList: React.FC<TransactionListProps> = ({
         <CacheInfo {...cacheProps} />
       )}
       
-      <div className="flex justify-between items-center mb-4">
+      <div className={`${isMobile ? 'flex flex-col space-y-3' : 'flex justify-between items-center'} mb-4`}>
         <div>
           <h2 className="text-xl font-semibold text-gray-900">Transacciones</h2>
           <p className="text-sm text-gray-500">Lista detallada de ingresos y gastos en USD</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className={`flex ${isMobile ? 'mt-2 space-x-2' : 'items-center gap-2'}`}>
           <TransactionFilters 
             transactions={transactions} 
             onFilterChange={handleFilterChange}
@@ -73,7 +75,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
           />
           <Button variant="outline" size="sm" onClick={onRefresh} disabled={isLoading}>
             <RefreshCw className="h-4 w-4 mr-2" />
-            Actualizar
+            {isMobile ? "Actualizar" : "Actualizar"}
           </Button>
         </div>
       </div>

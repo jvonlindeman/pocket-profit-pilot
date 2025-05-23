@@ -12,23 +12,23 @@ export class TransactionStatsRepository extends StatsBaseRepository {
   async getTransactionCounts(): Promise<Record<string, number>> {
     try {
       // Get count of transactions by source
+      // Using a simpler query approach to avoid type issues
       const { data, error } = await this.getClient()
         .from('cached_transactions')
-        .select('source')
-        .not('source', 'is', null);
+        .select('source');
       
       if (error) {
         this.logStatError("Error getting transaction counts", error);
         return {};
       }
       
-      // Format the counts manually
+      // Count transactions by source manually
       const counts: Record<string, number> = {};
       if (data) {
-        // Group by source and count
         data.forEach(item => {
-          const source = item.source;
-          counts[source] = (counts[source] || 0) + 1;
+          if (item.source) {
+            counts[item.source] = (counts[item.source] || 0) + 1;
+          }
         });
       }
       
@@ -44,7 +44,8 @@ export class TransactionStatsRepository extends StatsBaseRepository {
    */
   async getTransactionCountsByMonth(): Promise<Record<string, Record<string, number>>> {
     try {
-      // Get transactions grouped by year, month and source
+      // Get transactions with year, month and source
+      // Using a simpler query approach to avoid type issues
       const { data, error } = await this.getClient()
         .from('cached_transactions')
         .select('source, year, month')
@@ -56,20 +57,17 @@ export class TransactionStatsRepository extends StatsBaseRepository {
         return {};
       }
       
-      // Format the counts manually
+      // Group and count transactions by month and source manually
       const countsByMonth: Record<string, Record<string, number>> = {};
       if (data) {
         data.forEach(item => {
-          // Convert to string for consistent typing
-          const year = String(item.year);
-          const month = String(item.month).padStart(2, '0');
-          const key = `${year}-${month}`;
-          const source = item.source;
-          
-          if (!countsByMonth[key]) {
-            countsByMonth[key] = {};
+          if (item.year !== null && item.month !== null && item.source) {
+            const key = `${item.year}-${String(item.month).padStart(2, '0')}`;
+            if (!countsByMonth[key]) {
+              countsByMonth[key] = {};
+            }
+            countsByMonth[key][item.source] = (countsByMonth[key][item.source] || 0) + 1;
           }
-          countsByMonth[key][source] = (countsByMonth[key][source] || 0) + 1;
         });
       }
       

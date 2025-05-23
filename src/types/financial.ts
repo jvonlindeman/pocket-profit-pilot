@@ -1,103 +1,80 @@
 
-/**
- * Transaction type
- * Defines the structure of financial transactions in the app
- */
 export interface Transaction {
   id: string;
+  external_id?: string; // Added external_id as optional field
   date: string;
   amount: number;
   description: string;
-  category?: string;
-  source: string;
+  category: string;
+  source: 'Zoho' | 'Stripe';
   type: 'income' | 'expense';
-  fees?: number;
-  gross?: number;
-  metadata?: Record<string, any>;
-  external_id?: string;
+  fees?: number; // Added optional fees field
+  gross?: number; // Added optional gross amount field (before fees)
+  metadata?: any; // Added metadata field for additional properties
 }
 
-/**
- * Financial summary type
- * Provides an aggregated view of financial data
- */
 export interface FinancialSummary {
   totalIncome: number;
   totalExpense: number;
-  profit: number;
-  profitMargin: number;
-  startDate: Date;
-  endDate: Date;
   collaboratorExpense: number;
   otherExpense: number;
-  grossProfit: number;
-  grossProfitMargin: number;
+  profit: number;
+  profitMargin: number;
+  grossProfit: number; // Added gross profit field 
+  grossProfitMargin: number; // Added gross profit margin field
   startingBalance?: number;
 }
 
-/**
- * Financial data type for processed transactions
- */
-export interface FinancialData {
-  summary: FinancialSummary;
-  incomeBySource: CategorySummary[];
-  expenseByCategory: CategorySummary[];
-  transactions: Transaction[];
-}
-
-/**
- * Monthly Balance type for tracking monthly financial data
- */
-export interface MonthlyBalance {
-  id?: number;
-  month_year: string;
-  balance: number;
-  notes?: string;
-  created_at?: string;
-  updated_at?: string;
-  stripe_override?: number;
-  itbm_amount?: number;
-  opex_amount?: number;
-  profit_percentage?: number;
-}
-
-/**
- * Monthly Data type
- * Represents monthly financial data for charts and analysis
- */
-export interface MonthlyData {
-  month: string;
-  income: number;
-  expense: number;
-  profit: number;
-}
-
-/**
- * Vendor Expense type
- * Represents expenses grouped by vendor
- */
-export interface VendorExpense {
-  vendor: string;
-  amount: number;
-  percentage: number;
-}
-
-/**
- * Category Summary type
- * Represents financial data grouped by category
- */
 export interface CategorySummary {
   category: string;
   amount: number;
   percentage: number;
-  count?: number;
+  date?: string; // Fecha opcional para los colaboradores
+  count?: number; // Added count property for number of transactions in category
 }
 
-/**
- * Date Range type
- * Defines a date range for filtering financial data
- */
 export interface DateRange {
   startDate: Date;
   endDate: Date;
+}
+
+export interface ChartData {
+  labels: string[];
+  values: number[];
+}
+
+export interface FinancialData {
+  summary: FinancialSummary;
+  transactions: Transaction[];
+  incomeBySource: CategorySummary[];
+  expenseByCategory: CategorySummary[];
+  dailyData: {
+    income: ChartData;
+    expense: ChartData;
+  };
+  monthlyData: {
+    income: ChartData;
+    expense: ChartData;
+    profit: ChartData;
+  };
+}
+
+export interface CollaboratorData {
+  name: string;
+  amount: number;
+  percentage: number;
+  date?: string; // Fecha opcional para los colaboradores
+}
+
+export interface MonthlyBalance {
+  id: number;
+  month_year: string;
+  balance: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  stripe_override: number | null; // Added to match the database schema
+  opex_amount: number | null; // Added for OPEX percentage
+  itbm_amount: number | null; // Added for ITBM amount
+  profit_percentage: number | null; // Added for Profit First percentage
 }

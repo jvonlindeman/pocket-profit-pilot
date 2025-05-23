@@ -37,6 +37,8 @@ const Index = () => {
     startingBalance,
     updateStartingBalance,
     setStartingBalance,
+    usingCachedData,
+    cacheStatus
   } = useFinanceData();
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
@@ -179,11 +181,7 @@ const Index = () => {
           <DashboardContent 
             periodTitle={periodTitle}
             dateRange={dateRange}
-            financialData={{
-              summary: financialData.summary,
-              transactions: financialData.transactions,
-              expenseByCategory: financialData.expenseByCategory
-            }}
+            financialData={financialData}
             currentMonthDate={currentMonthDate}
             startingBalance={startingBalance}
             refreshData={refreshData}

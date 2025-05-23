@@ -40,9 +40,6 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
 
-  // Set default refresh token from the user's input
-  const defaultRefreshToken = '1000.e43c417017e3052b5b62e1b9b49ade73.591f8e648553ddf2d54346d862772edd';
-
   // Fetch current configuration
   useEffect(() => {
     const fetchConfig = async () => {
@@ -54,7 +51,7 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
           method: 'GET'
         });
         
-        console.log('Zoho config response:', { data, error });
+        console.log('Zoho config response received');
         
         if (error) {
           console.error('Error fetching Zoho config:', error);
@@ -72,14 +69,6 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
           setExistingConfig(data.config);
           setClientId(data.config.clientId || '');
           setOrganizationId(data.config.organizationId || '');
-          
-          // Pre-fill refresh token if not configured yet or if we're updating
-          if (!refreshToken) {
-            setRefreshToken(defaultRefreshToken);
-          }
-        } else {
-          // If not configured, set default refresh token
-          setRefreshToken(defaultRefreshToken);
         }
       } catch (err) {
         console.error('Error in fetchConfig:', err);
@@ -100,13 +89,13 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
         description: 'Refresh token has been pre-filled from OAuth flow'
       });
     }
-  }, [toast, searchParams, defaultRefreshToken, refreshToken]);
+  }, [toast, searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setStatusMessage("Validando credenciales con make.com...");
+    setStatusMessage("Validando credenciales...");
     
     try {
       // Validate required fields for new configuration
@@ -130,15 +119,15 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
         organizationId
       };
 
-      setStatusMessage("Enviando credenciales a make.com y validando la conexión...");
+      setStatusMessage("Enviando credenciales y validando la conexión...");
       
-      console.log('Saving Zoho config via make.com webhook...', configData);
+      console.log('Saving Zoho config via edge function...');
       const { data, error } = await supabase.functions.invoke('zoho-config', {
         method: 'POST',
         body: configData
       });
       
-      console.log('Zoho config save response:', { data, error });
+      console.log('Zoho config save response received');
       
       if (error) {
         console.error('Error saving Zoho config:', error);
@@ -152,15 +141,15 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
           } else if (error.details.includes('invalid_organization')) {
             setError('Organization ID is invalid. Please verify it in your Zoho Books account.');
           } else {
-            setError(error.message || 'Failed to save Zoho configuration through make.com');
+            setError(error.message || 'Failed to save Zoho configuration');
           }
         } else {
-          setError(error.message || 'Failed to save Zoho configuration through make.com');
+          setError(error.message || 'Failed to save Zoho configuration');
         }
         
         toast({
           title: 'Error',
-          description: error.message || 'Failed to save Zoho configuration through make.com',
+          description: error.message || 'Failed to save Zoho configuration',
           variant: 'destructive'
         });
         return;
@@ -168,7 +157,7 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
       
       toast({
         title: 'Success',
-        description: 'Zoho Books integration configured successfully via make.com'
+        description: 'Zoho Books integration configured successfully'
       });
       
       setConfigured(true);
@@ -182,10 +171,10 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
       window.location.reload();
     } catch (err: any) {
       console.error('Error in handleSubmit:', err);
-      setError(err.message || 'An unexpected error occurred with make.com webhook');
+      setError(err.message || 'An unexpected error occurred');
       toast({
         title: 'Error',
-        description: err.message || 'An unexpected error occurred with make.com webhook',
+        description: err.message || 'An unexpected error occurred',
         variant: 'destructive'
       });
     } finally {
@@ -216,7 +205,7 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
         <CardDescription>
           {configured 
             ? `Zoho Books is configured with client ID: ${existingConfig?.clientId}. Last updated: ${new Date(existingConfig?.updatedAt || '').toLocaleString()}`
-            : 'Enter your Zoho Books API credentials below to connect via make.com.'}
+            : 'Enter your Zoho Books API credentials below to connect.'}
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
@@ -252,9 +241,9 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
         <CardContent className="space-y-4">
           <Alert className="mb-4">
             <CheckCircle className="h-4 w-4" />
-            <AlertTitle>Make.com Integration</AlertTitle>
+            <AlertTitle>Secure Configuration</AlertTitle>
             <AlertDescription>
-              This form will send your Zoho credentials to make.com (webhook URL: https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihlmx22) for processing.
+              Your Zoho credentials will be securely stored and processed
             </AlertDescription>
           </Alert>
 
@@ -340,7 +329,7 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
         
         <CardFooter className="flex justify-between">
           <p className="text-sm text-muted-foreground">
-            {configured ? 'Update your Zoho Books integration settings via make.com' : 'Connect to Zoho Books API via make.com'}
+            {configured ? 'Update your Zoho Books integration settings' : 'Connect to Zoho Books API'}
           </p>
           <Button type="submit" disabled={loading}>
             {loading ? (

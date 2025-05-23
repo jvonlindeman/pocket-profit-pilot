@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Bug } from 'lucide-react';
 import StripeDebug from '@/components/StripeDebug';
 import WebhookDebug from '@/components/WebhookDebug';
@@ -16,16 +16,6 @@ const DebugSection: React.FC<DebugSectionProps> = ({
   refreshData,
   rawResponse
 }) => {
-  // Log when the raw response changes to help debugging
-  useEffect(() => {
-    if (rawResponse) {
-      console.log("DebugSection: received rawResponse:", {
-        hasFacturasSinPagar: !!rawResponse.facturas_sin_pagar,
-        invoicesCount: rawResponse.facturas_sin_pagar?.length || 0
-      });
-    }
-  }, [rawResponse]);
-
   return (
     <div className="mt-8 grid grid-cols-1 gap-6">
       <h2 className="text-lg font-semibold text-gray-900 flex items-center">

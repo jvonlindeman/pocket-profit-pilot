@@ -1,9 +1,10 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// CORS headers for browser requests
+// CORS headers with restricted origin
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") || "*", // Preferably set to specific origin
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -12,8 +13,12 @@ const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as stri
 
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-// The make.com webhook URL
-const makeWebhookUrl = "https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihlmx22";
+// Get make.com webhook URL from environment variable
+const makeWebhookUrl = Deno.env.get("MAKE_WEBHOOK_URL") as string;
+
+if (!makeWebhookUrl) {
+  console.error("MAKE_WEBHOOK_URL environment variable is not set");
+}
 
 serve(async (req: Request) => {
   console.log(`zoho-tokens function called with method: ${req.method}`);
@@ -24,6 +29,95 @@ serve(async (req: Request) => {
   }
 
   try {
+    // Handle POST requests for code exchange or custom actions
+    if (req.method === "POST") {
+      const requestBody = await req.json();
+      
+      // Input validation
+      if (!requestBody || typeof requestBody !== 'object') {
+        return new Response(
+          JSON.stringify({ error: "Invalid request format" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      // Handle code exchange action
+      if (requestBody.action === "exchange-code" && requestBody.code) {
+        console.log("Exchanging authorization code for tokens");
+        
+        // Validate code parameter
+        if (typeof requestBody.code !== 'string' || requestBody.code.length < 5) {
+          return new Response(
+            JSON.stringify({ error: "Invalid authorization code format" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        
+        try {
+          // Get the client configuration from database
+          const { data: configData, error: configError } = await supabase
+            .from("zoho_integration")
+            .select("client_id, client_secret")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single();
+            
+          if (configError || !configData) {
+            console.error("Error fetching Zoho client configuration:", configError);
+            return new Response(
+              JSON.stringify({ error: "Zoho client configuration not found" }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+          
+          // Call make.com webhook to exchange the code for tokens
+          if (!makeWebhookUrl) {
+            throw new Error("Make webhook URL is not configured");
+          }
+          
+          const exchangeResponse = await fetch(makeWebhookUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "exchangeCode",
+              code: requestBody.code,
+              clientId: configData.client_id,
+              clientSecret: configData.client_secret
+            })
+          });
+          
+          if (!exchangeResponse.ok) {
+            const errorText = await exchangeResponse.text();
+            throw new Error(`Code exchange failed: ${errorText}`);
+          }
+          
+          const tokenData = await exchangeResponse.json();
+          
+          if (!tokenData.refresh_token) {
+            throw new Error("No refresh token received from code exchange");
+          }
+          
+          // Return the refresh token to the client
+          return new Response(
+            JSON.stringify({ refresh_token: tokenData.refresh_token, organization_id: tokenData.organization_id }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        } catch (err) {
+          console.error("Error exchanging code:", err);
+          return new Response(
+            JSON.stringify({ error: "Failed to exchange code for tokens", details: err.message }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+
+      // Invalid action
+      return new Response(
+        JSON.stringify({ error: "Invalid action specified" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
     // Get the current integration record
     console.log("Fetching Zoho integration record");
     const { data: integration, error: fetchError } = await supabase
@@ -86,8 +180,20 @@ serve(async (req: Request) => {
       );
     }
 
+    // Make sure webhook URL is available
+    if (!makeWebhookUrl) {
+      console.error("Make webhook URL is not configured");
+      return new Response(
+        JSON.stringify({ error: "Make webhook URL is not configured" }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
+
     // Call the make.com webhook to refresh the token
-    console.log("Calling make.com webhook for token refresh:", makeWebhookUrl);
+    console.log("Calling make.com webhook for token refresh");
     const webhookResponse = await fetch(makeWebhookUrl, {
       method: "POST",
       headers: {
@@ -124,7 +230,7 @@ serve(async (req: Request) => {
     let tokenData;
     try {
       const responseText = await webhookResponse.text();
-      console.log(`make.com webhook token response: ${responseText}`);
+      console.log(`make.com webhook token response received`);
       tokenData = JSON.parse(responseText);
     } catch (e) {
       console.error("Failed to parse make.com webhook token response:", e);
@@ -138,7 +244,7 @@ serve(async (req: Request) => {
     }
     
     if (!tokenData.access_token) {
-      console.error("Invalid token data from make.com webhook:", tokenData);
+      console.error("Invalid token data from make.com webhook");
       return new Response(
         JSON.stringify({ error: "Invalid token data from make.com webhook" }),
         { 

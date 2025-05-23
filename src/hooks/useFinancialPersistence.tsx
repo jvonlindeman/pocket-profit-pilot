@@ -1,49 +1,60 @@
 
 import { useCallback } from 'react';
-import { financialSummaryService } from '@/services/financialSummaryService';
+import { financialService } from '@/services/financialService';
 import { FinancialData } from '@/types/financial';
+import { toast } from "@/hooks/use-toast";
+import { useCacheSegments } from '@/hooks/cache/useCacheSegments';
 
 /**
- * Hook for persisting financial data
+ * Hook to handle persistence of financial data
  */
 export const useFinancialPersistence = () => {
+  const { getCacheSegmentIds } = useCacheSegments();
+
   /**
-   * Save financial data to local storage
+   * Save financial data to database with appropriate cache segment ID
    */
-  const saveFinancialData = useCallback((
-    financialData: FinancialData
+  const saveFinancialData = useCallback(async (
+    financialData: FinancialData,
+    dateRange: { startDate: Date; endDate: Date },
+    transactionsLength: number,
+    loading: boolean
   ) => {
-    // Skip if no data is available
-    if (!financialData) return;
-    
-    // Skip if there are no transactions
-    if (financialData.transactions.length === 0) {
-      console.log("useFinancialPersistence - No transactions to save");
-      return;
-    }
-    
-    // Ensure we have valid date range
-    if (!financialData.summary.startDate || !financialData.summary.endDate) {
-      console.warn("useFinancialPersistence - Invalid date range in summary");
-      return;
-    }
-    
-    // Save the financial summary
-    try {
-      const dateRange = {
-        startDate: financialData.summary.startDate,
-        endDate: financialData.summary.endDate
-      };
+    // Only save when we have actual financial data and valid date range
+    if (
+      financialData && 
+      financialData.summary && 
+      dateRange.startDate && 
+      dateRange.endDate && 
+      transactionsLength > 0 && 
+      !loading
+    ) {
+      console.log("Saving financial data to database:", { 
+        financialData,
+        dateRange
+      });
       
-      financialSummaryService.saveFinancialSummary(
-        financialData.summary,
-        dateRange.startDate,
-        dateRange.endDate
-      );
-    } catch (error) {
-      console.error("useFinancialPersistence - Error saving financial data:", error);
+      // Get the cache segment ID before saving the financial summary
+      const { zoho, stripe } = await getCacheSegmentIds(dateRange);
+      
+      // Prefer Zoho if available, otherwise use Stripe if available
+      const cacheSegmentId = zoho || stripe || null;
+      
+      console.log("Using cache segment ID for saving financial summary:", cacheSegmentId);
+      
+      financialService.saveFinancialSummary(financialData, dateRange, cacheSegmentId)
+        .then(summaryId => {
+          if (summaryId) {
+            console.log("Financial summary saved with ID:", summaryId);
+          } else {
+            console.warn("Failed to save financial summary");
+          }
+        })
+        .catch(err => {
+          console.error("Error saving financial summary:", err);
+        });
     }
-  }, []);
-  
+  }, [getCacheSegmentIds]);
+
   return { saveFinancialData };
 };

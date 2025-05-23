@@ -30,6 +30,8 @@ export const useFinanceData = () => {
     loading, 
     error, 
     rawResponse, 
+    usingCachedData, 
+    cacheStatus, 
     apiConnectivity, 
     checkApiConnectivity, 
     fetchData, 
@@ -47,8 +49,8 @@ export const useFinanceData = () => {
 
   // Save financial summary when data changes
   useMemo(() => {
-    saveFinancialData(financialData);
-  }, [financialData, saveFinancialData]);
+    saveFinancialData(financialData, dateRange, transactions.length, loading);
+  }, [financialData, dateRange, transactions.length, loading, saveFinancialData]);
 
   // Function to refresh data with the callbacks prepared
   const refreshData = useCallback((force = false) => {
@@ -83,6 +85,8 @@ export const useFinanceData = () => {
     updateStartingBalance,
     setStartingBalance,
     setNotes,
+    usingCachedData,
+    cacheStatus,
     apiConnectivity,
     checkApiConnectivity
   };

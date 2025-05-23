@@ -1,4 +1,3 @@
-
 import { Transaction, FinancialData } from "../types/financial";
 import { zohoRepository } from "../repositories/zohoRepository";
 import { stripeRepository } from "../repositories/stripeRepository";
@@ -31,11 +30,6 @@ export class FinancialService {
    */
   processTransactionData(transactions: Transaction[], startingBalance: number = 0, collaboratorExpenses: any[] = []): FinancialData {
     console.log("Processing transaction data with collaborator expenses:", collaboratorExpenses);
-    
-    // Use the current date range
-    const today = new Date();
-    const startDate = today;
-    const endDate = today;
     
     // Calculate total collaborator expense from the collaboratorExpenses array
     // with improved logging and error handling
@@ -72,8 +66,6 @@ export class FinancialService {
       grossProfit: totalIncome,
       grossProfitMargin: totalIncome > 0 ? 100 : 0,
       startingBalance,
-      startDate,
-      endDate,
     };
     
     console.log("Final financial summary:", summary);
@@ -128,11 +120,26 @@ export class FinancialService {
     expenseByCategory.sort((a, b) => b.amount - a.amount);
     incomeBySource.sort((a, b) => b.amount - a.amount);
     
+    // Add daily and monthly data placeholders
+    // In a real implementation, we would calculate these values
+    const dailyData = {
+      income: { labels: [], values: [] },
+      expense: { labels: [], values: [] }
+    };
+    
+    const monthlyData = {
+      income: { labels: [], values: [] },
+      expense: { labels: [], values: [] },
+      profit: { labels: [], values: [] }
+    };
+    
     return {
       summary,
       transactions,
       incomeBySource,
-      expenseByCategory
+      expenseByCategory,
+      dailyData,
+      monthlyData
     };
   }
 
@@ -140,7 +147,7 @@ export class FinancialService {
    * Check API connectivity for both data sources
    */
   async checkApiConnectivity(): Promise<{zoho: boolean, stripe: boolean}> {
-    const zohoConnected = await zohoRepository.checkConnectivity();
+    const zohoConnected = await zohoRepository.checkApiConnectivity();
     const stripeConnected = await stripeRepository.checkApiConnectivity();
     
     return { 
@@ -154,8 +161,52 @@ export class FinancialService {
    */
   async verifyCacheIntegrity(dateRange: { startDate: Date; endDate: Date }): Promise<void> {
     try {
-      // Since we're removing cache functionality, this is now a dummy function
-      console.log("Cache integrity check skipped - cache functionality removed");
+      // Verify Zoho cache
+      const zohoCache = await CacheService.checkCache(
+        'Zoho', 
+        dateRange.startDate, 
+        dateRange.endDate
+      );
+      
+      if (zohoCache.cached && zohoCache.status === 'complete') {
+        // Verify there are actually transactions
+        const { isConsistent, transactionCount } = await CacheService.verifyCacheIntegrity(
+          'Zoho',
+          dateRange.startDate,
+          dateRange.endDate
+        );
+        
+        if (!isConsistent && transactionCount < 10) {
+          console.log("Cache integrity issue detected. Attempting repair...");
+          
+          // Try to repair the cache
+          const repaired = await zohoRepository.repairCache(dateRange.startDate, dateRange.endDate);
+          if (repaired) {
+            console.log("Cache successfully repaired");
+          } else {
+            console.warn("Cache repair failed or wasn't needed");
+          }
+        }
+      }
+      
+      // Verify Stripe cache (similar approach)
+      const stripeCache = await CacheService.checkCache(
+        'Stripe', 
+        dateRange.startDate, 
+        dateRange.endDate
+      );
+      
+      if (stripeCache.cached && stripeCache.status === 'complete') {
+        const { isConsistent, transactionCount } = await CacheService.verifyCacheIntegrity(
+          'Stripe',
+          dateRange.startDate,
+          dateRange.endDate
+        );
+        
+        if (!isConsistent && transactionCount < 5) {
+          console.log("Stripe cache integrity issue detected. Will force refresh during next data fetch.");
+        }
+      }
     } catch (err) {
       console.error("Error verifying cache integrity:", err);
     }
@@ -243,10 +294,14 @@ export class FinancialService {
         });
       }
       
-      // Get transactions from Zoho Books - updated to use the correct method name
-      const zohoData = await zohoRepository.fetchTransactions(
+      // Verify cache integrity
+      await this.verifyCacheIntegrity(dateRange);
+      
+      // Get transactions from Zoho Books
+      const zohoData = await zohoRepository.getTransactions(
         dateRange.startDate, 
-        dateRange.endDate
+        dateRange.endDate,
+        forceRefresh
       );
 
       // Get the current raw response for debugging
@@ -281,6 +336,11 @@ export class FinancialService {
       
       // Update transactions state
       callbacks.onTransactions(combinedData);
+      
+      // Schedule cache check for background refresh if needed
+      if (!forceRefresh) {
+        zohoRepository.checkAndRefreshCache(dateRange.startDate, dateRange.endDate);
+      }
       
       return true;
     } catch (err: any) {
