@@ -1,4 +1,3 @@
-
 import { Transaction, FinancialSummary, CategorySummary, UnpaidInvoice, FinancialData } from "@/types/financial";
 import { stripeRepository } from "@/repositories/stripeRepository";
 import { zohoRepository } from "@/repositories/zohoRepository";
@@ -68,7 +67,7 @@ export class FinancialService {
   async saveFinancialSummary(
     financialData: FinancialData, 
     dateRange: { startDate: Date; endDate: Date },
-    cacheSegmentId: number | null
+    cacheSegmentId: number | string | null
   ): Promise<number | null> {
     console.log("Saving financial summary:", { 
       summary: financialData.summary,
