@@ -7,5 +7,7 @@ export const excludedVendors = [
   "Private Vendor 3",
   "Private Vendor 4",
   "Private Vendor 5",
-  "Private Vendor 6"
+  "Private Vendor 6",
+  "Johan von Lindeman",
+  "DFC Panama"
 ];
