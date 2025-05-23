@@ -157,7 +157,7 @@ export class FinancialService {
   }
 
   /**
-   * Verify cache integrity for a range
+   * Verify cache integrity for a range - simplified to just check for cache presence
    */
   async verifyCacheIntegrity(dateRange: { startDate: Date; endDate: Date }): Promise<void> {
     try {
@@ -169,7 +169,7 @@ export class FinancialService {
       );
       
       if (zohoCache.cached && zohoCache.status === 'complete') {
-        // Verify there are actually transactions
+        // Check cached transaction data without attempting repair
         const { isConsistent, transactionCount } = await CacheService.verifyCacheIntegrity(
           'Zoho',
           dateRange.startDate,
@@ -177,15 +177,8 @@ export class FinancialService {
         );
         
         if (!isConsistent && transactionCount < 10) {
-          console.log("Cache integrity issue detected. Attempting repair...");
-          
-          // Try to repair the cache
-          const repaired = await zohoRepository.repairCache(dateRange.startDate, dateRange.endDate);
-          if (repaired) {
-            console.log("Cache successfully repaired");
-          } else {
-            console.warn("Cache repair failed or wasn't needed");
-          }
+          console.log("Cache integrity issue detected but repair functionality has been removed.");
+          // Cache repair has been removed as part of simplification
         }
       }
       
@@ -337,10 +330,7 @@ export class FinancialService {
       // Update transactions state
       callbacks.onTransactions(combinedData);
       
-      // Schedule cache check for background refresh if needed
-      if (!forceRefresh) {
-        zohoRepository.checkAndRefreshCache(dateRange.startDate, dateRange.endDate);
-      }
+      // Background cache refresh has been removed as part of simplification
       
       return true;
     } catch (err: any) {
