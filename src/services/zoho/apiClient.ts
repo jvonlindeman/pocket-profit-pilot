@@ -1,5 +1,4 @@
 
-
 import { Transaction, UnpaidInvoice } from "@/types/financial";
 import { ZohoTransactionResponse } from "./api/types";
 import { handleApiError } from "./utils";
@@ -33,7 +32,7 @@ export const fetchZohoData = async (
   
   // Generate a simple cache key based ONLY on the date range and raw flag
   // This ensures maximum cache hits across different call sites
-  const cacheKey = `zoho-data-${formatDateYYYYMMDD(startDate)}-${formatDateYYYYMMDD(endDate)}-${returnRawResponse}`;
+  const cacheKey = `zoho-data-${formatDateYYYYMMDD(startDate)}-${formatDateYYYYMMDD(endDate)}-${returnRawResponse ? 'raw' : 'processed'}`;
   
   console.log(`ZohoApiClient: Using cache key: ${cacheKey}, forceRefresh: ${forceRefresh}`);
   
@@ -106,7 +105,7 @@ export const fetchZohoData = async (
       }
     },
     30000, // 30 second TTL for this specific request
-    5000   // 5 second cooldown between identical requests
+    30000  // 30 second cooldown between identical requests (increased)
   );
 };
 

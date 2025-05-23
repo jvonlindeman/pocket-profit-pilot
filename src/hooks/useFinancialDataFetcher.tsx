@@ -4,6 +4,7 @@ import { financialService } from '@/services/financialService';
 import { zohoRepository } from '@/repositories/zohoRepository';
 import { useCacheSegments } from '@/hooks/cache/useCacheSegments';
 import CacheService from '@/services/cache';
+import { apiRequestManager } from '@/utils/ApiRequestManager';
 
 /**
  * Base hook for fetching financial data
@@ -35,72 +36,102 @@ export const useFinancialDataFetcher = () => {
     startDate?: Date;
     endDate?: Date;
     forceRefresh?: boolean;
+    requestId?: string;
   }>({});
   const connectivityTimeoutRef = useRef<any>(null);
+  const currentRequestIdRef = useRef<string>('');
+  const cacheCheckInProgressRef = useRef<boolean>(false);
 
   // Get cache segments helper
   const { checkSourceCache } = useCacheSegments();
 
-  // Check cache status
+  // Check cache status - optimized to prevent duplicate calls
   const checkCacheStatus = useCallback(async (
-    dateRange: { startDate: Date; endDate: Date }
+    dateRange: { startDate: Date; endDate: Date },
+    skipIfInProgress = true
   ) => {
-    if (!dateRange.startDate || !dateRange.endDate) return;
+    if (!dateRange.startDate || !dateRange.endDate) return null;
 
+    // Skip if another check is in progress
+    if (skipIfInProgress && cacheCheckInProgressRef.current) {
+      console.log("Cache check already in progress, skipping duplicate check");
+      return null;
+    }
+
+    // Generate a cache key for the cache check itself
+    const cacheCheckKey = `cache-status-${dateRange.startDate.getTime()}-${dateRange.endDate.getTime()}`;
+    
     try {
-      // Check Zoho cache
-      const zohoCache = await checkSourceCache('Zoho', dateRange);
-      
-      // Check Stripe cache
-      const stripeCache = await checkSourceCache('Stripe', dateRange);
-      
-      // Update cache status
+      cacheCheckInProgressRef.current = true;
+
+      // Use ApiRequestManager to deduplicate cache check calls
+      const result = await apiRequestManager.executeRequest(
+        cacheCheckKey,
+        async () => {
+          // Check Zoho cache
+          const zohoCache = await checkSourceCache('Zoho', dateRange);
+          
+          // Check Stripe cache
+          const stripeCache = await checkSourceCache('Stripe', dateRange);
+          
+          return {
+            zoho: zohoCache,
+            stripe: stripeCache
+          };
+        },
+        10000, // 10 second TTL
+        5000   // 5 second cooldown
+      );
+
+      // Update states using the result
       setCacheStatus({
         zoho: { 
-          hit: zohoCache.cached, 
-          partial: zohoCache.partial || false 
+          hit: result.zoho.cached, 
+          partial: result.zoho.partial || false 
         },
         stripe: { 
-          hit: stripeCache.cached, 
-          partial: stripeCache.partial || false 
+          hit: result.stripe.cached, 
+          partial: result.stripe.partial || false 
         }
       });
       
       // Determine if we're using cached data
-      setUsingCachedData(zohoCache.cached || stripeCache.cached);
+      setUsingCachedData(result.zoho.cached || result.stripe.cached);
       
-      return {
-        zoho: zohoCache,
-        stripe: stripeCache
-      };
+      return result;
     } catch (err) {
       console.error("Error checking cache status:", err);
       return null;
+    } finally {
+      cacheCheckInProgressRef.current = false;
     }
   }, [checkSourceCache]);
 
-  // Check API connectivity with debounce
+  // Check API connectivity with caching
   const checkApiConnectivity = useCallback(async () => {
     // Clear any pending timeout
     if (connectivityTimeoutRef.current) {
       clearTimeout(connectivityTimeoutRef.current);
     }
     
-    // Set a timeout to delay the execution (debounce)
-    return new Promise<{zoho: boolean, stripe: boolean}>((resolve) => {
-      connectivityTimeoutRef.current = setTimeout(async () => {
+    // Use the ApiRequestManager to deduplicate connectivity checks
+    return apiRequestManager.executeRequest(
+      'api-connectivity-check',
+      async () => {
         try {
           const result = await financialService.checkApiConnectivity();
           setApiConnectivity(result);
-          resolve(result);
+          return result;
         } catch (error) {
           console.error("Error checking API connectivity:", error);
           const result = { zoho: false, stripe: false };
           setApiConnectivity(result);
-          resolve(result);
+          return result;
         }
-      }, 300); // 300ms debounce delay
-    });
+      },
+      60000, // 60 second TTL
+      5000   // 5 second cooldown
+    );
   }, []);
 
   // Fetch financial data from external services with duplication prevention
@@ -113,9 +144,13 @@ export const useFinancialDataFetcher = () => {
       onIncomeTypes: (transactions: any[], stripeData: any) => void,
     }
   ) => {
+    // Generate a unique request ID
+    const requestId = `fetch-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    currentRequestIdRef.current = requestId;
+    
     // Check if we're already fetching data
     if (isFetchingRef.current) {
-      console.warn("Fetch in progress, skipping duplicate request");
+      console.warn(`Fetch in progress, skipping duplicate request (${requestId})`);
       return false;
     }
     
@@ -124,26 +159,33 @@ export const useFinancialDataFetcher = () => {
     const sameStartDate = lastParams.startDate && lastParams.startDate.getTime() === dateRange.startDate.getTime();
     const sameEndDate = lastParams.endDate && lastParams.endDate.getTime() === dateRange.endDate.getTime();
     const sameForce = lastParams.forceRefresh === forceRefresh;
+    const shortTimeElapsed = lastParams.requestId && 
+                            (Date.now() - parseInt(lastParams.requestId.split('-')[1])) < 5000;
     
-    if (sameStartDate && sameEndDate && sameForce && !forceRefresh) {
-      console.warn("Duplicate request detected, using cached data");
-      // Only check cache status silently when we detect a duplicate
-      checkCacheStatus(dateRange).catch(console.error);
+    if (sameStartDate && sameEndDate && sameForce && shortTimeElapsed && !forceRefresh) {
+      console.warn(`Duplicate request detected within short timeframe, using cached data (${requestId})`);
       return false;
     }
     
     // Update last fetch params and set fetching flag
-    lastFetchParamsRef.current = { startDate: dateRange.startDate, endDate: dateRange.endDate, forceRefresh };
+    lastFetchParamsRef.current = { 
+      startDate: dateRange.startDate, 
+      endDate: dateRange.endDate, 
+      forceRefresh, 
+      requestId 
+    };
     isFetchingRef.current = true;
     
     setLoading(true);
     setError(null);
     
-    // Check cache status first
-    await checkCacheStatus(dateRange);
+    // Check cache status first - but only once
+    if (!cacheCheckInProgressRef.current) {
+      await checkCacheStatus(dateRange, false);
+    }
     
     try {
-      // Check connectivity first with debounced call
+      // Check connectivity first (cached)
       await checkApiConnectivity();
       
       // Fetch the financial data
@@ -159,8 +201,10 @@ export const useFinancialDataFetcher = () => {
         setRawResponse(rawData);
       }
       
-      // Check cache status again after fetch to update the UI
-      await checkCacheStatus(dateRange);
+      // Check cache status again after fetch to update the UI - but only if this is still the current request
+      if (currentRequestIdRef.current === requestId) {
+        await checkCacheStatus(dateRange);
+      }
       
       setLoading(false);
       isFetchingRef.current = false;

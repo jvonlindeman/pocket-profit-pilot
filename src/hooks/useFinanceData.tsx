@@ -1,3 +1,4 @@
+
 import { useMemo, useCallback, useRef } from 'react';
 import { useFinanceDateRange } from '@/hooks/useFinanceDateRange';
 import { useEnhancedFinancialDataFetcher } from '@/hooks/useEnhancedFinancialDataFetcher';
@@ -9,11 +10,13 @@ import { financialService, processTransactionData } from '@/services/financialSe
 import { getCurrentMonthRange } from '@/utils/dateUtils';
 import { zohoRepository } from '@/repositories/zohoRepository';
 import { UnpaidInvoice } from '@/types/financial';
+import { apiRequestManager } from '@/utils/ApiRequestManager';
 
 export const useFinanceData = () => {
   // Keep track of the last time refreshData was called
   const lastRefreshTimeRef = useRef<number>(0);
-  const refreshCooldownRef = useRef<number>(2000); // 2 second cooldown
+  const refreshInProgressRef = useRef<boolean>(false);
+  const refreshRequestIdRef = useRef<string>('');
   
   // Import functionality from smaller hooks
   const { startingBalance, fetchMonthlyBalance, updateStartingBalance, setStartingBalance, notes, setNotes } = useMonthlyBalanceManager();
@@ -64,28 +67,53 @@ export const useFinanceData = () => {
     }
   }, [financialData, dateRange, transactions.length, loading, saveFinancialData]);
 
-  // Function to refresh data with the callbacks prepared and cooldown protection
+  // Function to refresh data with strict deduplication
   const refreshData = useCallback((force = false) => {
-    const now = Date.now();
-    const timeSinceLastRefresh = now - lastRefreshTimeRef.current;
+    // Generate a unique request ID for this refresh
+    const requestId = `refresh-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     
-    // Skip if within cooldown period and not a forced refresh
-    if (timeSinceLastRefresh < refreshCooldownRef.current && !force) {
-      console.log(`Skipping refresh, last refresh was ${timeSinceLastRefresh}ms ago (cooldown: ${refreshCooldownRef.current}ms)`);
+    // Skip if we're already refreshing and this isn't a forced refresh
+    if (refreshInProgressRef.current && !force) {
+      console.log(`Skip refresh, already in progress (${requestId})`);
       return Promise.resolve(false);
     }
     
-    // Update last refresh time
-    lastRefreshTimeRef.current = now;
+    // Generate a cache key for this specific refresh operation
+    const refreshCacheKey = `finance-refresh-${dateRange.startDate?.getTime()}-${dateRange.endDate?.getTime()}-${force}`;
     
-    // Get the fetch function with cooldown protection applied
-    const fetchFunction = getRefreshFunction(force);
+    // If force refresh, clear the cache entry
+    if (force) {
+      apiRequestManager.clearCacheEntry(refreshCacheKey);
+    }
     
-    // Return a function that will call the fetchFunction with the appropriate parameters
-    return fetchFunction(dateRange, force, {
-      onCollaboratorData: processCollaboratorData,
-      onIncomeTypes: processIncomeTypes
-    });
+    // Use the ApiRequestManager to deduplicate refresh requests
+    return apiRequestManager.executeRequest(
+      refreshCacheKey,
+      async () => {
+        try {
+          // Set flags to indicate refresh in progress
+          refreshInProgressRef.current = true;
+          refreshRequestIdRef.current = requestId;
+          lastRefreshTimeRef.current = Date.now();
+          
+          // Get the actual fetch function
+          const fetchFunction = getRefreshFunction(force);
+          
+          // Execute the fetch with dates and callbacks
+          const result = await fetchFunction(dateRange, force, {
+            onCollaboratorData: processCollaboratorData,
+            onIncomeTypes: processIncomeTypes
+          });
+          
+          return result;
+        } finally {
+          // Always clean up when done
+          refreshInProgressRef.current = false;
+        }
+      },
+      0,  // No caching, always execute the function
+      force ? 0 : 5000  // Cooldown of 5 seconds unless forced
+    );
   }, [dateRange, getRefreshFunction, processCollaboratorData, processIncomeTypes]);
 
   return {

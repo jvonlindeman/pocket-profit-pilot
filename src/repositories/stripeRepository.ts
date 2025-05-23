@@ -24,6 +24,7 @@ export interface StripeResult {
  */
 export class StripeRepository {
   private apiCallsContext?: ReturnType<typeof useApiCalls>;
+  private lastRequestKey: string = '';
 
   /**
    * Set the API calls context for tracking
@@ -55,13 +56,16 @@ export class StripeRepository {
       
       console.log(`StripeRepository: Using cache key ${cacheKey}, forceRefresh: ${forceRefresh}`);
       
+      // Store the last request key for deduplication
+      this.lastRequestKey = cacheKey;
+      
       // If we're forcing a refresh, clear any existing cache entry
       if (forceRefresh) {
         console.log("StripeRepository: Force refresh requested, clearing cache");
         apiRequestManager.clearCacheEntry(cacheKey);
       }
       
-      // Use ApiRequestManager to deduplicate requests
+      // Use ApiRequestManager to deduplicate requests with a longer cooldown
       return await apiRequestManager.executeRequest(
         cacheKey,
         async () => {
@@ -79,7 +83,8 @@ export class StripeRepository {
             feePercentage: result.feePercentage
           };
         },
-        forceRefresh ? 0 : 5 * 60 * 1000 // 5 minutes TTL, or 0 if force refresh
+        forceRefresh ? 0 : 5 * 60 * 1000, // 5 minutes TTL, or 0 if force refresh
+        30000 // 30 second cooldown (increased from default)
       );
     } catch (error) {
       console.error("Error in stripeRepository.getTransactions:", error);
@@ -101,19 +106,20 @@ export class StripeRepository {
    */
   async checkApiConnectivity(): Promise<boolean> {
     try {
-      // Generate a cache key for this connectivity check
-      const cacheKey = `stripe-connectivity-${new Date().toISOString()}`;
+      // Generate a cache key for this connectivity check with timestamp
+      const cacheKey = `stripe-connectivity-check`;
       
       console.log("StripeRepository: Checking API connectivity");
       
-      // Use ApiRequestManager to deduplicate requests
+      // Use ApiRequestManager to deduplicate requests with a longer cache time
       return await apiRequestManager.executeRequest(
         cacheKey,
         async () => {
           this.trackApiCall();
           return await StripeService.checkApiConnectivity();
         },
-        30000 // 30 second TTL for connectivity checks
+        60000, // 60 second TTL for connectivity checks (increased)
+        5000   // 5 second cooldown
       );
     } catch {
       return false;
