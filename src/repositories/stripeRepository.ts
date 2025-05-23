@@ -1,7 +1,8 @@
 
 import { Transaction } from "../types/financial";
 import StripeService from "../services/stripeService";
-import CacheService from "../services/cache";
+import { apiRequestManager } from "@/utils/ApiRequestManager";
+import { formatDateYYYYMMDD } from "@/utils/dateUtils";
 
 /**
  * Interface for Stripe data results that includes transactions and aggregate data
@@ -18,8 +19,7 @@ export interface StripeResult {
 }
 
 /**
- * StripeRepository handles all data access related to Stripe,
- * including fetching data from API and cache management
+ * StripeRepository handles all data access related to Stripe
  */
 export class StripeRepository {
   /**
@@ -31,17 +31,32 @@ export class StripeRepository {
     forceRefresh = false
   ): Promise<StripeResult> {
     try {
-      const result = await StripeService.getTransactions(startDate, endDate, forceRefresh);
-      return {
-        transactions: result.transactions,
-        gross: result.gross,
-        fees: result.fees,
-        transactionFees: result.transactionFees,
-        payoutFees: result.payoutFees,
-        additionalFees: result.stripeFees || 0, // Map stripeFees to additionalFees
-        net: result.net,
-        feePercentage: result.feePercentage
-      };
+      // Generate a cache key for this request
+      const cacheKey = `stripe-transactions-${formatDateYYYYMMDD(startDate)}-${formatDateYYYYMMDD(endDate)}-${forceRefresh}`;
+      
+      // If we're forcing a refresh, clear any existing cache entry
+      if (forceRefresh) {
+        apiRequestManager.clearCacheEntry(cacheKey);
+      }
+      
+      // Use ApiRequestManager to deduplicate requests
+      return await apiRequestManager.executeRequest(
+        cacheKey,
+        async () => {
+          const result = await StripeService.getTransactions(startDate, endDate, forceRefresh);
+          return {
+            transactions: result.transactions,
+            gross: result.gross,
+            fees: result.fees,
+            transactionFees: result.transactionFees,
+            payoutFees: result.payoutFees,
+            additionalFees: result.stripeFees || 0, // Map stripeFees to additionalFees
+            net: result.net,
+            feePercentage: result.feePercentage
+          };
+        },
+        forceRefresh ? 0 : 5 * 60 * 1000 // 5 minutes TTL, or 0 if force refresh
+      );
     } catch (error) {
       console.error("Error in stripeRepository.getTransactions:", error);
       return {
@@ -62,7 +77,17 @@ export class StripeRepository {
    */
   async checkApiConnectivity(): Promise<boolean> {
     try {
-      return await StripeService.checkApiConnectivity();
+      // Generate a cache key for this connectivity check
+      const cacheKey = `stripe-connectivity-${Date.now()}`;
+      
+      // Use ApiRequestManager to deduplicate requests
+      return await apiRequestManager.executeRequest(
+        cacheKey,
+        async () => {
+          return await StripeService.checkApiConnectivity();
+        },
+        30000 // 30 second TTL for connectivity checks
+      );
     } catch {
       return false;
     }

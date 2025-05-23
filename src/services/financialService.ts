@@ -1,9 +1,11 @@
+
 import { Transaction, FinancialData } from "../types/financial";
 import { zohoRepository } from "../repositories/zohoRepository";
 import { stripeRepository } from "../repositories/stripeRepository";
 import CacheService from "../services/cache";
 import { toast } from "@/hooks/use-toast";
 import { financialSummaryService } from "./financialSummaryService";
+import { apiRequestManager } from "@/utils/ApiRequestManager";
 
 export interface FinancialDataCallbacks {
   onTransactions: (transactions: Transaction[]) => void;
@@ -147,13 +149,23 @@ export class FinancialService {
    * Check API connectivity for both data sources
    */
   async checkApiConnectivity(): Promise<{zoho: boolean, stripe: boolean}> {
-    const zohoConnected = await zohoRepository.checkApiConnectivity();
-    const stripeConnected = await stripeRepository.checkApiConnectivity();
+    // Generate a cache key for API connectivity checks
+    const cacheKey = `api-connectivity-check-${Date.now()}`;
     
-    return { 
-      zoho: zohoConnected, 
-      stripe: stripeConnected 
-    };
+    // Use the ApiRequestManager to execute the connectivity check
+    return await apiRequestManager.executeRequest(
+      cacheKey,
+      async () => {
+        const zohoConnected = await zohoRepository.checkApiConnectivity();
+        const stripeConnected = await stripeRepository.checkApiConnectivity();
+        
+        return { 
+          zoho: zohoConnected, 
+          stripe: stripeConnected 
+        };
+      },
+      30000 // 30 second TTL for connectivity checks
+    );
   }
 
   /**
@@ -253,98 +265,103 @@ export class FinancialService {
     forceRefresh: boolean,
     callbacks: FinancialDataCallbacks
   ): Promise<boolean> {
-    // If we've fetched recently and not forcing a refresh, don't fetch again
-    const now = Date.now();
-    if (!forceRefresh && now - this.lastFetchTimestamp < 2000) {
-      console.log("Skipping fetch, too soon since last fetch");
-      return false;
-    }
+    // Generate a unique cache key for this fetch operation
+    const fetchCacheKey = `financial-data-${dateRange.startDate.toISOString()}-${dateRange.endDate.toISOString()}-${forceRefresh}`;
     
-    this.lastFetchTimestamp = now;
-    console.log("Fetching financial data...");
-    
-    try {
-      // Check API connectivity first
-      const connectivity = await this.checkApiConnectivity();
-      
-      if (!connectivity.zoho && !connectivity.stripe) {
-        toast({
-          title: "API Connectivity Issue",
-          description: "Cannot connect to Zoho or Stripe APIs. Using cached data if available.",
-          variant: "destructive"
-        });
-      } else if (!connectivity.zoho) {
-        toast({
-          title: "Zoho API Connectivity Issue",
-          description: "Cannot connect to Zoho API. Using cached data if available.",
-          variant: "destructive"
-        });
-      } else if (!connectivity.stripe) {
-        toast({
-          title: "Stripe API Connectivity Issue",
-          description: "Cannot connect to Stripe API. Using cached data if available.",
-          variant: "destructive"
-        });
-      }
-      
-      // Verify cache integrity
-      await this.verifyCacheIntegrity(dateRange);
-      
-      // Get transactions from Zoho Books
-      const zohoData = await zohoRepository.getTransactions(
-        dateRange.startDate, 
-        dateRange.endDate,
-        forceRefresh
-      );
+    // Use ApiRequestManager to deduplicate multiple calls to fetchFinancialData
+    return await apiRequestManager.executeRequest(
+      fetchCacheKey,
+      async () => {
+        // If we've fetched recently and not forcing a refresh, don't fetch again
+        const now = Date.now();
+        if (!forceRefresh && now - this.lastFetchTimestamp < 2000) {
+          console.log("Skipping fetch, too soon since last fetch");
+          return false;
+        }
+        
+        this.lastFetchTimestamp = now;
+        console.log("Fetching financial data...");
+        
+        try {
+          // Check API connectivity first
+          const connectivity = await this.checkApiConnectivity();
+          
+          if (!connectivity.zoho && !connectivity.stripe) {
+            toast({
+              title: "API Connectivity Issue",
+              description: "Cannot connect to Zoho or Stripe APIs. Using cached data if available.",
+              variant: "destructive"
+            });
+          } else if (!connectivity.zoho) {
+            toast({
+              title: "Zoho API Connectivity Issue",
+              description: "Cannot connect to Zoho API. Using cached data if available.",
+              variant: "destructive"
+            });
+          } else if (!connectivity.stripe) {
+            toast({
+              title: "Stripe API Connectivity Issue",
+              description: "Cannot connect to Stripe API. Using cached data if available.",
+              variant: "destructive"
+            });
+          }
+          
+          // Get transactions from Zoho Books - uses ApiRequestManager internally
+          const zohoData = await zohoRepository.getTransactions(
+            dateRange.startDate, 
+            dateRange.endDate,
+            forceRefresh
+          );
 
-      // Get the current raw response for debugging
-      this.lastRawResponse = zohoRepository.getLastRawResponse();
-      console.log("Fetched raw response for debugging:", this.lastRawResponse);
+          // Get the current raw response for debugging
+          this.lastRawResponse = zohoRepository.getLastRawResponse();
+          console.log("Fetched raw response for debugging:", this.lastRawResponse);
 
-      // Process collaborator data - this is crucial for the fix
-      callbacks.onCollaboratorData(this.lastRawResponse);
+          // Process collaborator data - this is crucial for the fix
+          callbacks.onCollaboratorData(this.lastRawResponse);
 
-      // Get transactions from Stripe
-      console.log("Fetching from Stripe:", dateRange.startDate, dateRange.endDate);
-      const stripeData = await stripeRepository.getTransactions(
-        dateRange.startDate,
-        dateRange.endDate,
-        forceRefresh
-      );
+          // Get transactions from Stripe - uses ApiRequestManager internally
+          console.log("Fetching from Stripe:", dateRange.startDate, dateRange.endDate);
+          const stripeData = await stripeRepository.getTransactions(
+            dateRange.startDate,
+            dateRange.endDate,
+            forceRefresh
+          );
 
-      // Combine the data
-      const combinedData = [...zohoData, ...stripeData.transactions];
-      console.log("Combined transactions:", combinedData.length);
-      console.log("Stripe data summary:", {
-        gross: stripeData.gross,
-        fees: stripeData.fees,
-        transactionFees: stripeData.transactionFees,
-        payoutFees: stripeData.payoutFees,
-        net: stripeData.net,
-        feePercentage: stripeData.feePercentage
-      });
-      
-      // Process separated income
-      callbacks.onIncomeTypes(combinedData, stripeData);
-      
-      // Update transactions state
-      callbacks.onTransactions(combinedData);
-      
-      // Background cache refresh has been removed as part of simplification
-      
-      return true;
-    } catch (err: any) {
-      console.error("Error fetching financial data:", err);
-      
-      // Make sure to get any raw response for debugging even in case of error
-      const rawData = zohoRepository.getLastRawResponse();
-      if (rawData) {
-        this.lastRawResponse = rawData;
-        console.log("Set raw response after error:", rawData);
-      }
-      
-      return false;
-    }
+          // Combine the data
+          const combinedData = [...zohoData, ...stripeData.transactions];
+          console.log("Combined transactions:", combinedData.length);
+          console.log("Stripe data summary:", {
+            gross: stripeData.gross,
+            fees: stripeData.fees,
+            transactionFees: stripeData.transactionFees,
+            payoutFees: stripeData.payoutFees,
+            net: stripeData.net,
+            feePercentage: stripeData.feePercentage
+          });
+          
+          // Process separated income
+          callbacks.onIncomeTypes(combinedData, stripeData);
+          
+          // Update transactions state
+          callbacks.onTransactions(combinedData);
+          
+          return true;
+        } catch (err: any) {
+          console.error("Error fetching financial data:", err);
+          
+          // Make sure to get any raw response for debugging even in case of error
+          const rawData = zohoRepository.getLastRawResponse();
+          if (rawData) {
+            this.lastRawResponse = rawData;
+            console.log("Set raw response after error:", rawData);
+          }
+          
+          return false;
+        }
+      },
+      forceRefresh ? 0 : 60000 // 1 minute TTL, or 0 if force refresh
+    );
   }
 }
 
