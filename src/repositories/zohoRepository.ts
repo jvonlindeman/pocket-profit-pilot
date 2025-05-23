@@ -10,6 +10,10 @@ import { formatDateYYYYMMDD } from "../utils/dateUtils";
  */
 export class ZohoRepository {
   private lastRawResponse: any = null;
+  // Add in-memory cache for raw responses keyed by date ranges
+  private rawResponseCache: Map<string, {data: any, timestamp: number}> = new Map();
+  // Cache TTL in milliseconds (5 minutes)
+  private CACHE_TTL = 5 * 60 * 1000;
   
   /**
    * Get transactions for a date range with automatic cache handling
@@ -42,6 +46,13 @@ export class ZohoRepository {
       // Store the raw response for debugging
       if (response && typeof response === 'object') {
         this.lastRawResponse = response;
+        
+        // Also cache the raw response
+        const cacheKey = this.generateCacheKey(startDate, endDate);
+        this.rawResponseCache.set(cacheKey, {
+          data: response,
+          timestamp: Date.now()
+        });
       }
       
       // If the response is already an array of Transaction objects, return it
@@ -75,16 +86,48 @@ export class ZohoRepository {
 
   /**
    * Get raw response data directly (for debugging purposes)
+   * Now with in-memory caching to prevent redundant API calls
    */
-  async getRawResponse(startDate: Date, endDate: Date): Promise<any> {
+  async getRawResponse(startDate: Date, endDate: Date, forceRefresh = false): Promise<any> {
     try {
-      const rawData = await zohoApiClient.fetchTransactionsFromWebhook(startDate, endDate, false, true);
+      // Generate a cache key from the date range
+      const cacheKey = this.generateCacheKey(startDate, endDate);
+
+      // Check if we have a recent cached response and forceRefresh is false
+      if (!forceRefresh && this.rawResponseCache.has(cacheKey)) {
+        const cached = this.rawResponseCache.get(cacheKey);
+        // Only use cache if it's within TTL
+        if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+          console.log("Using cached Zoho raw response for", startDate, "to", endDate);
+          this.lastRawResponse = cached.data;
+          return cached.data;
+        }
+      }
+
+      console.log("Fetching fresh Zoho raw response for", startDate, "to", endDate);
+      const rawData = await zohoApiClient.fetchTransactionsFromWebhook(startDate, endDate, forceRefresh, true);
       this.lastRawResponse = rawData;
+      
+      // Cache the response
+      this.rawResponseCache.set(cacheKey, {
+        data: rawData,
+        timestamp: Date.now()
+      });
+      
       return rawData;
     } catch (error) {
       console.error("Error fetching raw Zoho response:", error);
       return { error: error.message || "Unknown error" };
     }
+  }
+
+  /**
+   * Generate a cache key from a date range
+   */
+  private generateCacheKey(startDate: Date, endDate: Date): string {
+    const startStr = formatDateYYYYMMDD(startDate);
+    const endStr = formatDateYYYYMMDD(endDate);
+    return `zoho-raw-${startStr}-${endStr}`;
   }
 
   /**

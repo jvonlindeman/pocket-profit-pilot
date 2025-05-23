@@ -16,6 +16,12 @@ const DebugSection: React.FC<DebugSectionProps> = ({
   refreshData,
   rawResponse
 }) => {
+  // Convert from Financial date range to DayPicker format for WebhookDebug
+  const dayPickerDateRange = {
+    from: dateRange.startDate,
+    to: dateRange.endDate
+  };
+  
   return (
     <div className="mt-8 grid grid-cols-1 gap-6">
       <h2 className="text-lg font-semibold text-gray-900 flex items-center">
@@ -31,7 +37,7 @@ const DebugSection: React.FC<DebugSectionProps> = ({
       
       {/* Componente de depuración de Webhook Zoho */}
       <WebhookDebug 
-        dateRange={dateRange} 
+        dateRange={dayPickerDateRange}
         refreshDataFunction={refreshData}
         rawResponse={rawResponse}
       />
