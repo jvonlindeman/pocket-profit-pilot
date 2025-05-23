@@ -1,10 +1,11 @@
+
 import { Transaction, UnpaidInvoice } from "@/types/financial";
 import { ZohoTransactionResponse } from "./api/types";
 import { handleApiError } from "./utils";
 import { getMockTransactions } from "./mockData";
 import { supabase } from "@/integrations/supabase/client";
 import { PANAMA_TIMEZONE } from "@/utils/timezoneUtils";
-import { processRawTransactions, filterExcludedVendors } from "./api/processor";
+import { processRawTransactions, filterExcludedVendors, processUnpaidInvoices } from "./api/processor";
 import { preparePanamaDates } from "./api/formatter";
 import { apiRequestManager } from "@/utils/ApiRequestManager";
 import { formatDateYYYYMMDD } from "@/utils/dateUtils";

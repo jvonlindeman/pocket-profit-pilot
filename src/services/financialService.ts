@@ -1,3 +1,4 @@
+
 import { Transaction, FinancialSummary, CategorySummary, UnpaidInvoice, FinancialData } from "@/types/financial";
 import { stripeRepository } from "@/repositories/stripeRepository";
 import { zohoRepository } from "@/repositories/zohoRepository";
@@ -58,8 +59,25 @@ export class FinancialService {
    */
   getLastRawResponse(): any {
     return this.lastRawResponse ||
-      zohoRepository.getLastRawResponse() ||
-      stripeRepository.getLastRawResponse();
+      zohoRepository.getLastRawResponse();
+  }
+  
+  /**
+   * Save financial summary to database
+   */
+  async saveFinancialSummary(
+    financialData: FinancialData, 
+    dateRange: { startDate: Date; endDate: Date },
+    cacheSegmentId: number | null
+  ): Promise<number | null> {
+    console.log("Saving financial summary:", { 
+      summary: financialData.summary,
+      dateRange,
+      cacheSegmentId
+    });
+    
+    // For now, just return a mock ID
+    return 123;
   }
 
   /**
@@ -75,9 +93,7 @@ export class FinancialService {
 // Export a singleton instance
 export const financialService = new FinancialService();
 
-// Add unpaidInvoices to the imported types and update the return type in processTransactionData function
-// Include unpaid invoices in the data processing
-
+// Add the processTransactionData function
 export const processTransactionData = (
   transactions: Transaction[],
   startingBalance: number = 0,

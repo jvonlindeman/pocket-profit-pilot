@@ -6,7 +6,7 @@ import { useFinancialPersistence } from '@/hooks/useFinancialPersistence';
 import { useCollaboratorProcessor } from '@/hooks/useCollaboratorProcessor';
 import { useIncomeProcessor } from '@/hooks/useIncomeProcessor';
 import { useMonthlyBalanceManager } from '@/hooks/useMonthlyBalanceManager';
-import { financialService } from '@/services/financialService';
+import { financialService, processTransactionData } from '@/services/financialService';
 import { getCurrentMonthRange } from '@/utils/dateUtils';
 import { zohoRepository } from '@/repositories/zohoRepository';
 import { UnpaidInvoice } from '@/types/financial';
@@ -51,7 +51,7 @@ export const useFinanceData = () => {
   // Financial data processing
   const financialData = useMemo(() => {
     // Pass collaboratorExpenses to ensure they're included in the summary
-    return financialService.processTransactionData(transactions, startingBalance, collaboratorExpenses);
+    return processTransactionData(transactions, startingBalance, collaboratorExpenses);
   }, [transactions, startingBalance, collaboratorExpenses]);
 
   // Save financial summary when data changes
