@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from "@/hooks/use-toast";
 import { Transaction } from '@/types/financial';
 import { useFinancialDataFetcher } from '@/hooks/useFinancialDataFetcher';
@@ -12,6 +12,7 @@ import { zohoRepository } from '@/repositories/zohoRepository';
 
 /**
  * Enhanced hook to handle fetching of financial data with transaction management
+ * and throttling to prevent duplicate API calls
  */
 export const useEnhancedFinancialDataFetcher = () => {
   // States
@@ -19,6 +20,11 @@ export const useEnhancedFinancialDataFetcher = () => {
   const [dataInitialized, setDataInitialized] = useState<boolean>(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const apiCalls = useApiCalls();
+  
+  // Throttling mechanism
+  const lastFetchTimeRef = useRef<number>(0);
+  const fetchThrottleTimeRef = useRef<number>(1000); // 1 second throttle time
+  const pendingFetchRef = useRef<any>(null);
   
   const { 
     loading, 
@@ -95,7 +101,7 @@ export const useEnhancedFinancialDataFetcher = () => {
     }
   };
 
-  // Function to fetch data
+  // Function to fetch data with throttling
   const fetchData = useCallback(async (
     dateRange: { startDate: Date; endDate: Date },
     forceRefresh = false,
@@ -108,6 +114,46 @@ export const useEnhancedFinancialDataFetcher = () => {
     if (forceRefresh) {
       apiCalls.resetApiCalls();
     }
+    
+    // Check if we should throttle this request
+    const now = Date.now();
+    const timeSinceLastFetch = now - lastFetchTimeRef.current;
+    
+    if (timeSinceLastFetch < fetchThrottleTimeRef.current && !forceRefresh) {
+      console.log(`Throttling fetch request. Time since last fetch: ${timeSinceLastFetch}ms`);
+      
+      // Clear any existing pending fetch
+      if (pendingFetchRef.current) {
+        clearTimeout(pendingFetchRef.current);
+      }
+      
+      // Schedule a delayed fetch
+      return new Promise<boolean>((resolve) => {
+        pendingFetchRef.current = setTimeout(async () => {
+          console.log("Executing throttled fetch request");
+          const result = await executeFetchData(dateRange, forceRefresh, callbacks);
+          resolve(result);
+        }, fetchThrottleTimeRef.current - timeSinceLastFetch);
+      });
+    }
+    
+    // Execute the fetch immediately
+    return executeFetchData(dateRange, forceRefresh, callbacks);
+  }, [
+    apiCalls,
+  ]);
+  
+  // Actual fetch execution logic (separated to avoid code duplication)
+  const executeFetchData = useCallback(async (
+    dateRange: { startDate: Date; endDate: Date },
+    forceRefresh: boolean,
+    callbacks: {
+      onCollaboratorData: (data: any) => void,
+      onIncomeTypes: (transactions: any[], stripeData: any) => void
+    }
+  ) => {
+    // Update last fetch time
+    lastFetchTimeRef.current = Date.now();
     
     const success = await fetchFinancialData(
       dateRange,
@@ -130,12 +176,7 @@ export const useEnhancedFinancialDataFetcher = () => {
     }
     
     return success;
-  }, [
-    fetchFinancialData, 
-    transactions.length,
-    usingCachedData,
-    apiCalls
-  ]);
+  }, [fetchFinancialData, transactions.length, usingCachedData]);
   
   // Public function to refresh data
   const refreshData = useCallback((force = false) => {
@@ -144,7 +185,11 @@ export const useEnhancedFinancialDataFetcher = () => {
         title: "Forzando actualización",
         description: "Obteniendo datos frescos desde la API"
       });
+      
+      // Reset throttling for forced refreshes
+      lastFetchTimeRef.current = 0;
     }
+    
     return fetchData; // Return the fetchData function for later use
   }, [fetchData]);
 
@@ -182,6 +227,15 @@ export const useEnhancedFinancialDataFetcher = () => {
       
       return 0;
     }
+  }, []);
+
+  // Cleanup function
+  useEffect(() => {
+    return () => {
+      if (pendingFetchRef.current) {
+        clearTimeout(pendingFetchRef.current);
+      }
+    };
   }, []);
 
   return {

@@ -1,4 +1,5 @@
 
+
 import { Transaction, UnpaidInvoice } from "@/types/financial";
 import { ZohoTransactionResponse } from "./api/types";
 import { handleApiError } from "./utils";
@@ -103,7 +104,9 @@ export const fetchZohoData = async (
           ? { error: err instanceof Error ? err.message : 'Unknown error', raw_response: null } 
           : getMockTransactions(startDate, endDate);
       }
-    }
+    },
+    30000, // 30 second TTL for this specific request
+    5000   // 5 second cooldown between identical requests
   );
 };
 

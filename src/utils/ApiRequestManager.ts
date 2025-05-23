@@ -12,12 +12,14 @@ interface CachedRequest<T> {
   timestamp: number;
   error?: any;
   requestId?: string;
+  cooldownUntil?: number; // Added cooldown timestamp
 }
 
 export class ApiRequestManager {
   private static instance: ApiRequestManager;
   private requestCache: Record<string, CachedRequest<any>> = {};
   private DEFAULT_TTL = 5 * 60 * 1000; // 5 minutes default TTL
+  private DEFAULT_COOLDOWN = 2000; // 2 seconds cooldown between identical requests
   
   private constructor() {
     // Private constructor for singleton
@@ -38,11 +40,13 @@ export class ApiRequestManager {
    * @param cacheKey A unique key for this request
    * @param requestFn The function that performs the actual API request
    * @param ttl Time to live in milliseconds for the cache entry
+   * @param cooldown Time in milliseconds to prevent repeat calls with the same parameters
    */
   public async executeRequest<T>(
     cacheKey: string,
     requestFn: () => Promise<T>,
-    ttl: number = this.DEFAULT_TTL
+    ttl: number = this.DEFAULT_TTL,
+    cooldown: number = this.DEFAULT_COOLDOWN
   ): Promise<T> {
     // Generate a unique request ID for tracing
     const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -53,6 +57,16 @@ export class ApiRequestManager {
     
     // If there's a cached request
     if (cachedRequest) {
+      // If we're in cooldown period, return the existing data or pending promise
+      if (cachedRequest.cooldownUntil && now < cachedRequest.cooldownUntil) {
+        console.log(`ApiRequestManager: Request in cooldown for key "${cacheKey}", remaining: ${(cachedRequest.cooldownUntil - now) / 1000}s (${requestId})`);
+        if (cachedRequest.data) {
+          return cachedRequest.data;
+        } else {
+          return cachedRequest.promise;
+        }
+      }
+      
       // If the request is still in progress, return the existing promise
       if (!cachedRequest.data && !cachedRequest.error) {
         console.log(`ApiRequestManager: Reusing in-progress request for key "${cacheKey}" (${requestId})`);
@@ -84,7 +98,9 @@ export class ApiRequestManager {
           this.requestCache[cacheKey].data = result;
           this.requestCache[cacheKey].timestamp = Date.now();
           this.requestCache[cacheKey].error = undefined;
-          console.log(`ApiRequestManager: Updated cache for key "${cacheKey}" with new data (${requestId})`);
+          // Set cooldown period to prevent rapid duplicate calls
+          this.requestCache[cacheKey].cooldownUntil = Date.now() + cooldown;
+          console.log(`ApiRequestManager: Updated cache for key "${cacheKey}" with new data, cooldown until: ${new Date(this.requestCache[cacheKey].cooldownUntil!).toISOString()} (${requestId})`);
         }
         
         return result;
@@ -94,6 +110,8 @@ export class ApiRequestManager {
         if (this.requestCache[cacheKey]) {
           this.requestCache[cacheKey].error = error;
           this.requestCache[cacheKey].timestamp = Date.now();
+          // Even for errors, set a short cooldown to prevent hammering
+          this.requestCache[cacheKey].cooldownUntil = Date.now() + Math.min(cooldown, 1000);
         }
         
         throw error;
@@ -104,7 +122,8 @@ export class ApiRequestManager {
     this.requestCache[cacheKey] = {
       promise,
       timestamp: now,
-      requestId
+      requestId,
+      cooldownUntil: now + cooldown
     };
     
     return promise;

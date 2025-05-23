@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { financialService } from '@/services/financialService';
 import { zohoRepository } from '@/repositories/zohoRepository';
 import { useCacheSegments } from '@/hooks/cache/useCacheSegments';
@@ -28,6 +28,15 @@ export const useFinancialDataFetcher = () => {
     zoho: true,
     stripe: true
   });
+  
+  // References to prevent duplicate calls
+  const isFetchingRef = useRef<boolean>(false);
+  const lastFetchParamsRef = useRef<{
+    startDate?: Date;
+    endDate?: Date;
+    forceRefresh?: boolean;
+  }>({});
+  const connectivityTimeoutRef = useRef<any>(null);
 
   // Get cache segments helper
   const { checkSourceCache } = useCacheSegments();
@@ -70,14 +79,31 @@ export const useFinancialDataFetcher = () => {
     }
   }, [checkSourceCache]);
 
-  // Check API connectivity
+  // Check API connectivity with debounce
   const checkApiConnectivity = useCallback(async () => {
-    const result = await financialService.checkApiConnectivity();
-    setApiConnectivity(result);
-    return result;
+    // Clear any pending timeout
+    if (connectivityTimeoutRef.current) {
+      clearTimeout(connectivityTimeoutRef.current);
+    }
+    
+    // Set a timeout to delay the execution (debounce)
+    return new Promise<{zoho: boolean, stripe: boolean}>((resolve) => {
+      connectivityTimeoutRef.current = setTimeout(async () => {
+        try {
+          const result = await financialService.checkApiConnectivity();
+          setApiConnectivity(result);
+          resolve(result);
+        } catch (error) {
+          console.error("Error checking API connectivity:", error);
+          const result = { zoho: false, stripe: false };
+          setApiConnectivity(result);
+          resolve(result);
+        }
+      }, 300); // 300ms debounce delay
+    });
   }, []);
 
-  // Fetch financial data from external services
+  // Fetch financial data from external services with duplication prevention
   const fetchFinancialData = useCallback(async (
     dateRange: { startDate: Date; endDate: Date },
     forceRefresh: boolean,
@@ -87,6 +113,29 @@ export const useFinancialDataFetcher = () => {
       onIncomeTypes: (transactions: any[], stripeData: any) => void,
     }
   ) => {
+    // Check if we're already fetching data
+    if (isFetchingRef.current) {
+      console.warn("Fetch in progress, skipping duplicate request");
+      return false;
+    }
+    
+    // Check if this is an identical request to the last one made
+    const lastParams = lastFetchParamsRef.current;
+    const sameStartDate = lastParams.startDate && lastParams.startDate.getTime() === dateRange.startDate.getTime();
+    const sameEndDate = lastParams.endDate && lastParams.endDate.getTime() === dateRange.endDate.getTime();
+    const sameForce = lastParams.forceRefresh === forceRefresh;
+    
+    if (sameStartDate && sameEndDate && sameForce && !forceRefresh) {
+      console.warn("Duplicate request detected, using cached data");
+      // Only check cache status silently when we detect a duplicate
+      checkCacheStatus(dateRange).catch(console.error);
+      return false;
+    }
+    
+    // Update last fetch params and set fetching flag
+    lastFetchParamsRef.current = { startDate: dateRange.startDate, endDate: dateRange.endDate, forceRefresh };
+    isFetchingRef.current = true;
+    
     setLoading(true);
     setError(null);
     
@@ -94,7 +143,7 @@ export const useFinancialDataFetcher = () => {
     await checkCacheStatus(dateRange);
     
     try {
-      // Check connectivity first
+      // Check connectivity first with debounced call
       await checkApiConnectivity();
       
       // Fetch the financial data
@@ -114,11 +163,13 @@ export const useFinancialDataFetcher = () => {
       await checkCacheStatus(dateRange);
       
       setLoading(false);
+      isFetchingRef.current = false;
       return success;
     } catch (err: any) {
       console.error("Error in fetchFinancialData:", err);
       setError(err.message || "Error al cargar los datos financieros");
       setLoading(false);
+      isFetchingRef.current = false;
       return false;
     }
   }, [checkApiConnectivity, checkCacheStatus]);
@@ -131,6 +182,13 @@ export const useFinancialDataFetcher = () => {
     const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
     
     checkCacheStatus({ startDate, endDate });
+    
+    // Clean up timeout on unmount
+    return () => {
+      if (connectivityTimeoutRef.current) {
+        clearTimeout(connectivityTimeoutRef.current);
+      }
+    };
   }, [checkCacheStatus]);
 
   return {
