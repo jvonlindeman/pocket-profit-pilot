@@ -25,6 +25,7 @@ export interface StripeResult {
 export class StripeRepository {
   private apiCallsContext?: ReturnType<typeof useApiCalls>;
   private lastRequestKey: string = '';
+  private inProgressRequestsMap: Map<string, Promise<any>> = new Map();
 
   /**
    * Set the API calls context for tracking
@@ -43,7 +44,7 @@ export class StripeRepository {
   }
 
   /**
-   * Get transactions for a date range
+   * Get transactions for a date range with improved deduplication
    */
   async getTransactions(
     startDate: Date,
@@ -59,33 +60,30 @@ export class StripeRepository {
       // Store the last request key for deduplication
       this.lastRequestKey = cacheKey;
       
-      // If we're forcing a refresh, clear any existing cache entry
+      // Check if there's already a request in progress with this key
+      if (this.inProgressRequestsMap.has(cacheKey) && !forceRefresh) {
+        console.log(`StripeRepository: Reusing in-progress request for ${cacheKey}`);
+        return await this.inProgressRequestsMap.get(cacheKey)!;
+      }
+      
+      // If we're forcing a refresh, clear any existing cache entry and in-progress request
       if (forceRefresh) {
         console.log("StripeRepository: Force refresh requested, clearing cache");
         apiRequestManager.clearCacheEntry(cacheKey);
+        this.inProgressRequestsMap.delete(cacheKey);
       }
       
-      // Use ApiRequestManager to deduplicate requests with a longer cooldown
-      return await apiRequestManager.executeRequest(
-        cacheKey,
-        async () => {
-          console.log(`StripeRepository: Making actual API call for ${cacheKey}`);
-          this.trackApiCall();
-          const result = await StripeService.getTransactions(startDate, endDate, forceRefresh);
-          return {
-            transactions: result.transactions,
-            gross: result.gross,
-            fees: result.fees,
-            transactionFees: result.transactionFees,
-            payoutFees: result.payoutFees,
-            additionalFees: result.stripeFees || 0, // Map stripeFees to additionalFees
-            net: result.net,
-            feePercentage: result.feePercentage
-          };
-        },
-        forceRefresh ? 0 : 5 * 60 * 1000, // 5 minutes TTL, or 0 if force refresh
-        30000 // 30 second cooldown (increased from default)
-      );
+      // Create and store the promise
+      const requestPromise = this.executeRequest(cacheKey, startDate, endDate, forceRefresh);
+      this.inProgressRequestsMap.set(cacheKey, requestPromise);
+      
+      // Execute the request and clean up after
+      try {
+        return await requestPromise;
+      } finally {
+        // Clean up after the request is done
+        this.inProgressRequestsMap.delete(cacheKey);
+      }
     } catch (error) {
       console.error("Error in stripeRepository.getTransactions:", error);
       return {
@@ -99,6 +97,37 @@ export class StripeRepository {
         feePercentage: 0
       };
     }
+  }
+  
+  /**
+   * Execute the actual request with ApiRequestManager
+   */
+  private async executeRequest(
+    cacheKey: string, 
+    startDate: Date, 
+    endDate: Date, 
+    forceRefresh: boolean
+  ): Promise<StripeResult> {
+    return await apiRequestManager.executeRequest(
+      cacheKey,
+      async () => {
+        console.log(`StripeRepository: Making actual API call for ${cacheKey}`);
+        this.trackApiCall();
+        const result = await StripeService.getTransactions(startDate, endDate, forceRefresh);
+        return {
+          transactions: result.transactions,
+          gross: result.gross,
+          fees: result.fees,
+          transactionFees: result.transactionFees,
+          payoutFees: result.payoutFees,
+          additionalFees: result.stripeFees || 0, // Map stripeFees to additionalFees
+          net: result.net,
+          feePercentage: result.feePercentage
+        };
+      },
+      forceRefresh ? 0 : 5 * 60 * 1000, // 5 minutes TTL, or 0 if force refresh
+      30000 // 30 second cooldown (increased from default)
+    );
   }
 
   /**
@@ -124,6 +153,13 @@ export class StripeRepository {
     } catch {
       return false;
     }
+  }
+  
+  /**
+   * Get the last raw response for debugging
+   */
+  getLastRawResponse(): any {
+    return StripeService.getLastRawResponse();
   }
 }
 

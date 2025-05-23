@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, RefreshCw, CreditCard, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import StripeService from '@/services/stripeService';
 import StripeDebugData from '@/components/WebhookDebug/StripeDebugData';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -14,11 +13,12 @@ interface StripeDebugProps {
     endDate: Date;
   };
   refreshDataFunction?: (forceRefresh: boolean) => void;
+  // Add a new prop for raw stripe data
+  stripeRawData?: any;
 }
 
-export default function StripeDebug({ dateRange, refreshDataFunction }: StripeDebugProps) {
+export default function StripeDebug({ dateRange, refreshDataFunction, stripeRawData }: StripeDebugProps) {
   const [loading, setLoading] = useState(false);
-  const [stripeRawData, setStripeRawData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastFetchedDateRange, setLastFetchedDateRange] = useState<{
     startDate: string;
@@ -30,8 +30,19 @@ export default function StripeDebug({ dateRange, refreshDataFunction }: StripeDe
     return format(date, 'yyyy-MM-dd');
   };
   
-  // Función para obtener los datos de Stripe
-  const fetchStripeData = async () => {
+  useEffect(() => {
+    if (stripeRawData) {
+      setLastFetchedDateRange({
+        startDate: formatDisplayDate(dateRange.startDate),
+        endDate: formatDisplayDate(dateRange.endDate)
+      });
+    }
+  }, [stripeRawData, dateRange]);
+
+  // Handle refresh button click - uses the centralized refresh function
+  const handleRefresh = async () => {
+    if (loading || !refreshDataFunction) return;
+    
     setLoading(true);
     setError(null);
     
@@ -42,62 +53,29 @@ export default function StripeDebug({ dateRange, refreshDataFunction }: StripeDe
         description: `Periodo: ${formatDisplayDate(dateRange.startDate)} a ${formatDisplayDate(dateRange.endDate)}`,
       });
       
-      // Use the global refresh function if available
-      if (refreshDataFunction) {
-        console.log("Usando la función de actualización global para cargar datos");
-        refreshDataFunction(true);
-        
-        // Wait briefly for the update to complete
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
+      // Use the centralized refresh function from parent
+      await refreshDataFunction(true);
       
-      // Get Stripe data for the period
-      try {
-        console.log("StripeDebug: Fetching data for period", formatDisplayDate(dateRange.startDate), "to", formatDisplayDate(dateRange.endDate));
-        
-        // First check if there's any cached response
-        let stripeData = StripeService.getLastRawResponse();
-        
-        // If no cached data exists, fetch it
-        if (!stripeData) {
-          console.log("No cached Stripe data, fetching from API");
-          await StripeService.getTransactions(dateRange.startDate, dateRange.endDate);
-          stripeData = StripeService.getLastRawResponse();
-        }
-        
-        setStripeRawData(stripeData);
-        setLastFetchedDateRange({
-          startDate: formatDisplayDate(dateRange.startDate),
-          endDate: formatDisplayDate(dateRange.endDate)
-        });
-        
-        console.log("Stripe debug data received:", stripeData);
-        
-        // Success toast
-        toast({
-          title: "Datos de Stripe cargados",
-          description: `${stripeData.transactions?.length || 0} transacciones encontradas`,
-          variant: "success",
-        });
-      } catch (stripeErr: any) {
-        console.error("Failed to fetch Stripe debug data:", stripeErr);
-        setError(stripeErr.message || "Error desconocido al obtener datos de Stripe");
-        setStripeRawData({ error: stripeErr.message || "Error desconocido al obtener datos de Stripe" });
-        
-        // Error toast
-        toast({
-          title: "Error al cargar datos de Stripe",
-          description: stripeErr.message || "Error desconocido",
-          variant: "destructive",
-        });
-      }
-    } catch (err: any) {
-      setError(err.message || "Error desconocido");
-      console.error("Failed to fetch debug data:", err);
-      
-      // General error toast
+      // Success toast
       toast({
-        title: "Error",
+        title: "Datos de Stripe cargados",
+        description: stripeRawData?.transactions?.length 
+          ? `${stripeRawData.transactions.length} transacciones encontradas` 
+          : "Datos actualizados",
+        variant: "success",
+      });
+      
+      setLastFetchedDateRange({
+        startDate: formatDisplayDate(dateRange.startDate),
+        endDate: formatDisplayDate(dateRange.endDate)
+      });
+    } catch (err: any) {
+      console.error("Failed to fetch Stripe debug data:", err);
+      setError(err.message || "Error desconocido al obtener datos de Stripe");
+      
+      // Error toast
+      toast({
+        title: "Error al cargar datos de Stripe",
         description: err.message || "Error desconocido",
         variant: "destructive",
       });
@@ -105,15 +83,6 @@ export default function StripeDebug({ dateRange, refreshDataFunction }: StripeDe
       setLoading(false);
     }
   };
-
-  // Load data on component mount if needed
-  useEffect(() => {
-    // Check if we already have data cached
-    const cachedData = StripeService.getLastRawResponse();
-    if (cachedData) {
-      setStripeRawData(cachedData);
-    }
-  }, []);
 
   return (
     <Card>
@@ -135,7 +104,7 @@ export default function StripeDebug({ dateRange, refreshDataFunction }: StripeDe
             </span>
           </div>
           <Button 
-            onClick={fetchStripeData} 
+            onClick={handleRefresh} 
             variant="outline" 
             disabled={loading}
           >
@@ -169,6 +138,12 @@ export default function StripeDebug({ dateRange, refreshDataFunction }: StripeDe
         {stripeRawData && !loading && (
           <div className="border rounded-md p-4 mt-2 bg-gray-50 max-h-[400px] overflow-auto">
             <StripeDebugData rawData={stripeRawData} />
+          </div>
+        )}
+        
+        {!stripeRawData && !loading && (
+          <div className="border rounded-md p-4 mt-2 bg-gray-50 text-center text-gray-500">
+            No hay datos disponibles. Presione "Cargar Datos de Stripe" para obtener información.
           </div>
         )}
       </CardContent>

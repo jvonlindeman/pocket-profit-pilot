@@ -1,4 +1,3 @@
-
 import { useMemo, useCallback, useRef } from 'react';
 import { useFinanceDateRange } from '@/hooks/useFinanceDateRange';
 import { useEnhancedFinancialDataFetcher } from '@/hooks/useEnhancedFinancialDataFetcher';
@@ -17,6 +16,7 @@ export const useFinanceData = () => {
   const lastRefreshTimeRef = useRef<number>(0);
   const refreshInProgressRef = useRef<boolean>(false);
   const refreshRequestIdRef = useRef<string>('');
+  const refreshPromiseRef = useRef<Promise<boolean> | null>(null);
   
   // Import functionality from smaller hooks
   const { startingBalance, fetchMonthlyBalance, updateStartingBalance, setStartingBalance, notes, setNotes } = useMonthlyBalanceManager();
@@ -67,53 +67,50 @@ export const useFinanceData = () => {
     }
   }, [financialData, dateRange, transactions.length, loading, saveFinancialData]);
 
-  // Function to refresh data with strict deduplication
+  // CENTRALIZED DATA REFRESH FUNCTION - Single source of truth
+  // This function will handle all data refresh requests and ensure only one is processed at a time
   const refreshData = useCallback((force = false) => {
     // Generate a unique request ID for this refresh
     const requestId = `refresh-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     
-    // Skip if we're already refreshing and this isn't a forced refresh
-    if (refreshInProgressRef.current && !force) {
-      console.log(`Skip refresh, already in progress (${requestId})`);
+    // If a refresh is already in progress, return the existing promise
+    if (refreshInProgressRef.current) {
+      console.log(`Finance data refresh already in progress, reusing existing promise (${requestId})`);
+      return refreshPromiseRef.current || Promise.resolve(false);
+    }
+    
+    // If this is a new refresh request within the cooldown period and not forced, throttle it
+    const now = Date.now();
+    const timeSinceLastRefresh = now - lastRefreshTimeRef.current;
+    if (timeSinceLastRefresh < 10000 && !force) { // 10 second cooldown
+      console.log(`Throttling refresh request, last refresh was ${timeSinceLastRefresh}ms ago`);
       return Promise.resolve(false);
     }
     
-    // Generate a cache key for this specific refresh operation
-    const refreshCacheKey = `finance-refresh-${dateRange.startDate?.getTime()}-${dateRange.endDate?.getTime()}-${force}`;
+    // Set flags to indicate refresh in progress
+    refreshInProgressRef.current = true;
+    refreshRequestIdRef.current = requestId;
+    lastRefreshTimeRef.current = now;
     
-    // If force refresh, clear the cache entry
-    if (force) {
-      apiRequestManager.clearCacheEntry(refreshCacheKey);
-    }
+    console.log(`Beginning centralized data refresh (ID: ${requestId}, force: ${force})`);
     
-    // Use the ApiRequestManager to deduplicate refresh requests
-    return apiRequestManager.executeRequest(
-      refreshCacheKey,
-      async () => {
-        try {
-          // Set flags to indicate refresh in progress
-          refreshInProgressRef.current = true;
-          refreshRequestIdRef.current = requestId;
-          lastRefreshTimeRef.current = Date.now();
-          
-          // Get the actual fetch function
-          const fetchFunction = getRefreshFunction(force);
-          
-          // Execute the fetch with dates and callbacks
-          const result = await fetchFunction(dateRange, force, {
-            onCollaboratorData: processCollaboratorData,
-            onIncomeTypes: processIncomeTypes
-          });
-          
-          return result;
-        } finally {
-          // Always clean up when done
-          refreshInProgressRef.current = false;
-        }
-      },
-      0,  // No caching, always execute the function
-      force ? 0 : 5000  // Cooldown of 5 seconds unless forced
-    );
+    // Get the fetch function from the data fetcher
+    const fetchFunction = getRefreshFunction(force);
+    
+    // Execute the fetch with dates and callbacks
+    const promise = fetchFunction(dateRange, force, {
+      onCollaboratorData: processCollaboratorData,
+      onIncomeTypes: processIncomeTypes
+    }).finally(() => {
+      // Always clean up when done
+      console.log(`Completed data refresh (ID: ${requestId})`);
+      refreshInProgressRef.current = false;
+      refreshPromiseRef.current = null;
+    });
+    
+    // Store the promise for reuse if another request comes in while this is processing
+    refreshPromiseRef.current = promise;
+    return promise;
   }, [dateRange, getRefreshFunction, processCollaboratorData, processIncomeTypes]);
 
   return {

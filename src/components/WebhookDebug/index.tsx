@@ -1,9 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Bug } from 'lucide-react';
-import * as ZohoService from '@/services/zohoService';
 import { DateRange } from 'react-day-picker';
 import { toFinancialDateRange } from '@/utils/dateRangeAdapter';
 import WebhookDebugHeader from './WebhookDebugHeader';
@@ -15,66 +14,26 @@ import WebhookDataSummary from './WebhookDataSummary';
 interface WebhookDebugProps {
   dateRange: DateRange;
   refreshDataFunction?: (forceRefresh: boolean) => void;
-  rawResponse?: any;
+  rawResponse?: any; // This will now be the primary data source
 }
 
 export default function WebhookDebug({ dateRange, refreshDataFunction, rawResponse }: WebhookDebugProps) {
   const [loading, setLoading] = useState(false);
-  const [localRawData, setLocalRawData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Use the rawResponse from props when available
-  React.useEffect(() => {
-    if (rawResponse && !localRawData) {
-      console.log("WebhookDebug: Using rawResponse from props");
-      setLocalRawData(rawResponse);
-    }
-  }, [rawResponse, localRawData]);
-
-  // Display data - prioritize local data if available, otherwise use props
-  const displayData = localRawData || rawResponse;
-
-  // Function to fetch raw webhook data - only called when user explicitly requests it
-  const fetchDebugData = async () => {
-    // Don't fetch if we're already loading
-    if (loading) return;
-    
-    setLoading(true);
-    setError(null);
+  // For UI state only - this doesn't trigger API calls
+  const handleRefresh = async () => {
+    if (loading || !refreshDataFunction) return;
     
     try {
-      // First update data using the global refresh function if available
-      if (refreshDataFunction) {
-        console.log("WebhookDebug: Using global refresh function to load data");
-        refreshDataFunction(true);
-        
-        // Wait a brief moment for the update to complete
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // If we have data via props after refresh, use that
-        if (rawResponse) {
-          console.log("WebhookDebug: Using rawResponse from props after refresh");
-          setLocalRawData(rawResponse);
-          setLoading(false);
-          return;
-        }
-      }
+      setLoading(true);
+      setError(null);
       
-      // If we still need to fetch data ourselves
-      console.log("WebhookDebug: Fetching data directly");
-      const financialDateRange = toFinancialDateRange(dateRange);
-      
-      // Get raw data directly to show in the debug UI
-      const data = await ZohoService.getRawResponse(
-        financialDateRange.startDate, 
-        financialDateRange.endDate,
-        true // Force refresh to bypass even in-memory cache
-      );
-      setLocalRawData(data);
-      console.log("WebhookDebug: Debug data received", data);
+      // Use the central refresh function - we won't make a separate call here
+      await refreshDataFunction(true);
     } catch (err: any) {
       setError(err.message || "Error desconocido");
-      console.error("WebhookDebug: Failed to fetch debug data:", err);
+      console.error("WebhookDebug: Failed to refresh data:", err);
     } finally {
       setLoading(false);
     }
@@ -94,7 +53,7 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
       <CardContent>
         <WebhookDebugHeader 
           loading={loading} 
-          onFetchData={fetchDebugData} 
+          onFetchData={handleRefresh} 
         />
 
         {error && <WebhookErrorDisplay error={error} />}
@@ -105,7 +64,7 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
           </div>
         )}
 
-        {displayData && !loading && (
+        {rawResponse && !loading && (
           <Tabs defaultValue="formatted" className="w-full">
             <TabsList className="grid grid-cols-2 w-[200px]">
               <TabsTrigger value="formatted">Formateado</TabsTrigger>
@@ -114,15 +73,21 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
             
             <TabsContent value="formatted" className="p-0">
               <div className="border rounded-md p-4 mt-2 bg-gray-50 max-h-[400px] overflow-auto">
-                <WebhookDataSummary rawData={displayData} />
-                <WebhookDataTable rawData={displayData} />
+                <WebhookDataSummary rawData={rawResponse} />
+                <WebhookDataTable rawData={rawResponse} />
               </div>
             </TabsContent>
             
             <TabsContent value="raw" className="p-0">
-              <WebhookRawData rawData={displayData} />
+              <WebhookRawData rawData={rawResponse} />
             </TabsContent>
           </Tabs>
+        )}
+
+        {!rawResponse && !loading && (
+          <div className="border rounded-md p-4 mt-2 bg-gray-50 text-center text-gray-500">
+            No hay datos disponibles. Presione "Refrescar Datos" para obtener información.
+          </div>
         )}
       </CardContent>
     </Card>

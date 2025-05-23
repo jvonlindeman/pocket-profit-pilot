@@ -4,6 +4,7 @@ import { Bug } from 'lucide-react';
 import StripeDebug from '@/components/StripeDebug';
 import WebhookDebug from '@/components/WebhookDebug';
 import WebhookRequestDebug from '@/components/WebhookRequestDebug';
+import { stripeRepository } from '@/repositories/stripeRepository';
 
 interface DebugSectionProps {
   dateRange: { startDate: Date; endDate: Date };
@@ -22,6 +23,9 @@ const DebugSection: React.FC<DebugSectionProps> = ({
     to: dateRange.endDate
   };
   
+  // Get the Stripe raw response for the Stripe debug component
+  const stripeRawData = stripeRepository.getLastRawResponse();
+  
   return (
     <div className="mt-8 grid grid-cols-1 gap-6">
       <h2 className="text-lg font-semibold text-gray-900 flex items-center">
@@ -29,20 +33,21 @@ const DebugSection: React.FC<DebugSectionProps> = ({
         Herramientas de depuración
       </h2>
       
-      {/* Nuevo componente de depuración de Stripe */}
+      {/* Stripe debug component - pass stripeRawData */}
       <StripeDebug 
         dateRange={dateRange} 
         refreshDataFunction={refreshData}
+        stripeRawData={stripeRawData}
       />
       
-      {/* Componente de depuración de Webhook Zoho */}
+      {/* Webhook debug component - pass rawResponse */}
       <WebhookDebug 
         dateRange={dayPickerDateRange}
         refreshDataFunction={refreshData}
         rawResponse={rawResponse}
       />
       
-      {/* Componente de depuración de solicitud al webhook */}
+      {/* Webhook request debug component */}
       <WebhookRequestDebug dateRange={dateRange} />
     </div>
   );
