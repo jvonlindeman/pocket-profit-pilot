@@ -7,6 +7,9 @@ import { PANAMA_TIMEZONE } from "../../utils/timezoneUtils";
 import { processRawTransactions, filterExcludedVendors } from "./api/processor";
 import { preparePanamaDates } from "./api/formatter";
 
+// Simple in-memory request cache to avoid duplicate API calls
+const requestCache = new Map();
+
 // Function to call the Supabase edge function which handles requests
 export const fetchTransactionsFromWebhook = async (
   startDate: Date, 
@@ -15,14 +18,7 @@ export const fetchTransactionsFromWebhook = async (
   returnRawResponse = false
 ): Promise<Transaction[] | any> => {
   try {
-    console.log("ZohoService: Fetching transactions from", startDate, "to", endDate);
-    console.log("ZohoService: Raw date objects:", {
-      startDateObj: startDate,
-      startDateType: typeof startDate,
-      endDateObj: endDate,
-      endDateType: typeof endDate,
-      timezone: PANAMA_TIMEZONE
-    });
+    console.log("ZohoService: Fetching transactions from", startDate, "to", endDate, { forceRefresh });
     
     // Prepare dates in Panama timezone
     const { 
@@ -32,11 +28,20 @@ export const fetchTransactionsFromWebhook = async (
       formattedEndDate 
     } = preparePanamaDates(startDate, endDate);
     
-    console.log("ZohoService: Formatted Panama dates:", {
-      startDate: panamaStartDate.toString(),
-      formattedStartDate,
-      endDate: panamaEndDate.toString(),
-      formattedEndDate,
+    // Create a cache key based on the request parameters
+    const cacheKey = `${formattedStartDate}-${formattedEndDate}-${forceRefresh}`;
+    
+    // Check cache for this exact request (only if not forcing refresh)
+    if (!forceRefresh && requestCache.has(cacheKey)) {
+      console.log("ZohoService: Using cached API response for", cacheKey);
+      const cachedData = requestCache.get(cacheKey);
+      return returnRawResponse ? cachedData : processRawTransactions(cachedData);
+    }
+    
+    console.log("ZohoService: Calling Supabase function with parameters:", {
+      startDate: formattedStartDate,
+      endDate: formattedEndDate,
+      forceRefresh,
       timezone: PANAMA_TIMEZONE
     });
     
@@ -69,7 +74,9 @@ export const fetchTransactionsFromWebhook = async (
       return returnRawResponse ? mockData : processRawTransactions(mockData);
     }
     
-    console.log("ZohoService: Received data from Supabase function");
+    // Cache the response data
+    requestCache.set(cacheKey, data);
+    console.log("ZohoService: Cached API response for", cacheKey);
     
     // Return raw response for debugging if requested
     if (returnRawResponse) {

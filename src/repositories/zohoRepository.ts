@@ -7,13 +7,14 @@ class ZohoRepository {
   private lastFetchedData: {
     transactions: Transaction[];
     raw: any;
+    unpaidInvoices: UnpaidInvoice[];
     fetchTime: number;
     startDate?: Date;
     endDate?: Date;
   } | null = null;
   
-  // Cache duration in milliseconds (5 minutes)
-  private readonly CACHE_DURATION = 5 * 60 * 1000;
+  // Increase cache duration to 15 minutes (15 * 60 * 1000)
+  private readonly CACHE_DURATION = 15 * 60 * 1000;
   
   /**
    * Check if we have a valid cached response for the given date range
@@ -25,16 +26,21 @@ class ZohoRepository {
     const cacheAge = now - this.lastFetchedData.fetchTime;
     
     // If cache is too old, don't use it
-    if (cacheAge > this.CACHE_DURATION) return false;
+    if (cacheAge > this.CACHE_DURATION) {
+      console.log("ZohoRepository: Cache expired, fetching new data");
+      return false;
+    }
     
     // If date range is different, don't use cache
     if (this.lastFetchedData.startDate && this.lastFetchedData.endDate) {
       if (this.lastFetchedData.startDate.getTime() !== startDate.getTime() || 
           this.lastFetchedData.endDate.getTime() !== endDate.getTime()) {
+        console.log("ZohoRepository: Date range changed, fetching new data");
         return false;
       }
     }
     
+    console.log("ZohoRepository: Using cached data");
     return true;
   }
   
@@ -47,7 +53,12 @@ class ZohoRepository {
     forceRefresh: boolean = false
   ): Promise<Transaction[]> {
     try {
-      console.log("ZohoRepository: Fetching transactions", { startDate, endDate, forceRefresh });
+      console.log("ZohoRepository: fetchTransactions called with", { 
+        startDate, 
+        endDate, 
+        forceRefresh,
+        hasCachedData: this.hasCachedResponse(startDate, endDate)
+      });
       
       // Check cache first if not forcing refresh
       if (!forceRefresh && this.hasCachedResponse(startDate, endDate)) {
@@ -56,18 +67,33 @@ class ZohoRepository {
       }
       
       // Call the webhook directly
-      const transactions = await fetchTransactionsFromWebhook(startDate, endDate, forceRefresh);
+      const response = await fetchTransactionsFromWebhook(startDate, endDate, forceRefresh);
+      
+      // Extract transactions and unpaid invoices
+      const transactions = Array.isArray(response.cached_transactions) 
+        ? response.cached_transactions 
+        : [];
+      
+      const unpaidInvoices = Array.isArray(response.facturas_sin_pagar) 
+        ? response.facturas_sin_pagar 
+        : [];
       
       // Store the last fetched data with timestamp
       this.lastFetchedData = {
-        transactions: Array.isArray(transactions) ? transactions : [],
-        raw: transactions,
+        transactions,
+        raw: response,
+        unpaidInvoices,
         fetchTime: Date.now(),
         startDate,
         endDate
       };
       
-      return Array.isArray(transactions) ? transactions : [];
+      console.log("ZohoRepository: Successfully fetched and cached new data", {
+        transactionsCount: transactions.length,
+        unpaidInvoicesCount: unpaidInvoices.length
+      });
+      
+      return transactions;
     } catch (error) {
       console.error("ZohoRepository: Error fetching transactions", error);
       return [];
@@ -87,28 +113,24 @@ class ZohoRepository {
    */
   async getRawResponse(startDate: Date, endDate: Date, forceRefresh: boolean = false): Promise<any> {
     try {
+      console.log("ZohoRepository: getRawResponse called with", { 
+        startDate, 
+        endDate, 
+        forceRefresh,
+        hasCachedData: this.hasCachedResponse(startDate, endDate)
+      });
+      
       // Check cache first if not forcing refresh
       if (!forceRefresh && this.hasCachedResponse(startDate, endDate)) {
         console.log("ZohoRepository: Using cached raw response data");
         return this.lastFetchedData?.raw || null;
       }
       
-      console.log("ZohoRepository: Fetching raw response data from webhook");
-      // We'll directly fetch from the webhook with returnRawResponse=true
-      const rawData = await fetchTransactionsFromWebhook(startDate, endDate, forceRefresh, true);
-      
-      // Update cache
-      this.lastFetchedData = {
-        transactions: [],  // We don't have processed transactions here
-        raw: rawData,
-        fetchTime: Date.now(),
-        startDate,
-        endDate
-      };
-      
-      return rawData;
+      // We'll fetch from the webhook and populate our cache
+      await this.fetchTransactions(startDate, endDate, true);
+      return this.lastFetchedData?.raw || null;
     } catch (error) {
-      console.error("Error getting raw response:", error);
+      console.error("ZohoRepository: Error getting raw response:", error);
       return null;
     }
   }
@@ -121,7 +143,7 @@ class ZohoRepository {
       // Use current date for a quick test
       const today = new Date();
       const result = await fetchTransactionsFromWebhook(today, today, false);
-      return Array.isArray(result) || (result && typeof result === 'object');
+      return result && typeof result === 'object';
     } catch (error) {
       console.error("ZohoRepository: Connectivity check failed", error);
       return false;
@@ -130,9 +152,24 @@ class ZohoRepository {
 
   /**
    * Get unpaid invoices from the last fetched data
+   * If no data is cached, can fetch from API
    */
-  getUnpaidInvoices(): UnpaidInvoice[] {
-    return this.lastFetchedData?.raw?.facturas_sin_pagar || [];
+  async getUnpaidInvoices(startDate?: Date, endDate?: Date): Promise<UnpaidInvoice[]> {
+    try {
+      // If dates are provided, check if we need to fetch new data
+      if (startDate && endDate) {
+        if (!this.hasCachedResponse(startDate, endDate)) {
+          console.log("ZohoRepository: Fetching data to get unpaid invoices");
+          await this.fetchTransactions(startDate, endDate, false);
+        }
+      }
+      
+      // Return the unpaid invoices from cache
+      return this.lastFetchedData?.unpaidInvoices || [];
+    } catch (error) {
+      console.error("ZohoRepository: Error getting unpaid invoices", error);
+      return [];
+    }
   }
 }
 

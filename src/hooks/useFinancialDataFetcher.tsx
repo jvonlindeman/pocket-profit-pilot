@@ -50,7 +50,7 @@ export const useFinancialDataFetcher = () => {
         callbacks
       );
       
-      // Get raw response for debugging
+      // Get raw response for debugging - use the cached data
       const rawData = zohoRepository.getLastRawResponse();
       if (rawData) {
         console.log("useFinancialDataFetcher: Using cached raw response");

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -6,6 +7,7 @@ import { Webhook, RefreshCcw, FileText } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { zohoRepository } from '@/repositories/zohoRepository';
 import InvoicesTab from './InvoicesTab';
+import { UnpaidInvoice } from '@/services/zoho/api/types';
 
 interface WebhookDebugProps {
   dateRange: { startDate: Date; endDate: Date };
@@ -20,15 +22,21 @@ const WebhookDebug: React.FC<WebhookDebugProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("summary");
-  const [unpaidInvoices, setUnpaidInvoices] = useState<any[]>([]);
+  const [unpaidInvoices, setUnpaidInvoices] = useState<UnpaidInvoice[]>([]);
   const [dataFetched, setDataFetched] = useState(false);
   
   // Use rawResponse if provided, but don't auto-fetch
   useEffect(() => {
-    if (rawResponse && rawResponse.facturas_sin_pagar && Array.isArray(rawResponse.facturas_sin_pagar)) {
-      console.log("WebhookDebug: Using facturas_sin_pagar from rawResponse:", rawResponse.facturas_sin_pagar.length);
-      setUnpaidInvoices(rawResponse.facturas_sin_pagar);
-      setDataFetched(true);
+    if (rawResponse) {
+      console.log("WebhookDebug: received rawResponse:", {
+        hasUnpaidInvoices: !!rawResponse.facturas_sin_pagar,
+        unpaidInvoicesCount: rawResponse.facturas_sin_pagar?.length || 0,
+      });
+      
+      if (rawResponse.facturas_sin_pagar && Array.isArray(rawResponse.facturas_sin_pagar)) {
+        setUnpaidInvoices(rawResponse.facturas_sin_pagar);
+        setDataFetched(true);
+      }
     }
   }, [rawResponse]);
 
@@ -37,45 +45,74 @@ const WebhookDebug: React.FC<WebhookDebugProps> = ({
     setLoading(true);
     try {
       // Check if we should use the global refresh function first
-      // This helps coordinate data fetching across components
       if (refreshDataFunction) {
         console.log("WebhookDebug: Using global refresh function");
-        refreshDataFunction(true);
+        refreshDataFunction(true); // force refresh
         
-        // If rawResponse is already available, use it instead of making another API call
-        if (rawResponse && rawResponse.facturas_sin_pagar) {
-          console.log("WebhookDebug: Using available rawResponse");
-          setUnpaidInvoices(rawResponse.facturas_sin_pagar || []);
+        // Wait a bit for the refresh to complete
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Get the data from the repository
+        const cachedData = zohoRepository.getLastRawResponse();
+        
+        if (cachedData?.facturas_sin_pagar && Array.isArray(cachedData.facturas_sin_pagar)) {
+          console.log("WebhookDebug: Using data from repository after refresh");
+          setUnpaidInvoices(cachedData.facturas_sin_pagar);
           setDataFetched(true);
-          setLoading(false);
           toast({
             title: "Datos cargados",
-            description: `Se encontraron ${rawResponse.facturas_sin_pagar.length} facturas sin pagar`,
+            description: `Se encontraron ${cachedData.facturas_sin_pagar.length} facturas sin pagar`,
           });
+          setLoading(false);
           return;
         }
       }
       
-      // Otherwise, get data directly from the repository
-      console.log("WebhookDebug: Fetching data directly from repository");
-      const data = await zohoRepository.getRawResponse(dateRange.startDate, dateRange.endDate, true);
-      
-      if (data && data.facturas_sin_pagar && Array.isArray(data.facturas_sin_pagar)) {
-        console.log("WebhookDebug: Received unpaid invoices:", data.facturas_sin_pagar.length);
-        setUnpaidInvoices(data.facturas_sin_pagar);
-        setDataFetched(true);
+      // If not using the global refresh function or if it didn't provide data,
+      // get data from the repository directly without an API call if possible
+      try {
+        console.log("WebhookDebug: Fetching unpaid invoices from repository");
+        const invoices = await zohoRepository.getUnpaidInvoices(dateRange.startDate, dateRange.endDate);
+        
+        if (invoices && invoices.length > 0) {
+          console.log("WebhookDebug: Got unpaid invoices from repository:", invoices.length);
+          setUnpaidInvoices(invoices);
+          setDataFetched(true);
+          toast({
+            title: "Datos cargados",
+            description: `Se encontraron ${invoices.length} facturas sin pagar`,
+          });
+        } else {
+          console.log("WebhookDebug: No unpaid invoices found in repository, need to fetch from API");
+          // Only make a direct API call if absolutely necessary
+          const data = await zohoRepository.getRawResponse(dateRange.startDate, dateRange.endDate, true);
+          
+          if (data?.facturas_sin_pagar && Array.isArray(data.facturas_sin_pagar)) {
+            console.log("WebhookDebug: Fetched unpaid invoices from API:", data.facturas_sin_pagar.length);
+            setUnpaidInvoices(data.facturas_sin_pagar);
+            setDataFetched(true);
+            toast({
+              title: "Datos cargados",
+              description: `Se encontraron ${data.facturas_sin_pagar.length} facturas sin pagar`,
+            });
+          } else {
+            console.warn("WebhookDebug: No unpaid invoices found after API fetch");
+            setUnpaidInvoices([]);
+            toast({
+              title: "Información",
+              description: "No se encontraron facturas sin pagar",
+              variant: "default"
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching unpaid invoices:", error);
         toast({
-          title: "Datos cargados",
-          description: `Se encontraron ${data.facturas_sin_pagar.length} facturas sin pagar`,
-        });
-      } else {
-        console.warn("WebhookDebug: No unpaid invoices found in response");
-        setUnpaidInvoices([]);
-        toast({
-          title: "Advertencia",
-          description: "No se encontraron facturas sin pagar en la respuesta",
+          title: "Error",
+          description: "Error al cargar las facturas sin pagar",
           variant: "destructive"
         });
+        setUnpaidInvoices([]);
       }
     } catch (error) {
       console.error("Error fetching debug data:", error);

@@ -19,8 +19,10 @@ const DebugSection: React.FC<DebugSectionProps> = ({
   // Log when the raw response changes to help debugging
   useEffect(() => {
     if (rawResponse) {
-      console.log("DebugSection: received rawResponse with facturas_sin_pagar:", 
-        rawResponse.facturas_sin_pagar ? rawResponse.facturas_sin_pagar.length : 'none');
+      console.log("DebugSection: received rawResponse:", {
+        hasFacturasSinPagar: !!rawResponse.facturas_sin_pagar,
+        invoicesCount: rawResponse.facturas_sin_pagar?.length || 0
+      });
     }
   }, [rawResponse]);
 
