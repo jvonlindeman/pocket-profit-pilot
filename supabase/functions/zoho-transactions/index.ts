@@ -52,16 +52,22 @@ serve(async (req) => {
       );
     }
 
+    // Generate a unique request ID for tracing
+    const requestId = crypto.randomUUID();
+    console.log(`Request ID: ${requestId}`);
+
     // Make direct call to the webhook
     const webhookResponse = await fetch(webhookUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "X-Request-ID": requestId,
       },
       body: JSON.stringify({
         startDate,
         endDate,
         rawResponse: !!rawResponse,
+        requestId,
       }),
     });
 
@@ -89,26 +95,10 @@ serve(async (req) => {
       );
     }
 
-    // If raw response is requested, return the webhook response directly
-    if (rawResponse) {
-      return new Response(
-        JSON.stringify(data),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Process the transactions if needed
-    const transactions = data.transactions || [];
-    
-    // Return the processed response
+    // Return the data directly without additional processing
+    // This ensures the client receives the exact same structure every time
     return new Response(
-      JSON.stringify({
-        transactions,
-        source: "Zoho",
-        startDate,
-        endDate,
-        count: transactions.length,
-      }),
+      JSON.stringify(data),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 

@@ -1,4 +1,3 @@
-
 import { Transaction, FinancialData } from "../types/financial";
 import { zohoRepository } from "../repositories/zohoRepository";
 import { stripeRepository } from "../repositories/stripeRepository";
@@ -19,6 +18,7 @@ export interface FinancialDataCallbacks {
 export class FinancialService {
   private lastFetchTimestamp = 0;
   private lastRawResponse: any = null;
+  private apiConnectivityStatus: {zoho: boolean, stripe: boolean} | null = null;
   
   /**
    * Get the last raw response for debugging
@@ -147,15 +147,22 @@ export class FinancialService {
 
   /**
    * Check API connectivity for both data sources
+   * This now uses a cache to avoid triggering extra API calls
    */
   async checkApiConnectivity(): Promise<{zoho: boolean, stripe: boolean}> {
-    // Generate a cache key for API connectivity checks
+    // If we already have the status and it's recent, return it
+    if (this.apiConnectivityStatus) {
+      return this.apiConnectivityStatus;
+    }
+    
+    // Otherwise get fresh status
     const cacheKey = `api-connectivity-check-${Date.now()}`;
     
     // Use the ApiRequestManager to execute the connectivity check
-    return await apiRequestManager.executeRequest(
+    const result = await apiRequestManager.executeRequest(
       cacheKey,
       async () => {
+        console.log("FinancialService: Checking API connectivity");
         const zohoConnected = await zohoRepository.checkApiConnectivity();
         const stripeConnected = await stripeRepository.checkApiConnectivity();
         
@@ -166,6 +173,11 @@ export class FinancialService {
       },
       30000 // 30 second TTL for connectivity checks
     );
+    
+    // Cache the result
+    this.apiConnectivityStatus = result;
+    
+    return result;
   }
 
   /**
@@ -265,13 +277,21 @@ export class FinancialService {
     forceRefresh: boolean,
     callbacks: FinancialDataCallbacks
   ): Promise<boolean> {
+    // Generate a unique request ID for this fetch operation
+    const requestId = `financial-data-${Date.now()}`;
+    console.log(`FinancialService: Starting data fetch with ID ${requestId}`);
+    
     // Generate a unique cache key for this fetch operation
-    const fetchCacheKey = `financial-data-${dateRange.startDate.toISOString()}-${dateRange.endDate.toISOString()}-${forceRefresh}`;
+    const fetchCacheKey = `financial-data-${dateRange.startDate.toISOString()}-${dateRange.endDate.toISOString()}`;
+    
+    console.log(`FinancialService: Using cache key ${fetchCacheKey}, forceRefresh: ${forceRefresh}`);
     
     // Use ApiRequestManager to deduplicate multiple calls to fetchFinancialData
     return await apiRequestManager.executeRequest(
       fetchCacheKey,
       async () => {
+        console.log(`FinancialService: Making actual fetch for ${fetchCacheKey}`);
+        
         // If we've fetched recently and not forcing a refresh, don't fetch again
         const now = Date.now();
         if (!forceRefresh && now - this.lastFetchTimestamp < 2000) {
@@ -280,12 +300,13 @@ export class FinancialService {
         }
         
         this.lastFetchTimestamp = now;
-        console.log("Fetching financial data...");
+        console.log(`FinancialService: Fetching financial data (request ID: ${requestId})...`);
         
         try {
-          // Check API connectivity first
+          // Check API connectivity first as part of the same operation
           const connectivity = await this.checkApiConnectivity();
           
+          // Show connectivity toasts
           if (!connectivity.zoho && !connectivity.stripe) {
             toast({
               title: "API Connectivity Issue",
@@ -306,7 +327,8 @@ export class FinancialService {
             });
           }
           
-          // Get transactions from Zoho Books - uses ApiRequestManager internally
+          // Get transactions from Zoho Books
+          console.log(`FinancialService: Getting Zoho data (request ID: ${requestId})`);
           const zohoData = await zohoRepository.getTransactions(
             dateRange.startDate, 
             dateRange.endDate,
@@ -315,13 +337,13 @@ export class FinancialService {
 
           // Get the current raw response for debugging
           this.lastRawResponse = zohoRepository.getLastRawResponse();
-          console.log("Fetched raw response for debugging:", this.lastRawResponse);
+          console.log(`FinancialService: Fetched raw response for debugging (request ID: ${requestId})`);
 
           // Process collaborator data - this is crucial for the fix
           callbacks.onCollaboratorData(this.lastRawResponse);
 
-          // Get transactions from Stripe - uses ApiRequestManager internally
-          console.log("Fetching from Stripe:", dateRange.startDate, dateRange.endDate);
+          // Get transactions from Stripe
+          console.log(`FinancialService: Getting Stripe data (request ID: ${requestId})`);
           const stripeData = await stripeRepository.getTransactions(
             dateRange.startDate,
             dateRange.endDate,
@@ -330,8 +352,9 @@ export class FinancialService {
 
           // Combine the data
           const combinedData = [...zohoData, ...stripeData.transactions];
-          console.log("Combined transactions:", combinedData.length);
-          console.log("Stripe data summary:", {
+          console.log(`FinancialService: Combined ${zohoData.length} Zoho + ${stripeData.transactions.length} Stripe = ${combinedData.length} total transactions (request ID: ${requestId})`);
+          
+          console.log(`FinancialService: Stripe data summary (request ID: ${requestId}):`, {
             gross: stripeData.gross,
             fees: stripeData.fees,
             transactionFees: stripeData.transactionFees,
@@ -346,15 +369,16 @@ export class FinancialService {
           // Update transactions state
           callbacks.onTransactions(combinedData);
           
+          console.log(`FinancialService: Fetch completed successfully (request ID: ${requestId})`);
           return true;
         } catch (err: any) {
-          console.error("Error fetching financial data:", err);
+          console.error(`FinancialService: Error fetching financial data (request ID: ${requestId}):`, err);
           
           // Make sure to get any raw response for debugging even in case of error
           const rawData = zohoRepository.getLastRawResponse();
           if (rawData) {
             this.lastRawResponse = rawData;
-            console.log("Set raw response after error:", rawData);
+            console.log(`FinancialService: Set raw response after error (request ID: ${requestId}):`, rawData);
           }
           
           return false;

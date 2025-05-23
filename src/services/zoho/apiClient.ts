@@ -1,55 +1,124 @@
 
-import { supabase } from "../../integrations/supabase/client";
 import { Transaction } from "../../types/financial";
+import { handleApiError } from "./utils";
+import { getMockTransactions } from "./mockData";
+import { supabase } from "@/integrations/supabase/client";
+import { PANAMA_TIMEZONE } from "@/utils/timezoneUtils";
+import { processRawTransactions, filterExcludedVendors } from "./api/processor";
+import { preparePanamaDates } from "./api/formatter";
+import { apiRequestManager } from "@/utils/ApiRequestManager";
+import { formatDateYYYYMMDD } from "@/utils/dateUtils";
 
 /**
- * Fetch transactions from webhook directly without using database cache
+ * Unified gateway function to fetch Zoho data
+ * All Zoho data requests should go through this function
  */
-export async function fetchTransactionsFromWebhook(
-  startDate: Date,
-  endDate: Date,
+export const fetchZohoData = async (
+  startDate: Date, 
+  endDate: Date, 
   forceRefresh = false,
-  rawResponse = false
-): Promise<Transaction[] | any> {
-  try {
-    console.log(`Fetching Zoho transactions from ${startDate.toISOString()} to ${endDate.toISOString()}`);
-    
-    // Get the formatted start and end dates
-    const formattedStartDate = startDate.toISOString().split('T')[0];
-    const formattedEndDate = endDate.toISOString().split('T')[0];
-    
-    // Call the edge function directly
-    const { data, error } = await supabase.functions.invoke("zoho-transactions", {
-      body: {
-        startDate: formattedStartDate,
-        endDate: formattedEndDate,
-        forceRefresh,
-        rawResponse
-      }
-    });
-    
-    if (error) {
-      console.error("Error invoking zoho-transactions function:", error);
-      throw error;
-    }
-    
-    if (!data) {
-      console.warn("No data returned from zoho-transactions function");
-      return rawResponse ? { error: "No data returned" } : [];
-    }
-    
-    // Return the raw response if requested
-    if (rawResponse) {
-      return data;
-    }
-    
-    // Return the processed transactions
-    return data.transactions || [];
-  } catch (error) {
-    console.error("Error in fetchTransactionsFromWebhook:", error);
-    if (rawResponse) {
-      return { error: error.message || "Unknown error" };
-    }
-    throw error;
+  returnRawResponse = false
+): Promise<Transaction[] | any> => {
+  console.log(`ZohoApiClient: Unified gateway call for dates ${startDate.toDateString()} to ${endDate.toDateString()}`);
+  
+  // Prepare dates in Panama timezone
+  const { 
+    panamaStartDate, 
+    panamaEndDate, 
+    formattedStartDate, 
+    formattedEndDate 
+  } = preparePanamaDates(startDate, endDate);
+  
+  // Generate a simple cache key based ONLY on the date range and raw flag
+  // This ensures maximum cache hits across different call sites
+  const cacheKey = `zoho-data-${formatDateYYYYMMDD(startDate)}-${formatDateYYYYMMDD(endDate)}-${returnRawResponse}`;
+  
+  console.log(`ZohoApiClient: Using cache key: ${cacheKey}, forceRefresh: ${forceRefresh}`);
+  
+  // If we're forcing a refresh, clear any existing cache entry
+  if (forceRefresh) {
+    console.log(`ZohoApiClient: Force refresh requested, clearing cache entry`);
+    apiRequestManager.clearCacheEntry(cacheKey);
   }
-}
+  
+  // Use the ApiRequestManager to execute the request with deduplication
+  return await apiRequestManager.executeRequest(
+    cacheKey,
+    async () => {
+      console.log(`ZohoApiClient: Making actual API call for ${cacheKey}`);
+      try {
+        // Call the Supabase edge function to get transactions
+        const { data, error } = await supabase.functions.invoke("zoho-transactions", {
+          body: {
+            startDate: formattedStartDate,
+            endDate: formattedEndDate,
+            rawResponse: returnRawResponse
+          }
+        });
+        
+        if (error) {
+          console.error("Failed to fetch data from Supabase function:", error);
+          
+          // If we get an error, use mock data
+          handleApiError({details: error.message}, 'Failed to fetch Zoho transactions from Supabase');
+          console.warn('Falling back to mock data due to error');
+          
+          return returnRawResponse 
+            ? { error: error.message, raw_response: null } 
+            : getMockTransactions(panamaStartDate, panamaEndDate);
+        }
+        
+        if (!data) {
+          console.log("No transactions returned from Supabase function, using mock data");
+          
+          return returnRawResponse 
+            ? { message: "No data returned", data: null, raw_response: null } 
+            : getMockTransactions(panamaStartDate, panamaEndDate);
+        }
+        
+        // Log what we received from the edge function
+        console.log("ZohoApiClient: Received data from edge function:", {
+          isArray: Array.isArray(data),
+          hasPayments: data.payments && Array.isArray(data.payments),
+          hasExpenses: data.expenses && Array.isArray(data.expenses),
+          hasCollaborators: data.colaboradores && Array.isArray(data.colaboradores),
+          hasCachedTransactions: data.cached_transactions && Array.isArray(data.cached_transactions),
+          dataKeys: Object.keys(data)
+        });
+        
+        // Return raw response for debugging if requested
+        if (returnRawResponse) {
+          return data;
+        }
+        
+        return data;
+      } catch (err) {
+        console.error("Error in fetchZohoData:", err);
+        handleApiError(err, 'Failed to connect to Supabase function');
+        
+        // Fall back to mock data
+        console.warn('Falling back to mock data due to exception');
+        return returnRawResponse 
+          ? { error: err instanceof Error ? err.message : 'Unknown error', raw_response: null } 
+          : getMockTransactions(startDate, endDate);
+      }
+    }
+  );
+};
+
+/**
+ * Process the transaction response from the API
+ */
+export const processTransactionResponse = (data: any): Transaction[] => {
+  // We need to process the raw data using the processor function
+  if (!data) return [];
+  
+  // Log what we're processing
+  console.log("Processing transaction response with keys:", Object.keys(data));
+  
+  // Call the processor function directly to ensure consistent processing
+  return processRawTransactions(data);
+};
+
+// Legacy function name for backward compatibility
+export const fetchTransactionsFromWebhook = fetchZohoData;

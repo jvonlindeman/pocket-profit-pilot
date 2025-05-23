@@ -31,11 +31,14 @@ export class StripeRepository {
     forceRefresh = false
   ): Promise<StripeResult> {
     try {
-      // Generate a cache key for this request
-      const cacheKey = `stripe-transactions-${formatDateYYYYMMDD(startDate)}-${formatDateYYYYMMDD(endDate)}-${forceRefresh}`;
+      // Generate a simplified cache key for this request - only use date range
+      const cacheKey = `stripe-data-${formatDateYYYYMMDD(startDate)}-${formatDateYYYYMMDD(endDate)}`;
+      
+      console.log(`StripeRepository: Using cache key ${cacheKey}, forceRefresh: ${forceRefresh}`);
       
       // If we're forcing a refresh, clear any existing cache entry
       if (forceRefresh) {
+        console.log("StripeRepository: Force refresh requested, clearing cache");
         apiRequestManager.clearCacheEntry(cacheKey);
       }
       
@@ -43,6 +46,7 @@ export class StripeRepository {
       return await apiRequestManager.executeRequest(
         cacheKey,
         async () => {
+          console.log(`StripeRepository: Making actual API call for ${cacheKey}`);
           const result = await StripeService.getTransactions(startDate, endDate, forceRefresh);
           return {
             transactions: result.transactions,
@@ -78,7 +82,9 @@ export class StripeRepository {
   async checkApiConnectivity(): Promise<boolean> {
     try {
       // Generate a cache key for this connectivity check
-      const cacheKey = `stripe-connectivity-${Date.now()}`;
+      const cacheKey = `stripe-connectivity-${new Date().toISOString()}`;
+      
+      console.log("StripeRepository: Checking API connectivity");
       
       // Use ApiRequestManager to deduplicate requests
       return await apiRequestManager.executeRequest(

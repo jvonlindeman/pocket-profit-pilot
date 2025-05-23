@@ -21,30 +21,35 @@ export class ZohoRepository {
     try {
       console.log(`Getting Zoho transactions from ${startDate} to ${endDate}, forceRefresh: ${forceRefresh}`);
       
-      // Fetch from API client, which handles deduplication and caching internally
-      const response = await zohoApiClient.fetchTransactionsFromWebhook(startDate, endDate, forceRefresh);
+      // Use the unified API client gateway function
+      const response = await zohoApiClient.fetchZohoData(startDate, endDate, forceRefresh);
       
       // Store the raw response for debugging
-      if (response && typeof response === 'object') {
-        this.lastRawResponse = response;
-      }
+      this.lastRawResponse = response;
       
-      // If the response is already an array of Transaction objects, return it
-      if (Array.isArray(response) && response.length > 0 && 'type' in response[0] && 'source' in response[0]) {
-        console.log(`Received ${response.length} processed Zoho transactions`);
-        return response;
+      let transactions: Transaction[] = [];
+      
+      if (Array.isArray(response)) {
+        // If the response is already an array of Transaction objects
+        console.log(`Received ${response.length} already processed Zoho transactions`);
+        transactions = response;
       } 
-      
-      // If we received a structured response with transactions inside
-      if (response && typeof response === 'object') {
+      else if (response && typeof response === 'object') {
         if (response.cached_transactions && Array.isArray(response.cached_transactions)) {
-          console.log(`Received ${response.cached_transactions.length} Zoho transactions`);
-          return response.cached_transactions;
+          // If we received a structured response with transactions inside
+          console.log(`Received ${response.cached_transactions.length} cached Zoho transactions`);
+          transactions = response.cached_transactions;
+        } 
+        else {
+          // Process the raw response through our processor
+          console.log("Processing raw Zoho response data");
+          const processed = zohoApiClient.processTransactionResponse(response);
+          transactions = processed;
         }
       }
       
-      console.log("No valid Zoho transactions found in response");
-      return [];
+      console.log(`Final transaction count: ${transactions.length}`);
+      return transactions;
     } catch (error) {
       console.error("Error fetching transactions from Zoho:", error);
       return []; 
@@ -64,7 +69,7 @@ export class ZohoRepository {
   async getRawResponse(startDate: Date, endDate: Date, forceRefresh = false): Promise<any> {
     try {
       console.log("Fetching Zoho raw response for", startDate, "to", endDate);
-      const rawData = await zohoApiClient.fetchTransactionsFromWebhook(startDate, endDate, forceRefresh, true);
+      const rawData = await zohoApiClient.fetchZohoData(startDate, endDate, forceRefresh, true);
       this.lastRawResponse = rawData;
       return rawData;
     } catch (error) {
@@ -78,8 +83,8 @@ export class ZohoRepository {
    */
   async checkApiConnectivity(): Promise<boolean> {
     try {
-      // Simple connectivity check - just try to get a minimal response
-      const response = await zohoApiClient.fetchTransactionsFromWebhook(
+      // Use the main fetch function with minimal data to check connectivity
+      const response = await zohoApiClient.fetchZohoData(
         new Date(), 
         new Date(),
         false,
