@@ -9,7 +9,6 @@ import { ApiCallsProvider } from "./contexts/ApiCallsContext";
 import { FinancialAssistantButton } from "./components/FinancialAssistant/FinancialAssistantButton";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
-import ZohoCallback from "./pages/ZohoCallback";
 import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
@@ -24,7 +23,6 @@ const App = () => (
             <Sonner />
             <Routes>
               <Route path="/" element={<Index />} />
-              <Route path="/zoho/callback" element={<ZohoCallback />} />
               <Route path="/settings" element={<Settings />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

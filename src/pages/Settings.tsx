@@ -1,6 +1,5 @@
 
 import React from 'react';
-import ZohoDebug from '@/components/ZohoDebug';
 import StripeDebug from '@/components/StripeDebug';
 import CacheClearTool from '@/components/Dashboard/CacheClearTool';
 import CacheMonitor from '@/components/Dashboard/CacheMonitor';
@@ -8,9 +7,8 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Bug, Database } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { endOfMonth, startOfMonth } from 'date-fns';
-import ZohoConfig from '@/components/ZohoConfig';
-import WebhookDebug from '@/components/WebhookDebug'; // Re-add the import
-import { toDayPickerDateRange } from '@/utils/dateRangeAdapter'; // Re-add the import
+import WebhookDebug from '@/components/WebhookDebug'; // Keep this import
+import { toDayPickerDateRange } from '@/utils/dateRangeAdapter'; // Keep this import
 
 const Settings = () => {
   // Create a date range for the current month
@@ -69,21 +67,13 @@ const Settings = () => {
               Herramientas de Depuración
             </h2>
             
-            {/* Existing Debug Tools */}
-            <ZohoDebug />
+            {/* Debug Tools (without ZohoDebug) */}
             <div className="mt-6">
               <StripeDebug dateRange={financialDateRange} />
             </div>
             <div className="mt-6">
               <WebhookDebug dateRange={dayPickerDateRange} />
             </div>
-          </section>
-          
-          <section className="bg-white shadow-sm rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">
-              Configuración
-            </h2>
-            <ZohoConfig />
           </section>
         </div>
       </main>
