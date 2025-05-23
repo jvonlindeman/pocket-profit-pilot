@@ -1,22 +1,21 @@
 
 import { Transaction } from "../types/financial";
 import * as zohoApiClient from "../services/zoho/apiClient";
-import CacheService from "../services/cache";
 import { formatDateYYYYMMDD } from "../utils/dateUtils";
 
 /**
  * ZohoRepository handles all data access related to Zoho,
- * including fetching data from API and cache management
+ * with minimal in-memory caching for UI performance
  */
 export class ZohoRepository {
   private lastRawResponse: any = null;
-  // Add in-memory cache for raw responses keyed by date ranges
+  
+  // Simple in-memory cache with a short TTL (5 minutes)
   private rawResponseCache: Map<string, {data: any, timestamp: number}> = new Map();
-  // Cache TTL in milliseconds (5 minutes)
-  private CACHE_TTL = 5 * 60 * 1000;
+  private CACHE_TTL = 5 * 60 * 1000; // 5 minutes
   
   /**
-   * Get transactions for a date range with automatic cache handling
+   * Get transactions for a date range with simple in-memory caching
    */
   async getTransactions(
     startDate: Date,
@@ -24,31 +23,41 @@ export class ZohoRepository {
     forceRefresh = false
   ): Promise<Transaction[]> {
     try {
-      return await this.fetchTransactionsFromSource(startDate, endDate, forceRefresh);
-    } catch (error) {
-      console.error("Error in getTransactions:", error);
-      return []; 
-    }
-  }
-
-  /**
-   * Implementation of fetching transactions with cache integration
-   */
-  async fetchTransactionsFromSource(
-    startDate: Date,
-    endDate: Date,
-    forceRefresh = false
-  ): Promise<Transaction[]> {
-    try {
-      console.log("Fetching Zoho transactions from", startDate, "to", endDate);
+      console.log(`Getting Zoho transactions from ${startDate} to ${endDate}, forceRefresh: ${forceRefresh}`);
+      
+      // Generate cache key for this request
+      const cacheKey = this.generateCacheKey(startDate, endDate);
+      
+      // Check if we have a valid cached response and not forcing refresh
+      if (!forceRefresh && this.rawResponseCache.has(cacheKey)) {
+        const cached = this.rawResponseCache.get(cacheKey);
+        
+        // Only use cache if it's within TTL
+        if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+          console.log("Using cached Zoho transactions (in-memory)");
+          
+          // If the cached data is already an array of transactions, return it
+          if (Array.isArray(cached.data) && cached.data.length > 0 && 'type' in cached.data[0]) {
+            return cached.data;
+          }
+          
+          // If we have a structured response with transactions inside
+          if (cached.data && typeof cached.data === 'object') {
+            if (cached.data.cached_transactions && Array.isArray(cached.data.cached_transactions)) {
+              return cached.data.cached_transactions;
+            }
+          }
+        }
+      }
+      
+      // If not cached or cache expired, fetch from API
       const response = await zohoApiClient.fetchTransactionsFromWebhook(startDate, endDate, forceRefresh);
       
-      // Store the raw response for debugging
+      // Store the raw response for debugging and in memory cache
       if (response && typeof response === 'object') {
         this.lastRawResponse = response;
         
-        // Also cache the raw response
-        const cacheKey = this.generateCacheKey(startDate, endDate);
+        // Cache the raw response
         this.rawResponseCache.set(cacheKey, {
           data: response,
           timestamp: Date.now()
@@ -64,7 +73,7 @@ export class ZohoRepository {
       // If we received a structured response with transactions inside
       if (response && typeof response === 'object') {
         if (response.cached_transactions && Array.isArray(response.cached_transactions)) {
-          console.log(`Received ${response.cached_transactions.length} cached Zoho transactions`);
+          console.log(`Received ${response.cached_transactions.length} Zoho transactions`);
           return response.cached_transactions;
         }
       }
@@ -73,7 +82,7 @@ export class ZohoRepository {
       return [];
     } catch (error) {
       console.error("Error fetching transactions from Zoho:", error);
-      throw error;
+      return []; 
     }
   }
 
@@ -85,8 +94,7 @@ export class ZohoRepository {
   }
 
   /**
-   * Get raw response data directly (for debugging purposes)
-   * Now with in-memory caching to prevent redundant API calls
+   * Get raw response data directly (using simple in-memory caching)
    */
   async getRawResponse(startDate: Date, endDate: Date, forceRefresh = false): Promise<any> {
     try {
@@ -145,32 +153,6 @@ export class ZohoRepository {
       return !!response && !response.error;
     } catch {
       return false;
-    }
-  }
-
-  /**
-   * Force refresh to repair the cache
-   */
-  async repairCache(startDate: Date, endDate: Date): Promise<boolean> {
-    try {
-      await zohoApiClient.fetchTransactionsFromWebhook(startDate, endDate, true);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Trigger a background refresh of the cache
-   */
-  async checkAndRefreshCache(startDate: Date, endDate: Date): Promise<void> {
-    try {
-      console.log("Background refresh of Zoho cache initiated");
-      zohoApiClient.fetchTransactionsFromWebhook(startDate, endDate, true)
-        .then(() => console.log("Background Zoho cache refresh completed"))
-        .catch(err => console.error("Background Zoho cache refresh failed:", err));
-    } catch (error) {
-      console.error("Error checking/refreshing Zoho cache:", error);
     }
   }
 }

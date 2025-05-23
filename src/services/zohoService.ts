@@ -1,11 +1,32 @@
 
-// Re-export functionality from the repository
-import { zohoRepository } from '../repositories/zohoRepository';
+import { zohoRepository } from "../repositories/zohoRepository";
+import { Transaction } from "../types/financial";
 
-// Export functions from repository to maintain backward compatibility
-export const getTransactions = zohoRepository.getTransactions.bind(zohoRepository);
-export const getLastRawResponse = zohoRepository.getLastRawResponse.bind(zohoRepository);
-export const getRawResponse = zohoRepository.getRawResponse.bind(zohoRepository);
-export const checkApiConnectivity = zohoRepository.checkApiConnectivity.bind(zohoRepository);
-export const repairCache = zohoRepository.repairCache.bind(zohoRepository);
-export const checkAndRefreshCache = zohoRepository.checkAndRefreshCache.bind(zohoRepository);
+/**
+ * Get transactions for a specified date range
+ */
+export async function getTransactions(
+  startDate: Date,
+  endDate: Date,
+  forceRefresh = false
+): Promise<Transaction[]> {
+  return await zohoRepository.getTransactions(startDate, endDate, forceRefresh);
+}
+
+/**
+ * Get raw response data for debugging
+ */
+export async function getRawResponse(
+  startDate: Date,
+  endDate: Date,
+  forceRefresh = false
+): Promise<any> {
+  return await zohoRepository.getRawResponse(startDate, endDate, forceRefresh);
+}
+
+/**
+ * Check API connectivity
+ */
+export async function checkApiConnectivity(): Promise<boolean> {
+  return await zohoRepository.checkApiConnectivity();
+}

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Bug } from 'lucide-react';
@@ -24,7 +24,7 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
   const [error, setError] = useState<string | null>(null);
 
   // Use the rawResponse from props when available
-  useEffect(() => {
+  React.useEffect(() => {
     if (rawResponse && !localRawData) {
       console.log("WebhookDebug: Using rawResponse from props");
       setLocalRawData(rawResponse);
@@ -67,7 +67,8 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
       // Get raw data directly to show in the debug UI
       const data = await ZohoService.getRawResponse(
         financialDateRange.startDate, 
-        financialDateRange.endDate
+        financialDateRange.endDate,
+        true // Force refresh to bypass even in-memory cache
       );
       setLocalRawData(data);
       console.log("WebhookDebug: Debug data received", data);

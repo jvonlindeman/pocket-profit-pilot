@@ -1,3 +1,4 @@
+
 import React from 'react';
 import ZohoDebug from '@/components/ZohoDebug';
 import StripeDebug from '@/components/StripeDebug';
@@ -8,6 +9,8 @@ import { ArrowLeft, Bug, Database } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { endOfMonth, startOfMonth } from 'date-fns';
 import ZohoConfig from '@/components/ZohoConfig';
+import WebhookDebug from '@/components/WebhookDebug'; // Re-add the import
+import { toDayPickerDateRange } from '@/utils/dateRangeAdapter'; // Re-add the import
 
 const Settings = () => {
   // Create a date range for the current month
@@ -16,6 +19,9 @@ const Settings = () => {
     startDate: startOfMonth(today),
     endDate: endOfMonth(today),
   };
+  
+  // Convert to DayPicker DateRange format for components that expect it
+  const dayPickerDateRange = toDayPickerDateRange(financialDateRange);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -67,6 +73,9 @@ const Settings = () => {
             <ZohoDebug />
             <div className="mt-6">
               <StripeDebug dateRange={financialDateRange} />
+            </div>
+            <div className="mt-6">
+              <WebhookDebug dateRange={dayPickerDateRange} />
             </div>
           </section>
           
