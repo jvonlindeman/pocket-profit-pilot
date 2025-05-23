@@ -38,3 +38,11 @@ export function isDateWithinMonth(dateToCheck: Date, yearMonth: Date): boolean {
   
   return checkDate >= start && checkDate <= end;
 }
+
+/**
+ * Format a date for display purposes
+ */
+export function formatDateForDisplay(dateStr: string | Date): string {
+  const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+  return format(date, 'MMM d, yyyy');
+}

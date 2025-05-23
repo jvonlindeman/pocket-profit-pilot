@@ -35,11 +35,11 @@ export const useFinancialPersistence = () => {
         endDate: financialData.summary.endDate
       };
       
-      financialSummaryService.saveFinancialSummary({
-        summary: financialData.summary,
-        dateRange,
-        transactionCount: financialData.transactions.length
-      });
+      financialSummaryService.saveFinancialSummary(
+        financialData.summary,
+        dateRange.startDate,
+        dateRange.endDate
+      );
     } catch (error) {
       console.error("useFinancialPersistence - Error saving financial data:", error);
     }
