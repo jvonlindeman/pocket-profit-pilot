@@ -1,3 +1,4 @@
+
 import { Transaction } from "../../types/financial";
 import { handleApiError } from "./utils";
 import { getMockTransactions, getMockZohoWebhookResponse } from "./mockData";
@@ -39,7 +40,7 @@ export const fetchTransactionsFromWebhook = async (
       timezone: PANAMA_TIMEZONE
     });
     
-    // Call the Supabase edge function to get transactions
+    // Call the Supabase edge function directly to get transactions
     const { data, error } = await supabase.functions.invoke("zoho-transactions", {
       body: {
         startDate: formattedStartDate,

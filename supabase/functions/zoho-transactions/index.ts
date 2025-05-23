@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -13,7 +14,7 @@ const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as stri
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
 // The make.com webhook URL
-const makeWebhookUrl = "https://hook.us2.make.com/1iyetupimuaxn4au7gyf9kqnpihlmx22";
+const makeWebhookUrl = Deno.env.get("MAKE_WEBHOOK_URL") as string;
 
 // Lista de proveedores que deben ser excluidos
 const excludedVendors = ["Johan von Lindeman", "DFC Panama", "Bottom Consulting", "Mr. Analytics LLC"];
@@ -45,167 +46,6 @@ const generateConsistentId = (transaction: Partial<Transaction>, index: number):
   
   return `${source.toLowerCase()}-${type.toLowerCase()}-${date}-${identifier}`;
 };
-
-/**
- * Check if data for a given date range is already in cache
- */
-async function checkCache(source: string, startDate: string, endDate: string): Promise<{
-  cached: boolean;
-  data?: Transaction[];
-  partial: boolean;
-}> {
-  try {
-    // Call the RPC function to check if date range is cached
-    const { data: cacheCheck, error: cacheError } = await supabase.rpc(
-      'is_date_range_cached',
-      { p_source: source, p_start_date: startDate, p_end_date: endDate }
-    );
-    
-    if (cacheError || !cacheCheck || cacheCheck.length === 0) {
-      console.log(`Cache check failed or returned no data: ${cacheError?.message || 'No data'}`);
-      return { cached: false, partial: false };
-    }
-    
-    const { is_cached, is_partial } = cacheCheck[0];
-    
-    console.log(`Cache check result for ${source} from ${startDate} to ${endDate}: Cached: ${is_cached}, Partial: ${is_partial}`);
-    
-    // If not cached, return early
-    if (!is_cached) {
-      return { cached: false, partial: is_partial };
-    }
-    
-    // If cached, fetch the transactions from cache
-    const { data: transactions, error: txError } = await supabase
-      .from('cached_transactions')
-      .select('*')
-      .eq('source', source)
-      .gte('date', startDate)
-      .lte('date', endDate);
-    
-    if (txError) {
-      console.error(`Error fetching cached transactions: ${txError.message}`);
-      return { cached: false, partial: is_partial };
-    }
-    
-    if (!transactions || transactions.length === 0) {
-      console.log(`Cache indicated data exists but no transactions found for ${source} from ${startDate} to ${endDate}`);
-      return { cached: false, partial: is_partial };
-    }
-    
-    console.log(`Successfully retrieved ${transactions.length} cached transactions for ${source} from ${startDate} to ${endDate}`);
-    return { cached: true, data: transactions as Transaction[], partial: is_partial };
-  } catch (err) {
-    console.error(`Error checking cache: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    return { cached: false, partial: false };
-  }
-}
-
-/**
- * Store transactions directly in the Supabase database
- */
-async function storeTransactionsInCache(transactions: Transaction[], source: string, startDate: string, endDate: string): Promise<boolean> {
-  if (!transactions || transactions.length === 0) {
-    console.log("No transactions to cache");
-    return false;
-  }
-
-  console.log(`Storing ${transactions.length} ${source} transactions in cache from ${startDate} to ${endDate}`);
-
-  try {
-    // Create a cache segment record
-    const { error: segmentError } = await supabase
-      .from('cache_segments')
-      .upsert({
-        source,
-        start_date: startDate,
-        end_date: endDate,
-        transaction_count: transactions.length,
-        last_refreshed_at: new Date().toISOString(),
-        status: 'processing'
-      }, { onConflict: 'source, start_date, end_date' });
-    
-    if (segmentError) {
-      console.error("Error creating cache segment:", segmentError);
-      return false;
-    }
-
-    // Store transactions in batches
-    const BATCH_SIZE = 50;
-    let successCount = 0;
-    let errorCount = 0;
-
-    // Format transactions for database
-    const cacheTransactions = transactions.map(tx => ({
-      external_id: tx.id,
-      date: tx.date,
-      amount: tx.amount,
-      description: tx.description || null,
-      category: tx.category || null,
-      source: tx.source,
-      type: tx.type,
-      fetched_at: new Date().toISOString()
-    }));
-
-    // Store transactions in batches
-    for (let i = 0; i < cacheTransactions.length; i += BATCH_SIZE) {
-      const batch = cacheTransactions.slice(i, i + BATCH_SIZE);
-      const { error: txError } = await supabase
-        .from('cached_transactions')
-        .upsert(batch, { onConflict: 'external_id' });
-      
-      if (txError) {
-        console.error(`Error storing transaction batch ${i}-${i+batch.length}:`, txError);
-        errorCount++;
-      } else {
-        successCount++;
-        console.log(`Successfully stored transaction batch ${i}-${i+batch.length}`);
-      }
-    }
-
-    // Update segment status to complete if all successful
-    if (errorCount === 0) {
-      const { error: finalSegmentError } = await supabase
-        .from('cache_segments')
-        .upsert({
-          source,
-          start_date: startDate,
-          end_date: endDate,
-          transaction_count: transactions.length,
-          last_refreshed_at: new Date().toISOString(),
-          status: 'complete'
-        }, { onConflict: 'source, start_date, end_date' });
-      
-      if (finalSegmentError) {
-        console.error("Error updating cache segment status:", finalSegmentError);
-      }
-    }
-
-    // Verify storage
-    const { count, error: countError } = await supabase
-      .from('cached_transactions')
-      .select('*', { count: 'exact' })
-      .eq('source', source)
-      .gte('date', startDate)
-      .lte('date', endDate);
-
-    if (countError) {
-      console.error("Error verifying transaction storage:", countError);
-    } else {
-      console.log(`Verified ${count} transactions in cache after storage`);
-      
-      if (count && count < transactions.length * 0.9) {
-        console.warn(`Potentially incomplete storage. Expected ~${transactions.length}, found ${count}`);
-        return false;
-      }
-    }
-
-    return errorCount === 0;
-  } catch (err) {
-    console.error("Error storing transactions in cache:", err);
-    return false;
-  }
-}
 
 serve(async (req: Request) => {
   console.log(`zoho-transactions function called with method: ${req.method}`);
@@ -249,36 +89,6 @@ serve(async (req: Request) => {
         JSON.stringify({ error: "Start date and end date are required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-    }
-
-    // Check if data is already in cache and we're not forcing a refresh
-    if (!forceRefresh) {
-      console.log("Checking cache for Zoho transactions");
-      const cacheResult = await checkCache('Zoho', startDate, endDate);
-
-      // If we have complete cached data, return it immediately
-      if (cacheResult.cached && cacheResult.data) {
-        console.log(`Using ${cacheResult.data.length} cached transactions instead of calling webhook`);
-        
-        // Format response to match expected structure
-        const responseData = {
-          colaboradores: [],  // Empty placeholders since we're using cached data
-          expenses: [],
-          payments: [],
-          cached: true,
-          cached_transactions: cacheResult.data,
-          cache_hit: true
-        };
-        
-        return new Response(
-          JSON.stringify(responseData),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      
-      console.log("No complete cache hit found, proceeding to call webhook");
-    } else {
-      console.log("Force refresh requested, skipping cache check");
     }
     
     // Call the make.com webhook directly
@@ -527,13 +337,6 @@ serve(async (req: Request) => {
     }
     
     console.log(`Processed ${transactions.length} transactions`);
-    
-    // Store the transactions in cache directly from the edge function
-    if (transactions.length > 0) {
-      console.log(`Storing ${transactions.length} transactions in cache`);
-      const cacheResult = await storeTransactionsInCache(transactions, 'Zoho', startDate, endDate);
-      console.log(`Transaction caching result: ${cacheResult ? 'Success' : 'Failed'}`);
-    }
     
     // Add the original response to the data for debugging
     const responseData = {
