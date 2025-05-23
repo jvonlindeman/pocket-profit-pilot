@@ -3,6 +3,7 @@ import { Transaction } from "../types/financial";
 import StripeService from "../services/stripeService";
 import { apiRequestManager } from "@/utils/ApiRequestManager";
 import { formatDateYYYYMMDD } from "@/utils/dateUtils";
+import { useApiCalls } from "@/contexts/ApiCallsContext";
 
 /**
  * Interface for Stripe data results that includes transactions and aggregate data
@@ -22,6 +23,24 @@ export interface StripeResult {
  * StripeRepository handles all data access related to Stripe
  */
 export class StripeRepository {
+  private apiCallsContext?: ReturnType<typeof useApiCalls>;
+
+  /**
+   * Set the API calls context for tracking
+   */
+  setApiCallsContext(context: ReturnType<typeof useApiCalls>) {
+    this.apiCallsContext = context;
+  }
+
+  /**
+   * Track API call
+   */
+  private trackApiCall() {
+    if (this.apiCallsContext) {
+      this.apiCallsContext.incrementStripeApiCalls();
+    }
+  }
+
   /**
    * Get transactions for a date range
    */
@@ -47,6 +66,7 @@ export class StripeRepository {
         cacheKey,
         async () => {
           console.log(`StripeRepository: Making actual API call for ${cacheKey}`);
+          this.trackApiCall();
           const result = await StripeService.getTransactions(startDate, endDate, forceRefresh);
           return {
             transactions: result.transactions,
@@ -90,6 +110,7 @@ export class StripeRepository {
       return await apiRequestManager.executeRequest(
         cacheKey,
         async () => {
+          this.trackApiCall();
           return await StripeService.checkApiConnectivity();
         },
         30000 // 30 second TTL for connectivity checks

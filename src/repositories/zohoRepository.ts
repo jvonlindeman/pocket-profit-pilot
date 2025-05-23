@@ -2,6 +2,7 @@
 import { Transaction } from "../types/financial";
 import * as zohoApiClient from "../services/zoho/apiClient";
 import { formatDateYYYYMMDD } from "../utils/dateUtils";
+import { useApiCalls } from "@/contexts/ApiCallsContext";
 
 /**
  * ZohoRepository handles all data access related to Zoho,
@@ -9,6 +10,23 @@ import { formatDateYYYYMMDD } from "../utils/dateUtils";
  */
 export class ZohoRepository {
   private lastRawResponse: any = null;
+  private apiCallsContext?: ReturnType<typeof useApiCalls>;
+  
+  /**
+   * Set the API calls context for tracking
+   */
+  setApiCallsContext(context: ReturnType<typeof useApiCalls>) {
+    this.apiCallsContext = context;
+  }
+
+  /**
+   * Track API call
+   */
+  private trackApiCall() {
+    if (this.apiCallsContext) {
+      this.apiCallsContext.incrementZohoApiCalls();
+    }
+  }
   
   /**
    * Get transactions for a date range
@@ -22,6 +40,7 @@ export class ZohoRepository {
       console.log(`Getting Zoho transactions from ${startDate} to ${endDate}, forceRefresh: ${forceRefresh}`);
       
       // Use the unified API client gateway function
+      this.trackApiCall();
       const response = await zohoApiClient.fetchZohoData(startDate, endDate, forceRefresh);
       
       // Store the raw response for debugging
@@ -69,6 +88,7 @@ export class ZohoRepository {
   async getRawResponse(startDate: Date, endDate: Date, forceRefresh = false): Promise<any> {
     try {
       console.log("Fetching Zoho raw response for", startDate, "to", endDate);
+      this.trackApiCall();
       const rawData = await zohoApiClient.fetchZohoData(startDate, endDate, forceRefresh, true);
       this.lastRawResponse = rawData;
       return rawData;
@@ -84,6 +104,7 @@ export class ZohoRepository {
   async checkApiConnectivity(): Promise<boolean> {
     try {
       // Use the main fetch function with minimal data to check connectivity
+      this.trackApiCall();
       const response = await zohoApiClient.fetchZohoData(
         new Date(), 
         new Date(),

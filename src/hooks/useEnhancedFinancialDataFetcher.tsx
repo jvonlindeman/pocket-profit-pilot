@@ -6,6 +6,9 @@ import { useFinancialDataFetcher } from '@/hooks/useFinancialDataFetcher';
 import { useSearchParams } from 'react-router-dom';
 import CacheService from '@/services/cache';
 import StripeService from '@/services/stripeService';
+import { useApiCalls } from '@/contexts/ApiCallsContext';
+import { stripeRepository } from '@/repositories/stripeRepository';
+import { zohoRepository } from '@/repositories/zohoRepository';
 
 /**
  * Enhanced hook to handle fetching of financial data with transaction management
@@ -15,6 +18,7 @@ export const useEnhancedFinancialDataFetcher = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [dataInitialized, setDataInitialized] = useState<boolean>(false);
   const [searchParams, setSearchParams] = useSearchParams();
+  const apiCalls = useApiCalls();
   
   const { 
     loading, 
@@ -26,6 +30,13 @@ export const useEnhancedFinancialDataFetcher = () => {
     apiConnectivity,
     checkApiConnectivity
   } = useFinancialDataFetcher();
+
+  // Initialize API call tracking
+  useEffect(() => {
+    // Set API calls context to repositories
+    stripeRepository.setApiCallsContext(apiCalls);
+    zohoRepository.setApiCallsContext(apiCalls);
+  }, [apiCalls]);
 
   // Remove refresh parameter from URL if present
   useEffect(() => {
@@ -93,6 +104,11 @@ export const useEnhancedFinancialDataFetcher = () => {
       onIncomeTypes: (transactions: any[], stripeData: any) => void
     }
   ) => {
+    // Reset API call counters when starting a new fetch
+    if (forceRefresh) {
+      apiCalls.resetApiCalls();
+    }
+    
     const success = await fetchFinancialData(
       dateRange,
       forceRefresh,
@@ -117,7 +133,8 @@ export const useEnhancedFinancialDataFetcher = () => {
   }, [
     fetchFinancialData, 
     transactions.length,
-    usingCachedData
+    usingCachedData,
+    apiCalls
   ]);
   
   // Public function to refresh data
