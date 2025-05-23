@@ -2,7 +2,7 @@
 import React from 'react';
 import { useApiCalls } from '@/contexts/ApiCallsContext';
 import { Badge } from '@/components/ui/badge';
-import { ApiIcon, RefreshCw } from 'lucide-react';
+import { Database, RefreshCw } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
