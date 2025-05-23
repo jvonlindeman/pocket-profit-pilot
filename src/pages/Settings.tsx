@@ -1,13 +1,12 @@
 
 import React from 'react';
-import StripeDebug from '@/components/StripeDebug';
 import CacheClearTool from '@/components/Dashboard/CacheClearTool';
 import CacheMonitor from '@/components/Dashboard/CacheMonitor';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Bug, Database } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { endOfMonth, startOfMonth } from 'date-fns';
-import WebhookDebug from '@/components/WebhookDebug'; // Keep this import
+import DebugSection from '@/components/Dashboard/DebugTools/DebugSection';
 import { toDayPickerDateRange } from '@/utils/dateRangeAdapter'; // Keep this import
 
 const Settings = () => {
@@ -20,6 +19,12 @@ const Settings = () => {
   
   // Convert to DayPicker DateRange format for components that expect it
   const dayPickerDateRange = toDayPickerDateRange(financialDateRange);
+
+  // Simple refresh function to pass to debug components
+  const refreshData = (force: boolean) => {
+    console.log('Settings page refresh triggered with force:', force);
+    // This is just a stub - the actual refresh happens inside the DebugSection component
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -61,20 +66,12 @@ const Settings = () => {
             </div>
           </section>
           
-          <section className="bg-white shadow-sm rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-              <Bug className="h-5 w-5 mr-2 text-amber-500" />
-              Herramientas de Depuración
-            </h2>
-            
-            {/* Debug Tools (without ZohoDebug) */}
-            <div className="mt-6">
-              <StripeDebug dateRange={financialDateRange} />
-            </div>
-            <div className="mt-6">
-              <WebhookDebug dateRange={dayPickerDateRange} />
-            </div>
-          </section>
+          {/* Use the centralized DebugSection component */}
+          <DebugSection 
+            dateRange={financialDateRange}
+            refreshData={refreshData}
+            rawResponse={null} // Initially null, it will be populated by the component
+          />
         </div>
       </main>
 
