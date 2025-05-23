@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
@@ -21,18 +20,50 @@ const WebhookDebug: React.FC<WebhookDebugProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("summary");
-  const [unpaidInvoices, setUnpaidInvoices] = useState([]);
+  const [unpaidInvoices, setUnpaidInvoices] = useState<any[]>([]);
+  const [dataFetched, setDataFetched] = useState(false);
   
-  // Fetch debug data from Zoho
+  // Use rawResponse if provided, but don't auto-fetch
+  useEffect(() => {
+    if (rawResponse && rawResponse.facturas_sin_pagar && Array.isArray(rawResponse.facturas_sin_pagar)) {
+      console.log("WebhookDebug: Using facturas_sin_pagar from rawResponse:", rawResponse.facturas_sin_pagar.length);
+      setUnpaidInvoices(rawResponse.facturas_sin_pagar);
+      setDataFetched(true);
+    }
+  }, [rawResponse]);
+
+  // Fetch debug data from Zoho, with explicit user action only
   const fetchDebugData = async () => {
     setLoading(true);
     try {
-      // Get raw data for debugging purposes
-      const data = await zohoRepository.getRawResponse(dateRange.startDate, dateRange.endDate);
+      // Check if we should use the global refresh function first
+      // This helps coordinate data fetching across components
+      if (refreshDataFunction) {
+        console.log("WebhookDebug: Using global refresh function");
+        refreshDataFunction(true);
+        
+        // If rawResponse is already available, use it instead of making another API call
+        if (rawResponse && rawResponse.facturas_sin_pagar) {
+          console.log("WebhookDebug: Using available rawResponse");
+          setUnpaidInvoices(rawResponse.facturas_sin_pagar || []);
+          setDataFetched(true);
+          setLoading(false);
+          toast({
+            title: "Datos cargados",
+            description: `Se encontraron ${rawResponse.facturas_sin_pagar.length} facturas sin pagar`,
+          });
+          return;
+        }
+      }
+      
+      // Otherwise, get data directly from the repository
+      console.log("WebhookDebug: Fetching data directly from repository");
+      const data = await zohoRepository.getRawResponse(dateRange.startDate, dateRange.endDate, true);
       
       if (data && data.facturas_sin_pagar && Array.isArray(data.facturas_sin_pagar)) {
         console.log("WebhookDebug: Received unpaid invoices:", data.facturas_sin_pagar.length);
         setUnpaidInvoices(data.facturas_sin_pagar);
+        setDataFetched(true);
         toast({
           title: "Datos cargados",
           description: `Se encontraron ${data.facturas_sin_pagar.length} facturas sin pagar`,
@@ -46,7 +77,6 @@ const WebhookDebug: React.FC<WebhookDebugProps> = ({
           variant: "destructive"
         });
       }
-
     } catch (error) {
       console.error("Error fetching debug data:", error);
       toast({
@@ -59,14 +89,6 @@ const WebhookDebug: React.FC<WebhookDebugProps> = ({
       setLoading(false);
     }
   };
-
-  // Use rawResponse if provided, but don't auto-fetch
-  React.useEffect(() => {
-    if (rawResponse && rawResponse.facturas_sin_pagar && Array.isArray(rawResponse.facturas_sin_pagar)) {
-      console.log("WebhookDebug: Using facturas_sin_pagar from rawResponse:", rawResponse.facturas_sin_pagar.length);
-      setUnpaidInvoices(rawResponse.facturas_sin_pagar);
-    }
-  }, [rawResponse]);
 
   return (
     <Card>
@@ -117,16 +139,28 @@ const WebhookDebug: React.FC<WebhookDebugProps> = ({
           </TabsList>
           
           <TabsContent value="summary" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <div className="rounded-lg bg-blue-50 border border-blue-100 p-3">
-                <div className="text-xs text-blue-700 font-medium">Facturas sin pagar</div>
-                <div className="text-lg font-bold text-blue-900">{unpaidInvoices.length}</div>
+            {!dataFetched && !loading ? (
+              <div className="text-center py-4 text-sm text-muted-foreground">
+                Haga clic en "Cargar Datos" para obtener información del webhook.
               </div>
-            </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="rounded-lg bg-blue-50 border border-blue-100 p-3">
+                  <div className="text-xs text-blue-700 font-medium">Facturas sin pagar</div>
+                  <div className="text-lg font-bold text-blue-900">{unpaidInvoices.length}</div>
+                </div>
+              </div>
+            )}
           </TabsContent>
           
           <TabsContent value="invoices">
-            <InvoicesTab invoices={unpaidInvoices} />
+            {!dataFetched && !loading ? (
+              <div className="text-center py-4 text-sm text-muted-foreground">
+                Haga clic en "Cargar Datos" para ver las facturas sin pagar.
+              </div>
+            ) : (
+              <InvoicesTab invoices={unpaidInvoices} />
+            )}
           </TabsContent>
         </Tabs>
       </CardContent>
