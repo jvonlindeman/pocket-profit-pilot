@@ -3,7 +3,7 @@ import React from 'react';
 import CacheClearTool from '@/components/Dashboard/CacheClearTool';
 import CacheMonitor from '@/components/Dashboard/CacheMonitor';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Database } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { endOfMonth, startOfMonth } from 'date-fns';
 import DebugSection from '@/components/Dashboard/DebugTools/DebugSection';
