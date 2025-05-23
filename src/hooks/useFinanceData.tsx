@@ -8,6 +8,8 @@ import { useIncomeProcessor } from '@/hooks/useIncomeProcessor';
 import { useMonthlyBalanceManager } from '@/hooks/useMonthlyBalanceManager';
 import { financialService } from '@/services/financialService';
 import { getCurrentMonthRange } from '@/utils/dateUtils';
+import { zohoRepository } from '@/repositories/zohoRepository';
+import { UnpaidInvoice } from '@/types/financial';
 
 export const useFinanceData = () => {
   // Import functionality from smaller hooks
@@ -40,6 +42,11 @@ export const useFinanceData = () => {
 
   // Use the financial persistence hook
   const { saveFinancialData } = useFinancialPersistence();
+
+  // Get unpaid invoices from zoho repository
+  const unpaidInvoices = useMemo<UnpaidInvoice[]>(() => {
+    return zohoRepository.getUnpaidInvoices();
+  }, [transactions]);
 
   // Financial data processing
   const financialData = useMemo(() => {
@@ -80,6 +87,7 @@ export const useFinanceData = () => {
     stripeFeePercentage,
     regularIncome,
     collaboratorExpenses,
+    unpaidInvoices,
     startingBalance,
     notes,
     updateStartingBalance,

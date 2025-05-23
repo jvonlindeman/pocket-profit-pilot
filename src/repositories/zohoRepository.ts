@@ -1,5 +1,5 @@
 
-import { Transaction } from "../types/financial";
+import { Transaction, UnpaidInvoice } from "../types/financial";
 import * as zohoApiClient from "../services/zoho/apiClient";
 import { formatDateYYYYMMDD } from "../utils/dateUtils";
 import { useApiCalls } from "@/contexts/ApiCallsContext";
@@ -11,6 +11,7 @@ import { useApiCalls } from "@/contexts/ApiCallsContext";
 export class ZohoRepository {
   private lastRawResponse: any = null;
   private apiCallsContext?: ReturnType<typeof useApiCalls>;
+  private unpaidInvoices: UnpaidInvoice[] = [];
   
   /**
    * Set the API calls context for tracking
@@ -64,6 +65,10 @@ export class ZohoRepository {
           console.log("Processing raw Zoho response data");
           const processed = zohoApiClient.processTransactionResponse(response);
           transactions = processed;
+          
+          // Also process unpaid invoices if available
+          this.unpaidInvoices = zohoApiClient.processUnpaidInvoicesResponse(response);
+          console.log(`Processed ${this.unpaidInvoices.length} unpaid invoices`);
         }
       }
       
@@ -73,6 +78,13 @@ export class ZohoRepository {
       console.error("Error fetching transactions from Zoho:", error);
       return []; 
     }
+  }
+  
+  /**
+   * Get unpaid invoices
+   */
+  getUnpaidInvoices(): UnpaidInvoice[] {
+    return this.unpaidInvoices;
   }
 
   /**

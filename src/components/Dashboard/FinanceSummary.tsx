@@ -1,6 +1,6 @@
 
 import React, { useEffect } from 'react';
-import { FinancialSummary, CategorySummary, Transaction } from '@/types/financial';
+import { FinancialSummary, CategorySummary, Transaction, UnpaidInvoice } from '@/types/financial';
 import InitialBalanceSection from './FinancialCards/InitialBalanceSection';
 import IncomeTabs from './FinancialCards/IncomeTabs';
 import { FinanceProvider } from '@/contexts/FinanceContext';
@@ -21,6 +21,7 @@ interface FinanceSummaryProps {
   regularIncome?: number;
   dateRange?: { startDate: Date | null; endDate: Date | null };
   transactions?: Transaction[];
+  unpaidInvoices?: UnpaidInvoice[];
 }
 
 const FinanceSummary: React.FC<FinanceSummaryProps> = ({
@@ -35,7 +36,8 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
   stripeFeePercentage = 0,
   regularIncome = 0,
   dateRange = { startDate: null, endDate: null },
-  transactions = []
+  transactions = [],
+  unpaidInvoices = []
 }) => {
   // Filter collaborator expenses using our utility function
   const collaboratorExpenses = expenseCategories.filter(
@@ -64,7 +66,12 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
     console.log("FinanceSummary - Zoho income transactions:", 
       transactions.filter(tx => tx.type === 'income' && tx.source === 'Zoho').length
     );
-  }, [expenseCategories, collaboratorExpenses, summary, refinedSummary, processedData, dateRange, transactions]);
+    console.log("FinanceSummary - Unpaid invoices count:", unpaidInvoices.length);
+  }, [
+    expenseCategories, collaboratorExpenses, 
+    summary, refinedSummary, processedData, 
+    dateRange, transactions, unpaidInvoices
+  ]);
 
   return (
     <FinanceProvider
@@ -80,6 +87,7 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
       stripeFeePercentage={stripeFeePercentage}
       regularIncome={regularIncome}
       collaboratorExpenses={collaboratorExpenses}
+      unpaidInvoices={unpaidInvoices}
     >
       <div className="space-y-8 animate-fade-in">
         {/* Initial Balance Section */}

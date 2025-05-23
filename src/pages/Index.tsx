@@ -34,6 +34,7 @@ const Index = () => {
     stripeFeePercentage,
     regularIncome,
     collaboratorExpenses,
+    unpaidInvoices,
     startingBalance,
     updateStartingBalance,
     setStartingBalance,
@@ -198,6 +199,7 @@ const Index = () => {
             regularIncome={regularIncome}
             monthlyBalance={monthlyBalance}
             totalZohoExpenses={totalZohoExpenses}
+            unpaidInvoices={unpaidInvoices}
           />
         )}
 

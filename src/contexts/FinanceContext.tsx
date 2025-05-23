@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, ReactNode } from 'react';
-import { FinancialSummary, Transaction, CategorySummary } from '@/types/financial';
+import { FinancialSummary, Transaction, CategorySummary, UnpaidInvoice } from '@/types/financial';
 import { useFinanceFormatter } from '@/hooks/useFinanceFormatter';
 
 // Define the context value type
@@ -29,6 +29,9 @@ interface FinanceContextType {
   
   // Collaborator expenses
   collaboratorExpenses: CategorySummary[];
+  
+  // Unpaid invoices
+  unpaidInvoices: UnpaidInvoice[];
   
   // Formatting functions from useFinanceFormatter
   formatCurrency: (amount: number) => string;
@@ -64,6 +67,7 @@ export const FinanceContext = createContext<FinanceContextType>({
   stripeFeePercentage: 0,
   regularIncome: 0,
   collaboratorExpenses: [],
+  unpaidInvoices: [],
   formatCurrency: () => '',
   formatPercentage: () => '',
   formatChange: () => '',
@@ -86,6 +90,7 @@ interface FinanceProviderProps {
   stripeFeePercentage: number;
   regularIncome: number;
   collaboratorExpenses: CategorySummary[];
+  unpaidInvoices?: UnpaidInvoice[];
 }
 
 // Provider component
@@ -103,6 +108,7 @@ export const FinanceProvider: React.FC<FinanceProviderProps> = ({
   stripeFeePercentage,
   regularIncome,
   collaboratorExpenses,
+  unpaidInvoices = [],
 }) => {
   // Use our formatter hook
   const {
@@ -126,6 +132,7 @@ export const FinanceProvider: React.FC<FinanceProviderProps> = ({
     stripeFeePercentage,
     regularIncome,
     collaboratorExpenses,
+    unpaidInvoices,
     formatCurrency,
     formatPercentage,
     formatChange,

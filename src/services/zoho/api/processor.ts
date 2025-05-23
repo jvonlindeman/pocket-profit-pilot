@@ -1,5 +1,5 @@
 
-import { Transaction } from "../../../types/financial";
+import { Transaction, UnpaidInvoice } from "../../../types/financial";
 import { parseToPanamaTime, formatDateYYYYMMDD_Panama } from "@/utils/timezoneUtils";
 import { ZohoTransactionResponse } from "./types";
 import { excludedVendors } from "./config";
@@ -160,6 +160,32 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
   });
   
   return result;
+};
+
+// Process unpaid invoices from Zoho response
+export const processUnpaidInvoices = (data: ZohoTransactionResponse): UnpaidInvoice[] => {
+  if (!data || !data.facturas_sin_pagar) {
+    return [];
+  }
+  
+  try {
+    const invoices: UnpaidInvoice[] = data.facturas_sin_pagar.map(invoice => ({
+      customer_name: invoice.customer_name || 'Cliente sin nombre',
+      company_name: invoice.company_name || '',
+      balance: typeof invoice.balance === 'number' ? invoice.balance : parseFloat(invoice.balance)
+    }));
+    
+    console.log(`Processed ${invoices.length} unpaid invoices from Zoho data`);
+    return invoices;
+  } catch (error) {
+    console.error("Error processing unpaid invoices:", error);
+    return [];
+  }
+};
+
+// Calculate total amount of unpaid invoices
+export const calculateTotalUnpaidAmount = (invoices: UnpaidInvoice[]): number => {
+  return invoices.reduce((sum, invoice) => sum + invoice.balance, 0);
 };
 
 // Function to filter excluded vendors from any transaction array

@@ -1,5 +1,5 @@
-
-import { Transaction } from "../../types/financial";
+import { Transaction, UnpaidInvoice } from "@/types/financial";
+import { ZohoTransactionResponse } from "./api/types";
 import { handleApiError } from "./utils";
 import { getMockTransactions } from "./mockData";
 import { supabase } from "@/integrations/supabase/client";
@@ -107,17 +107,29 @@ export const fetchZohoData = async (
 };
 
 /**
- * Process the transaction response from the API
+ * Process the API response into a structured format
  */
-export const processTransactionResponse = (data: any): Transaction[] => {
-  // We need to process the raw data using the processor function
-  if (!data) return [];
+export const processTransactionResponse = (response: any): Transaction[] => {
+  if (!response) return [];
   
-  // Log what we're processing
-  console.log("Processing transaction response with keys:", Object.keys(data));
+  // Structure the response into our ZohoTransactionResponse format
+  const structuredResponse: ZohoTransactionResponse = response;
   
-  // Call the processor function directly to ensure consistent processing
-  return processRawTransactions(data);
+  // Process the structured data to extract transactions
+  return processRawTransactions(structuredResponse);
+};
+
+/**
+ * Process unpaid invoices from the API response
+ */
+export const processUnpaidInvoicesResponse = (response: any): UnpaidInvoice[] => {
+  if (!response) return [];
+  
+  // Structure the response into our ZohoTransactionResponse format
+  const structuredResponse: ZohoTransactionResponse = response;
+  
+  // Process the structured data to extract unpaid invoices
+  return processUnpaidInvoices(structuredResponse);
 };
 
 // Legacy function name for backward compatibility

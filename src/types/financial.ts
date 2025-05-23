@@ -1,4 +1,3 @@
-
 export interface Transaction {
   id: string;
   external_id?: string; // Added external_id as optional field
@@ -11,6 +10,12 @@ export interface Transaction {
   fees?: number; // Added optional fees field
   gross?: number; // Added optional gross amount field (before fees)
   metadata?: any; // Added metadata field for additional properties
+}
+
+export interface UnpaidInvoice {
+  customer_name: string;
+  company_name?: string;
+  balance: number;
 }
 
 export interface FinancialSummary {
@@ -48,6 +53,7 @@ export interface FinancialData {
   transactions: Transaction[];
   incomeBySource: CategorySummary[];
   expenseByCategory: CategorySummary[];
+  unpaidInvoices?: UnpaidInvoice[]; // Added unpaid invoices
   dailyData: {
     income: ChartData;
     expense: ChartData;
