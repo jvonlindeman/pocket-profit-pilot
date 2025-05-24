@@ -30,6 +30,11 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
   });
 
   const fetchData = useCallback(async (forceRefresh = false) => {
+    console.log("🚀 useOptimizedFinancialData: Starting fetch", {
+      dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
+      forceRefresh
+    });
+    
     setData(prev => ({ ...prev, loading: true, error: null }));
 
     try {
@@ -43,11 +48,11 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
 
       // Check Stripe cache first
       if (!forceRefresh) {
-        console.log("useOptimizedFinancialData: Checking Stripe cache...");
+        console.log("🔍 useOptimizedFinancialData: Checking Stripe cache...");
         const stripeCacheCheck = await CacheService.checkCache('Stripe', startDate, endDate);
         
         if (stripeCacheCheck.cached && stripeCacheCheck.data && stripeCacheCheck.data.length > 0) {
-          console.log(`useOptimizedFinancialData: Using cached Stripe data (${stripeCacheCheck.data.length} transactions)`);
+          console.log(`✅ useOptimizedFinancialData: CACHE HIT - Using cached Stripe data (${stripeCacheCheck.data.length} transactions)`);
           
           // Calculate summary from cached data
           const transactions = stripeCacheCheck.data;
@@ -70,41 +75,61 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
           allTransactions = [...allTransactions, ...transactions];
           usingCache = true;
           cacheStatus.stripe = { hit: true, partial: stripeCacheCheck.partial };
+        } else {
+          console.log("❌ useOptimizedFinancialData: CACHE MISS - Stripe cache not available or empty");
         }
       }
 
       // If no Stripe cache or force refresh, get from API
       if (!stripeData || forceRefresh) {
-        console.log("useOptimizedFinancialData: Fetching Stripe data from API...");
+        console.log("🌐 useOptimizedFinancialData: Fetching Stripe data from API...");
         stripeData = await stripeRepository.getTransactions(startDate, endDate, forceRefresh);
         allTransactions = [...allTransactions, ...stripeData.transactions];
         cacheStatus.stripe = { hit: false, partial: false };
+        console.log(`📡 useOptimizedFinancialData: API CALL - Fetched ${stripeData.transactions.length} Stripe transactions`);
       }
 
       // Check Zoho cache
       if (!forceRefresh) {
-        console.log("useOptimizedFinancialData: Checking Zoho cache...");
+        console.log("🔍 useOptimizedFinancialData: Checking Zoho cache...");
         const zohoCacheCheck = await CacheService.checkCache('Zoho', startDate, endDate);
         
         if (zohoCacheCheck.cached && zohoCacheCheck.data && zohoCacheCheck.data.length > 0) {
-          console.log(`useOptimizedFinancialData: Using cached Zoho data (${zohoCacheCheck.data.length} transactions)`);
+          console.log(`✅ useOptimizedFinancialData: CACHE HIT - Using cached Zoho data (${zohoCacheCheck.data.length} transactions)`);
           allTransactions = [...allTransactions, ...zohoCacheCheck.data];
           usingCache = true;
           cacheStatus.zoho = { hit: true, partial: zohoCacheCheck.partial };
         } else {
+          console.log("❌ useOptimizedFinancialData: CACHE MISS - Zoho cache not available or empty");
           // Get Zoho data from API if not cached
-          console.log("useOptimizedFinancialData: Fetching Zoho data from API...");
+          console.log("🌐 useOptimizedFinancialData: Fetching Zoho data from API...");
           const zohoTransactions = await zohoRepository.getTransactions(startDate, endDate);
           allTransactions = [...allTransactions, ...zohoTransactions];
           cacheStatus.zoho = { hit: false, partial: false };
+          console.log(`📡 useOptimizedFinancialData: API CALL - Fetched ${zohoTransactions.length} Zoho transactions`);
         }
       } else {
         // Force refresh Zoho
-        console.log("useOptimizedFinancialData: Force refreshing Zoho data...");
+        console.log("🌐 useOptimizedFinancialData: Force refreshing Zoho data...");
         const zohoTransactions = await zohoRepository.getTransactions(startDate, endDate);
         allTransactions = [...allTransactions, ...zohoTransactions];
         cacheStatus.zoho = { hit: false, partial: false };
+        console.log(`📡 useOptimizedFinancialData: FORCE REFRESH - Fetched ${zohoTransactions.length} Zoho transactions`);
       }
+
+      // Final summary
+      const totalCacheHits = (cacheStatus.zoho.hit ? 1 : 0) + (cacheStatus.stripe.hit ? 1 : 0);
+      const totalSources = 2;
+      const cacheEfficiency = (totalCacheHits / totalSources) * 100;
+      
+      console.log("📊 useOptimizedFinancialData: FINAL SUMMARY", {
+        totalTransactions: allTransactions.length,
+        zohoSource: cacheStatus.zoho.hit ? 'CACHE' : 'API',
+        stripeSource: cacheStatus.stripe.hit ? 'CACHE' : 'API',
+        cacheEfficiency: `${cacheEfficiency.toFixed(1)}%`,
+        usingCachedData: usingCache,
+        apiCallsMade: totalSources - totalCacheHits
+      });
 
       setData({
         transactions: allTransactions,
@@ -116,7 +141,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
       });
 
     } catch (error) {
-      console.error("useOptimizedFinancialData: Error fetching data:", error);
+      console.error("❌ useOptimizedFinancialData: Error fetching data:", error);
       setData(prev => ({
         ...prev,
         loading: false,
@@ -131,6 +156,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
   }, [fetchData]);
 
   const refetch = useCallback((forceRefresh = false) => {
+    console.log("🔄 useOptimizedFinancialData: Manual refetch requested", { forceRefresh });
     return fetchData(forceRefresh);
   }, [fetchData]);
 
