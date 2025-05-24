@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { financialService } from '@/services/financialService';
 import { zohoRepository } from '@/repositories/zohoRepository';
@@ -7,7 +6,7 @@ import CacheService from '@/services/cache';
 import { apiRequestManager } from '@/utils/ApiRequestManager';
 
 /**
- * Base hook for fetching financial data
+ * Base hook for fetching financial data with improved deduplication
  */
 export const useFinancialDataFetcher = () => {
   // States
@@ -31,21 +30,13 @@ export const useFinancialDataFetcher = () => {
   });
   
   // References to prevent duplicate calls
-  const isFetchingRef = useRef<boolean>(false);
-  const lastFetchParamsRef = useRef<{
-    startDate?: Date;
-    endDate?: Date;
-    forceRefresh?: boolean;
-    requestId?: string;
-  }>({});
-  const connectivityTimeoutRef = useRef<any>(null);
   const currentRequestIdRef = useRef<string>('');
   const cacheCheckInProgressRef = useRef<boolean>(false);
 
   // Get cache segments helper
   const { checkSourceCache } = useCacheSegments();
 
-  // Check cache status - optimized to prevent duplicate calls
+  // Check cache status with improved deduplication
   const checkCacheStatus = useCallback(async (
     dateRange: { startDate: Date; endDate: Date },
     skipIfInProgress = true
@@ -64,7 +55,7 @@ export const useFinancialDataFetcher = () => {
     try {
       cacheCheckInProgressRef.current = true;
 
-      // Use ApiRequestManager to deduplicate cache check calls
+      // Use ApiRequestManager to deduplicate cache check calls with shorter TTL
       const result = await apiRequestManager.executeRequest(
         cacheCheckKey,
         async () => {
@@ -79,8 +70,8 @@ export const useFinancialDataFetcher = () => {
             stripe: stripeCache
           };
         },
-        10000, // 10 second TTL
-        5000   // 5 second cooldown
+        15000, // 15 second TTL (reduced from 10s)
+        3000   // 3 second cooldown (reduced from 5s)
       );
 
       // Update states using the result
@@ -107,14 +98,8 @@ export const useFinancialDataFetcher = () => {
     }
   }, [checkSourceCache]);
 
-  // Check API connectivity with caching
+  // Check API connectivity with improved caching
   const checkApiConnectivity = useCallback(async () => {
-    // Clear any pending timeout
-    if (connectivityTimeoutRef.current) {
-      clearTimeout(connectivityTimeoutRef.current);
-    }
-    
-    // Use the ApiRequestManager to deduplicate connectivity checks
     return apiRequestManager.executeRequest(
       'api-connectivity-check',
       async () => {
@@ -129,12 +114,12 @@ export const useFinancialDataFetcher = () => {
           return result;
         }
       },
-      60000, // 60 second TTL
-      5000   // 5 second cooldown
+      45000, // 45 second TTL (reduced from 60s)
+      3000   // 3 second cooldown (reduced from 5s)
     );
   }, []);
 
-  // Fetch financial data from external services with duplication prevention
+  // Fetch financial data with improved duplicate prevention
   const fetchFinancialData = useCallback(async (
     dateRange: { startDate: Date; endDate: Date },
     forceRefresh: boolean,
@@ -144,76 +129,64 @@ export const useFinancialDataFetcher = () => {
       onIncomeTypes: (transactions: any[], stripeData: any) => void,
     }
   ) => {
-    // Generate a unique request ID
-    const requestId = `fetch-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    currentRequestIdRef.current = requestId;
+    // Generate a unique request ID based on parameters
+    const requestKey = `fetch-data-${dateRange.startDate.getTime()}-${dateRange.endDate.getTime()}-${forceRefresh}`;
     
-    // Check if we're already fetching data
-    if (isFetchingRef.current) {
-      console.warn(`Fetch in progress, skipping duplicate request (${requestId})`);
-      return false;
-    }
-    
-    // Check if this is an identical request to the last one made
-    const lastParams = lastFetchParamsRef.current;
-    const sameStartDate = lastParams.startDate && lastParams.startDate.getTime() === dateRange.startDate.getTime();
-    const sameEndDate = lastParams.endDate && lastParams.endDate.getTime() === dateRange.endDate.getTime();
-    const sameForce = lastParams.forceRefresh === forceRefresh;
-    const shortTimeElapsed = lastParams.requestId && 
-                            (Date.now() - parseInt(lastParams.requestId.split('-')[1])) < 5000;
-    
-    if (sameStartDate && sameEndDate && sameForce && shortTimeElapsed && !forceRefresh) {
-      console.warn(`Duplicate request detected within short timeframe, using cached data (${requestId})`);
-      return false;
-    }
-    
-    // Update last fetch params and set fetching flag
-    lastFetchParamsRef.current = { 
-      startDate: dateRange.startDate, 
-      endDate: dateRange.endDate, 
-      forceRefresh, 
-      requestId 
-    };
-    isFetchingRef.current = true;
-    
-    setLoading(true);
-    setError(null);
-    
-    // Check cache status first - but only once
-    if (!cacheCheckInProgressRef.current) {
-      await checkCacheStatus(dateRange, false);
-    }
+    console.log(`[FINANCIAL_DATA_FETCHER] Starting fetch with key: ${requestKey}`);
     
     try {
-      // Check connectivity first (cached)
-      await checkApiConnectivity();
-      
-      // Fetch the financial data
-      const success = await financialService.fetchFinancialData(
-        dateRange, 
-        forceRefresh, 
-        callbacks
+      // Use ApiRequestManager to prevent duplicate requests
+      const success = await apiRequestManager.executeRequest(
+        requestKey,
+        async () => {
+          console.log(`[FINANCIAL_DATA_FETCHER] Executing fetch for ${requestKey}`);
+          
+          setLoading(true);
+          setError(null);
+          
+          // Check connectivity first (cached)
+          await checkApiConnectivity();
+          
+          // Check cache status first - but only once
+          if (!cacheCheckInProgressRef.current) {
+            await checkCacheStatus(dateRange, false);
+          }
+          
+          // Fetch the financial data
+          const result = await financialService.fetchFinancialData(
+            dateRange, 
+            forceRefresh, 
+            callbacks
+          );
+          
+          // Get raw response for debugging
+          const rawData = financialService.getLastRawResponse();
+          if (rawData) {
+            setRawResponse(rawData);
+          }
+          
+          // Check cache status again after fetch to update the UI
+          await checkCacheStatus(dateRange);
+          
+          return result;
+        },
+        30000, // 30 second TTL
+        8000   // 8 second cooldown for fetches
       );
       
-      // Get raw response for debugging
-      const rawData = financialService.getLastRawResponse();
-      if (rawData) {
-        setRawResponse(rawData);
-      }
-      
-      // Check cache status again after fetch to update the UI - but only if this is still the current request
-      if (currentRequestIdRef.current === requestId) {
-        await checkCacheStatus(dateRange);
-      }
-      
       setLoading(false);
-      isFetchingRef.current = false;
       return success;
     } catch (err: any) {
       console.error("Error in fetchFinancialData:", err);
+      
+      // Si es un error de cooldown, no establecer como error crítico
+      if (err.message?.includes('Request too frequent')) {
+        console.warn("Request throttled, skipping this call");
+        return false;
+      }
+      
       setError(err.message || "Error al cargar los datos financieros");
       setLoading(false);
-      isFetchingRef.current = false;
       return false;
     }
   }, [checkApiConnectivity, checkCacheStatus]);

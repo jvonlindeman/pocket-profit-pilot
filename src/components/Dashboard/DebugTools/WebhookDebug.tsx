@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bug } from 'lucide-react';
+import { Bug, AlertTriangle } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
 import { useDebugComponent } from '@/hooks/useDebugComponent';
 import WebhookDebugHeader from '@/components/WebhookDebug/WebhookDebugHeader';
@@ -42,6 +42,15 @@ export default function WebhookDebug({ dateRange, refreshDataFunction, rawRespon
         <CardDescription>
           Ver la respuesta cruda del webhook para detectar problemas
         </CardDescription>
+        
+        {/* Warning sobre llamadas múltiples */}
+        <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <div className="text-sm text-amber-800">
+            <strong>Nota:</strong> Se han implementado mejoras para prevenir llamadas duplicadas al webhook. 
+            Las peticiones están ahora protegidas con deduplicación automática.
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <WebhookDebugHeader 

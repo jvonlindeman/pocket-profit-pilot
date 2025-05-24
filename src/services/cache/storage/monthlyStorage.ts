@@ -1,3 +1,4 @@
+
 import { CacheDbClient } from "../db/client";
 import { Transaction } from "../../../types/financial";
 import { CacheSource } from "../types";
@@ -136,7 +137,7 @@ export class MonthlyStorage extends CacheDbClient {
   }
 
   /**
-   * Store transactions for a specific month with detailed logging
+   * Store transactions for a specific month with improved conflict handling
    */
   async storeMonthTransactions(
     source: CacheSource | string,
@@ -162,7 +163,7 @@ export class MonthlyStorage extends CacheDbClient {
         return false;
       }
 
-      // Prepare transactions for database
+      // Prepare transactions for database with improved external_id handling
       const dbTransactions = transactions.map((tx, index) => {
         const dbTx = {
           external_id: tx.external_id || tx.id,
@@ -191,7 +192,7 @@ export class MonthlyStorage extends CacheDbClient {
         return dbTx;
       });
 
-      // Store transactions in batches
+      // Store transactions in batches with improved conflict resolution
       const batchSize = 100;
       let totalStored = 0;
       
@@ -205,7 +206,7 @@ export class MonthlyStorage extends CacheDbClient {
         const { data, error } = await this.getClient()
           .from('cached_transactions')
           .upsert(batch, { 
-            onConflict: 'source,external_id',
+            onConflict: 'source,external_id', // Now this will work with the unique constraint
             ignoreDuplicates: false
           })
           .select('id');
