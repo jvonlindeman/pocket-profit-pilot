@@ -14,8 +14,8 @@ export function useApiConnectivity(options: { enabled?: boolean } = {}) {
     },
     // Connectivity checks should be fairly fresh
     staleTime: 30 * 1000, // 30 seconds
-    // Cache it for a bit longer
-    cacheTime: 2 * 60 * 1000, // 2 minutes
+    // Cache it for a bit longer (formerly cacheTime)
+    gcTime: 2 * 60 * 1000, // 2 minutes
     enabled: options.enabled !== false,
   });
 }

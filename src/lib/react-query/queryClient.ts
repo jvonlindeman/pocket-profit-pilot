@@ -1,4 +1,3 @@
-
 import { QueryClient } from "@tanstack/react-query";
 
 // Create a client with default options
@@ -11,8 +10,8 @@ export const queryClient = new QueryClient({
       retry: 3,
       // Don't retry if the error is a 404 or 403
       retryOnMount: true,
-      // Show previous data while new data is being fetched
-      keepPreviousData: true,
+      // Show previous data while new data is being fetched (formerly keepPreviousData)
+      placeholderData: 'keepPrevious',
     },
   },
 });

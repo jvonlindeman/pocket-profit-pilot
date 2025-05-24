@@ -16,7 +16,7 @@ export function QueryDevTools() {
 
   return (
     <Suspense fallback={null}>
-      <ReactQueryDevtools initialIsOpen={false} position="bottom-right" />
+      <ReactQueryDevtools buttonPosition="bottom-right" />
     </Suspense>
   );
 }

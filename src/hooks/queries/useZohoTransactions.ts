@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Transaction } from "@/types/financial";
 import { zohoRepository } from "@/repositories/zohoRepository";
 import { formatDateYYYYMMDD } from "@/utils/dateUtils";
+import { queryClient } from "@/lib/react-query/queryClient";
 
 export const zohoTransactionsKeys = {
   all: ["zoho-transactions"] as const,
@@ -27,8 +28,10 @@ export function useZohoTransactions(
       return await zohoRepository.getTransactions(startDate, endDate);
     },
     enabled: options.enabled !== false,
-    onSuccess: options.onSuccess,
-    onError: options.onError,
+    meta: {
+      onSuccess: options.onSuccess,
+      onError: options.onError,
+    }
   });
 }
 

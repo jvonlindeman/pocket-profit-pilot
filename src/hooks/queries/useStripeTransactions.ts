@@ -2,6 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { formatDateYYYYMMDD } from "@/utils/dateUtils";
 import { stripeRepository } from "@/repositories/stripeRepository";
+import { queryClient } from "@/lib/react-query/queryClient";
 
 export const stripeTransactionsKeys = {
   all: ["stripe-transactions"] as const,
@@ -26,8 +27,10 @@ export function useStripeTransactions(
       return await stripeRepository.getTransactions(startDate, endDate);
     },
     enabled: options.enabled !== false,
-    onSuccess: options.onSuccess,
-    onError: options.onError,
+    meta: {
+      onSuccess: options.onSuccess,
+      onError: options.onError,
+    }
   });
 }
 
