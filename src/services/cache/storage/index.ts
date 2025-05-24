@@ -1,4 +1,3 @@
-
 import { CacheSource, CacheClearOptions, DetailedCacheStats } from "../types";
 import { Transaction } from "../../../types/financial";
 import { monthlyStorage } from "./monthlyStorage";
@@ -21,7 +20,7 @@ export class CacheStorage {
   ): Promise<boolean> {
     try {
       const result = await monthlyStorage.isMonthCached(source, year, month);
-      return result;
+      return result.isCached;
     } catch (err) {
       console.error("Error checking if month is cached:", err);
       return false;

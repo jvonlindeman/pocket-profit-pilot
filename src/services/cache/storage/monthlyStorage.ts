@@ -233,7 +233,7 @@ export class MonthlyStorage extends CacheDbClient {
       
       let query = this.getClient()
         .from('cached_transactions')
-        .select('id, date')
+        .select('id, date, external_id, amount, type, source, description, category, fees, gross, metadata')
         .or('year.is.null,month.is.null');
         
       if (source) {
@@ -258,22 +258,40 @@ export class MonthlyStorage extends CacheDbClient {
         const date = new Date(tx.date);
         return {
           id: tx.id,
+          external_id: tx.external_id,
+          date: tx.date,
+          amount: tx.amount,
+          type: tx.type,
+          source: tx.source,
+          description: tx.description,
+          category: tx.category,
+          fees: tx.fees,
+          gross: tx.gross,
+          metadata: tx.metadata || {},
           year: date.getFullYear(),
           month: date.getMonth() + 1
         };
       });
       
-      const { error: updateError } = await this.getClient()
-        .from('cached_transactions')
-        .upsert(updates, { onConflict: 'id' });
+      const batchSize = 100;
+      let fixedCount = 0;
+      
+      for (let i = 0; i < updates.length; i += batchSize) {
+        const batch = updates.slice(i, i + batchSize);
         
-      if (updateError) {
-        this.logError("Error updating legacy transactions", updateError);
-        return 0;
+        const { error: updateError } = await this.getClient()
+          .from('cached_transactions')
+          .upsert(batch);
+          
+        if (updateError) {
+          this.logError(`Error updating batch ${Math.floor(i/batchSize) + 1}`, updateError);
+        } else {
+          fixedCount += batch.length;
+        }
       }
       
-      console.log(`[MONTHLY_STORAGE_DEBUG] Successfully fixed ${legacyTransactions.length} legacy transactions`);
-      return legacyTransactions.length;
+      console.log(`[MONTHLY_STORAGE_DEBUG] Successfully fixed ${fixedCount} legacy transactions`);
+      return fixedCount;
     } catch (err) {
       this.logError("Exception fixing legacy transactions", err);
       return 0;
