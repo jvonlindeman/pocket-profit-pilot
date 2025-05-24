@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { financialService } from '@/services/financialService';
 import { zohoRepository } from '@/repositories/zohoRepository';
@@ -32,6 +33,7 @@ export const useFinancialDataFetcher = () => {
   // References to prevent duplicate calls
   const currentRequestIdRef = useRef<string>('');
   const cacheCheckInProgressRef = useRef<boolean>(false);
+  const connectivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Get cache segments helper
   const { checkSourceCache } = useCacheSegments();

@@ -50,6 +50,16 @@ class ApiRequestManager {
   }
   
   /**
+   * Limpia una entrada específica de caché
+   */
+  clearCacheEntry(key: string): void {
+    this.activeRequests.delete(key);
+    this.requestCooldowns.delete(key);
+    this.lastRequestTimes.delete(key);
+    console.log(`[API_REQUEST_MANAGER] Cache entry cleared for ${key}`);
+  }
+  
+  /**
    * Limpia una petición específica
    */
   clearRequest(key: string): void {
