@@ -4,6 +4,7 @@ import { cacheStorage } from "../storage";
 import { cacheMetrics } from "../metrics";
 import { CacheResponse, CacheSource } from "../types";
 import { supabase } from "../../../integrations/supabase/client";
+import { monthlyStorage } from "../storage/monthlyStorage";
 
 /**
  * Format a date for API use
@@ -82,7 +83,7 @@ export const checkCache = async (
       console.log(`[CACHE_CHECK_DEBUG] Single month request detected: ${startInfo.year}/${startInfo.month}`);
       
       // This is a request for exactly one month, which is our optimized case
-      const cacheResult = await cacheStorage.isMonthCached(
+      const cacheResult = await monthlyStorage.isMonthCached(
         source, 
         startInfo.year, 
         startInfo.month
@@ -94,7 +95,7 @@ export const checkCache = async (
         console.log(`[CACHE_CHECK_DEBUG] Cache HIT - Found ${cacheResult.transactionCount} transactions`);
         
         // Get transactions for this month
-        const transactions = await cacheStorage.getMonthTransactions(
+        const transactions = await monthlyStorage.getMonthTransactions(
           source,
           startInfo.year,
           startInfo.month
