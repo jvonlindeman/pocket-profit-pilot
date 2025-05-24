@@ -41,13 +41,20 @@ class CacheIntelligenceService {
       
       // Check cache status
       const cacheResponse = await CacheService.checkCache(source, startDate, endDate);
+      console.log(`CacheIntelligence: Cache response received:`, {
+        cached: cacheResponse.cached,
+        partial: cacheResponse.partial,
+        missingRanges: cacheResponse.missingRanges,
+        missingRangesType: typeof cacheResponse.missingRanges,
+        missingRangesIsArray: Array.isArray(cacheResponse.missingRanges)
+      });
       
       // Determine cache age and staleness
       const maxAge = this.freshnessConfig[dataType];
       const cacheAge = this.estimateCacheAge(cacheResponse);
       const isStale = cacheAge > maxAge;
       
-      // Analyze coverage
+      // Analyze coverage with safe missing ranges extraction
       const analysis: CacheAnalysis = {
         fullyCached: cacheResponse.cached && !cacheResponse.partial,
         partiallyCached: cacheResponse.cached && cacheResponse.partial,
@@ -62,12 +69,13 @@ class CacheIntelligenceService {
         dataType,
         fullyCached: analysis.fullyCached,
         isStale: analysis.isStale,
-        action: analysis.recommendedAction
+        action: analysis.recommendedAction,
+        missingRangesCount: analysis.missingRanges.length
       });
       
       return analysis;
     } catch (error) {
-      console.error('Error analyzing cache status:', error);
+      console.error('CacheIntelligence: Error analyzing cache status:', error);
       return {
         fullyCached: false,
         partiallyCached: false,
@@ -116,12 +124,41 @@ class CacheIntelligenceService {
 
   /**
    * Extract missing date ranges that need to be fetched
+   * Safely handles cases where missingRanges is not an array
    */
-  private extractMissingRanges(missingRanges: any[]): Array<{ startDate: Date; endDate: Date }> {
-    return missingRanges.map(range => ({
-      startDate: new Date(range.startDate),
-      endDate: new Date(range.endDate)
-    }));
+  private extractMissingRanges(missingRanges: any): Array<{ startDate: Date; endDate: Date }> {
+    try {
+      // Defensive validation - ensure missingRanges is an array
+      if (!missingRanges) {
+        console.log('CacheIntelligence: missingRanges is null/undefined, returning empty array');
+        return [];
+      }
+      
+      if (!Array.isArray(missingRanges)) {
+        console.warn('CacheIntelligence: missingRanges is not an array:', typeof missingRanges, missingRanges);
+        return [];
+      }
+      
+      return missingRanges.map(range => {
+        if (!range || typeof range !== 'object') {
+          console.warn('CacheIntelligence: Invalid range object:', range);
+          return null;
+        }
+        
+        try {
+          return {
+            startDate: new Date(range.startDate),
+            endDate: new Date(range.endDate)
+          };
+        } catch (dateError) {
+          console.warn('CacheIntelligence: Error parsing date range:', range, dateError);
+          return null;
+        }
+      }).filter(range => range !== null);
+    } catch (error) {
+      console.error('CacheIntelligence: Error extracting missing ranges:', error);
+      return [];
+    }
   }
 
   /**

@@ -1,4 +1,3 @@
-
 import { startOfMonth, endOfMonth, differenceInDays, addDays } from 'date-fns';
 import { CacheSource } from '@/services/cache/types';
 import CacheService from '@/services/cache';
@@ -42,6 +41,12 @@ class QueryOptimizerService {
     try {
       // Check cache coverage for the entire range
       const cacheResponse = await CacheService.checkCache(source, startDate, endDate);
+      console.log(`QueryOptimizer: Cache response:`, {
+        cached: cacheResponse.cached,
+        partial: cacheResponse.partial,
+        missingRanges: cacheResponse.missingRanges,
+        missingRangesType: typeof cacheResponse.missingRanges
+      });
       
       // Determine data freshness requirements
       const maxAgeHours = this.freshnessConfig[dataType];
@@ -65,7 +70,7 @@ class QueryOptimizerService {
 
       return plan;
     } catch (error) {
-      console.error('Error creating query plan:', error);
+      console.error('QueryOptimizer: Error creating query plan:', error);
       return this.createFallbackPlan(startDate, endDate);
     }
   }
@@ -135,13 +140,41 @@ class QueryOptimizerService {
   }
 
   /**
-   * Extract missing date ranges
+   * Extract missing date ranges with safe validation
    */
-  private extractMissingRanges(missingRanges: any[]): Array<{ startDate: Date; endDate: Date }> {
-    return missingRanges.map(range => ({
-      startDate: new Date(range.startDate),
-      endDate: new Date(range.endDate)
-    }));
+  private extractMissingRanges(missingRanges: any): Array<{ startDate: Date; endDate: Date }> {
+    try {
+      // Defensive validation - ensure missingRanges is an array
+      if (!missingRanges) {
+        console.log('QueryOptimizer: missingRanges is null/undefined, returning empty array');
+        return [];
+      }
+      
+      if (!Array.isArray(missingRanges)) {
+        console.warn('QueryOptimizer: missingRanges is not an array:', typeof missingRanges, missingRanges);
+        return [];
+      }
+      
+      return missingRanges.map(range => {
+        if (!range || typeof range !== 'object') {
+          console.warn('QueryOptimizer: Invalid range object:', range);
+          return null;
+        }
+        
+        try {
+          return {
+            startDate: new Date(range.startDate),
+            endDate: new Date(range.endDate)
+          };
+        } catch (dateError) {
+          console.warn('QueryOptimizer: Error parsing date range:', range, dateError);
+          return null;
+        }
+      }).filter(range => range !== null);
+    } catch (error) {
+      console.error('QueryOptimizer: Error extracting missing ranges:', error);
+      return [];
+    }
   }
 
   /**
