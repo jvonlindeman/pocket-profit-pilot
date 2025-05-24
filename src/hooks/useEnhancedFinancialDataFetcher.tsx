@@ -6,9 +6,6 @@ import { useFinancialDataFetcher } from '@/hooks/useFinancialDataFetcher';
 import { useSearchParams } from 'react-router-dom';
 import CacheService from '@/services/cache';
 import StripeService from '@/services/stripeService';
-import { useApiCalls } from '@/contexts/ApiCallsContext';
-import { stripeRepository } from '@/repositories/stripeRepository';
-import { zohoRepository } from '@/repositories/zohoRepository';
 
 /**
  * Enhanced hook to handle fetching of financial data with transaction management
@@ -19,7 +16,6 @@ export const useEnhancedFinancialDataFetcher = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [dataInitialized, setDataInitialized] = useState<boolean>(false);
   const [searchParams, setSearchParams] = useSearchParams();
-  const apiCalls = useApiCalls();
   
   // Throttling mechanism
   const lastFetchTimeRef = useRef<number>(0);
@@ -36,13 +32,6 @@ export const useEnhancedFinancialDataFetcher = () => {
     apiConnectivity,
     checkApiConnectivity
   } = useFinancialDataFetcher();
-
-  // Initialize API call tracking
-  useEffect(() => {
-    // Set API calls context to repositories
-    stripeRepository.setApiCallsContext(apiCalls);
-    zohoRepository.setApiCallsContext(apiCalls);
-  }, [apiCalls]);
 
   // Remove refresh parameter from URL if present
   useEffect(() => {
@@ -110,11 +99,6 @@ export const useEnhancedFinancialDataFetcher = () => {
       onIncomeTypes: (transactions: any[], stripeData: any) => void
     }
   ) => {
-    // Reset API call counters when starting a new fetch
-    if (forceRefresh) {
-      apiCalls.resetApiCalls();
-    }
-    
     // Check if we should throttle this request
     const now = Date.now();
     const timeSinceLastFetch = now - lastFetchTimeRef.current;
@@ -139,9 +123,7 @@ export const useEnhancedFinancialDataFetcher = () => {
     
     // Execute the fetch immediately
     return executeFetchData(dateRange, forceRefresh, callbacks);
-  }, [
-    apiCalls,
-  ]);
+  }, []);
   
   // Actual fetch execution logic (separated to avoid code duplication)
   const executeFetchData = useCallback(async (
