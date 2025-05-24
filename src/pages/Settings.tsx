@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import CacheClearTool from '@/components/Dashboard/CacheClearTool';
 import CacheMonitor from '@/components/Dashboard/CacheMonitor';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,8 @@ import { ArrowLeft, Database } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { endOfMonth, startOfMonth } from 'date-fns';
 import DebugSection from '@/components/Dashboard/DebugTools/DebugSection';
-import { toDayPickerDateRange } from '@/utils/dateRangeAdapter'; // Keep this import
+import { dataFetcherService } from '@/services/dataFetcherService';
+import { toast } from '@/hooks/use-toast';
 
 const Settings = () => {
   // Create a date range for the current month
@@ -17,13 +18,67 @@ const Settings = () => {
     endDate: endOfMonth(today),
   };
   
-  // Convert to DayPicker DateRange format for components that expect it
-  const dayPickerDateRange = toDayPickerDateRange(financialDateRange);
+  const [rawResponse, setRawResponse] = useState<any>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Fetch data on component mount
+  useEffect(() => {
+    checkApiStatus();
+  }, []);
 
-  // Simple refresh function to pass to debug components
-  const refreshData = (force: boolean) => {
-    console.log('Settings page refresh triggered with force:', force);
-    // This is just a stub - the actual refresh happens inside the DebugSection component
+  // Check API status for debugging purposes
+  const checkApiStatus = async () => {
+    try {
+      const connectivity = await dataFetcherService.checkApiConnectivity();
+      console.log('API Connectivity Status:', connectivity);
+    } catch (error) {
+      console.error('Error checking API status:', error);
+    }
+  };
+
+  // Settings page refresh function that uses the centralized data fetcher
+  const refreshData = async (force: boolean = false) => {
+    if (isRefreshing) return;
+    
+    try {
+      setIsRefreshing(true);
+      
+      toast({
+        title: "Actualizando datos",
+        description: "Obteniendo datos desde los servicios externos...",
+      });
+      
+      // Use the centralized data fetcher service
+      const success = await dataFetcherService.fetchAllFinancialData(
+        financialDateRange,
+        force,
+        {
+          // No callbacks necessary for settings page
+        }
+      );
+      
+      // Get the raw response for debugging
+      const response = dataFetcherService.getLastRawResponse();
+      setRawResponse(response);
+      
+      toast({
+        title: success ? "Datos actualizados" : "Error al actualizar",
+        description: success 
+          ? "Los datos se han actualizado correctamente" 
+          : "No se pudieron obtener todos los datos",
+        variant: success ? "success" : "destructive",
+      });
+      
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+      toast({
+        title: "Error al actualizar",
+        description: "Se produjo un error al obtener los datos",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   return (
@@ -66,11 +121,11 @@ const Settings = () => {
             </div>
           </section>
           
-          {/* Use the centralized DebugSection component */}
+          {/* Use the centralized DebugSection component with our new refreshData function */}
           <DebugSection 
             dateRange={financialDateRange}
             refreshData={refreshData}
-            rawResponse={null} // Initially null, it will be populated by the component
+            rawResponse={rawResponse}
           />
         </div>
       </main>
