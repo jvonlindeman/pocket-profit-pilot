@@ -16,6 +16,8 @@ interface FinancialData {
     stripe: { hit: boolean, partial: boolean }
   };
   isDataRequested: boolean;
+  cacheChecked: boolean;
+  hasCachedData: boolean;
 }
 
 export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
@@ -28,14 +30,131 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
       zoho: { hit: false, partial: false },
       stripe: { hit: false, partial: false }
     },
-    isDataRequested: false
+    isDataRequested: false,
+    cacheChecked: false,
+    hasCachedData: false
   });
+
+  // Check cache on mount and load any existing data
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkAndLoadCacheOnMount = async () => {
+      console.log("🔍 useOptimizedFinancialData: Checking cache on mount", {
+        dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`
+      });
+
+      try {
+        // Check both sources for cached data
+        const [zohoCacheCheck, stripeCacheCheck] = await Promise.all([
+          CacheService.checkCache('Zoho', startDate, endDate),
+          CacheService.checkCache('Stripe', startDate, endDate)
+        ]);
+
+        if (!isMounted) return;
+
+        const hasZohoCache = zohoCacheCheck.cached && zohoCacheCheck.data && zohoCacheCheck.data.length > 0;
+        const hasStripeCache = stripeCacheCheck.cached && stripeCacheCheck.data && stripeCacheCheck.data.length > 0;
+        const hasCachedData = hasZohoCache || hasStripeCache;
+
+        console.log("🔍 useOptimizedFinancialData: Cache check results", {
+          zoho: { cached: hasZohoCache, count: zohoCacheCheck.data?.length || 0 },
+          stripe: { cached: hasStripeCache, count: stripeCacheCheck.data?.length || 0 },
+          totalCachedData: hasCachedData
+        });
+
+        if (hasCachedData) {
+          console.log("✅ useOptimizedFinancialData: Auto-loading cached data on mount");
+          
+          let allTransactions: Transaction[] = [];
+          let stripeData: any = null;
+
+          // Load Zoho cached data
+          if (hasZohoCache) {
+            allTransactions = [...allTransactions, ...zohoCacheCheck.data];
+            console.log(`📊 useOptimizedFinancialData: Loaded ${zohoCacheCheck.data.length} Zoho transactions from cache`);
+          }
+
+          // Load Stripe cached data
+          if (hasStripeCache) {
+            const transactions = stripeCacheCheck.data;
+            allTransactions = [...allTransactions, ...transactions];
+            
+            // Calculate summary from cached data
+            const gross = transactions.reduce((sum, tx) => sum + (tx.gross || tx.amount), 0);
+            const fees = transactions.reduce((sum, tx) => sum + (tx.fees || 0), 0);
+            const net = gross - fees;
+            const feePercentage = gross > 0 ? (fees / gross) * 100 : 0;
+            
+            stripeData = {
+              transactions,
+              gross,
+              fees,
+              transactionFees: fees,
+              payoutFees: 0,
+              additionalFees: 0,
+              net,
+              feePercentage
+            };
+            
+            console.log(`📊 useOptimizedFinancialData: Loaded ${transactions.length} Stripe transactions from cache`);
+          }
+
+          setData({
+            transactions: allTransactions,
+            stripeData,
+            loading: false,
+            error: null,
+            usingCachedData: true,
+            cacheStatus: {
+              zoho: { hit: hasZohoCache, partial: zohoCacheCheck.partial || false },
+              stripe: { hit: hasStripeCache, partial: stripeCacheCheck.partial || false }
+            },
+            isDataRequested: true,
+            cacheChecked: true,
+            hasCachedData: true
+          });
+
+          console.log("🎉 useOptimizedFinancialData: Successfully auto-loaded cached data", {
+            totalTransactions: allTransactions.length,
+            sources: {
+              zoho: hasZohoCache ? 'CACHE' : 'NONE',
+              stripe: hasStripeCache ? 'CACHE' : 'NONE'
+            }
+          });
+        } else {
+          console.log("❌ useOptimizedFinancialData: No cached data found, user interaction required");
+          setData(prev => ({
+            ...prev,
+            cacheChecked: true,
+            hasCachedData: false
+          }));
+        }
+      } catch (error) {
+        console.error("❌ useOptimizedFinancialData: Error during cache check:", error);
+        if (isMounted) {
+          setData(prev => ({
+            ...prev,
+            cacheChecked: true,
+            hasCachedData: false,
+            error: error instanceof Error ? error.message : 'Error checking cache'
+          }));
+        }
+      }
+    };
+
+    checkAndLoadCacheOnMount();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [startDate, endDate]);
 
   const fetchData = useCallback(async (forceRefresh = false) => {
     console.log("🚀 useOptimizedFinancialData: Starting EXPLICIT fetch", {
       dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
       forceRefresh,
-      caller: new Error().stack?.split('\n')[2]?.trim() // Log who called this
+      caller: new Error().stack?.split('\n')[2]?.trim()
     });
     
     setData(prev => ({ ...prev, loading: true, error: null, isDataRequested: true }));
@@ -141,7 +260,9 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         error: null,
         usingCachedData: usingCache,
         cacheStatus,
-        isDataRequested: true
+        isDataRequested: true,
+        cacheChecked: true,
+        hasCachedData: allTransactions.length > 0
       });
 
     } catch (error) {
@@ -150,20 +271,18 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         ...prev,
         loading: false,
         error: error instanceof Error ? error.message : 'Unknown error',
-        isDataRequested: true
+        isDataRequested: true,
+        cacheChecked: true
       }));
     }
   }, [startDate, endDate]);
-
-  // REMOVED: Auto-fetch on mount. Data will only be loaded when explicitly requested
-  // useEffect(() => {
-  //   fetchData();
-  // }, [fetchData]);
 
   console.log("🔄 useOptimizedFinancialData: Hook rendered", {
     dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
     hasData: data.transactions.length > 0,
     isDataRequested: data.isDataRequested,
+    cacheChecked: data.cacheChecked,
+    hasCachedData: data.hasCachedData,
     loading: data.loading
   });
 

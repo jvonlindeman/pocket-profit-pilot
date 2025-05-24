@@ -11,6 +11,8 @@ interface InitialSetupProps {
   setShowBalanceDialog: (show: boolean) => void;
   currentMonthDate: Date;
   onBalanceSaved: () => void;
+  cacheChecked?: boolean;
+  hasCachedData?: boolean;
 }
 
 const InitialSetup: React.FC<InitialSetupProps> = ({
@@ -20,6 +22,8 @@ const InitialSetup: React.FC<InitialSetupProps> = ({
   setShowBalanceDialog,
   currentMonthDate,
   onBalanceSaved,
+  cacheChecked = false,
+  hasCachedData = false,
 }) => {
   return (
     <>
@@ -33,7 +37,11 @@ const InitialSetup: React.FC<InitialSetupProps> = ({
       
       {/* Initial load prompt if data not initialized */}
       {!dataInitialized && (
-        <InitialLoadPrompt onLoadData={onLoadData} />
+        <InitialLoadPrompt 
+          onLoadData={onLoadData} 
+          cacheChecked={cacheChecked}
+          hasCachedData={hasCachedData}
+        />
       )}
     </>
   );

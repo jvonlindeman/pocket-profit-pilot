@@ -15,7 +15,7 @@ import Footer from '@/components/Dashboard/Footer';
 import InitialSetup from '@/components/Dashboard/InitialSetup';
 
 const Index = () => {
-  // SIMPLIFIED: Use ONLY useFinanceData hook - it handles everything
+  // SIMPLIFIED: Use ONLY useFinanceData hook - it handles everything including auto-loading
   const {
     dateRange,
     updateDateRange,
@@ -40,7 +40,9 @@ const Index = () => {
     updateStartingBalance,
     setStartingBalance,
     usingCachedData,
-    cacheStatus
+    cacheStatus,
+    cacheChecked,
+    hasCachedData
   } = useFinanceData();
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
@@ -75,7 +77,7 @@ const Index = () => {
     [financialData.transactions]
   );
 
-  // Handler for loading initial data
+  // Handler for loading initial data (only called when no cached data exists)
   const handleInitialLoad = async () => {
     // Check if we need to set the initial balance first
     const balanceExists = await checkBalanceExists();
@@ -160,6 +162,8 @@ const Index = () => {
         setShowBalanceDialog={setShowBalanceDialog}
         currentMonthDate={currentMonthDate}
         onBalanceSaved={handleBalanceSaved}
+        cacheChecked={cacheChecked}
+        hasCachedData={hasCachedData}
       />
       
       {/* Header section */}

@@ -28,7 +28,7 @@ export const useFinanceData = () => {
   // Use the date range hook
   const { dateRange, updateDateRange } = useFinanceDateRange(fetchMonthlyBalance);
   
-  // Use ONLY the optimized financial data hook - NO AUTO-LOADING
+  // Use ONLY the optimized financial data hook - NOW WITH AUTO-LOADING
   const { 
     transactions, 
     stripeData,
@@ -37,13 +37,17 @@ export const useFinanceData = () => {
     usingCachedData, 
     cacheStatus, 
     refetch,
-    isDataRequested
+    isDataRequested,
+    cacheChecked,
+    hasCachedData
   } = useOptimizedFinancialData(dateRange.startDate, dateRange.endDate);
 
   console.log("🏠 useFinanceData: Hook rendered", {
     dateRange: `${dateRange.startDate.toISOString().split('T')[0]} to ${dateRange.endDate.toISOString().split('T')[0]}`,
     transactionCount: transactions.length,
     isDataRequested,
+    cacheChecked,
+    hasCachedData,
     loading
   });
 
@@ -85,10 +89,10 @@ export const useFinanceData = () => {
     }
   }, []);
 
-  // Data initialized flag - only true if data was explicitly requested and loaded
+  // Data initialized flag - true if data was explicitly requested and loaded OR auto-loaded from cache
   const dataInitialized = useMemo(() => {
-    return isDataRequested && transactions.length > 0;
-  }, [isDataRequested, transactions.length]);
+    return (isDataRequested && transactions.length > 0) || (cacheChecked && hasCachedData);
+  }, [isDataRequested, transactions.length, cacheChecked, hasCachedData]);
 
   // SIMPLIFIED DATA REFRESH FUNCTION
   const refreshData = useCallback((force = false) => {
@@ -152,6 +156,8 @@ export const useFinanceData = () => {
     usingCachedData,
     cacheStatus,
     apiConnectivity: { zoho: true, stripe: true }, // Simplified
-    checkApiConnectivity
+    checkApiConnectivity,
+    cacheChecked,
+    hasCachedData
   };
 };
