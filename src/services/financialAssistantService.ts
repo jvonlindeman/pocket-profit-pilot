@@ -18,14 +18,14 @@ export const sendMessageToAssistant = async (
   dateRange: { startDate: Date | null; endDate: Date | null },
   uiData: any,
   conversationContext: ConversationMemory
-): Promise<string> => {
+): Promise<string | { content: string; searchResults?: any[]; searchPerformed?: boolean }> => {
   // Prepare messages for the API (exclude 'system' messages)
   const apiMessages = messages
     .filter(msg => msg.role !== 'system')
     .concat(userMessage)
     .map(({ role, content }) => ({ role, content }));
   
-  console.log('Sending request to financial-assistant edge function with enhanced data...');
+  console.log('Sending request to financial-assistant edge function with semantic search support...');
   
   // Call the financial-assistant edge function with enhanced UI data
   const { data, error } = await supabase.functions.invoke('financial-assistant', {
@@ -49,6 +49,15 @@ export const sendMessageToAssistant = async (
   
   if (!data || !data.response || !data.response.content) {
     throw new Error('Respuesta vacía del asistente financiero');
+  }
+  
+  // If semantic search was performed, return the full response object
+  if (data.searchPerformed && data.searchResults) {
+    return {
+      content: data.response.content,
+      searchResults: data.searchResults,
+      searchPerformed: data.searchPerformed
+    };
   }
   
   return data.response.content;

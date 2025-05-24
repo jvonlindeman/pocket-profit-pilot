@@ -10,7 +10,7 @@ import {
   DialogDescription
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { RefreshCcwIcon, MessageCircleIcon } from 'lucide-react';
+import { RefreshCcwIcon, MessageCircleIcon, SearchIcon } from 'lucide-react';
 import { registerInteraction } from '@/utils/uiCapture';
 import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
@@ -24,7 +24,7 @@ export const FinancialAssistantDialog: React.FC<FinancialAssistantDialogProps> =
   isOpen,
   onClose,
 }) => {
-  const { messages, isLoading, sendMessage, resetChat, getSuggestedQuestions } = useFinancialAssistant();
+  const { messages, isLoading, sendMessage, resetChat, getSuggestedQuestions, semanticSearchResults } = useFinancialAssistant();
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -80,14 +80,20 @@ export const FinancialAssistantDialog: React.FC<FinancialAssistantDialogProps> =
   
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="sm:max-w-[600px] h-[80vh] max-h-[700px] flex flex-col p-0 financial-assistant-dialog" data-component="financial-assistant">
+      <DialogContent className="sm:max-w-[700px] h-[85vh] max-h-[800px] flex flex-col p-0 financial-assistant-dialog" data-component="financial-assistant">
         <DialogHeader className="px-6 py-4 border-b">
           <DialogTitle className="flex items-center">
             <MessageCircleIcon className="mr-2 h-5 w-5" />
             Asistente Financiero
+            {semanticSearchResults.length > 0 && (
+              <span className="ml-2 flex items-center text-sm text-blue-600">
+                <SearchIcon className="h-4 w-4 mr-1" />
+                {semanticSearchResults.length} resultados
+              </span>
+            )}
           </DialogTitle>
           <DialogDescription>
-            Habla con tu asistente para analizar tus finanzas y descubrir insights históricos
+            Habla con tu asistente para analizar tus finanzas, buscar transacciones específicas y descubrir insights históricos con búsqueda semántica avanzada
           </DialogDescription>
         </DialogHeader>
         

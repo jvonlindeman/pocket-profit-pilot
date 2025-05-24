@@ -7,17 +7,19 @@ import { ChatMessage, ConversationMemory } from '@/types/chat';
 import { extractInsights } from '@/utils/insightExtraction';
 import { generateSuggestedQuestions } from '@/utils/suggestionGenerator';
 import { sendMessageToAssistant } from '@/services/financialAssistantService';
+import { SemanticSearchResult } from '@/services/semanticSearchService';
 
 export const useFinancialAssistant = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
       role: 'assistant',
-      content: '¡Hola! Soy tu asistente financiero con acceso completo a tu historial de datos. ¿En qué puedo ayudarte hoy? Puedo analizar tus datos financieros, identificar tendencias a lo largo del tiempo o responder preguntas específicas sobre tus finanzas.',
+      content: '¡Hola! Soy tu asistente financiero con acceso completo a tu historial de datos y capacidades de búsqueda semántica avanzada. Puedo ayudarte a:\n\n• Analizar tus finanzas y identificar tendencias\n• Buscar transacciones específicas por descripción\n• Encontrar patrones de gasto similares\n• Responder preguntas sobre tu historial financiero\n\n¿En qué puedo ayudarte hoy?',
       timestamp: new Date(),
     },
   ]);
   const [isLoading, setIsLoading] = useState(false);
+  const [semanticSearchResults, setSemanticSearchResults] = useState<SemanticSearchResult[]>([]);
   const financeContext = useFinance();
   const [conversationContext, setConversationContext] = useState<ConversationMemory>({
     lastQuery: {
@@ -104,8 +106,24 @@ export const useFinancialAssistant = () => {
         updatedContext
       );
       
+      // Check if semantic search results were returned
+      let searchResults: SemanticSearchResult[] = [];
+      let responseContent = assistantResponse;
+      
+      // If the response includes semantic search results, extract them
+      if (typeof assistantResponse === 'object' && assistantResponse.searchResults) {
+        searchResults = assistantResponse.searchResults;
+        responseContent = assistantResponse.response?.content || assistantResponse.content;
+        setSemanticSearchResults(searchResults);
+        
+        console.log(`Semantic search returned ${searchResults.length} results`);
+      } else {
+        // Clear previous search results if this wasn't a search query
+        setSemanticSearchResults([]);
+      }
+      
       // Extract and store insights from the assistant's response
-      const newInsights = extractInsights(assistantResponse);
+      const newInsights = extractInsights(responseContent);
       if (newInsights.length > 0) {
         setConversationContext(prev => ({
           ...prev,
@@ -119,8 +137,9 @@ export const useFinancialAssistant = () => {
         {
           id: `assistant-${Date.now()}`,
           role: 'assistant',
-          content: assistantResponse,
+          content: responseContent,
           timestamp: new Date(),
+          searchResults: searchResults.length > 0 ? searchResults : undefined
         },
       ]);
       
@@ -154,10 +173,11 @@ export const useFinancialAssistant = () => {
       {
         id: 'welcome',
         role: 'assistant',
-        content: '¡Hola! Soy tu asistente financiero con acceso completo a tu historial de datos. ¿En qué puedo ayudarte hoy? Puedo analizar tus datos financieros, identificar tendencias a lo largo del tiempo o responder preguntas específicas sobre tus finanzas.',
+        content: '¡Hola! Soy tu asistente financiero con acceso completo a tu historial de datos y capacidades de búsqueda semántica avanzada. Puedo ayudarte a:\n\n• Analizar tus finanzas y identificar tendencias\n• Buscar transacciones específicas por descripción\n• Encontrar patrones de gasto similares\n• Responder preguntas sobre tu historial financiero\n\n¿En qué puedo ayudarte hoy?',
         timestamp: new Date(),
       },
     ]);
+    setSemanticSearchResults([]);
     setConversationContext({
       lastQuery: {
         timestamp: '',
@@ -171,7 +191,17 @@ export const useFinancialAssistant = () => {
 
   // Suggest questions based on the current financial context and historical data
   const getSuggestedQuestions = useCallback((): string[] => {
-    return generateSuggestedQuestions(financeContext);
+    const baseQuestions = generateSuggestedQuestions(financeContext);
+    
+    // Add semantic search specific suggestions
+    const semanticQuestions = [
+      "Busca transacciones similares a pagos de Netflix",
+      "Encuentra gastos relacionados con comida",
+      "Muestra compras parecidas a Amazon",
+      "Busca pagos similares a servicios públicos"
+    ];
+    
+    return [...baseQuestions, ...semanticQuestions];
   }, [financeContext]);
 
   return {
@@ -180,6 +210,7 @@ export const useFinancialAssistant = () => {
     sendMessage,
     resetChat,
     conversationContext,
-    getSuggestedQuestions
+    getSuggestedQuestions,
+    semanticSearchResults
   };
 };
