@@ -1,39 +1,45 @@
-import { supabase } from "../../../integrations/supabase/client";
-import { CacheSource } from "../types";
+
+import { CacheDbClient } from "../db/client";
 import { Transaction } from "../../../types/financial";
+import { CacheSource } from "../types";
 
 /**
- * MonthlyStorage handles all database interactions for monthly cached data
+ * MonthlyStorage handles monthly transaction cache operations
  */
-export class MonthlyStorage {
+export class MonthlyStorage extends CacheDbClient {
   /**
-   * Check if a month is cached
+   * Check if a specific month is cached
    */
   async isMonthCached(
     source: CacheSource | string,
     year: number,
     month: number
-  ): Promise<boolean> {
+  ): Promise<{ isCached: boolean; transactionCount: number }> {
     try {
-      const { data, error } = await this.getClient().rpc('is_month_cached', {
-        p_source: source,
-        p_year: year,
-        p_month: month
-      });
+      console.log(`[MONTHLY_STORAGE_DEBUG] Checking if month is cached: ${source} ${year}/${month}`);
       
+      const { data, error } = await this.getClient()
+        .rpc('is_month_cached', {
+          p_source: source,
+          p_year: year,
+          p_month: month
+        });
+        
       if (error) {
-        console.error("Error checking if month is cached via RPC", error);
-        return false;
+        this.logError("Error checking if month is cached", error);
+        return { isCached: false, transactionCount: 0 };
       }
       
-      if (!data || data.length === 0) {
-        return false;
-      }
+      const result = data?.[0] || { is_cached: false, transaction_count: 0 };
+      console.log(`[MONTHLY_STORAGE_DEBUG] Month cache check result:`, result);
       
-      return data[0].is_cached;
+      return {
+        isCached: result.is_cached,
+        transactionCount: result.transaction_count
+      };
     } catch (err) {
-      console.error("Exception checking if month is cached:", err);
-      return false;
+      this.logError("Exception checking if month is cached", err);
+      return { isCached: false, transactionCount: 0 };
     }
   }
 
@@ -46,22 +52,143 @@ export class MonthlyStorage {
     month: number
   ): Promise<Transaction[]> {
     try {
+      console.log(`[MONTHLY_STORAGE_DEBUG] Getting month transactions: ${source} ${year}/${month}`);
+      
       const { data, error } = await this.getClient()
         .from('cached_transactions')
         .select('*')
         .eq('source', source)
         .eq('year', year)
-        .eq('month', month);
+        .eq('month', month)
+        .order('date', { ascending: false });
         
       if (error) {
-        console.error("Error getting month transactions:", error);
+        this.logError("Error fetching month transactions", error);
         return [];
       }
       
+      console.log(`[MONTHLY_STORAGE_DEBUG] Retrieved ${data?.length || 0} transactions for ${year}/${month}`);
       return data as Transaction[];
     } catch (err) {
-      console.error("Exception getting month transactions:", err);
+      this.logError("Exception getting month transactions", err);
       return [];
+    }
+  }
+
+  /**
+   * Store transactions for a specific month with detailed logging
+   */
+  async storeMonthTransactions(
+    source: CacheSource | string,
+    year: number,
+    month: number,
+    transactions: Transaction[]
+  ): Promise<boolean> {
+    try {
+      console.log(`[MONTHLY_STORAGE_DEBUG] Starting to store ${transactions.length} transactions for ${source} ${year}/${month}`);
+      
+      if (transactions.length === 0) {
+        console.warn(`[MONTHLY_STORAGE_DEBUG] No transactions to store for ${year}/${month}`);
+        return true;
+      }
+
+      // Validate all transactions have required fields
+      const invalidTransactions = transactions.filter(tx => 
+        !tx.id || tx.amount === undefined || !tx.date || !tx.type || !tx.source
+      );
+      
+      if (invalidTransactions.length > 0) {
+        console.error(`[MONTHLY_STORAGE_DEBUG] Found ${invalidTransactions.length} invalid transactions:`, invalidTransactions);
+        return false;
+      }
+
+      // Prepare transactions for database
+      const dbTransactions = transactions.map((tx, index) => {
+        const dbTx = {
+          external_id: tx.external_id || tx.id,
+          date: tx.date.split('T')[0], // Ensure we just get the date part
+          amount: tx.amount,
+          description: tx.description || '',
+          category: tx.category || '',
+          type: tx.type,
+          source: tx.source,
+          fees: tx.fees || null,
+          gross: tx.gross || null,
+          metadata: tx.metadata || {},
+          year: year,
+          month: month,
+          fetched_at: new Date().toISOString()
+        };
+        
+        console.log(`[MONTHLY_STORAGE_DEBUG] Prepared transaction ${index}:`, {
+          external_id: dbTx.external_id,
+          date: dbTx.date,
+          amount: dbTx.amount,
+          year: dbTx.year,
+          month: dbTx.month
+        });
+        
+        return dbTx;
+      });
+
+      // Store transactions in batches
+      const batchSize = 100;
+      let totalStored = 0;
+      
+      for (let i = 0; i < dbTransactions.length; i += batchSize) {
+        const batch = dbTransactions.slice(i, i + batchSize);
+        const batchNumber = Math.floor(i / batchSize) + 1;
+        const totalBatches = Math.ceil(dbTransactions.length / batchSize);
+        
+        console.log(`[MONTHLY_STORAGE_DEBUG] Storing batch ${batchNumber}/${totalBatches} with ${batch.length} transactions`);
+        
+        const { data, error } = await this.getClient()
+          .from('cached_transactions')
+          .upsert(batch, { 
+            onConflict: 'source,external_id',
+            ignoreDuplicates: false
+          })
+          .select('id');
+          
+        if (error) {
+          console.error(`[MONTHLY_STORAGE_DEBUG] Error storing batch ${batchNumber}:`, error);
+          this.logError(`Error storing batch ${batchNumber}/${totalBatches}`, error);
+          return false;
+        }
+        
+        const storedCount = data?.length || batch.length;
+        totalStored += storedCount;
+        console.log(`[MONTHLY_STORAGE_DEBUG] Batch ${batchNumber}/${totalBatches} stored successfully: ${storedCount} transactions`);
+      }
+
+      // Update monthly cache record
+      console.log(`[MONTHLY_STORAGE_DEBUG] Updating monthly cache record for ${year}/${month}`);
+      
+      const { error: cacheError } = await this.getClient()
+        .from('monthly_cache')
+        .upsert({
+          source,
+          year,
+          month,
+          transaction_count: totalStored,
+          status: 'complete',
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'source,year,month'
+        });
+
+      if (cacheError) {
+        console.error(`[MONTHLY_STORAGE_DEBUG] Error updating monthly cache record:`, cacheError);
+        this.logError("Error updating monthly cache record", cacheError);
+        return false;
+      }
+
+      console.log(`[MONTHLY_STORAGE_DEBUG] Successfully stored ${totalStored} transactions and updated cache record for ${source} ${year}/${month}`);
+      return true;
+    } catch (err) {
+      console.error(`[MONTHLY_STORAGE_DEBUG] Exception storing month transactions:`, err);
+      this.logError("Exception storing month transactions", err);
+      return false;
     }
   }
 
@@ -80,154 +207,21 @@ export class MonthlyStorage {
         .eq('source', source)
         .eq('year', year)
         .eq('month', month)
-        .maybeSingle();
+        .eq('status', 'complete')
+        .single();
         
-      if (error) {
-        console.error("Error getting month cache info:", error);
+      if (error || !data) {
         return null;
       }
       
-      return data ? { id: data.id, transaction_count: data.transaction_count } : null;
+      return {
+        id: data.id,
+        transaction_count: data.transaction_count
+      };
     } catch (err) {
-      console.error("Exception getting month cache info:", err);
+      this.logError("Exception getting month cache info", err);
       return null;
     }
-  }
-
-  /**
-   * Store transactions for a specific month
-   */
-  async storeMonthTransactions(
-    source: CacheSource | string,
-    year: number,
-    month: number,
-    transactions: Transaction[]
-  ): Promise<boolean> {
-    try {
-      console.log(`MonthlyStorage: Storing ${transactions.length} transactions for ${source} ${year}-${month}`);
-      
-      // Begin transaction
-      // 1. Insert or update monthly cache entry
-      const { data: existingEntry } = await this.getClient()
-        .from('monthly_cache')
-        .select('*')
-        .eq('source', source)
-        .eq('year', year)
-        .eq('month', month)
-        .maybeSingle();
-      
-      if (existingEntry) {
-        // Update existing entry
-        const { error: updateError } = await this.getClient()
-          .from('monthly_cache')
-          .update({
-            transaction_count: transactions.length,
-            status: 'complete',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingEntry.id);
-          
-        if (updateError) {
-          throw updateError;
-        }
-      } else {
-        // Create new entry
-        const { error: insertError } = await this.getClient()
-          .from('monthly_cache')
-          .insert({
-            source,
-            year,
-            month,
-            transaction_count: transactions.length,
-            status: 'complete'
-          });
-          
-        if (insertError) {
-          throw insertError;
-        }
-      }
-      
-      // 2. Store transactions in cache - need to ensure all transactions have external_id
-      const formattedTransactions = transactions.map(transaction => ({
-        year,
-        month,
-        source,
-        id: transaction.id,
-        external_id: transaction.external_id || transaction.id, // Ensure external_id is always present
-        date: transaction.date,
-        amount: transaction.amount,
-        description: transaction.description || '',
-        category: transaction.category || '',
-        type: transaction.type,
-        fees: transaction.fees,
-        gross: transaction.gross,
-        metadata: transaction.metadata
-      }));
-
-      // Process transactions in batches to prevent overloading the database
-      const BATCH_SIZE = 100;
-      for (let i = 0; i < formattedTransactions.length; i += BATCH_SIZE) {
-        const batch = formattedTransactions.slice(i, i + BATCH_SIZE);
-        
-        // First, check for existing transactions to avoid duplicates
-        const externalIds = batch.map(tx => tx.external_id);
-        
-        // Delete existing transactions for these external_ids to avoid conflicts
-        const { error: deleteError } = await this.getClient()
-          .from('cached_transactions')
-          .delete()
-          .eq('source', source)
-          .in('external_id', externalIds);
-          
-        if (deleteError) {
-          console.error(`Error deleting existing transactions in batch ${i / BATCH_SIZE + 1}:`, deleteError);
-        }
-        
-        // Insert the batch of transactions
-        const { error: insertError } = await this.getClient()
-          .from('cached_transactions')
-          .insert(batch.map(tx => ({
-            amount: tx.amount,
-            category: tx.category,
-            date: tx.date,
-            description: tx.description,
-            external_id: tx.external_id, // Now guaranteed to be present
-            fees: tx.fees,
-            gross: tx.gross,
-            metadata: tx.metadata,
-            month: tx.month,
-            source: tx.source,
-            type: tx.type,
-            year: tx.year
-          })));
-          
-        if (insertError) {
-          console.error(`Error inserting transactions in batch ${i / BATCH_SIZE + 1}:`, insertError);
-          throw insertError;
-        }
-        
-        console.log(`Successfully inserted batch ${i / BATCH_SIZE + 1} of ${Math.ceil(formattedTransactions.length / BATCH_SIZE)}`);
-      }
-      
-      return true;
-    } catch (err) {
-      console.error("Exception storing monthly transactions:", err);
-      return false;
-    }
-  }
-
-  /**
-   * Get Supabase client
-   */
-  getClient() {
-    return supabase;
-  }
-
-  /**
-   * Log an error
-   */
-  logError(message: string, error: any) {
-    console.error(`MonthlyStorage: ${message}`, error);
   }
 
   /**
@@ -235,57 +229,53 @@ export class MonthlyStorage {
    */
   async fixLegacyTransactions(source?: CacheSource): Promise<number> {
     try {
-      // Get transactions missing year/month
-      const { data, error } = await this.getClient()
+      console.log(`[MONTHLY_STORAGE_DEBUG] Fixing legacy transactions for ${source || 'all sources'}`);
+      
+      let query = this.getClient()
         .from('cached_transactions')
         .select('id, date')
-        .is('year', null);
+        .or('year.is.null,month.is.null');
         
-      if (error) {
-        throw error;
+      if (source) {
+        query = query.eq('source', source);
       }
       
-      if (!data || data.length === 0) {
-        console.log("No transactions with missing year/month found");
+      const { data: legacyTransactions, error: fetchError } = await query;
+      
+      if (fetchError) {
+        this.logError("Error fetching legacy transactions", fetchError);
         return 0;
       }
       
-      console.log(`Found ${data.length} transactions with missing year/month to fix`);
-      
-      // Process in small batches to avoid hitting DB limits
-      const BATCH_SIZE = 50;
-      let fixedCount = 0;
-      
-      for (let i = 0; i < data.length; i += BATCH_SIZE) {
-        const batch = data.slice(i, i + BATCH_SIZE);
-        const updates = batch.map(tx => {
-          const date = new Date(tx.date);
-          return {
-            id: tx.id,
-            year: date.getFullYear(),
-            month: date.getMonth() + 1
-          };
-        });
-        
-        // Update each transaction individually
-        for (const update of updates) {
-          const { error: updateError } = await this.getClient()
-            .from('cached_transactions')
-            .update({ year: update.year, month: update.month })
-            .eq('id', update.id);
-            
-          if (!updateError) {
-            fixedCount++;
-          }
-        }
-        
-        console.log(`Processed batch ${Math.ceil(i / BATCH_SIZE) + 1} of ${Math.ceil(data.length / BATCH_SIZE)}`);
+      if (!legacyTransactions || legacyTransactions.length === 0) {
+        console.log("[MONTHLY_STORAGE_DEBUG] No legacy transactions found to fix");
+        return 0;
       }
       
-      console.log(`Fixed ${fixedCount} transactions with missing year/month values`);
-      return fixedCount;
+      console.log(`[MONTHLY_STORAGE_DEBUG] Found ${legacyTransactions.length} legacy transactions to fix`);
+      
+      const updates = legacyTransactions.map(tx => {
+        const date = new Date(tx.date);
+        return {
+          id: tx.id,
+          year: date.getFullYear(),
+          month: date.getMonth() + 1
+        };
+      });
+      
+      const { error: updateError } = await this.getClient()
+        .from('cached_transactions')
+        .upsert(updates, { onConflict: 'id' });
+        
+      if (updateError) {
+        this.logError("Error updating legacy transactions", updateError);
+        return 0;
+      }
+      
+      console.log(`[MONTHLY_STORAGE_DEBUG] Successfully fixed ${legacyTransactions.length} legacy transactions`);
+      return legacyTransactions.length;
     } catch (err) {
-      console.error("Error fixing legacy transactions:", err);
+      this.logError("Exception fixing legacy transactions", err);
       return 0;
     }
   }
