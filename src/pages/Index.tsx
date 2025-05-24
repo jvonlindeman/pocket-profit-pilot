@@ -15,6 +15,7 @@ import Footer from '@/components/Dashboard/Footer';
 import InitialSetup from '@/components/Dashboard/InitialSetup';
 
 const Index = () => {
+  // SIMPLIFIED: Use ONLY useFinanceData hook - it handles everything
   const {
     dateRange,
     updateDateRange,

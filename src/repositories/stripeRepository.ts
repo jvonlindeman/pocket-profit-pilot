@@ -1,9 +1,7 @@
 
 import { Transaction } from "../types/financial";
 import StripeService from "../services/stripeService";
-import { apiRequestManager } from "@/utils/ApiRequestManager";
 import { formatDateYYYYMMDD } from "@/utils/dateUtils";
-import { useApiCalls } from "@/contexts/ApiCallsContext";
 import CacheService from "@/services/cache";
 
 /**
@@ -21,31 +19,13 @@ export interface StripeResult {
 }
 
 /**
- * StripeRepository handles all data access related to Stripe
- * Simplified to avoid redundant caching layers
+ * StripeRepository - SIMPLIFIED to avoid duplicate API calls
  */
 export class StripeRepository {
-  private apiCallsContext?: ReturnType<typeof useApiCalls>;
   private inProgressRequestsMap: Map<string, Promise<any>> = new Map();
 
   /**
-   * Set the API calls context for tracking
-   */
-  setApiCallsContext(context: ReturnType<typeof useApiCalls>) {
-    this.apiCallsContext = context;
-  }
-
-  /**
-   * Track API call
-   */
-  private trackApiCall() {
-    if (this.apiCallsContext) {
-      this.apiCallsContext.incrementStripeApiCalls();
-    }
-  }
-
-  /**
-   * Get transactions for a date range - simplified without redundant caching
+   * Get transactions for a date range - SIMPLIFIED without redundant layers
    */
   async getTransactions(
     startDate: Date,
@@ -57,7 +37,7 @@ export class StripeRepository {
       
       console.log(`StripeRepository: Getting transactions for ${cacheKey}, forceRefresh: ${forceRefresh}`);
       
-      // Check if there's already a request in progress
+      // Check if there's already a request in progress for this exact key
       if (this.inProgressRequestsMap.has(cacheKey) && !forceRefresh) {
         console.log(`StripeRepository: Reusing in-progress request for ${cacheKey}`);
         return await this.inProgressRequestsMap.get(cacheKey)!;
@@ -69,7 +49,7 @@ export class StripeRepository {
         this.inProgressRequestsMap.delete(cacheKey);
       }
       
-      // Create and store the promise
+      // Create and store the promise to prevent duplicate calls
       const requestPromise = this.executeRequest(startDate, endDate, forceRefresh);
       this.inProgressRequestsMap.set(cacheKey, requestPromise);
       
@@ -96,7 +76,7 @@ export class StripeRepository {
   }
   
   /**
-   * Execute the actual request with automatic persistent storage
+   * Execute the actual request - ONLY makes API call, no caching here
    */
   private async executeRequest(
     startDate: Date, 
@@ -105,26 +85,19 @@ export class StripeRepository {
   ): Promise<StripeResult> {
     console.log(`StripeRepository: Making API call for ${formatDateYYYYMMDD(startDate)}-${formatDateYYYYMMDD(endDate)}`);
     
-    this.trackApiCall();
+    // Call StripeService directly - no redundant caching
     const result = await StripeService.getTransactions(startDate, endDate, forceRefresh);
     
-    // Store data in persistent cache immediately after successful API call
+    // Store data in persistent cache after successful API call
     if (result.transactions && result.transactions.length > 0) {
       console.log(`StripeRepository: Storing ${result.transactions.length} transactions in persistent cache`);
       
       try {
-        const storeResult = await CacheService.storeTransactions('Stripe', startDate, endDate, result.transactions);
-        
-        if (storeResult) {
-          console.log("StripeRepository: Successfully stored transactions in persistent cache");
-        } else {
-          console.error("StripeRepository: Failed to store transactions in persistent cache");
-        }
+        await CacheService.storeTransactions('Stripe', startDate, endDate, result.transactions);
+        console.log("StripeRepository: Successfully stored transactions in persistent cache");
       } catch (storeError) {
         console.error("StripeRepository: Exception storing transactions in persistent cache:", storeError);
       }
-    } else {
-      console.log("StripeRepository: No transactions to store in persistent cache");
     }
     
     return {
@@ -145,7 +118,6 @@ export class StripeRepository {
   async checkApiConnectivity(): Promise<boolean> {
     try {
       console.log("StripeRepository: Checking API connectivity");
-      this.trackApiCall();
       return await StripeService.checkApiConnectivity();
     } catch {
       return false;
