@@ -28,7 +28,7 @@ export const useFinanceData = () => {
   // Use the date range hook
   const { dateRange, updateDateRange } = useFinanceDateRange(fetchMonthlyBalance);
   
-  // Use ONLY the optimized financial data hook - NOW WITH AUTO-LOADING
+  // Use ONLY the optimized financial data hook - NOW WITH IMPROVED CACHE DETECTION
   const { 
     transactions, 
     stripeData,
@@ -42,20 +42,29 @@ export const useFinanceData = () => {
     hasCachedData
   } = useOptimizedFinancialData(dateRange.startDate, dateRange.endDate);
 
-  console.log("🏠 useFinanceData: Hook rendered", {
+  console.log("🏠 useFinanceData: Hook rendered with improved cache detection", {
     dateRange: `${dateRange.startDate.toISOString().split('T')[0]} to ${dateRange.endDate.toISOString().split('T')[0]}`,
     transactionCount: transactions.length,
     isDataRequested,
     cacheChecked,
     hasCachedData,
-    loading
+    loading,
+    usingCachedData,
+    cacheStatus: {
+      zohoHit: cacheStatus.zoho.hit,
+      stripeHit: cacheStatus.stripe.hit
+    }
   });
 
   // Process data when transactions change
   useMemo(() => {
     if (transactions.length > 0) {
       console.log("🔄 useFinanceData: Processing transaction data", {
-        transactionCount: transactions.length
+        transactionCount: transactions.length,
+        sources: transactions.reduce((acc, tx) => {
+          acc[tx.source] = (acc[tx.source] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>)
       });
       // Process collaborator data
       processCollaboratorData(transactions);
@@ -91,8 +100,17 @@ export const useFinanceData = () => {
 
   // Data initialized flag - true if data was explicitly requested and loaded OR auto-loaded from cache
   const dataInitialized = useMemo(() => {
-    return (isDataRequested && transactions.length > 0) || (cacheChecked && hasCachedData);
-  }, [isDataRequested, transactions.length, cacheChecked, hasCachedData]);
+    const initialized = (isDataRequested && transactions.length > 0) || (cacheChecked && hasCachedData);
+    console.log("🔍 useFinanceData: Data initialization check", {
+      initialized,
+      isDataRequested,
+      transactionCount: transactions.length,
+      cacheChecked,
+      hasCachedData,
+      usingCachedData
+    });
+    return initialized;
+  }, [isDataRequested, transactions.length, cacheChecked, hasCachedData, usingCachedData]);
 
   // SIMPLIFIED DATA REFRESH FUNCTION
   const refreshData = useCallback((force = false) => {
@@ -114,7 +132,7 @@ export const useFinanceData = () => {
     refreshInProgressRef.current = true;
     lastRefreshTimeRef.current = now;
     
-    console.log(`🚀 useFinanceData: Beginning EXPLICIT data refresh (force: ${force})`);
+    console.log(`🚀 useFinanceData: Beginning data refresh with improved cache detection (force: ${force})`);
     
     // Use the refetch function from useOptimizedFinancialData
     const promise = refetch(force);

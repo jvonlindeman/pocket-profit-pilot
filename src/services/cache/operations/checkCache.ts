@@ -24,7 +24,7 @@ const getYearAndMonth = (date: Date): { year: number, month: number } => {
 };
 
 /**
- * Check cache for transactions with improved logging and fallback logic
+ * Check cache for transactions with improved detection using PostgreSQL function
  */
 export const checkCache = async (
   source: CacheSource,
@@ -82,81 +82,128 @@ export const checkCache = async (
     ) {
       console.log(`[CACHE_CHECK_DEBUG] Single month request detected: ${startInfo.year}/${startInfo.month}`);
       
-      // This is a request for exactly one month, which is our optimized case
-      const cacheResult = await monthlyStorage.isMonthCached(
-        source, 
-        startInfo.year, 
-        startInfo.month
-      );
+      // Use the improved PostgreSQL function via direct RPC call for better reliability
+      const { data: cacheResult, error } = await supabase
+        .rpc('is_month_cached', {
+          p_source: source,
+          p_year: startInfo.year,
+          p_month: startInfo.month
+        });
       
-      console.log(`[CACHE_CHECK_DEBUG] Month cache result:`, cacheResult);
-      
-      if (cacheResult.isCached && cacheResult.transactionCount > 0) {
-        console.log(`[CACHE_CHECK_DEBUG] Cache HIT - Found ${cacheResult.transactionCount} transactions`);
-        
-        // Get transactions for this month
-        const transactions = await monthlyStorage.getMonthTransactions(
-          source,
-          startInfo.year,
+      if (error) {
+        console.error(`[CACHE_CHECK_DEBUG] Error calling is_month_cached RPC:`, error);
+        // Fallback to monthlyStorage method
+        const fallbackResult = await monthlyStorage.isMonthCached(
+          source, 
+          startInfo.year, 
           startInfo.month
         );
         
-        console.log(`[CACHE_CHECK_DEBUG] Retrieved ${transactions.length} transactions from cache`);
-        
-        // Record the cache hit
-        await cacheMetrics.recordCacheAccess(
-          source,
-          formattedStartDate,
-          formattedEndDate,
-          true,
-          false,
-          transactions.length
-        );
-        
-        const result: CacheResponse = {
-          cached: true,
-          status: "complete",
-          data: transactions,
-          partial: false,
-          metrics: {
+        if (fallbackResult.isCached && fallbackResult.transactionCount > 0) {
+          console.log(`[CACHE_CHECK_DEBUG] Cache HIT (fallback) - Found ${fallbackResult.transactionCount} transactions`);
+          
+          const transactions = await monthlyStorage.getMonthTransactions(
             source,
-            startDate: formattedStartDate,
-            endDate: formattedEndDate,
-            transactionCount: transactions.length,
-            cacheHit: true,
-            partialHit: false
-          }
-        };
-        
-        return result;
-      } else {
-        console.log(`[CACHE_CHECK_DEBUG] Cache MISS - No cached data found for ${startInfo.year}/${startInfo.month}`);
-        
-        // Record the cache miss
-        await cacheMetrics.recordCacheAccess(
-          source,
-          formattedStartDate,
-          formattedEndDate,
-          false,
-          false,
-          0
-        );
-        
-        const result: CacheResponse = {
-          cached: false,
-          status: "missing",
-          partial: false,
-          metrics: {
+            startInfo.year,
+            startInfo.month
+          );
+          
+          await cacheMetrics.recordCacheAccess(
             source,
-            startDate: formattedStartDate,
-            endDate: formattedEndDate,
-            cacheHit: false,
-            partialHit: false
-          }
-        };
+            formattedStartDate,
+            formattedEndDate,
+            true,
+            false,
+            transactions.length
+          );
+          
+          return {
+            cached: true,
+            status: "complete",
+            data: transactions,
+            partial: false,
+            metrics: {
+              source,
+              startDate: formattedStartDate,
+              endDate: formattedEndDate,
+              transactionCount: transactions.length,
+              cacheHit: true,
+              partialHit: false
+            }
+          };
+        }
+      } else if (cacheResult && cacheResult.length > 0) {
+        const result = cacheResult[0];
+        console.log(`[CACHE_CHECK_DEBUG] PostgreSQL RPC result:`, result);
         
-        return result;
+        if (result.is_cached && result.transaction_count > 0) {
+          console.log(`[CACHE_CHECK_DEBUG] Cache HIT (PostgreSQL) - Found ${result.transaction_count} transactions`);
+          
+          // Get transactions for this month
+          const transactions = await monthlyStorage.getMonthTransactions(
+            source,
+            startInfo.year,
+            startInfo.month
+          );
+          
+          console.log(`[CACHE_CHECK_DEBUG] Retrieved ${transactions.length} transactions from cache`);
+          
+          // Record the cache hit
+          await cacheMetrics.recordCacheAccess(
+            source,
+            formattedStartDate,
+            formattedEndDate,
+            true,
+            false,
+            transactions.length
+          );
+          
+          const result: CacheResponse = {
+            cached: true,
+            status: "complete",
+            data: transactions,
+            partial: false,
+            metrics: {
+              source,
+              startDate: formattedStartDate,
+              endDate: formattedEndDate,
+              transactionCount: transactions.length,
+              cacheHit: true,
+              partialHit: false
+            }
+          };
+          
+          return result;
+        }
       }
+      
+      // No cache found
+      console.log(`[CACHE_CHECK_DEBUG] Cache MISS - No cached data found for ${startInfo.year}/${startInfo.month}`);
+      
+      // Record the cache miss
+      await cacheMetrics.recordCacheAccess(
+        source,
+        formattedStartDate,
+        formattedEndDate,
+        false,
+        false,
+        0
+      );
+      
+      const result: CacheResponse = {
+        cached: false,
+        status: "missing",
+        partial: false,
+        metrics: {
+          source,
+          startDate: formattedStartDate,
+          endDate: formattedEndDate,
+          cacheHit: false,
+          partialHit: false
+        }
+      };
+      
+      return result;
     } 
     else {
       console.log(`[CACHE_CHECK_DEBUG] Complex date range detected, using cache-manager edge function`);

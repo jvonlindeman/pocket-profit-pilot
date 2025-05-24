@@ -7,7 +7,7 @@ import { CacheSource } from "../types";
  */
 export class MonthlyStorage extends CacheDbClient {
   /**
-   * Check if a specific month is cached - with fallback to direct transaction query
+   * Check if a specific month is cached - uses improved PostgreSQL function
    */
   async isMonthCached(
     source: CacheSource | string,
@@ -17,7 +17,7 @@ export class MonthlyStorage extends CacheDbClient {
     try {
       console.log(`[MONTHLY_STORAGE_DEBUG] Checking if month is cached: ${source} ${year}/${month}`);
       
-      // First try the monthly_cache table via RPC function
+      // Use the improved PostgreSQL function via RPC
       const { data, error } = await this.getClient()
         .rpc('is_month_cached', {
           p_source: source,
@@ -27,18 +27,16 @@ export class MonthlyStorage extends CacheDbClient {
         
       if (!error && data && data.length > 0) {
         const result = data[0];
-        console.log(`[MONTHLY_STORAGE_DEBUG] RPC result:`, result);
+        console.log(`[MONTHLY_STORAGE_DEBUG] PostgreSQL RPC result:`, result);
         
-        if (result.is_cached && result.transaction_count > 0) {
-          return {
-            isCached: true,
-            transactionCount: result.transaction_count
-          };
-        }
+        return {
+          isCached: result.is_cached || false,
+          transactionCount: result.transaction_count || 0
+        };
       }
       
-      // Fallback: Check cached_transactions table directly
-      console.log(`[MONTHLY_STORAGE_DEBUG] RPC failed or returned no cache, checking cached_transactions directly`);
+      // Fallback: Check cached_transactions table directly (should rarely be needed now)
+      console.log(`[MONTHLY_STORAGE_DEBUG] RPC failed, using fallback check`);
       
       const { data: transactions, error: txError } = await this.getClient()
         .from('cached_transactions')
@@ -55,13 +53,7 @@ export class MonthlyStorage extends CacheDbClient {
       const count = transactions?.length || 0;
       const isCached = count > 0;
       
-      console.log(`[MONTHLY_STORAGE_DEBUG] Direct transaction check result: ${count} transactions found, cached: ${isCached}`);
-      
-      // If we found transactions but monthly_cache is missing, sync it
-      if (isCached) {
-        console.log(`[MONTHLY_STORAGE_DEBUG] Found ${count} transactions but monthly_cache was missing, syncing...`);
-        await this.syncMonthlyCache(source, year, month, count);
-      }
+      console.log(`[MONTHLY_STORAGE_DEBUG] Fallback result: ${count} transactions found, cached: ${isCached}`);
       
       return {
         isCached,
@@ -74,7 +66,7 @@ export class MonthlyStorage extends CacheDbClient {
   }
 
   /**
-   * Sync monthly_cache table with actual cached_transactions data
+   * Sync monthly_cache table with actual cached_transactions data - now automatic via PostgreSQL function
    */
   async syncMonthlyCache(
     source: CacheSource | string,
