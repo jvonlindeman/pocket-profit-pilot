@@ -8,7 +8,7 @@ export const useThrottledFetch = (throttleTime: number = 1000) => {
   const lastFetchTimeRef = useRef<number>(0);
   const pendingFetchRef = useRef<any>(null);
 
-  const executeThrottledFetch = useCallback(async <T>(
+  const executeThrottledFetch = useCallback(<T>(
     fetchFunction: () => Promise<T>,
     forceRefresh: boolean = false
   ): Promise<T> => {
