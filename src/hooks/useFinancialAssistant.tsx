@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useFinance } from '@/contexts/FinanceContext';
@@ -106,19 +105,24 @@ export const useFinancialAssistant = () => {
         updatedContext
       );
       
-      // Check if semantic search results were returned
+      // Check if semantic search results were returned and extract content properly
       let searchResults: SemanticSearchResult[] = [];
-      let responseContent = assistantResponse;
+      let responseContent: string;
       
-      // If the response includes semantic search results, extract them
-      if (typeof assistantResponse === 'object' && assistantResponse.searchResults) {
-        searchResults = assistantResponse.searchResults;
-        responseContent = assistantResponse.response?.content || assistantResponse.content;
+      // Handle both string and object responses
+      if (typeof assistantResponse === 'string') {
+        responseContent = assistantResponse;
+        setSemanticSearchResults([]);
+      } else if (assistantResponse && typeof assistantResponse === 'object') {
+        // Extract content and search results from object response
+        responseContent = assistantResponse.content;
+        searchResults = assistantResponse.searchResults || [];
         setSemanticSearchResults(searchResults);
         
         console.log(`Semantic search returned ${searchResults.length} results`);
       } else {
-        // Clear previous search results if this wasn't a search query
+        // Fallback for unexpected response format
+        responseContent = 'Error: Respuesta inválida del asistente';
         setSemanticSearchResults([]);
       }
       
