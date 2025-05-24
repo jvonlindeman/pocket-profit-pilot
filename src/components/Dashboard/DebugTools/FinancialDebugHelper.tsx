@@ -19,11 +19,11 @@ export default function FinancialDebugHelper() {
     loading,
     apiConnectivity,
     cacheStatus
-  } = useFinancialData(
-    dateRange?.startDate || new Date(), 
-    dateRange?.endDate || new Date(),
-    { enabled }
-  );
+  } = useFinancialData({
+    startDate: dateRange?.startDate || new Date(),
+    endDate: dateRange?.endDate || new Date(),
+    enabled
+  });
   
   const handleDebugRefresh = async () => {
     try {
