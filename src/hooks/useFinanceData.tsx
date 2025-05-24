@@ -10,6 +10,7 @@ import { getCurrentMonthRange } from '@/utils/dateUtils';
 import { zohoRepository } from '@/repositories/zohoRepository';
 import { UnpaidInvoice } from '@/types/financial';
 import { apiRequestManager } from '@/utils/ApiRequestManager';
+import { smartDataFetcherService } from '@/services/smartDataFetcherService';
 
 export const useFinanceData = () => {
   // Keep track of the last time refreshData was called
@@ -67,7 +68,7 @@ export const useFinanceData = () => {
     }
   }, [financialData, dateRange, transactions.length, loading, saveFinancialData]);
 
-  // CENTRALIZED DATA REFRESH FUNCTION - Single source of truth
+  // CENTRALIZED DATA REFRESH FUNCTION - Now using Smart Strategy
   // This function will handle all data refresh requests and ensure only one is processed at a time
   const refreshData = useCallback((force = false) => {
     // Generate a unique request ID for this refresh
@@ -92,16 +93,45 @@ export const useFinanceData = () => {
     refreshRequestIdRef.current = requestId;
     lastRefreshTimeRef.current = now;
     
-    console.log(`Beginning centralized data refresh (ID: ${requestId}, force: ${force})`);
+    console.log(`Beginning intelligent data refresh (ID: ${requestId}, force: ${force})`);
     
-    // Get the fetch function from the data fetcher
-    const fetchFunction = getRefreshFunction(force);
-    
-    // Execute the fetch with dates and callbacks
-    const promise = fetchFunction(dateRange, force, {
-      onCollaboratorData: processCollaboratorData,
-      onIncomeTypes: processIncomeTypes
-    }).finally(() => {
+    // Create the promise using the smart data fetcher
+    const promise = (async () => {
+      try {
+        // Use the smart data fetcher service
+        const result = await smartDataFetcherService.fetchAllFinancialData(
+          dateRange,
+          force,
+          {
+            onTransactions: (transactions) => {
+              // This will be handled by the enhanced data fetcher
+            },
+            onCollaboratorData: processCollaboratorData,
+            onIncomeTypes: processIncomeTypes
+          }
+        );
+
+        console.log(`Smart fetch completed (ID: ${requestId})`, {
+          success: result.success,
+          totalTransactions: result.totalTransactions,
+          cacheEfficiency: Math.round(result.cacheEfficiency * 100) + '%',
+          apiCallsSaved: result.apiCallsSaved
+        });
+
+        // Use the enhanced data fetcher for actual data processing
+        const fetchFunction = getRefreshFunction(force);
+        return await fetchFunction(dateRange, force, {
+          onCollaboratorData: processCollaboratorData,
+          onIncomeTypes: processIncomeTypes
+        });
+
+      } catch (error) {
+        console.error(`Smart fetch failed (ID: ${requestId}):`, error);
+        throw error;
+      }
+    })();
+
+    promise.finally(() => {
       // Always clean up when done
       console.log(`Completed data refresh (ID: ${requestId})`);
       refreshInProgressRef.current = false;
