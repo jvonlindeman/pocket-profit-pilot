@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -55,6 +54,7 @@ serve(async (req) => {
     // Analyze user intent to determine if this is a semantic search query
     const userMessage = messages[messages.length - 1]?.content || ''
     const isSemanticSearchQuery = analyzeSearchIntent(userMessage)
+    const isTemporalQuery = analyzeTemporalIntent(userMessage)
     
     let semanticSearchResults = null
     let searchContext = ''
@@ -81,8 +81,8 @@ serve(async (req) => {
       }
     }
 
-    // Build the system prompt with enhanced context
-    const systemPrompt = buildSystemPrompt(uiData, conversationContext, searchContext)
+    // Build the system prompt with enhanced context including historical data
+    const systemPrompt = buildEnhancedSystemPrompt(uiData, conversationContext, searchContext, isTemporalQuery)
 
     // Prepare messages for OpenAI
     const openaiMessages = [
@@ -162,6 +162,21 @@ function analyzeSearchIntent(userMessage: string): boolean {
   return searchKeywords.some(keyword => lowerMessage.includes(keyword))
 }
 
+function analyzeTemporalIntent(userMessage: string): boolean {
+  const temporalKeywords = [
+    'compare', 'comparison', 'comparar', 'comparación', 'vs', 'versus',
+    'month to month', 'mes a mes', 'monthly', 'mensual',
+    'trend', 'tendencia', 'pattern', 'patrón', 'over time', 'con el tiempo',
+    'last month', 'el mes pasado', 'previous', 'anterior',
+    'year to year', 'año a año', 'seasonal', 'estacional',
+    'growth', 'crecimiento', 'decline', 'descenso', 'change', 'cambio',
+    'history', 'historial', 'historical', 'histórico'
+  ]
+  
+  const lowerMessage = userMessage.toLowerCase()
+  return temporalKeywords.some(keyword => lowerMessage.includes(keyword))
+}
+
 async function performSemanticSearch(
   query: string, 
   dateRange: any, 
@@ -229,7 +244,48 @@ function formatSearchResults(results: SemanticSearchResult[]): string {
   return formatted
 }
 
-function buildSystemPrompt(uiData: any, conversationContext: any, searchContext: string): string {
+function buildEnhancedSystemPrompt(uiData: any, conversationContext: any, searchContext: string, isTemporalQuery: boolean): string {
+  let historicalContext = '';
+  let temporalAnalysisInstructions = '';
+
+  // Include historical data if available
+  if (uiData?.historicalContext && uiData.temporalAnalysisAvailable) {
+    const history = uiData.historicalContext;
+    
+    historicalContext = `\nDATOS HISTÓRICOS DISPONIBLES:
+- Historial mensual: ${history.monthlyHistory?.length || 0} meses de datos
+- Período actual: ${history.currentPeriod?.year}-${history.currentPeriod?.month}
+- Tendencias generales: Ingresos ${history.trends?.overallIncomesTrend}, Gastos ${history.trends?.overallExpensesTrend}, Beneficio ${history.trends?.overallProfitTrend}
+- Volatilidad: ${history.trends?.volatility}%
+- Patrones estacionales: Mejor mes de ingresos: ${history.seasonalPatterns?.highestIncomeMonth}, Peor mes: ${history.seasonalPatterns?.lowestIncomeMonth}
+- Beneficio mensual promedio: $${history.seasonalPatterns?.averageMonthlyProfit?.toLocaleString() || 0}
+
+HISTORIAL MENSUAL DETALLADO:
+${history.monthlyHistory?.map((month: any, index: number) => `
+${index + 1}. ${month.year}-${month.month}: 
+   Ingresos: $${Number(month.total_income).toLocaleString()} (${month.income_trend || 'stable'})
+   Gastos: $${Number(month.total_expense).toLocaleString()} (${month.expense_trend || 'stable'})
+   Beneficio: $${Number(month.profit).toLocaleString()} (${month.profit_trend || 'stable'})
+   Margen: ${Number(month.profit_margin).toFixed(1)}%
+   ${month.mom_income_change ? `Cambio ingresos MoM: ${Number(month.mom_income_change).toFixed(1)}%` : ''}
+   ${month.mom_expense_change ? `Cambio gastos MoM: ${Number(month.mom_expense_change).toFixed(1)}%` : ''}
+   ${month.mom_profit_change ? `Cambio beneficio MoM: ${Number(month.mom_profit_change).toFixed(1)}%` : ''}
+`).join('') || 'No hay datos históricos detallados disponibles.'}`;
+
+    if (isTemporalQuery) {
+      temporalAnalysisInstructions = `\nINSTRUCCIONES PARA ANÁLISIS TEMPORAL:
+- Utiliza los datos históricos para realizar comparaciones mes a mes
+- Identifica tendencias y patrones en los datos
+- Proporciona contexto histórico para el período actual
+- Calcula cambios porcentuales y variaciones significativas
+- Destaca anomalías o desviaciones de patrones históricos
+- Sugiere acciones basadas en tendencias identificadas
+- Usa los datos de volatilidad para evaluar la estabilidad financiera`;
+    }
+  } else {
+    historicalContext = '\nDATOS HISTÓRICOS: No disponibles (se está generando en segundo plano)';
+  }
+
   const basePrompt = `Eres un asistente financiero especializado con acceso completo a datos financieros históricos y capacidades de búsqueda semántica avanzada.
 
 CAPACIDADES PRINCIPALES:
@@ -237,14 +293,18 @@ CAPACIDADES PRINCIPALES:
 2. Búsqueda semántica inteligente de transacciones por descripción
 3. Identificación de patrones de gasto y comportamiento financiero
 4. Comparaciones temporales y análisis de variaciones
+5. Análisis de tendencias mes a mes con datos históricos reales
+6. Detección de patrones estacionales y anomalías
 
-DATOS DISPONIBLES:
+DATOS DISPONIBLES PERÍODO ACTUAL:
 - Resumen financiero: ${JSON.stringify(uiData?.summary || {})}
 - Transacciones: ${uiData?.transactions?.length || 0} registros
 - Gastos colaboradores: ${uiData?.collaboratorExpenses?.length || 0} registros
 - Ingresos regulares: $${uiData?.regularIncome || 0}
 - Rango de fechas: ${uiData?.dateRange?.startDate} a ${uiData?.dateRange?.endDate}
 - Facturas pendientes: ${uiData?.unpaidInvoices?.length || 0}
+
+${historicalContext}
 
 ${searchContext ? `RESULTADOS DE BÚSQUEDA SEMÁNTICA:
 ${searchContext}
@@ -256,13 +316,17 @@ INSTRUCCIONES PARA BÚSQUEDA SEMÁNTICA:
 - Sugiere acciones o análisis adicionales basados en los resultados
 ` : ''}
 
-INSTRUCCIONES:
+${temporalAnalysisInstructions}
+
+INSTRUCCIONES GENERALES:
 - Responde en español de manera profesional y clara
 - Usa los datos específicos disponibles para tus análisis
 - Proporciona insights accionables y relevantes
 - Si realizaste una búsqueda semántica, enfócate en analizar esos resultados específicos
+- Para consultas temporales, utiliza los datos históricos para comparaciones reales
 - Mantén el contexto de conversaciones anteriores cuando sea relevante
 - Sé preciso con números y fechas
+- Cuando sea relevante, proporciona comparaciones mes a mes usando datos reales
 
 CONTEXTO CONVERSACIONAL:
 ${conversationContext?.sharedInsights?.length ? `Insights previos: ${conversationContext.sharedInsights.slice(-3).join('; ')}` : ''}

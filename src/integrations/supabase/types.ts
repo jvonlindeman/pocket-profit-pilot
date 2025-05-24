@@ -275,6 +275,87 @@ export type Database = {
         }
         Relationships: []
       }
+      monthly_financial_summaries: {
+        Row: {
+          cache_segment_ids: Json | null
+          collaborator_expense: number
+          created_at: string
+          data_sources: Json | null
+          expense_trend: string | null
+          id: string
+          income_trend: string | null
+          is_seasonal_high: boolean | null
+          is_seasonal_low: boolean | null
+          mom_expense_change: number | null
+          mom_income_change: number | null
+          mom_profit_change: number | null
+          month: number
+          other_expense: number
+          profit: number
+          profit_margin: number
+          profit_trend: string | null
+          seasonal_variance: number | null
+          starting_balance: number | null
+          total_expense: number
+          total_income: number
+          transaction_count: number
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          cache_segment_ids?: Json | null
+          collaborator_expense?: number
+          created_at?: string
+          data_sources?: Json | null
+          expense_trend?: string | null
+          id?: string
+          income_trend?: string | null
+          is_seasonal_high?: boolean | null
+          is_seasonal_low?: boolean | null
+          mom_expense_change?: number | null
+          mom_income_change?: number | null
+          mom_profit_change?: number | null
+          month: number
+          other_expense?: number
+          profit?: number
+          profit_margin?: number
+          profit_trend?: string | null
+          seasonal_variance?: number | null
+          starting_balance?: number | null
+          total_expense?: number
+          total_income?: number
+          transaction_count?: number
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          cache_segment_ids?: Json | null
+          collaborator_expense?: number
+          created_at?: string
+          data_sources?: Json | null
+          expense_trend?: string | null
+          id?: string
+          income_trend?: string | null
+          is_seasonal_high?: boolean | null
+          is_seasonal_low?: boolean | null
+          mom_expense_change?: number | null
+          mom_income_change?: number | null
+          mom_profit_change?: number | null
+          month?: number
+          other_expense?: number
+          profit?: number
+          profit_margin?: number
+          profit_trend?: string | null
+          seasonal_variance?: number | null
+          starting_balance?: number | null
+          total_expense?: number
+          total_income?: number
+          transaction_count?: number
+          updated_at?: string
+          year?: number
+        }
+        Relationships: []
+      }
       zoho_integration: {
         Row: {
           access_token: string | null
@@ -320,6 +401,10 @@ export type Database = {
         Args: { "": string } | { "": unknown }
         Returns: unknown
       }
+      calculate_monthly_trends: {
+        Args: { target_year: number; target_month: number }
+        Returns: boolean
+      }
       find_similar_transactions: {
         Args: {
           reference_transaction_id: string
@@ -336,6 +421,24 @@ export type Database = {
           type: string
           source: string
           similarity: number
+        }[]
+      }
+      get_monthly_summaries_for_ai: {
+        Args: { months_back?: number }
+        Returns: {
+          year: number
+          month: number
+          total_income: number
+          total_expense: number
+          profit: number
+          profit_margin: number
+          mom_income_change: number
+          mom_expense_change: number
+          mom_profit_change: number
+          income_trend: string
+          expense_trend: string
+          profit_trend: string
+          transaction_count: number
         }[]
       }
       halfvec_avg: {
