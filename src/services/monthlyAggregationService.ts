@@ -150,7 +150,24 @@ export class MonthlyAggregationService {
         return [];
       }
 
-      return data || [];
+      // Map the data to include missing fields
+      return (data || []).map((item: any): MonthlyFinancialSummary => ({
+        year: item.year,
+        month: item.month,
+        total_income: Number(item.total_income),
+        total_expense: Number(item.total_expense),
+        collaborator_expense: Number(item.collaborator_expense || 0),
+        other_expense: Number(item.other_expense || 0),
+        profit: Number(item.profit),
+        profit_margin: Number(item.profit_margin),
+        transaction_count: item.transaction_count,
+        mom_income_change: item.mom_income_change ? Number(item.mom_income_change) : undefined,
+        mom_expense_change: item.mom_expense_change ? Number(item.mom_expense_change) : undefined,
+        mom_profit_change: item.mom_profit_change ? Number(item.mom_profit_change) : undefined,
+        income_trend: item.income_trend,
+        expense_trend: item.expense_trend,
+        profit_trend: item.profit_trend
+      }));
     } catch (err) {
       console.error('Exception fetching historical summaries:', err);
       return [];

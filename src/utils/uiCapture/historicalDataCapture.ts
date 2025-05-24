@@ -1,5 +1,5 @@
 
-import { MonthlyFinancialSummary, monthlyAggregationService } from '@/services/monthlyAggregationService';
+import { MonthlyFinancialSummary, MonthlyAggregationService } from '@/services/monthlyAggregationService';
 
 export interface HistoricalFinancialContext {
   monthlyHistory: MonthlyFinancialSummary[];
@@ -31,13 +31,13 @@ export const captureHistoricalFinancialData = async (
   try {
     console.log('Capturing historical financial data for AI context...');
     
-    // Get historical monthly summaries
-    const monthlyHistory = await monthlyAggregationService.getHistoricalSummaries(12);
+    // Get historical monthly summaries using static method
+    const monthlyHistory = await MonthlyAggregationService.getHistoricalSummaries(12);
     
     if (monthlyHistory.length === 0) {
       console.log('No historical data available, triggering backfill...');
       // Trigger backfill but don't wait for it to complete
-      monthlyAggregationService.backfillHistoricalSummaries()
+      MonthlyAggregationService.backfillHistoricalSummaries()
         .then(result => console.log('Backfill completed:', result))
         .catch(err => console.error('Backfill failed:', err));
       

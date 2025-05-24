@@ -4,6 +4,16 @@
  * Used by the UI data capture utilities
  */
 
+// Function to get DOM elements by selector - exported for use in index.ts
+export function getDOMElementsBySelector(selector: string): Element[] {
+  try {
+    return Array.from(document.querySelectorAll(selector));
+  } catch (err) {
+    console.error('Error getting DOM elements by selector:', err);
+    return [];
+  }
+}
+
 // Function to detect visible components in the DOM
 export function getVisibleComponents(): string[] {
   try {

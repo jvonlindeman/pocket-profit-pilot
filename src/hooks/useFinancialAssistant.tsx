@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useFinance } from '@/contexts/FinanceContext';
@@ -65,9 +66,9 @@ export const useFinancialAssistant = () => {
         // You could add logic here to refresh financial data if needed
       }
       
-      // Capture current UI data with detailed logging
+      // Capture current UI data with detailed logging - await the Promise
       console.log('Capturing enhanced UI data for financial assistant...');
-      const uiData = captureUIData(financeContext);
+      const uiData = await captureUIData(financeContext);
       
       console.log('Enhanced UI data captured:', {
         activeComponents: uiData.activeComponents,

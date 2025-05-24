@@ -1,10 +1,42 @@
 
+import { FinancialData } from '@/types/financial';
+
 // Format amount for display
 export function formatAmount(amount: number) {
   return new Intl.NumberFormat('es-ES', {
     style: 'currency',
     currency: 'USD'
   }).format(amount);
+}
+
+// Main export function that was missing
+export function analyzeFinancialData(financialData: FinancialData) {
+  const insights = [];
+  
+  // Basic analysis from the summary
+  if (financialData.summary) {
+    if (financialData.summary.profitMargin < 10) {
+      insights.push({
+        description: `Margen de beneficio bajo: ${financialData.summary.profitMargin.toFixed(1)}%`,
+        significance: 'warning'
+      });
+    }
+    
+    if (financialData.summary.profit < 0) {
+      insights.push({
+        description: `Pérdidas este período: ${formatAmount(financialData.summary.profit)}`,
+        significance: 'warning'
+      });
+    }
+  }
+  
+  // Transaction-based insights
+  if (financialData.transactions && financialData.transactions.length > 0) {
+    const transactionInsights = calculateTransactionInsights(financialData.transactions);
+    insights.push(...transactionInsights);
+  }
+  
+  return insights;
 }
 
 // Enhanced function to calculate transaction insights with more sophisticated analysis
