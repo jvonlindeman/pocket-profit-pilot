@@ -133,11 +133,11 @@ export const checkCache = async (
           };
         }
       } else if (cacheResult && cacheResult.length > 0) {
-        const result = cacheResult[0];
-        console.log(`[CACHE_CHECK_DEBUG] PostgreSQL RPC result:`, result);
+        const cacheResultItem = cacheResult[0];
+        console.log(`[CACHE_CHECK_DEBUG] PostgreSQL RPC result:`, cacheResultItem);
         
-        if (result.is_cached && result.transaction_count > 0) {
-          console.log(`[CACHE_CHECK_DEBUG] Cache HIT (PostgreSQL) - Found ${result.transaction_count} transactions`);
+        if (cacheResultItem.is_cached && cacheResultItem.transaction_count > 0) {
+          console.log(`[CACHE_CHECK_DEBUG] Cache HIT (PostgreSQL) - Found ${cacheResultItem.transaction_count} transactions`);
           
           // Get transactions for this month
           const transactions = await monthlyStorage.getMonthTransactions(
@@ -158,7 +158,7 @@ export const checkCache = async (
             transactions.length
           );
           
-          const result: CacheResponse = {
+          const response: CacheResponse = {
             cached: true,
             status: "complete",
             data: transactions,
@@ -173,7 +173,7 @@ export const checkCache = async (
             }
           };
           
-          return result;
+          return response;
         }
       }
       
@@ -190,7 +190,7 @@ export const checkCache = async (
         0
       );
       
-      const result: CacheResponse = {
+      const missResponse: CacheResponse = {
         cached: false,
         status: "missing",
         partial: false,
@@ -203,7 +203,7 @@ export const checkCache = async (
         }
       };
       
-      return result;
+      return missResponse;
     } 
     else {
       console.log(`[CACHE_CHECK_DEBUG] Complex date range detected, using cache-manager edge function`);

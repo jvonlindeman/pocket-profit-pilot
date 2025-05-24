@@ -26,27 +26,41 @@ export const useIncomeProcessor = () => {
       }
     });
     
-    // Set Stripe income from the API response
-    setStripeIncome(stripeData.gross || 0);
-    setStripeFees(stripeData.fees || 0);
-    setStripeTransactionFees(stripeData.transactionFees || 0);
-    setStripePayoutFees(stripeData.payoutFees || 0);
-    setStripeAdditionalFees(stripeData.stripeFees || 0);
-    setStripeAdvances(stripeData.advances || 0);
-    setStripeAdvanceFunding(stripeData.advanceFunding || 0);
-    setStripeNet(stripeData.net || 0);
-    setStripeFeePercentage(stripeData.feePercentage || 0);
+    // Add null check for stripeData before accessing its properties
+    if (stripeData && typeof stripeData === 'object') {
+      setStripeIncome(stripeData.gross || 0);
+      setStripeFees(stripeData.fees || 0);
+      setStripeTransactionFees(stripeData.transactionFees || 0);
+      setStripePayoutFees(stripeData.payoutFees || 0);
+      setStripeAdditionalFees(stripeData.stripeFees || 0);
+      setStripeAdvances(stripeData.advances || 0);
+      setStripeAdvanceFunding(stripeData.advanceFunding || 0);
+      setStripeNet(stripeData.net || 0);
+      setStripeFeePercentage(stripeData.feePercentage || 0);
+    } else {
+      // Reset all Stripe values to 0 when stripeData is null
+      setStripeIncome(0);
+      setStripeFees(0);
+      setStripeTransactionFees(0);
+      setStripePayoutFees(0);
+      setStripeAdditionalFees(0);
+      setStripeAdvances(0);
+      setStripeAdvanceFunding(0);
+      setStripeNet(0);
+      setStripeFeePercentage(0);
+    }
+    
     setRegularIncome(regularAmount);
     
     return { 
-      stripeGross: stripeData.gross || 0, 
-      stripeFees: stripeData.fees || 0,
-      stripeTransactionFees: stripeData.transactionFees || 0,
-      stripePayoutFees: stripeData.payoutFees || 0,
-      stripeAdditionalFees: stripeData.stripeFees || 0,
-      stripeAdvances: stripeData.advances || 0,
-      stripeAdvanceFunding: stripeData.advanceFunding || 0,
-      stripeNet: stripeData.net || 0,
+      stripeGross: stripeData?.gross || 0, 
+      stripeFees: stripeData?.fees || 0,
+      stripeTransactionFees: stripeData?.transactionFees || 0,
+      stripePayoutFees: stripeData?.payoutFees || 0,
+      stripeAdditionalFees: stripeData?.stripeFees || 0,
+      stripeAdvances: stripeData?.advances || 0,
+      stripeAdvanceFunding: stripeData?.advanceFunding || 0,
+      stripeNet: stripeData?.net || 0,
       regularAmount 
     };
   }, []);
