@@ -1,9 +1,9 @@
-
 import { Transaction } from "../types/financial";
 import StripeService from "../services/stripeService";
 import { apiRequestManager } from "@/utils/ApiRequestManager";
 import { formatDateYYYYMMDD } from "@/utils/dateUtils";
 import { useApiCalls } from "@/contexts/ApiCallsContext";
+import CacheService from "@/services/cache";
 
 /**
  * Interface for Stripe data results that includes transactions and aggregate data
@@ -44,7 +44,7 @@ export class StripeRepository {
   }
 
   /**
-   * Get transactions for a date range with improved deduplication
+   * Get transactions for a date range with improved deduplication and persistent caching
    */
   async getTransactions(
     startDate: Date,
@@ -59,6 +59,45 @@ export class StripeRepository {
       
       // Store the last request key for deduplication
       this.lastRequestKey = cacheKey;
+      
+      // First check persistent cache before checking in-memory cache
+      if (!forceRefresh) {
+        console.log("StripeRepository: Checking persistent cache first...");
+        const persistentCacheCheck = await CacheService.checkCache('Stripe', startDate, endDate);
+        
+        if (persistentCacheCheck.cached && persistentCacheCheck.data && persistentCacheCheck.data.length > 0) {
+          console.log(`StripeRepository: Found ${persistentCacheCheck.data.length} transactions in persistent cache`);
+          
+          // Calculate summary data from cached transactions
+          const transactions = persistentCacheCheck.data;
+          const gross = transactions.reduce((sum, tx) => sum + (tx.gross || tx.amount), 0);
+          const fees = transactions.reduce((sum, tx) => sum + (tx.fees || 0), 0);
+          const transactionFees = transactions
+            .filter(tx => tx.metadata?.feeType === 'transaction')
+            .reduce((sum, tx) => sum + (tx.fees || 0), 0);
+          const payoutFees = transactions
+            .filter(tx => tx.metadata?.feeType === 'payout')
+            .reduce((sum, tx) => sum + (tx.fees || 0), 0);
+          const additionalFees = transactions
+            .filter(tx => tx.metadata?.feeType === 'stripe')
+            .reduce((sum, tx) => sum + (tx.fees || 0), 0);
+          const net = gross - fees;
+          const feePercentage = gross > 0 ? (fees / gross) * 100 : 0;
+          
+          return {
+            transactions,
+            gross,
+            fees,
+            transactionFees,
+            payoutFees,
+            additionalFees,
+            net,
+            feePercentage
+          };
+        } else {
+          console.log("StripeRepository: No data in persistent cache, checking in-memory cache...");
+        }
+      }
       
       // Check if there's already a request in progress with this key
       if (this.inProgressRequestsMap.has(cacheKey) && !forceRefresh) {
@@ -100,7 +139,7 @@ export class StripeRepository {
   }
   
   /**
-   * Execute the actual request with ApiRequestManager
+   * Execute the actual request with ApiRequestManager and automatic persistent storage
    */
   private async executeRequest(
     cacheKey: string, 
@@ -114,6 +153,26 @@ export class StripeRepository {
         console.log(`StripeRepository: Making actual API call for ${cacheKey}`);
         this.trackApiCall();
         const result = await StripeService.getTransactions(startDate, endDate, forceRefresh);
+        
+        // CRITICAL: Store data in persistent cache immediately after successful API call
+        if (result.transactions && result.transactions.length > 0) {
+          console.log(`StripeRepository: Storing ${result.transactions.length} transactions in persistent cache`);
+          
+          try {
+            const storeResult = await CacheService.storeTransactions('Stripe', startDate, endDate, result.transactions);
+            
+            if (storeResult) {
+              console.log("StripeRepository: Successfully stored transactions in persistent cache");
+            } else {
+              console.error("StripeRepository: Failed to store transactions in persistent cache");
+            }
+          } catch (storeError) {
+            console.error("StripeRepository: Exception storing transactions in persistent cache:", storeError);
+          }
+        } else {
+          console.log("StripeRepository: No transactions to store in persistent cache");
+        }
+        
         return {
           transactions: result.transactions,
           gross: result.gross,

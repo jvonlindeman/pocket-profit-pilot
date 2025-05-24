@@ -1,4 +1,3 @@
-
 import { Transaction } from "../types/financial";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateYYYYMMDD_Panama, toPanamaTime, PANAMA_TIMEZONE } from "@/utils/timezoneUtils";
@@ -46,30 +45,28 @@ const StripeService = {
     endDate: Date,
     forceRefresh: boolean = false
   ): Promise<StripeData> => {
-    console.log("StripeService: [STORAGE_DEBUG] Starting transaction fetch", {
+    console.log("StripeService: Starting transaction fetch", {
       startDate: startDate.toISOString(),
       endDate: endDate.toISOString(),
       forceRefresh
     });
     
     try {
-      // Check cache first if not forcing a refresh
+      // Check cache first if not forcing a refresh (keep this for backwards compatibility)
       if (!forceRefresh) {
-        console.log("StripeService: [STORAGE_DEBUG] Checking cache...");
+        console.log("StripeService: Checking cache...");
         const cacheCheck = await CacheService.checkCache('Stripe', startDate, endDate);
-        console.log("StripeService: [STORAGE_DEBUG] Cache check result:", {
+        console.log("StripeService: Cache check result:", {
           cached: cacheCheck.cached,
           dataLength: cacheCheck.data?.length || 0,
           hasData: !!cacheCheck.data
         });
         
         if (cacheCheck.cached && cacheCheck.data && cacheCheck.data.length > 0) {
-          console.log("StripeService: [STORAGE_DEBUG] Using cached data, found", cacheCheck.data.length, "transactions");
+          console.log("StripeService: Using cached data, found", cacheCheck.data.length, "transactions");
           
-          // We need to calculate the summary data for Stripe from cached transactions
+          // Calculate summary data from cached transactions
           const transactions = cacheCheck.data;
-          
-          // Calculate summary data
           const gross = transactions.reduce((sum, tx) => sum + (tx.gross || tx.amount), 0);
           const fees = transactions.reduce((sum, tx) => sum + (tx.fees || 0), 0);
           const transactionFees = transactions
@@ -113,7 +110,7 @@ const StripeService = {
             feePercentage
           };
         } else {
-          console.log("StripeService: [STORAGE_DEBUG] Cache miss or no data, proceeding to API call");
+          console.log("StripeService: Cache miss or no data, proceeding to API call");
         }
       }
       
@@ -125,7 +122,7 @@ const StripeService = {
       const formattedStartDate = formatDateYYYYMMDD_Panama(panamaStartDate);
       const formattedEndDate = formatDateYYYYMMDD_Panama(panamaEndDate);
       
-      console.log("StripeService: [STORAGE_DEBUG] Calling Stripe edge function with Panama dates:", {
+      console.log("StripeService: Calling Stripe edge function with Panama dates:", {
         formattedStartDate,
         formattedEndDate,
         timezone: PANAMA_TIMEZONE,
@@ -142,7 +139,7 @@ const StripeService = {
       });
       
       if (error) {
-        console.error("StripeService: [STORAGE_DEBUG] Error fetching from API:", error);
+        console.error("StripeService: Error fetching from API:", error);
         lastRawResponse = { error: error.message };
         return {
           transactions: [],
@@ -160,53 +157,45 @@ const StripeService = {
       
       // Store the raw response for debugging
       lastRawResponse = data;
-      console.log("StripeService: [STORAGE_DEBUG] Stored raw response for debugging:", {
+      console.log("StripeService: Stored raw response for debugging:", {
         hasData: !!data,
         transactionCount: data?.transactions?.length || 0,
         summaryExists: !!data?.summary
       });
       
       const response = data as StripeTransactionResponse;
-      console.log("StripeService: [STORAGE_DEBUG] API response with summary:", response.summary);
+      console.log("StripeService: API response with summary:", response.summary);
       
-      // Ensure all transaction dates are in Panama timezone format and validate data
+      // Process and validate transaction data
       if (response.transactions && Array.isArray(response.transactions)) {
-        console.log(`StripeService: [STORAGE_DEBUG] Processing ${response.transactions.length} transactions for cache storage`);
+        console.log(`StripeService: Processing ${response.transactions.length} transactions`);
         
-        // Validate and prepare transaction data
+        // Validate and prepare transaction data for storage (repository will handle storage)
         const validTransactions: Transaction[] = [];
         
         response.transactions.forEach((tx, index) => {
-          console.log(`StripeService: [STORAGE_DEBUG] Validating transaction ${index}:`, {
-            id: tx.id,
-            amount: tx.amount,
-            date: tx.date,
-            hasRequiredFields: !!(tx.id && tx.amount !== undefined && tx.date && tx.type && tx.source)
-          });
-          
           // Validate required fields
           if (!tx.id) {
-            console.error(`StripeService: [STORAGE_DEBUG] Transaction at index ${index} is missing id`, tx);
+            console.error(`StripeService: Transaction at index ${index} is missing id`, tx);
             tx.id = `stripe-missing-id-${Date.now()}-${index}`;
           }
           
           // Set external_id if missing
           if (!tx.external_id) {
-            console.log(`StripeService: [STORAGE_DEBUG] Setting external_id for transaction ${tx.id}`);
             tx.external_id = tx.id;
           }
           
           if (!tx.date) {
-            console.error(`StripeService: [STORAGE_DEBUG] Transaction ${tx.id} is missing date`, tx);
+            console.error(`StripeService: Transaction ${tx.id} is missing date`, tx);
             tx.date = formatDateYYYYMMDD_Panama(new Date());
           } else {
             try {
               // Convert existing date to Panama timezone format
               const originalDate = tx.date;
               tx.date = formatDateYYYYMMDD_Panama(toPanamaTime(new Date(tx.date)));
-              console.log(`StripeService: [STORAGE_DEBUG] Converted date for ${tx.id}: ${originalDate} -> ${tx.date}`);
+              console.log(`StripeService: Converted date for ${tx.id}: ${originalDate} -> ${tx.date}`);
             } catch (e) {
-              console.error(`StripeService: [STORAGE_DEBUG] Error converting transaction date to Panama timezone: ${tx.date}`, e);
+              console.error(`StripeService: Error converting transaction date to Panama timezone: ${tx.date}`, e);
               tx.date = formatDateYYYYMMDD_Panama(new Date());
             }
           }
@@ -218,12 +207,12 @@ const StripeService = {
           
           // Ensure required fields are present
           if (tx.amount === undefined || tx.amount === null) {
-            console.error(`StripeService: [STORAGE_DEBUG] Transaction ${tx.id} is missing amount`, tx);
+            console.error(`StripeService: Transaction ${tx.id} is missing amount`, tx);
             tx.amount = 0;
           }
           
           if (!tx.type) {
-            console.error(`StripeService: [STORAGE_DEBUG] Transaction ${tx.id} is missing type`, tx);
+            console.error(`StripeService: Transaction ${tx.id} is missing type`, tx);
             tx.type = 'income' as 'income' | 'expense';
           }
           
@@ -238,71 +227,24 @@ const StripeService = {
             const month = txDate.getMonth() + 1;
             (tx as any).year = year;
             (tx as any).month = month;
-            console.log(`StripeService: [STORAGE_DEBUG] Added year/month to transaction ${tx.id}: ${year}/${month}`);
           }
           
-          // Log final validation status
+          // Validate final transaction
           const isValid = !!(tx.id && tx.amount !== undefined && tx.date && tx.type && tx.source);
-          console.log(`StripeService: [STORAGE_DEBUG] Transaction ${tx.id} validation result:`, {
-            isValid,
-            id: !!tx.id,
-            amount: tx.amount !== undefined,
-            date: !!tx.date,
-            type: !!tx.type,
-            source: !!tx.source,
-            year: (tx as any).year,
-            month: (tx as any).month
-          });
           
           if (isValid) {
             validTransactions.push(tx);
           } else {
-            console.error(`StripeService: [STORAGE_DEBUG] Skipping invalid transaction:`, tx);
+            console.error(`StripeService: Skipping invalid transaction:`, tx);
           }
         });
         
-        console.log(`StripeService: [STORAGE_DEBUG] Validated ${validTransactions.length} out of ${response.transactions.length} transactions`);
+        console.log(`StripeService: Validated ${validTransactions.length} out of ${response.transactions.length} transactions`);
         
-        // Store transactions in cache using the NEW storeTransactions operation
-        if (validTransactions.length > 0) {
-          console.log("StripeService: [STORAGE_DEBUG] Attempting to store transactions in cache using new method");
-          
-          try {
-            const storeResult = await CacheService.storeTransactions('Stripe', startDate, endDate, validTransactions);
-            console.log("StripeService: [STORAGE_DEBUG] Store operation result:", storeResult);
-            
-            if (!storeResult) {
-              console.error("StripeService: [STORAGE_DEBUG] Failed to store transactions in cache");
-              // Log sample transaction for debugging
-              if (validTransactions.length > 0) {
-                console.error("StripeService: [STORAGE_DEBUG] Sample transaction that failed to cache:", JSON.stringify(validTransactions[0], null, 2));
-              }
-            } else {
-              console.log("StripeService: [STORAGE_DEBUG] Successfully stored transactions in cache");
-              
-              // Verify the transactions were stored correctly
-              try {
-                const verificationCheck = await CacheService.checkCache('Stripe', startDate, endDate);
-                console.log(`StripeService: [STORAGE_DEBUG] Verification check - cached=${verificationCheck.cached}, count=${verificationCheck.data?.length || 0}`);
-                
-                if (!verificationCheck.cached || !verificationCheck.data || verificationCheck.data.length === 0) {
-                  console.error("StripeService: [STORAGE_DEBUG] CRITICAL: Transactions were not properly stored or retrieved from cache!");
-                }
-              } catch (verifyErr) {
-                console.error("StripeService: [STORAGE_DEBUG] Error verifying cache storage:", verifyErr);
-              }
-            }
-          } catch (storeErr) {
-            console.error("StripeService: [STORAGE_DEBUG] Exception during cache storage:", storeErr);
-          }
-        } else {
-          console.warn("StripeService: [STORAGE_DEBUG] No valid transactions to store");
-        }
-        
-        // Update response with validated transactions
+        // Note: Storage is now handled by StripeRepository, not here
         response.transactions = validTransactions;
       } else {
-        console.warn("StripeService: [STORAGE_DEBUG] No transactions in API response or invalid format");
+        console.warn("StripeService: No transactions in API response or invalid format");
       }
       
       return {
@@ -318,7 +260,7 @@ const StripeService = {
         feePercentage: response.summary.feePercentage || 0
       };
     } catch (err) {
-      console.error("StripeService: [STORAGE_DEBUG] Critical error:", err);
+      console.error("StripeService: Critical error:", err);
       lastRawResponse = { error: err instanceof Error ? err.message : "Unknown error" };
       return {
         transactions: [],
