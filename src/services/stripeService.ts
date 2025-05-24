@@ -1,7 +1,6 @@
 import { Transaction } from "../types/financial";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDateYYYYMMDD_Panama, toPanamaTime, PANAMA_TIMEZONE } from "@/utils/timezoneUtils";
-import CacheService from "./cache";
 
 interface StripeTransactionResponse {
   transactions: Transaction[];
@@ -39,7 +38,7 @@ interface StripeData {
 let lastRawResponse: any = null;
 
 const StripeService = {
-  // Get transactions within a date range
+  // Get transactions within a date range - simplified without redundant cache checking
   getTransactions: async (
     startDate: Date, 
     endDate: Date,
@@ -52,68 +51,6 @@ const StripeService = {
     });
     
     try {
-      // Check cache first if not forcing a refresh (keep this for backwards compatibility)
-      if (!forceRefresh) {
-        console.log("StripeService: Checking cache...");
-        const cacheCheck = await CacheService.checkCache('Stripe', startDate, endDate);
-        console.log("StripeService: Cache check result:", {
-          cached: cacheCheck.cached,
-          dataLength: cacheCheck.data?.length || 0,
-          hasData: !!cacheCheck.data
-        });
-        
-        if (cacheCheck.cached && cacheCheck.data && cacheCheck.data.length > 0) {
-          console.log("StripeService: Using cached data, found", cacheCheck.data.length, "transactions");
-          
-          // Calculate summary data from cached transactions
-          const transactions = cacheCheck.data;
-          const gross = transactions.reduce((sum, tx) => sum + (tx.gross || tx.amount), 0);
-          const fees = transactions.reduce((sum, tx) => sum + (tx.fees || 0), 0);
-          const transactionFees = transactions
-            .filter(tx => tx.metadata?.feeType === 'transaction')
-            .reduce((sum, tx) => sum + (tx.fees || 0), 0);
-          const payoutFees = transactions
-            .filter(tx => tx.metadata?.feeType === 'payout')
-            .reduce((sum, tx) => sum + (tx.fees || 0), 0);
-          const stripeFees = transactions
-            .filter(tx => tx.metadata?.feeType === 'stripe')
-            .reduce((sum, tx) => sum + (tx.fees || 0), 0);
-          const net = gross - fees;
-          const feePercentage = gross > 0 ? (fees / gross) * 100 : 0;
-          
-          // Store the response for debugging
-          lastRawResponse = {
-            cached: true,
-            transactions,
-            summary: {
-              gross,
-              fees, 
-              transactionFees,
-              payoutFees,
-              stripeFees,
-              net,
-              feePercentage
-            },
-            metrics: cacheCheck.metrics
-          };
-          
-          return {
-            transactions,
-            gross,
-            fees,
-            transactionFees,
-            payoutFees,
-            stripeFees,
-            advances: 0,
-            advanceFunding: 0,
-            net,
-            feePercentage
-          };
-        } else {
-          console.log("StripeService: Cache miss or no data, proceeding to API call");
-        }
-      }
-      
       // Convert dates to Panama timezone before formatting
       const panamaStartDate = toPanamaTime(startDate);
       const panamaEndDate = toPanamaTime(endDate);
@@ -170,7 +107,7 @@ const StripeService = {
       if (response.transactions && Array.isArray(response.transactions)) {
         console.log(`StripeService: Processing ${response.transactions.length} transactions`);
         
-        // Validate and prepare transaction data for storage (repository will handle storage)
+        // Validate and prepare transaction data
         const validTransactions: Transaction[] = [];
         
         response.transactions.forEach((tx, index) => {
@@ -240,8 +177,6 @@ const StripeService = {
         });
         
         console.log(`StripeService: Validated ${validTransactions.length} out of ${response.transactions.length} transactions`);
-        
-        // Note: Storage is now handled by StripeRepository, not here
         response.transactions = validTransactions;
       } else {
         console.warn("StripeService: No transactions in API response or invalid format");

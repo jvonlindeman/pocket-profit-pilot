@@ -2,26 +2,37 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { Transaction } from '@/types/financial';
-import { dataFetcherService } from '@/services/dataFetcherService';
+import { useOptimizedFinancialData } from '@/hooks/queries/useOptimizedFinancialData';
 
 /**
- * Unified hook for financial data management with centralized approach
+ * Unified hook for financial data management with optimized cache-first approach
  */
 export const useUnifiedFinancialData = () => {
-  // States
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  // State for the current date range
+  const [dateRange, setDateRange] = useState<{ startDate: Date; endDate: Date } | null>(null);
+  
+  // References to prevent duplicate calls
+  const isFetchingRef = useRef<boolean>(false);
+  const lastRefreshTimeRef = useRef<number>(0);
+  const refreshCooldownRef = useRef<number>(10000); // 10 second cooldown
+  
+  // Use the optimized hook only when we have a date range
+  const {
+    transactions,
+    stripeData,
+    loading,
+    error,
+    usingCachedData,
+    cacheStatus,
+    refetch
+  } = useOptimizedFinancialData(
+    dateRange?.startDate || new Date(),
+    dateRange?.endDate || new Date()
+  );
+
+  // State for additional data
   const [rawResponse, setRawResponse] = useState<any>(null);
-  const [usingCachedData, setUsingCachedData] = useState<boolean>(false);
   const [dataInitialized, setDataInitialized] = useState<boolean>(false);
-  const [cacheStatus, setCacheStatus] = useState<{
-    zoho: { hit: boolean, partial: boolean },
-    stripe: { hit: boolean, partial: boolean }
-  }>({
-    zoho: { hit: false, partial: false },
-    stripe: { hit: false, partial: false }
-  });
   const [apiConnectivity, setApiConnectivity] = useState<{
     zoho: boolean,
     stripe: boolean
@@ -29,17 +40,19 @@ export const useUnifiedFinancialData = () => {
     zoho: true,
     stripe: true
   });
-  
-  // References to prevent duplicate calls
-  const isFetchingRef = useRef<boolean>(false);
-  const lastRefreshTimeRef = useRef<number>(0);
-  const refreshCooldownRef = useRef<number>(10000); // 10 second cooldown
-  const currentRequestIdRef = useRef<string>('');
-  
-  // Function to check API connectivity
+
+  // Update data initialized flag when we have data
+  useEffect(() => {
+    if (transactions.length > 0) {
+      setDataInitialized(true);
+    }
+  }, [transactions.length]);
+
+  // Function to check API connectivity (simplified)
   const checkApiConnectivity = useCallback(async () => {
     try {
-      const result = await dataFetcherService.checkApiConnectivity();
+      // For now, assume APIs are connected if we can load data
+      const result = { zoho: true, stripe: true };
       setApiConnectivity(result);
       return result;
     } catch (error) {
@@ -50,28 +63,23 @@ export const useUnifiedFinancialData = () => {
     }
   }, []);
 
-  // Function to check cache status
-  const checkCacheStatus = useCallback(async (dateRange: { startDate: Date; endDate: Date }) => {
-    try {
-      const result = await dataFetcherService.checkCacheStatus(dateRange);
-      
-      setCacheStatus({
-        zoho: { hit: result.zoho.cached, partial: result.zoho.partial },
-        stripe: { hit: result.stripe.cached, partial: result.stripe.partial }
-      });
-      
-      setUsingCachedData(result.zoho.cached || result.stripe.cached);
-      
-      return result;
-    } catch (error) {
-      console.error("Error checking cache status:", error);
-      return null;
+  // Function to check cache status (now provided by the optimized hook)
+  const checkCacheStatus = useCallback(async (newDateRange: { startDate: Date; endDate: Date }) => {
+    if (!dateRange || 
+        dateRange.startDate.getTime() !== newDateRange.startDate.getTime() ||
+        dateRange.endDate.getTime() !== newDateRange.endDate.getTime()) {
+      setDateRange(newDateRange);
     }
-  }, []);
+    
+    return {
+      zoho: { cached: cacheStatus.zoho.hit, partial: cacheStatus.zoho.partial },
+      stripe: { cached: cacheStatus.stripe.hit, partial: cacheStatus.stripe.partial }
+    };
+  }, [dateRange, cacheStatus]);
 
-  // Function to fetch data
+  // Function to fetch data with throttling
   const fetchData = useCallback(async (
-    dateRange: { startDate: Date; endDate: Date },
+    newDateRange: { startDate: Date; endDate: Date },
     forceRefresh = false,
     callbacks: {
       onCollaboratorData: (data: any) => void,
@@ -94,48 +102,39 @@ export const useUnifiedFinancialData = () => {
     // Update state and refs
     isFetchingRef.current = true;
     lastRefreshTimeRef.current = now;
-    setLoading(true);
-    setError(null);
     
     try {
-      // Check API connectivity first
-      await checkApiConnectivity();
+      // Set the date range to trigger the optimized hook
+      setDateRange(newDateRange);
       
-      // Check cache status before fetch
-      await checkCacheStatus(dateRange);
+      // Wait a bit for the hook to process
+      await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Fetch data using the centralized service
-      const success = await dataFetcherService.fetchAllFinancialData(
-        dateRange,
-        forceRefresh,
-        {
-          onTransactions: (data) => {
-            setTransactions(data);
-            setDataInitialized(true);
-          },
-          ...callbacks
-        }
-      );
+      // Trigger the refetch with force refresh if needed
+      await refetch(forceRefresh);
       
-      // Update raw response for debugging
-      const responseData = dataFetcherService.getLastRawResponse();
-      if (responseData) {
-        setRawResponse(responseData);
+      // Call the callbacks with the current data
+      if (callbacks.onCollaboratorData) {
+        callbacks.onCollaboratorData(transactions);
       }
       
-      // Check cache status again after fetch
-      await checkCacheStatus(dateRange);
+      if (callbacks.onIncomeTypes) {
+        callbacks.onIncomeTypes(transactions, stripeData);
+      }
       
-      return success;
+      return true;
     } catch (err: any) {
       console.error("Error fetching financial data:", err);
-      setError(err.message || "Error al cargar los datos financieros");
+      toast({
+        title: "Error",
+        description: err.message || "Error al cargar los datos financieros",
+        variant: "destructive",
+      });
       return false;
     } finally {
-      setLoading(false);
       isFetchingRef.current = false;
     }
-  }, [checkApiConnectivity, checkCacheStatus]);
+  }, [refetch, transactions, stripeData]);
   
   // Function to refresh data with throttling
   const refreshData = useCallback((force = false) => {
@@ -151,6 +150,17 @@ export const useUnifiedFinancialData = () => {
   useEffect(() => {
     checkApiConnectivity();
   }, [checkApiConnectivity]);
+
+  // Update raw response when stripeData changes
+  useEffect(() => {
+    if (stripeData) {
+      setRawResponse({
+        stripe: stripeData,
+        cached: usingCachedData,
+        cacheStatus
+      });
+    }
+  }, [stripeData, usingCachedData, cacheStatus]);
 
   return {
     transactions,

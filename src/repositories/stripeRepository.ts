@@ -1,3 +1,4 @@
+
 import { Transaction } from "../types/financial";
 import StripeService from "../services/stripeService";
 import { apiRequestManager } from "@/utils/ApiRequestManager";
@@ -21,10 +22,10 @@ export interface StripeResult {
 
 /**
  * StripeRepository handles all data access related to Stripe
+ * Simplified to avoid redundant caching layers
  */
 export class StripeRepository {
   private apiCallsContext?: ReturnType<typeof useApiCalls>;
-  private lastRequestKey: string = '';
   private inProgressRequestsMap: Map<string, Promise<any>> = new Map();
 
   /**
@@ -44,7 +45,7 @@ export class StripeRepository {
   }
 
   /**
-   * Get transactions for a date range with improved deduplication and persistent caching
+   * Get transactions for a date range - simplified without redundant caching
    */
   async getTransactions(
     startDate: Date,
@@ -52,68 +53,24 @@ export class StripeRepository {
     forceRefresh = false
   ): Promise<StripeResult> {
     try {
-      // Generate a simplified cache key for this request - only use date range
       const cacheKey = `stripe-data-${formatDateYYYYMMDD(startDate)}-${formatDateYYYYMMDD(endDate)}`;
       
-      console.log(`StripeRepository: Using cache key ${cacheKey}, forceRefresh: ${forceRefresh}`);
+      console.log(`StripeRepository: Getting transactions for ${cacheKey}, forceRefresh: ${forceRefresh}`);
       
-      // Store the last request key for deduplication
-      this.lastRequestKey = cacheKey;
-      
-      // First check persistent cache before checking in-memory cache
-      if (!forceRefresh) {
-        console.log("StripeRepository: Checking persistent cache first...");
-        const persistentCacheCheck = await CacheService.checkCache('Stripe', startDate, endDate);
-        
-        if (persistentCacheCheck.cached && persistentCacheCheck.data && persistentCacheCheck.data.length > 0) {
-          console.log(`StripeRepository: Found ${persistentCacheCheck.data.length} transactions in persistent cache`);
-          
-          // Calculate summary data from cached transactions
-          const transactions = persistentCacheCheck.data;
-          const gross = transactions.reduce((sum, tx) => sum + (tx.gross || tx.amount), 0);
-          const fees = transactions.reduce((sum, tx) => sum + (tx.fees || 0), 0);
-          const transactionFees = transactions
-            .filter(tx => tx.metadata?.feeType === 'transaction')
-            .reduce((sum, tx) => sum + (tx.fees || 0), 0);
-          const payoutFees = transactions
-            .filter(tx => tx.metadata?.feeType === 'payout')
-            .reduce((sum, tx) => sum + (tx.fees || 0), 0);
-          const additionalFees = transactions
-            .filter(tx => tx.metadata?.feeType === 'stripe')
-            .reduce((sum, tx) => sum + (tx.fees || 0), 0);
-          const net = gross - fees;
-          const feePercentage = gross > 0 ? (fees / gross) * 100 : 0;
-          
-          return {
-            transactions,
-            gross,
-            fees,
-            transactionFees,
-            payoutFees,
-            additionalFees,
-            net,
-            feePercentage
-          };
-        } else {
-          console.log("StripeRepository: No data in persistent cache, checking in-memory cache...");
-        }
-      }
-      
-      // Check if there's already a request in progress with this key
+      // Check if there's already a request in progress
       if (this.inProgressRequestsMap.has(cacheKey) && !forceRefresh) {
         console.log(`StripeRepository: Reusing in-progress request for ${cacheKey}`);
         return await this.inProgressRequestsMap.get(cacheKey)!;
       }
       
-      // If we're forcing a refresh, clear any existing cache entry and in-progress request
+      // If we're forcing a refresh, clear any existing in-progress request
       if (forceRefresh) {
-        console.log("StripeRepository: Force refresh requested, clearing cache");
-        apiRequestManager.clearCacheEntry(cacheKey);
+        console.log("StripeRepository: Force refresh requested, clearing in-progress requests");
         this.inProgressRequestsMap.delete(cacheKey);
       }
       
       // Create and store the promise
-      const requestPromise = this.executeRequest(cacheKey, startDate, endDate, forceRefresh);
+      const requestPromise = this.executeRequest(startDate, endDate, forceRefresh);
       this.inProgressRequestsMap.set(cacheKey, requestPromise);
       
       // Execute the request and clean up after
@@ -139,54 +96,47 @@ export class StripeRepository {
   }
   
   /**
-   * Execute the actual request with ApiRequestManager and automatic persistent storage
+   * Execute the actual request with automatic persistent storage
    */
   private async executeRequest(
-    cacheKey: string, 
     startDate: Date, 
     endDate: Date, 
     forceRefresh: boolean
   ): Promise<StripeResult> {
-    return await apiRequestManager.executeRequest(
-      cacheKey,
-      async () => {
-        console.log(`StripeRepository: Making actual API call for ${cacheKey}`);
-        this.trackApiCall();
-        const result = await StripeService.getTransactions(startDate, endDate, forceRefresh);
+    console.log(`StripeRepository: Making API call for ${formatDateYYYYMMDD(startDate)}-${formatDateYYYYMMDD(endDate)}`);
+    
+    this.trackApiCall();
+    const result = await StripeService.getTransactions(startDate, endDate, forceRefresh);
+    
+    // Store data in persistent cache immediately after successful API call
+    if (result.transactions && result.transactions.length > 0) {
+      console.log(`StripeRepository: Storing ${result.transactions.length} transactions in persistent cache`);
+      
+      try {
+        const storeResult = await CacheService.storeTransactions('Stripe', startDate, endDate, result.transactions);
         
-        // CRITICAL: Store data in persistent cache immediately after successful API call
-        if (result.transactions && result.transactions.length > 0) {
-          console.log(`StripeRepository: Storing ${result.transactions.length} transactions in persistent cache`);
-          
-          try {
-            const storeResult = await CacheService.storeTransactions('Stripe', startDate, endDate, result.transactions);
-            
-            if (storeResult) {
-              console.log("StripeRepository: Successfully stored transactions in persistent cache");
-            } else {
-              console.error("StripeRepository: Failed to store transactions in persistent cache");
-            }
-          } catch (storeError) {
-            console.error("StripeRepository: Exception storing transactions in persistent cache:", storeError);
-          }
+        if (storeResult) {
+          console.log("StripeRepository: Successfully stored transactions in persistent cache");
         } else {
-          console.log("StripeRepository: No transactions to store in persistent cache");
+          console.error("StripeRepository: Failed to store transactions in persistent cache");
         }
-        
-        return {
-          transactions: result.transactions,
-          gross: result.gross,
-          fees: result.fees,
-          transactionFees: result.transactionFees,
-          payoutFees: result.payoutFees,
-          additionalFees: result.stripeFees || 0, // Map stripeFees to additionalFees
-          net: result.net,
-          feePercentage: result.feePercentage
-        };
-      },
-      forceRefresh ? 0 : 5 * 60 * 1000, // 5 minutes TTL, or 0 if force refresh
-      30000 // 30 second cooldown (increased from default)
-    );
+      } catch (storeError) {
+        console.error("StripeRepository: Exception storing transactions in persistent cache:", storeError);
+      }
+    } else {
+      console.log("StripeRepository: No transactions to store in persistent cache");
+    }
+    
+    return {
+      transactions: result.transactions,
+      gross: result.gross,
+      fees: result.fees,
+      transactionFees: result.transactionFees,
+      payoutFees: result.payoutFees,
+      additionalFees: result.stripeFees || 0,
+      net: result.net,
+      feePercentage: result.feePercentage
+    };
   }
 
   /**
@@ -194,21 +144,9 @@ export class StripeRepository {
    */
   async checkApiConnectivity(): Promise<boolean> {
     try {
-      // Generate a cache key for this connectivity check with timestamp
-      const cacheKey = `stripe-connectivity-check`;
-      
       console.log("StripeRepository: Checking API connectivity");
-      
-      // Use ApiRequestManager to deduplicate requests with a longer cache time
-      return await apiRequestManager.executeRequest(
-        cacheKey,
-        async () => {
-          this.trackApiCall();
-          return await StripeService.checkApiConnectivity();
-        },
-        60000, // 60 second TTL for connectivity checks (increased)
-        5000   // 5 second cooldown
-      );
+      this.trackApiCall();
+      return await StripeService.checkApiConnectivity();
     } catch {
       return false;
     }
