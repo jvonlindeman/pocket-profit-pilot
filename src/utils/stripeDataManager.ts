@@ -25,7 +25,11 @@ export class StripeDataManager {
       console.log(`StripeDataManager: Date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
       
       // Clear any existing cache for this period
-      await CacheService.clearCache('Stripe', startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]);
+      await CacheService.clearCache({
+        source: 'Stripe',
+        startDate: startDate,
+        endDate: endDate
+      });
       
       // Force refresh data through repository (this will automatically store in persistent cache)
       const result = await stripeRepository.getTransactions(startDate, endDate, true);
