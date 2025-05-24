@@ -1,4 +1,3 @@
-
 import { CacheDbClient } from "../db/client";
 import { Transaction } from "../../../types/financial";
 import { CacheSource } from "../types";
@@ -8,7 +7,7 @@ import { CacheSource } from "../types";
  */
 export class MonthlyStorage extends CacheDbClient {
   /**
-   * Check if a specific month is cached
+   * Check if a specific month is cached - with fallback to direct transaction query
    */
   async isMonthCached(
     source: CacheSource | string,
@@ -18,6 +17,7 @@ export class MonthlyStorage extends CacheDbClient {
     try {
       console.log(`[MONTHLY_STORAGE_DEBUG] Checking if month is cached: ${source} ${year}/${month}`);
       
+      // First try the monthly_cache table via RPC function
       const { data, error } = await this.getClient()
         .rpc('is_month_cached', {
           p_source: source,
@@ -25,21 +25,89 @@ export class MonthlyStorage extends CacheDbClient {
           p_month: month
         });
         
-      if (error) {
-        this.logError("Error checking if month is cached", error);
+      if (!error && data && data.length > 0) {
+        const result = data[0];
+        console.log(`[MONTHLY_STORAGE_DEBUG] RPC result:`, result);
+        
+        if (result.is_cached && result.transaction_count > 0) {
+          return {
+            isCached: true,
+            transactionCount: result.transaction_count
+          };
+        }
+      }
+      
+      // Fallback: Check cached_transactions table directly
+      console.log(`[MONTHLY_STORAGE_DEBUG] RPC failed or returned no cache, checking cached_transactions directly`);
+      
+      const { data: transactions, error: txError } = await this.getClient()
+        .from('cached_transactions')
+        .select('id', { count: 'exact' })
+        .eq('source', source)
+        .eq('year', year)
+        .eq('month', month);
+        
+      if (txError) {
+        console.error(`[MONTHLY_STORAGE_DEBUG] Error checking cached_transactions:`, txError);
         return { isCached: false, transactionCount: 0 };
       }
       
-      const result = data?.[0] || { is_cached: false, transaction_count: 0 };
-      console.log(`[MONTHLY_STORAGE_DEBUG] Month cache check result:`, result);
+      const count = transactions?.length || 0;
+      const isCached = count > 0;
+      
+      console.log(`[MONTHLY_STORAGE_DEBUG] Direct transaction check result: ${count} transactions found, cached: ${isCached}`);
+      
+      // If we found transactions but monthly_cache is missing, sync it
+      if (isCached) {
+        console.log(`[MONTHLY_STORAGE_DEBUG] Found ${count} transactions but monthly_cache was missing, syncing...`);
+        await this.syncMonthlyCache(source, year, month, count);
+      }
       
       return {
-        isCached: result.is_cached,
-        transactionCount: result.transaction_count
+        isCached,
+        transactionCount: count
       };
     } catch (err) {
-      this.logError("Exception checking if month is cached", err);
+      console.error(`[MONTHLY_STORAGE_DEBUG] Exception checking if month is cached:`, err);
       return { isCached: false, transactionCount: 0 };
+    }
+  }
+
+  /**
+   * Sync monthly_cache table with actual cached_transactions data
+   */
+  async syncMonthlyCache(
+    source: CacheSource | string,
+    year: number,
+    month: number,
+    transactionCount: number
+  ): Promise<boolean> {
+    try {
+      console.log(`[MONTHLY_STORAGE_DEBUG] Syncing monthly_cache for ${source} ${year}/${month} with ${transactionCount} transactions`);
+      
+      const { error } = await this.getClient()
+        .from('monthly_cache')
+        .upsert({
+          source,
+          year,
+          month,
+          transaction_count: transactionCount,
+          status: 'complete',
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'source,year,month'
+        });
+
+      if (error) {
+        console.error(`[MONTHLY_STORAGE_DEBUG] Error syncing monthly_cache:`, error);
+        return false;
+      }
+
+      console.log(`[MONTHLY_STORAGE_DEBUG] Successfully synced monthly_cache`);
+      return true;
+    } catch (err) {
+      console.error(`[MONTHLY_STORAGE_DEBUG] Exception syncing monthly_cache:`, err);
+      return false;
     }
   }
 

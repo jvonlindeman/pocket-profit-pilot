@@ -4,6 +4,7 @@ import { Transaction } from '@/types/financial';
 import CacheService from '@/services/cache';
 import { stripeRepository } from '@/repositories/stripeRepository';
 import { zohoRepository } from '@/repositories/zohoRepository';
+import { MonthlyCacheSync } from '@/services/cache/syncMonthlyCache';
 
 interface FinancialData {
   transactions: Transaction[];
@@ -45,6 +46,11 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
       });
 
       try {
+        // First, run a one-time sync to ensure monthly_cache is up to date
+        console.log("🔄 useOptimizedFinancialData: Running monthly cache sync...");
+        const syncResult = await MonthlyCacheSync.syncAllMissingEntries();
+        console.log("🔄 useOptimizedFinancialData: Sync completed", syncResult);
+
         // Check both sources for cached data
         const [zohoCacheCheck, stripeCacheCheck] = await Promise.all([
           CacheService.checkCache('Zoho', startDate, endDate),
@@ -58,8 +64,16 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         const hasCachedData = hasZohoCache || hasStripeCache;
 
         console.log("🔍 useOptimizedFinancialData: Cache check results", {
-          zoho: { cached: hasZohoCache, count: zohoCacheCheck.data?.length || 0 },
-          stripe: { cached: hasStripeCache, count: stripeCacheCheck.data?.length || 0 },
+          zoho: { 
+            cached: hasZohoCache, 
+            count: zohoCacheCheck.data?.length || 0,
+            status: zohoCacheCheck.status 
+          },
+          stripe: { 
+            cached: hasStripeCache, 
+            count: stripeCacheCheck.data?.length || 0,
+            status: stripeCacheCheck.status 
+          },
           totalCachedData: hasCachedData
         });
 
