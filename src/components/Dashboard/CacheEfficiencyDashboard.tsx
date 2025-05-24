@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { Database, Zap, TrendingUp, RefreshCw, CheckCircle, AlertTriangle, Settings, Brain, Clock } from 'lucide-react';
+import { Database, Zap, TrendingUp, RefreshCw, CheckCircle, AlertTriangle, Settings, Brain, Clock, Play } from 'lucide-react';
 import { useRealCacheMetrics } from '@/hooks/useRealCacheMetrics';
 import { toast } from '@/hooks/use-toast';
 
@@ -18,6 +18,23 @@ interface CacheEfficiencyDashboardProps {
 const CacheEfficiencyDashboard: React.FC<CacheEfficiencyDashboardProps> = ({ dateRange }) => {
   const { metrics, loading, refresh } = useRealCacheMetrics(dateRange);
   const [optimizationEnabled, setOptimizationEnabled] = useState(true);
+  const [hasAnalyzed, setHasAnalyzed] = useState(false);
+
+  const handleAnalyze = useCallback(async () => {
+    console.log("🔄 CacheEfficiencyDashboard: Manual cache analysis requested");
+    toast({
+      title: "Analizando caché",
+      description: "Verificando estado actual del caché..."
+    });
+    
+    await refresh();
+    setHasAnalyzed(true);
+    
+    toast({
+      title: "Análisis completo",
+      description: `Eficiencia: ${Math.round(metrics.overallEfficiency * 100)}%`
+    });
+  }, [refresh, metrics.overallEfficiency]);
 
   const handleRefresh = useCallback(async () => {
     console.log("🔄 CacheEfficiencyDashboard: Manual refresh requested");
@@ -90,7 +107,35 @@ const CacheEfficiencyDashboard: React.FC<CacheEfficiencyDashboardProps> = ({ dat
     }
   };
 
-  if (loading && !metrics.lastCacheCheck) {
+  // Show initial analyze prompt if not analyzed yet
+  if (!hasAnalyzed && !loading && !metrics.lastCacheCheck) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Brain className="mr-2 h-5 w-5 text-blue-500" />
+            Cache Inteligente Optimizado
+          </CardTitle>
+          <CardDescription>
+            Sistema inteligente que prioriza base de datos local antes que APIs externas
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8">
+            <p className="text-gray-600 mb-4 text-center">
+              Haz clic para analizar el estado actual del caché
+            </p>
+            <Button onClick={handleAnalyze} className="gap-2">
+              <Play className="h-4 w-4" />
+              Analizar Caché
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (loading) {
     return (
       <Card>
         <CardHeader>

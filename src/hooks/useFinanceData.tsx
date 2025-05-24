@@ -1,3 +1,4 @@
+
 import { useMemo, useCallback, useRef } from 'react';
 import { useFinanceDateRange } from '@/hooks/useFinanceDateRange';
 import { useCollaboratorProcessor } from '@/hooks/useCollaboratorProcessor';
@@ -27,7 +28,7 @@ export const useFinanceData = () => {
   // Use the date range hook
   const { dateRange, updateDateRange } = useFinanceDateRange(fetchMonthlyBalance);
   
-  // Use ONLY the optimized financial data hook - this is our single source of truth
+  // Use ONLY the optimized financial data hook - NO AUTO-LOADING
   const { 
     transactions, 
     stripeData,
@@ -35,12 +36,23 @@ export const useFinanceData = () => {
     error, 
     usingCachedData, 
     cacheStatus, 
-    refetch
+    refetch,
+    isDataRequested
   } = useOptimizedFinancialData(dateRange.startDate, dateRange.endDate);
+
+  console.log("🏠 useFinanceData: Hook rendered", {
+    dateRange: `${dateRange.startDate.toISOString().split('T')[0]} to ${dateRange.endDate.toISOString().split('T')[0]}`,
+    transactionCount: transactions.length,
+    isDataRequested,
+    loading
+  });
 
   // Process data when transactions change
   useMemo(() => {
     if (transactions.length > 0) {
+      console.log("🔄 useFinanceData: Processing transaction data", {
+        transactionCount: transactions.length
+      });
       // Process collaborator data
       processCollaboratorData(transactions);
       
@@ -73,14 +85,16 @@ export const useFinanceData = () => {
     }
   }, []);
 
-  // Data initialized flag
-  const dataInitialized = useMemo(() => transactions.length > 0, [transactions.length]);
+  // Data initialized flag - only true if data was explicitly requested and loaded
+  const dataInitialized = useMemo(() => {
+    return isDataRequested && transactions.length > 0;
+  }, [isDataRequested, transactions.length]);
 
   // SIMPLIFIED DATA REFRESH FUNCTION
   const refreshData = useCallback((force = false) => {
     // If a refresh is already in progress, return early
     if (refreshInProgressRef.current) {
-      console.log("Refresh already in progress, skipping");
+      console.log("🚫 useFinanceData: Refresh already in progress, skipping");
       return Promise.resolve(false);
     }
     
@@ -88,7 +102,7 @@ export const useFinanceData = () => {
     const now = Date.now();
     const timeSinceLastRefresh = now - lastRefreshTimeRef.current;
     if (timeSinceLastRefresh < 10000 && !force) { // 10 second cooldown
-      console.log("Throttling refresh request, last refresh was ${timeSinceLastRefresh}ms ago");
+      console.log(`🚫 useFinanceData: Throttling refresh request, last refresh was ${timeSinceLastRefresh}ms ago`);
       return Promise.resolve(false);
     }
     
@@ -96,14 +110,14 @@ export const useFinanceData = () => {
     refreshInProgressRef.current = true;
     lastRefreshTimeRef.current = now;
     
-    console.log(`Beginning data refresh (force: ${force})`);
+    console.log(`🚀 useFinanceData: Beginning EXPLICIT data refresh (force: ${force})`);
     
     // Use the refetch function from useOptimizedFinancialData
     const promise = refetch(force);
     
     promise.finally(() => {
       // Always clean up when done
-      console.log("Completed data refresh");
+      console.log("✅ useFinanceData: Completed data refresh");
       refreshInProgressRef.current = false;
     });
     

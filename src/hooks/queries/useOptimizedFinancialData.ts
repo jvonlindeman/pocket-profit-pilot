@@ -15,6 +15,7 @@ interface FinancialData {
     zoho: { hit: boolean, partial: boolean },
     stripe: { hit: boolean, partial: boolean }
   };
+  isDataRequested: boolean;
 }
 
 export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
@@ -26,16 +27,18 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
     cacheStatus: {
       zoho: { hit: false, partial: false },
       stripe: { hit: false, partial: false }
-    }
+    },
+    isDataRequested: false
   });
 
   const fetchData = useCallback(async (forceRefresh = false) => {
-    console.log("🚀 useOptimizedFinancialData: Starting fetch", {
+    console.log("🚀 useOptimizedFinancialData: Starting EXPLICIT fetch", {
       dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
-      forceRefresh
+      forceRefresh,
+      caller: new Error().stack?.split('\n')[2]?.trim() // Log who called this
     });
     
-    setData(prev => ({ ...prev, loading: true, error: null }));
+    setData(prev => ({ ...prev, loading: true, error: null, isDataRequested: true }));
 
     try {
       let allTransactions: Transaction[] = [];
@@ -137,7 +140,8 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         loading: false,
         error: null,
         usingCachedData: usingCache,
-        cacheStatus
+        cacheStatus,
+        isDataRequested: true
       });
 
     } catch (error) {
@@ -145,18 +149,29 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
       setData(prev => ({
         ...prev,
         loading: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
+        isDataRequested: true
       }));
     }
   }, [startDate, endDate]);
 
-  // Initial fetch
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  // REMOVED: Auto-fetch on mount. Data will only be loaded when explicitly requested
+  // useEffect(() => {
+  //   fetchData();
+  // }, [fetchData]);
+
+  console.log("🔄 useOptimizedFinancialData: Hook rendered", {
+    dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
+    hasData: data.transactions.length > 0,
+    isDataRequested: data.isDataRequested,
+    loading: data.loading
+  });
 
   const refetch = useCallback((forceRefresh = false) => {
-    console.log("🔄 useOptimizedFinancialData: Manual refetch requested", { forceRefresh });
+    console.log("🔄 useOptimizedFinancialData: Manual refetch requested", { 
+      forceRefresh,
+      caller: new Error().stack?.split('\n')[2]?.trim()
+    });
     return fetchData(forceRefresh);
   }, [fetchData]);
 

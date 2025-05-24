@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import CacheService from '@/services/cache';
 
 export interface RealCacheMetrics {
@@ -46,9 +46,10 @@ export const useRealCacheMetrics = (dateRange: { startDate: Date; endDate: Date 
     
     setLoading(true);
     try {
-      console.log("🔍 useRealCacheMetrics: Analyzing cache status for:", {
+      console.log("🔍 useRealCacheMetrics: EXPLICIT cache analysis for:", {
         startDate: dateRange.startDate.toISOString(),
-        endDate: dateRange.endDate.toISOString()
+        endDate: dateRange.endDate.toISOString(),
+        caller: new Error().stack?.split('\n')[2]?.trim()
       });
 
       // Check real cache status for both sources
@@ -129,10 +130,10 @@ export const useRealCacheMetrics = (dateRange: { startDate: Date; endDate: Date 
     }
   }, [dateRange.startDate, dateRange.endDate]);
 
-  // Auto-analyze when date range changes
-  useEffect(() => {
-    analyzeCache();
-  }, [analyzeCache]);
+  // REMOVED: Auto-analyze when date range changes
+  // useEffect(() => {
+  //   analyzeCache();
+  // }, [analyzeCache]);
 
   return {
     metrics,
