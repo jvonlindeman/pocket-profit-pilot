@@ -1,9 +1,10 @@
-
 import { hybridDataService, HybridFetchResult } from './hybridDataService';
 import { Transaction } from '@/types/financial';
 import { stripeRepository } from '@/repositories/stripeRepository';
 import { zohoRepository } from '@/repositories/zohoRepository';
 import { cacheIntelligenceService } from './cacheIntelligence';
+import { queryOptimizerService, QueryPlan } from './queryOptimizer';
+import { predictiveCacheService } from './predictiveCacheService';
 
 export interface SmartFetchResult {
   success: boolean;
@@ -12,10 +13,15 @@ export interface SmartFetchResult {
   totalTransactions: number;
   cacheEfficiency: number;
   apiCallsSaved: number;
+  queryPlans: {
+    zoho: QueryPlan;
+    stripe: QueryPlan;
+  };
+  optimizationApplied: boolean;
 }
 
 /**
- * Smart data fetcher that prioritizes database over APIs
+ * Enhanced smart data fetcher that prioritizes database over APIs
  */
 class SmartDataFetcherService {
   private static instance: SmartDataFetcherService;
@@ -27,8 +33,31 @@ class SmartDataFetcherService {
     return SmartDataFetcherService.instance;
   }
 
+  constructor() {
+    // Initialize predictive caching
+    this.initializePredictiveCaching();
+  }
+
   /**
-   * Fetch all financial data using intelligent cache-first strategy
+   * Initialize predictive caching system
+   */
+  private initializePredictiveCaching(): void {
+    // Schedule automatic cache warming
+    predictiveCacheService.scheduleAutoWarmup();
+    
+    // Initial warm-up for current month
+    predictiveCacheService.warmCache(['Zoho', 'Stripe'], {
+      currentMonth: true,
+      nextMonth: false,
+      previousMonth: true,
+      commonRanges: true
+    }).catch(error => {
+      console.error('SmartDataFetcherService: Error in initial cache warming:', error);
+    });
+  }
+
+  /**
+   * Fetch all financial data using intelligent cache-first strategy with query optimization
    */
   async fetchAllFinancialData(
     dateRange: { startDate: Date; endDate: Date },
@@ -39,30 +68,55 @@ class SmartDataFetcherService {
       onIncomeTypes?: (transactions: Transaction[], stripeData: any) => void;
     }
   ): Promise<SmartFetchResult> {
-    console.log('SmartDataFetcherService: Starting intelligent data fetch');
+    console.log('SmartDataFetcherService: Starting optimized intelligent data fetch');
     
     try {
-      // Fetch data from both sources using hybrid strategy
-      const [zohoResult, stripeResult] = await Promise.all([
-        hybridDataService.fetchTransactions('Zoho', dateRange.startDate, dateRange.endDate, forceRefresh),
-        hybridDataService.fetchTransactions('Stripe', dateRange.startDate, dateRange.endDate, forceRefresh)
+      // Step 1: Create query plans for both sources
+      const [zohoQueryPlan, stripeQueryPlan] = await Promise.all([
+        queryOptimizerService.createQueryPlan('Zoho', dateRange.startDate, dateRange.endDate),
+        queryOptimizerService.createQueryPlan('Stripe', dateRange.startDate, dateRange.endDate)
       ]);
 
-      // Combine all transactions
+      console.log('SmartDataFetcherService: Query plans created', {
+        zoho: {
+          useFullCache: zohoQueryPlan.useFullCache,
+          requiresApiCall: zohoQueryPlan.requiresApiCall,
+          cacheHitRatio: zohoQueryPlan.estimatedCacheHitRatio
+        },
+        stripe: {
+          useFullCache: stripeQueryPlan.useFullCache,
+          requiresApiCall: stripeQueryPlan.requiresApiCall,
+          cacheHitRatio: stripeQueryPlan.estimatedCacheHitRatio
+        }
+      });
+
+      // Step 2: Pre-warm cache if beneficial
+      if (!forceRefresh) {
+        await this.preWarmIfBeneficial(dateRange, zohoQueryPlan, stripeQueryPlan);
+      }
+
+      // Step 3: Execute optimized data fetching
+      const [zohoResult, stripeResult] = await Promise.all([
+        this.executeOptimizedFetch('Zoho', dateRange, zohoQueryPlan, forceRefresh),
+        this.executeOptimizedFetch('Stripe', dateRange, stripeQueryPlan, forceRefresh)
+      ]);
+
+      // Step 4: Combine and process results
       const allTransactions = [...zohoResult.transactions, ...stripeResult.transactions];
       
       // Calculate efficiency metrics
-      const totalApiCallsPossible = 2; // Could have made 2 API calls (Zoho + Stripe)
+      const totalApiCallsPossible = 2;
       const actualApiCalls = zohoResult.apiCallsMade + stripeResult.apiCallsMade;
       const apiCallsSaved = totalApiCallsPossible - actualApiCalls;
       const cacheEfficiency = totalApiCallsPossible > 0 ? (apiCallsSaved / totalApiCallsPossible) : 0;
 
-      console.log('SmartDataFetcherService: Fetch completed', {
+      console.log('SmartDataFetcherService: Optimized fetch completed', {
         totalTransactions: allTransactions.length,
         zohoSource: zohoResult.dataSource,
         stripeSource: stripeResult.dataSource,
         cacheEfficiency: Math.round(cacheEfficiency * 100) + '%',
-        apiCallsSaved
+        apiCallsSaved,
+        optimizationApplied: true
       });
 
       // Execute callbacks
@@ -76,10 +130,12 @@ class SmartDataFetcherService {
       }
 
       if (callbacks?.onIncomeTypes) {
-        // Get Stripe data for income processing
         const stripeData = stripeRepository.getLastRawResponse();
         callbacks.onIncomeTypes(allTransactions, stripeData);
       }
+
+      // Step 5: Schedule predictive caching for next likely requests
+      this.schedulePredictiveCaching(dateRange);
 
       return {
         success: true,
@@ -87,11 +143,16 @@ class SmartDataFetcherService {
         stripeResult,
         totalTransactions: allTransactions.length,
         cacheEfficiency,
-        apiCallsSaved
+        apiCallsSaved,
+        queryPlans: {
+          zoho: zohoQueryPlan,
+          stripe: stripeQueryPlan
+        },
+        optimizationApplied: true
       };
 
     } catch (error) {
-      console.error('SmartDataFetcherService: Error fetching financial data:', error);
+      console.error('SmartDataFetcherService: Error in optimized fetch:', error);
       
       return {
         success: false,
@@ -111,9 +172,88 @@ class SmartDataFetcherService {
         },
         totalTransactions: 0,
         cacheEfficiency: 0,
-        apiCallsSaved: 0
+        apiCallsSaved: 0,
+        queryPlans: {
+          zoho: await queryOptimizerService.createQueryPlan('Zoho', dateRange.startDate, dateRange.endDate),
+          stripe: await queryOptimizerService.createQueryPlan('Stripe', dateRange.startDate, dateRange.endDate)
+        },
+        optimizationApplied: false
       };
     }
+  }
+
+  /**
+   * Execute optimized fetch based on query plan
+   */
+  private async executeOptimizedFetch(
+    source: 'Zoho' | 'Stripe',
+    dateRange: { startDate: Date; endDate: Date },
+    queryPlan: QueryPlan,
+    forceRefresh: boolean
+  ): Promise<HybridFetchResult> {
+    // If force refresh, skip optimization
+    if (forceRefresh) {
+      return hybridDataService.fetchTransactions(source, dateRange.startDate, dateRange.endDate, true);
+    }
+
+    // If we can use full cache, do so
+    if (queryPlan.useFullCache) {
+      console.log(`SmartDataFetcherService: Using full cache for ${source}`);
+      return hybridDataService.fetchTransactions(source, dateRange.startDate, dateRange.endDate, false);
+    }
+
+    // If partial cache or no cache, use hybrid approach
+    console.log(`SmartDataFetcherService: Using hybrid approach for ${source}`);
+    return hybridDataService.fetchTransactions(source, dateRange.startDate, dateRange.endDate, false);
+  }
+
+  /**
+   * Pre-warm cache if it would be beneficial
+   */
+  private async preWarmIfBeneficial(
+    dateRange: { startDate: Date; endDate: Date },
+    zohoQueryPlan: QueryPlan,
+    stripeQueryPlan: QueryPlan
+  ): Promise<void> {
+    // Pre-warm if cache hit ratio is low but could be improved
+    const shouldPreWarmZoho = zohoQueryPlan.estimatedCacheHitRatio < 0.8 && zohoQueryPlan.requiresApiCall;
+    const shouldPreWarmStripe = stripeQueryPlan.estimatedCacheHitRatio < 0.8 && stripeQueryPlan.requiresApiCall;
+
+    const preWarmTasks: Promise<void>[] = [];
+
+    if (shouldPreWarmZoho) {
+      preWarmTasks.push(
+        predictiveCacheService.preWarmForRequest('Zoho', dateRange.startDate, dateRange.endDate)
+      );
+    }
+
+    if (shouldPreWarmStripe) {
+      preWarmTasks.push(
+        predictiveCacheService.preWarmForRequest('Stripe', dateRange.startDate, dateRange.endDate)
+      );
+    }
+
+    if (preWarmTasks.length > 0) {
+      console.log('SmartDataFetcherService: Pre-warming cache for better performance');
+      await Promise.allSettled(preWarmTasks);
+    }
+  }
+
+  /**
+   * Schedule predictive caching for next likely requests
+   */
+  private schedulePredictiveCaching(dateRange: { startDate: Date; endDate: Date }): void {
+    // Schedule warming for adjacent months (don't await)
+    setTimeout(() => {
+      predictiveCacheService.warmCache(['Zoho', 'Stripe'], {
+        currentMonth: true,
+        nextMonth: true,
+        previousMonth: true,
+        commonRanges: false
+      }).catch(error => {
+        console.error('SmartDataFetcherService: Error in predictive caching:', error);
+      });
+    }, 5000); // 5 second delay to not interfere with current request
   }
 
   /**
