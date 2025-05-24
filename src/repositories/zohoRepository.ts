@@ -1,4 +1,3 @@
-
 import { Transaction, UnpaidInvoice } from "../types/financial";
 import * as zohoApiClient from "../services/zoho/apiClient";
 import { formatDateYYYYMMDD } from "../utils/dateUtils";
@@ -15,6 +14,7 @@ export class ZohoRepository {
   private unpaidInvoices: UnpaidInvoice[] = [];
   private lastRequestKey: string = '';
   private inProgressRequestsMap: Map<string, Promise<any>> = new Map();
+  private collaboratorExpenses: any[] = [];
   
   /**
    * Set the API calls context for tracking
@@ -120,6 +120,13 @@ export class ZohoRepository {
             
             // Also process unpaid invoices if available
             this.unpaidInvoices = zohoApiClient.processUnpaidInvoicesResponse(response);
+            
+            // Process collaborator data if available
+            if (response.colaboradores && Array.isArray(response.colaboradores)) {
+              this.collaboratorExpenses = response.colaboradores;
+              console.log(`Processed ${this.collaboratorExpenses.length} collaborator expenses`);
+            }
+            
             console.log(`Processed ${this.unpaidInvoices.length} unpaid invoices`);
           }
         }
@@ -137,6 +144,13 @@ export class ZohoRepository {
    */
   getUnpaidInvoices(): UnpaidInvoice[] {
     return this.unpaidInvoices;
+  }
+
+  /**
+   * Get collaborator expenses data
+   */
+  getCollaboratorExpenses(): any[] {
+    return this.collaboratorExpenses;
   }
 
   /**
