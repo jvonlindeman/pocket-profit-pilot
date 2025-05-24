@@ -79,6 +79,14 @@ export function useFinancialData(startDate: Date, endDate: Date) {
     return zohoResult.isSuccess && stripeResult.isSuccess;
   };
 
+  // Safely determine if we're using cached data
+  const usingCachedData = useMemo(() => {
+    return (
+      cacheStatus?.zoho?.cached === true || 
+      cacheStatus?.stripe?.cached === true
+    );
+  }, [cacheStatus]);
+
   return {
     transactions: allTransactions,
     zohoTransactions,
@@ -92,6 +100,6 @@ export function useFinancialData(startDate: Date, endDate: Date) {
     cacheStatusLoading,
     apiConnectivity,
     refreshData,
-    usingCachedData: cacheStatus?.zoho.cached || cacheStatus?.stripe.cached
+    usingCachedData
   };
 }

@@ -66,7 +66,7 @@ export default function FinancialDebugHelper() {
       <div className="flex items-center gap-2">
         {cacheStatus && (
           <div className="text-xs text-gray-500">
-            Cache: {cacheStatus.zoho.cached ? '✓' : '✗'} Zoho / {cacheStatus.stripe.cached ? '✓' : '✗'} Stripe
+            Cache: {cacheStatus.zoho?.cached ? '✓' : '✗'} Zoho / {cacheStatus.stripe?.cached ? '✓' : '✗'} Stripe
           </div>
         )}
         
