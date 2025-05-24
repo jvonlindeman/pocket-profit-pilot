@@ -1,114 +1,87 @@
 
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React from 'react';
+import { useFinanceData } from '@/hooks/useFinanceData';
+import { ApiStatusIndicator } from './ApiStatusIndicator';
 import { Button } from '@/components/ui/button';
-import { Eye, EyeOff, AlertTriangle } from 'lucide-react';
-import { useFinance } from '@/contexts/FinanceContext';
-import { validateFinancialValue } from '@/utils/financialUtils';
+import { RefreshCw } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useFinancialData } from '@/hooks/queries/useFinancialData';
 
-const FinancialDebugHelper: React.FC = () => {
-  const [showDebug, setShowDebug] = useState(false);
-  const { summary, collaboratorExpenses } = useFinance();
+export default function FinancialDebugHelper() {
+  const { dateRange } = useFinanceData();
+  const { toast } = useToast();
   
-  // Validate key financial values
-  const collaboratorExpense = validateFinancialValue(summary.collaboratorExpense);
-  const otherExpense = validateFinancialValue(summary.otherExpense);
-  const totalExpense = validateFinancialValue(summary.totalExpense);
+  // Only enable queries if we have a valid date range
+  const enabled = !!dateRange?.startDate && !!dateRange?.endDate;
   
-  // Check if the expense values add up correctly
-  const hasExpenseDiscrepancy = Math.abs((collaboratorExpense + otherExpense) - totalExpense) > 0.01;
-  
-  // Calculate total from collaborator expenses array for verification
-  const calculatedCollaboratorExpense = collaboratorExpenses.reduce(
-    (sum, item) => sum + validateFinancialValue(item.amount), 0
+  const { 
+    refreshData, 
+    loading,
+    apiConnectivity,
+    cacheStatus
+  } = useFinancialData(
+    dateRange?.startDate || new Date(), 
+    dateRange?.endDate || new Date(),
+    { enabled }
   );
   
-  // Check if there's a discrepancy between the summary and calculated values
-  const hasCollaboratorDiscrepancy = 
-    Math.abs(calculatedCollaboratorExpense - collaboratorExpense) > 0.01;
-  
-  // Don't render anything in production
-  if (process.env.NODE_ENV === 'production') return null;
+  const handleDebugRefresh = async () => {
+    try {
+      toast({
+        title: "Actualizando datos para depuración",
+        description: "Obteniendo la última información..."
+      });
+      
+      const success = await refreshData(true);
+      
+      if (success) {
+        toast({
+          title: "Datos actualizados",
+          description: "Los datos han sido refrescados correctamente",
+          variant: "success"
+        });
+      } else {
+        toast({
+          title: "Error al actualizar",
+          description: "No se pudieron actualizar todos los datos",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+      toast({
+        title: "Error",
+        description: "Ha ocurrido un error al actualizar los datos",
+        variant: "destructive"
+      });
+    }
+  };
   
   return (
-    <div className="mt-6">
-      <Button 
-        variant="outline" 
-        size="sm" 
-        onClick={() => setShowDebug(!showDebug)}
-        className="mb-2"
-      >
-        {showDebug ? (
-          <>
-            <EyeOff className="w-4 h-4 mr-1" />
-            Hide Debug Info
-          </>
-        ) : (
-          <>
-            <Eye className="w-4 h-4 mr-1" />
-            Show Debug Info
-          </>
-        )}
-      </Button>
+    <div className="mt-4 flex justify-between items-center p-2 bg-gray-50 rounded-md border border-gray-200">
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-gray-500">APIs:</span>
+        <ApiStatusIndicator />
+      </div>
       
-      {showDebug && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-md flex items-center">
-              Financial Debug Information
-              {(hasExpenseDiscrepancy || hasCollaboratorDiscrepancy) && (
-                <AlertTriangle className="w-5 h-5 ml-2 text-amber-500" />
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-sm font-medium">Summary Values:</h3>
-                <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto">
-                  {JSON.stringify(summary, null, 2)}
-                </pre>
-              </div>
-              
-              <div>
-                <h3 className="text-sm font-medium">Collaborator Expenses:</h3>
-                <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto">
-                  {JSON.stringify(collaboratorExpenses, null, 2)}
-                </pre>
-                <p className="text-xs mt-1">
-                  Total from array: {calculatedCollaboratorExpense.toFixed(2)}
-                </p>
-              </div>
-              
-              <div className="text-xs bg-gray-100 p-2 rounded">
-                <h3 className="font-medium mb-2">Expense Validation:</h3>
-                <p>Collaborator Expense: {collaboratorExpense.toFixed(2)}</p>
-                <p>Other Expenses: {otherExpense.toFixed(2)}</p>
-                <p>Total Expenses: {totalExpense.toFixed(2)}</p>
-                <p>Sum Check: {collaboratorExpense + otherExpense} = {totalExpense}</p>
-                
-                {hasExpenseDiscrepancy && (
-                  <div className="text-amber-600 mt-2 p-2 bg-amber-50 rounded">
-                    <strong>Warning:</strong> Expense values don't add up correctly.
-                    Discrepancy: {((collaboratorExpense + otherExpense) - totalExpense).toFixed(2)}
-                  </div>
-                )}
-                
-                {hasCollaboratorDiscrepancy && (
-                  <div className="text-amber-600 mt-2 p-2 bg-amber-50 rounded">
-                    <strong>Warning:</strong> Collaborator expense mismatch.
-                    Summary value: {collaboratorExpense.toFixed(2)}, 
-                    Calculated from array: {calculatedCollaboratorExpense.toFixed(2)},
-                    Discrepancy: {(collaboratorExpense - calculatedCollaboratorExpense).toFixed(2)}
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <div className="flex items-center gap-2">
+        {cacheStatus && (
+          <div className="text-xs text-gray-500">
+            Cache: {cacheStatus.zoho.hit ? '✓' : '✗'} Zoho / {cacheStatus.stripe.hit ? '✓' : '✗'} Stripe
+          </div>
+        )}
+        
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleDebugRefresh}
+          disabled={loading}
+          className="text-xs"
+        >
+          <RefreshCw className={`h-3 w-3 mr-1 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
     </div>
   );
-};
-
-export default FinancialDebugHelper;
+}
