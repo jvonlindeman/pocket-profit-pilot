@@ -5,6 +5,7 @@ import { useCollaboratorProcessor } from '@/hooks/useCollaboratorProcessor';
 import { useIncomeProcessor } from '@/hooks/useIncomeProcessor';
 import { useMonthlyBalanceManager } from '@/hooks/useMonthlyBalanceManager';
 import { useOptimizedFinancialData } from '@/hooks/queries/useOptimizedFinancialData';
+import { useUrlParamCleaner } from '@/hooks/useUrlParamCleaner';
 import { processTransactionData } from '@/services/financialService';
 import { getCurrentMonthRange } from '@/utils/dateUtils';
 import { zohoRepository } from '@/repositories/zohoRepository';
@@ -14,6 +15,9 @@ export const useFinanceData = () => {
   // Keep track of the last time refreshData was called
   const lastRefreshTimeRef = useRef<number>(0);
   const refreshInProgressRef = useRef<boolean>(false);
+  
+  // Clean URL parameters and detect legitimate refresh intentions
+  const { isLegitimateRefresh } = useUrlParamCleaner();
   
   // Import functionality from smaller hooks
   const { startingBalance, fetchMonthlyBalance, updateStartingBalance, setStartingBalance, notes, setNotes } = useMonthlyBalanceManager();
@@ -28,7 +32,7 @@ export const useFinanceData = () => {
   // Use the date range hook
   const { dateRange, updateDateRange } = useFinanceDateRange(fetchMonthlyBalance);
   
-  // Use ONLY the optimized financial data hook - NOW WITH IMPROVED CACHE DETECTION
+  // Use ONLY the optimized financial data hook - NOW WITH CACHE-FIRST STRATEGY
   const { 
     transactions, 
     stripeData,
@@ -42,7 +46,7 @@ export const useFinanceData = () => {
     hasCachedData
   } = useOptimizedFinancialData(dateRange.startDate, dateRange.endDate);
 
-  console.log("🏠 useFinanceData: Hook rendered with improved cache detection", {
+  console.log("🏠 useFinanceData: Hook rendered with CACHE-FIRST and URL cleanup", {
     dateRange: `${dateRange.startDate.toISOString().split('T')[0]} to ${dateRange.endDate.toISOString().split('T')[0]}`,
     transactionCount: transactions.length,
     isDataRequested,
@@ -50,6 +54,7 @@ export const useFinanceData = () => {
     hasCachedData,
     loading,
     usingCachedData,
+    isLegitimateRefresh,
     cacheStatus: {
       zohoHit: cacheStatus.zoho.hit,
       stripeHit: cacheStatus.stripe.hit
@@ -98,21 +103,27 @@ export const useFinanceData = () => {
     }
   }, []);
 
-  // Data initialized flag - true if data was explicitly requested and loaded OR auto-loaded from cache
+  // Data initialized flag - IMPROVED: prioritize cached data existence
   const dataInitialized = useMemo(() => {
-    const initialized = (isDataRequested && transactions.length > 0) || (cacheChecked && hasCachedData);
-    console.log("🔍 useFinanceData: Data initialization check", {
+    // If we have cached data available, consider it initialized immediately
+    // If data was explicitly requested and loaded, also consider it initialized
+    const initialized = (cacheChecked && hasCachedData) || (isDataRequested && transactions.length > 0);
+    
+    console.log("🔍 useFinanceData: Data initialization check with CACHE-FIRST priority", {
       initialized,
       isDataRequested,
       transactionCount: transactions.length,
       cacheChecked,
       hasCachedData,
-      usingCachedData
+      usingCachedData,
+      reason: initialized ? 
+        (hasCachedData ? 'cached_data_available' : 'explicit_request_completed') : 
+        'no_data_available'
     });
     return initialized;
   }, [isDataRequested, transactions.length, cacheChecked, hasCachedData, usingCachedData]);
 
-  // SIMPLIFIED DATA REFRESH FUNCTION
+  // ENHANCED DATA REFRESH FUNCTION - respects cache-first strategy
   const refreshData = useCallback((force = false) => {
     // If a refresh is already in progress, return early
     if (refreshInProgressRef.current) {
@@ -132,19 +143,26 @@ export const useFinanceData = () => {
     refreshInProgressRef.current = true;
     lastRefreshTimeRef.current = now;
     
-    console.log(`🚀 useFinanceData: Beginning data refresh with improved cache detection (force: ${force})`);
+    console.log(`🚀 useFinanceData: Beginning CACHE-FIRST data refresh`, {
+      force, 
+      isLegitimateRefresh,
+      actualForceNeeded: force || isLegitimateRefresh
+    });
+    
+    // Only force refresh if explicitly requested OR if it's a legitimate user refresh
+    const shouldForceRefresh = force || isLegitimateRefresh;
     
     // Use the refetch function from useOptimizedFinancialData
-    const promise = refetch(force);
+    const promise = refetch(shouldForceRefresh);
     
     promise.finally(() => {
       // Always clean up when done
-      console.log("✅ useFinanceData: Completed data refresh");
+      console.log("✅ useFinanceData: Completed CACHE-FIRST data refresh");
       refreshInProgressRef.current = false;
     });
     
     return promise;
-  }, [refetch]);
+  }, [refetch, isLegitimateRefresh]);
 
   return {
     dateRange,

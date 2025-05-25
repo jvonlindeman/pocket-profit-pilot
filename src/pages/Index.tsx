@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
@@ -15,7 +14,7 @@ import Footer from '@/components/Dashboard/Footer';
 import InitialSetup from '@/components/Dashboard/InitialSetup';
 
 const Index = () => {
-  // SIMPLIFIED: Use ONLY useFinanceData hook - it handles everything including auto-loading
+  // CACHE-FIRST: Use ONLY useFinanceData hook - it now handles cache-first loading and URL cleanup
   const {
     dateRange,
     updateDateRange,
@@ -79,6 +78,12 @@ const Index = () => {
 
   // Handler for loading initial data (only called when no cached data exists)
   const handleInitialLoad = async () => {
+    console.log("🚀 Index: Initial load requested - CACHE-FIRST strategy", {
+      cacheChecked,
+      hasCachedData,
+      dataInitialized
+    });
+    
     // Check if we need to set the initial balance first
     const balanceExists = await checkBalanceExists();
     
@@ -86,12 +91,12 @@ const Index = () => {
       // Show dialog to set initial balance
       setShowBalanceDialog(true);
     } else {
-      // Balance already exists, just load data
+      // Balance already exists, use cache-first approach
       toast({
         title: 'Cargando datos financieros',
-        description: 'Obteniendo datos de Zoho Books y Stripe',
+        description: 'Priorizando datos en caché para carga rápida',
       });
-      refreshData(true);
+      refreshData(false); // Don't force refresh, use cache-first
     }
   };
 
@@ -101,7 +106,7 @@ const Index = () => {
       title: 'Balance inicial guardado',
       description: 'Cargando datos financieros...',
     });
-    refreshData(true);
+    refreshData(false); // Use cache-first approach
   };
 
   // Improved handler for balance changes in the MonthlyBalanceEditor
@@ -144,17 +149,27 @@ const Index = () => {
 
   // Handler for data refresh
   const handleRefresh = () => {
-    console.log("Manual refresh requested");
+    console.log("Manual refresh requested - user action");
     toast({
       title: 'Actualizando datos',
       description: 'Obteniendo datos más recientes...',
     });
-    refreshData(true);
+    refreshData(true); // Force refresh for manual user action
   };
+
+  console.log("🏠 Index: Rendering with CACHE-FIRST strategy", {
+    dataInitialized,
+    loading,
+    error: !!error,
+    cacheChecked,
+    hasCachedData,
+    usingCachedData,
+    transactionCount: financialData.transactions.length
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Initial setup components */}
+      {/* Initial setup components - now respects cache-first */}
       <InitialSetup 
         dataInitialized={dataInitialized}
         onLoadData={handleInitialLoad}
@@ -182,8 +197,8 @@ const Index = () => {
           onRetry={handleRefresh}
         />
         
-        {/* Dashboard content */}
-        {dataInitialized && !loading && !error && (
+        {/* Dashboard content - now shows immediately if cached data exists */}
+        {dataInitialized && !error && (
           <DashboardContent 
             periodTitle={periodTitle}
             dateRange={dateRange}
