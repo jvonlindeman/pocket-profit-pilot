@@ -32,7 +32,7 @@ export const useFinanceData = () => {
   // Use the date range hook
   const { dateRange, updateDateRange } = useFinanceDateRange(fetchMonthlyBalance);
   
-  // Use ONLY the optimized financial data hook - NOW WITH CACHE-FIRST STRATEGY
+  // Use PASSIVE financial data hook - no auto-loading
   const { 
     transactions, 
     stripeData,
@@ -46,7 +46,7 @@ export const useFinanceData = () => {
     hasCachedData
   } = useOptimizedFinancialData(dateRange.startDate, dateRange.endDate);
 
-  console.log("🏠 useFinanceData: Hook rendered with CACHE-FIRST and URL cleanup", {
+  console.log("🏠 useFinanceData: Hook rendered with PASSIVE MODE", {
     dateRange: `${dateRange.startDate.toISOString().split('T')[0]} to ${dateRange.endDate.toISOString().split('T')[0]}`,
     transactionCount: transactions.length,
     isDataRequested,
@@ -55,6 +55,7 @@ export const useFinanceData = () => {
     loading,
     usingCachedData,
     isLegitimateRefresh,
+    autoLoadingPrevented: true,
     cacheStatus: {
       zohoHit: cacheStatus.zoho.hit,
       stripeHit: cacheStatus.stripe.hit
@@ -103,13 +104,12 @@ export const useFinanceData = () => {
     }
   }, []);
 
-  // Data initialized flag - IMPROVED: prioritize cached data existence
+  // Data initialized flag - FIXED: Only true when user explicitly loads data
   const dataInitialized = useMemo(() => {
-    // If we have cached data available, consider it initialized immediately
-    // If data was explicitly requested and loaded, also consider it initialized
-    const initialized = (cacheChecked && hasCachedData) || (isDataRequested && transactions.length > 0);
+    // Data is only initialized when explicitly requested AND has transactions
+    const initialized = isDataRequested && transactions.length > 0;
     
-    console.log("🔍 useFinanceData: Data initialization check with CACHE-FIRST priority", {
+    console.log("🔍 useFinanceData: Data initialization check with PASSIVE MODE", {
       initialized,
       isDataRequested,
       transactionCount: transactions.length,
@@ -117,13 +117,13 @@ export const useFinanceData = () => {
       hasCachedData,
       usingCachedData,
       reason: initialized ? 
-        (hasCachedData ? 'cached_data_available' : 'explicit_request_completed') : 
-        'no_data_available'
+        'user_explicitly_loaded_data' : 
+        (isDataRequested ? 'no_transactions_loaded' : 'no_explicit_request')
     });
     return initialized;
   }, [isDataRequested, transactions.length, cacheChecked, hasCachedData, usingCachedData]);
 
-  // ENHANCED DATA REFRESH FUNCTION - respects cache-first strategy
+  // MANUAL DATA REFRESH FUNCTION - only loads data when explicitly called
   const refreshData = useCallback((force = false) => {
     // If a refresh is already in progress, return early
     if (refreshInProgressRef.current) {
@@ -143,7 +143,7 @@ export const useFinanceData = () => {
     refreshInProgressRef.current = true;
     lastRefreshTimeRef.current = now;
     
-    console.log(`🚀 useFinanceData: Beginning CACHE-FIRST data refresh`, {
+    console.log(`🚀 useFinanceData: Beginning MANUAL data load by user action`, {
       force, 
       isLegitimateRefresh,
       actualForceNeeded: force || isLegitimateRefresh
@@ -157,7 +157,7 @@ export const useFinanceData = () => {
     
     promise.finally(() => {
       // Always clean up when done
-      console.log("✅ useFinanceData: Completed CACHE-FIRST data refresh");
+      console.log("✅ useFinanceData: Completed MANUAL data load");
       refreshInProgressRef.current = false;
     });
     

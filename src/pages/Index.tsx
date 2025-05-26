@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
@@ -14,7 +15,7 @@ import Footer from '@/components/Dashboard/Footer';
 import InitialSetup from '@/components/Dashboard/InitialSetup';
 
 const Index = () => {
-  // CACHE-FIRST: Use ONLY useFinanceData hook - it now handles cache-first loading and URL cleanup
+  // PASSIVE MODE: useFinanceData no longer auto-loads data
   const {
     dateRange,
     updateDateRange,
@@ -76,9 +77,9 @@ const Index = () => {
     [financialData.transactions]
   );
 
-  // Handler for loading initial data (only called when no cached data exists)
+  // Handler for manual data loading - triggered by user action only
   const handleInitialLoad = async () => {
-    console.log("🚀 Index: Initial load requested - CACHE-FIRST strategy", {
+    console.log("🚀 Index: Manual data load requested by user", {
       cacheChecked,
       hasCachedData,
       dataInitialized
@@ -91,12 +92,12 @@ const Index = () => {
       // Show dialog to set initial balance
       setShowBalanceDialog(true);
     } else {
-      // Balance already exists, use cache-first approach
+      // Balance exists, trigger manual data load
       toast({
         title: 'Cargando datos financieros',
-        description: 'Priorizando datos en caché para carga rápida',
+        description: hasCachedData ? 'Cargando desde caché local' : 'Obteniendo desde APIs',
       });
-      refreshData(false); // Don't force refresh, use cache-first
+      refreshData(false); // Manual load, use cache-first approach
     }
   };
 
@@ -106,7 +107,7 @@ const Index = () => {
       title: 'Balance inicial guardado',
       description: 'Cargando datos financieros...',
     });
-    refreshData(false); // Use cache-first approach
+    refreshData(false); // Manual load after balance is set
   };
 
   // Improved handler for balance changes in the MonthlyBalanceEditor
@@ -157,19 +158,20 @@ const Index = () => {
     refreshData(true); // Force refresh for manual user action
   };
 
-  console.log("🏠 Index: Rendering with CACHE-FIRST strategy", {
+  console.log("🏠 Index: Rendering with PASSIVE MODE", {
     dataInitialized,
     loading,
     error: !!error,
     cacheChecked,
     hasCachedData,
     usingCachedData,
-    transactionCount: financialData.transactions.length
+    transactionCount: financialData.transactions.length,
+    autoLoadingDisabled: true
   });
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Initial setup components - now respects cache-first */}
+      {/* Initial setup components - now requires explicit user action */}
       <InitialSetup 
         dataInitialized={dataInitialized}
         onLoadData={handleInitialLoad}
@@ -197,7 +199,7 @@ const Index = () => {
           onRetry={handleRefresh}
         />
         
-        {/* Dashboard content - now shows immediately if cached data exists */}
+        {/* Dashboard content - only shows when data is explicitly loaded */}
         {dataInitialized && !error && (
           <DashboardContent 
             periodTitle={periodTitle}
