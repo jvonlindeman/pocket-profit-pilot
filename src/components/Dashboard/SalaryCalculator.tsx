@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calculator, DollarSign, ArrowDown, ArrowUp, Percent, Info } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -9,7 +9,7 @@ interface SalaryCalculatorProps {
   opexAmount: number;
   itbmAmount: number;
   profitPercentage: number;
-  taxReservePercentage: number; // Now configurable instead of hardcoded
+  taxReservePercentage: number;
   startingBalance?: number;
   totalZohoExpenses?: number;
 }
@@ -20,19 +20,46 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
   opexAmount,
   itbmAmount,
   profitPercentage,
-  taxReservePercentage, // Use the configurable value
+  taxReservePercentage,
   startingBalance = 0,
   totalZohoExpenses = 0
 }) => {
+  // Enhanced debugging to track value changes
+  useEffect(() => {
+    console.log("SalaryCalculator: Received props:", {
+      zohoIncome,
+      stripeIncome,
+      opexAmount,
+      itbmAmount,
+      profitPercentage,
+      taxReservePercentage,
+      startingBalance,
+      totalZohoExpenses,
+      timestamp: new Date().toISOString()
+    });
+  }, [zohoIncome, stripeIncome, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, startingBalance, totalZohoExpenses]);
+
   // Cálculos
   const adjustedZohoIncome = (startingBalance || 0) + zohoIncome - totalZohoExpenses;
   const profitFirstAmount = (adjustedZohoIncome * profitPercentage) / 100;
-  const taxReserveAmount = (adjustedZohoIncome * taxReservePercentage) / 100; // Use configurable percentage
+  const taxReserveAmount = (adjustedZohoIncome * taxReservePercentage) / 100;
   const totalZohoDeductions = opexAmount + itbmAmount + profitFirstAmount + taxReserveAmount;
   const remainingZohoIncome = adjustedZohoIncome - totalZohoDeductions;
   const halfStripeIncome = stripeIncome / 2;
   const halfRemainingZoho = remainingZohoIncome / 2;
   const salary = halfStripeIncome + halfRemainingZoho;
+  
+  // Debug calculation results
+  console.log("SalaryCalculator: Calculation results:", {
+    adjustedZohoIncome,
+    profitFirstAmount,
+    taxReserveAmount,
+    totalZohoDeductions,
+    remainingZohoIncome,
+    salary,
+    profitPercentageUsed: profitPercentage,
+    taxReservePercentageUsed: taxReservePercentage
+  });
   
   // Formato para valores monetarios
   const formatCurrency = (amount: number) => {
@@ -50,6 +77,9 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
           <CardTitle className="flex items-center text-white">
             <Calculator className="h-6 w-6 mr-2" />
             Calculadora de Salario
+            <span className="ml-2 text-xs opacity-75">
+              (Profit: {profitPercentage}% | Tax Reserve: {taxReservePercentage}%)
+            </span>
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -226,7 +256,7 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                   </TooltipContent>
                 </Tooltip>
 
-                {/* Profit First */}
+                {/* Profit First - Now shows dynamic percentage */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className="bg-white p-3 rounded-md shadow-sm border border-amber-100">
@@ -242,11 +272,11 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="text-xs">Reserva para reinversión en el negocio</p>
+                    <p className="text-xs">Reserva para reinversión en el negocio ({profitPercentage}%)</p>
                   </TooltipContent>
                 </Tooltip>
                 
-                {/* Reserva para Taxes - Now shows configurable percentage */}
+                {/* Reserva para Taxes - Now shows dynamic percentage */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className="bg-white p-3 rounded-md shadow-sm border border-amber-100">
@@ -262,7 +292,7 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="text-xs">Reserva configurable para impuestos</p>
+                    <p className="text-xs">Reserva configurable para impuestos ({taxReservePercentage}%)</p>
                   </TooltipContent>
                 </Tooltip>
               </div>

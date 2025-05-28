@@ -43,7 +43,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     setError(null);
 
     try {
-      console.log("Fetching monthly balance for:", currentMonthYear);
+      console.log("useMonthlyBalance: Fetching monthly balance for:", currentMonthYear);
       
       const { data, error } = await supabase
         .from('monthly_balances')
@@ -52,7 +52,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
         .maybeSingle();
 
       if (error) {
-        console.error("Error fetching monthly balance:", error);
+        console.error("useMonthlyBalance: Error fetching monthly balance:", error);
         
         if (isMobile) {
           toast({
@@ -70,11 +70,21 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
         throw error;
       }
 
-      console.log("Monthly balance data received:", data);
+      console.log("useMonthlyBalance: Monthly balance data received:", data);
+      console.log("useMonthlyBalance: Setting monthly balance state with:", {
+        id: data?.id,
+        balance: data?.balance,
+        opex_amount: data?.opex_amount,
+        itbm_amount: data?.itbm_amount,
+        profit_percentage: data?.profit_percentage,
+        tax_reserve_percentage: data?.tax_reserve_percentage,
+        updated_at: data?.updated_at
+      });
+      
       setMonthlyBalance(data || null);
       return data || null;
     } catch (err: any) {
-      console.error("Error fetching monthly balance:", err);
+      console.error("useMonthlyBalance: Error fetching monthly balance:", err);
       setError(err.message || "Error al cargar el balance mensual");
       return null;
     } finally {
@@ -92,13 +102,13 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
         .maybeSingle();
 
       if (error) {
-        console.error("Error checking monthly balance:", error);
+        console.error("useMonthlyBalance: Error checking monthly balance:", error);
         return false;
       }
 
       return !!data;
     } catch (err) {
-      console.error("Error in checkBalanceExists:", err);
+      console.error("useMonthlyBalance: Error in checkBalanceExists:", err);
       return false;
     }
   }, [currentMonthYear]);
@@ -116,7 +126,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     setError(null);
 
     try {
-      console.log("Updating monthly balance with values:", {
+      console.log("useMonthlyBalance: Updating monthly balance with values:", {
         balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, notes,
         currentMonthYear
       });
@@ -132,7 +142,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       
       // Check if we're updating or inserting
       const existsResult = await checkBalanceExists();
-      console.log("Balance exists check:", existsResult);
+      console.log("useMonthlyBalance: Balance exists check:", existsResult);
       
       if (existsResult) {
         // Update existing record
@@ -143,12 +153,23 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
           .select();
 
         if (error) {
-          console.error("Error updating monthly balance:", error);
+          console.error("useMonthlyBalance: Error updating monthly balance:", error);
           throw error;
         }
         
-        console.log("Monthly balance updated:", data);
-        setMonthlyBalance(data[0] || null);
+        console.log("useMonthlyBalance: Monthly balance updated:", data);
+        const updatedBalance = data[0] || null;
+        setMonthlyBalance(updatedBalance);
+        
+        console.log("useMonthlyBalance: State updated with new balance:", {
+          id: updatedBalance?.id,
+          balance: updatedBalance?.balance,
+          opex_amount: updatedBalance?.opex_amount,
+          itbm_amount: updatedBalance?.itbm_amount,
+          profit_percentage: updatedBalance?.profit_percentage,
+          tax_reserve_percentage: updatedBalance?.tax_reserve_percentage,
+          updated_at: updatedBalance?.updated_at
+        });
         
         toast({
           title: "Balance actualizado",
@@ -165,12 +186,23 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
           .select();
 
         if (error) {
-          console.error("Error creating monthly balance:", error);
+          console.error("useMonthlyBalance: Error creating monthly balance:", error);
           throw error;
         }
         
-        console.log("New monthly balance created:", data);
-        setMonthlyBalance(data[0] || null);
+        console.log("useMonthlyBalance: New monthly balance created:", data);
+        const newBalance = data[0] || null;
+        setMonthlyBalance(newBalance);
+        
+        console.log("useMonthlyBalance: State updated with new balance:", {
+          id: newBalance?.id,
+          balance: newBalance?.balance,
+          opex_amount: newBalance?.opex_amount,
+          itbm_amount: newBalance?.itbm_amount,
+          profit_percentage: newBalance?.profit_percentage,
+          tax_reserve_percentage: newBalance?.tax_reserve_percentage,
+          updated_at: newBalance?.updated_at
+        });
         
         toast({
           title: "Balance creado",
@@ -180,7 +212,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       
       return true;
     } catch (err: any) {
-      console.error("Error updating monthly balance:", err);
+      console.error("useMonthlyBalance: Error updating monthly balance:", err);
       setError(err.message || "Error al actualizar el balance mensual");
       
       toast({
@@ -198,6 +230,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
   // Fetch the balance when the current date changes
   useEffect(() => {
     if (currentDate && !isNaN(currentDate.getTime())) {
+      console.log("useMonthlyBalance: Date changed, fetching balance for:", currentMonthYear);
       fetchMonthlyBalance();
     }
   }, [currentMonthYear, fetchMonthlyBalance, currentDate]);

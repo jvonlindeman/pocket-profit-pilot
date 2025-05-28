@@ -58,13 +58,27 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   totalZohoExpenses,
   unpaidInvoices = []
 }) => {
-  // Get calculator values from the monthly balance
-  const opexAmount = monthlyBalance?.opex_amount !== null ? monthlyBalance?.opex_amount || 35 : 35;
-  const itbmAmount = monthlyBalance?.itbm_amount !== null ? monthlyBalance?.itbm_amount || 0 : 0;
-  const profitPercentage = monthlyBalance?.profit_percentage !== null ? monthlyBalance?.profit_percentage || 1 : 1;
-  const taxReservePercentage = monthlyBalance?.tax_reserve_percentage !== null ? monthlyBalance?.tax_reserve_percentage || 5 : 5;
+  // Enhanced debugging and improved value extraction logic
+  console.log("DashboardContent: Monthly balance data received:", monthlyBalance);
   
-  console.log("DashboardContent: Using values for calculator:", { opexAmount, itbmAmount, profitPercentage, taxReservePercentage });
+  // Improved value extraction with better null/undefined handling
+  const opexAmount = monthlyBalance?.opex_amount ?? 35;
+  const itbmAmount = monthlyBalance?.itbm_amount ?? 0;
+  const profitPercentage = monthlyBalance?.profit_percentage ?? 1;
+  const taxReservePercentage = monthlyBalance?.tax_reserve_percentage ?? 5;
+  
+  console.log("DashboardContent: Extracted values for calculator:", { 
+    opexAmount, 
+    itbmAmount, 
+    profitPercentage, 
+    taxReservePercentage,
+    monthlyBalanceId: monthlyBalance?.id,
+    monthlyBalanceTimestamp: monthlyBalance?.updated_at
+  });
+  
+  // Create a unique key for forcing re-render when values change
+  const calculatorKey = `calculator-${monthlyBalance?.id || 'default'}-${monthlyBalance?.updated_at || Date.now()}`;
+  
   console.log("DashboardContent: Transaction count:", financialData.transactions.length);
   console.log("DashboardContent: Zoho income transactions:", 
     financialData.transactions.filter(tx => tx.type === 'income' && tx.source === 'Zoho').length
@@ -93,9 +107,10 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
         />
       </div>
 
-      {/* New Salary Calculator - Updated with additional props including taxReservePercentage */}
+      {/* New Salary Calculator with enhanced debugging and forced re-render */}
       <div className="mb-6">
         <SalaryCalculator 
+          key={calculatorKey}
           zohoIncome={regularIncome}
           stripeIncome={stripeNet}
           opexAmount={opexAmount}
