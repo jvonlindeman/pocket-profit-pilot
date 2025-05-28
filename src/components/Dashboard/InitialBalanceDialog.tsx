@@ -105,6 +105,16 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
       return;
     }
     
+    console.log("Calling onBalanceSaved with correct parameter order:", {
+      numericBalance, 
+      numericOpexAmount,
+      numericItbmAmount,
+      numericProfitPercentage,
+      numericTaxReservePercentage,
+      notes
+    });
+    
+    // Call with the correct parameter order: balance, opex, itbm, profit, taxReserve, notes
     onBalanceSaved(
       numericBalance, 
       numericOpexAmount,

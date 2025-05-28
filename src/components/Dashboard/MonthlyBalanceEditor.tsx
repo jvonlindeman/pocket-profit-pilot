@@ -49,7 +49,7 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
   
   const capitalizedMonth = formattedMonth.charAt(0).toUpperCase() + formattedMonth.slice(1);
 
-  // Handle the save event from the dialog
+  // Handle the save event from the dialog with correct parameter order
   const handleBalanceSaved = (
     balance: number, 
     opexAmount: number = 35,
@@ -58,11 +58,11 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
     taxReservePercentage: number = 5,
     notes?: string
   ) => {
-    console.log("MonthlyBalanceEditor: Balance saved with values:", {
+    console.log("MonthlyBalanceEditor: Balance saved with correct parameter order:", {
       balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, notes
     });
     
-    // Pass all values to the parent component, including the new taxReservePercentage
+    // Pass all values to the parent component in the correct order
     onBalanceChange(balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage);
     setShowBalanceDialog(false);
   };
