@@ -125,6 +125,16 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     setLoading(true);
     setError(null);
 
+    console.log("🔧 updateMonthlyBalance: DETAILED INPUT ANALYSIS:", {
+      balance: { value: balance, type: typeof balance, isNaN: isNaN(balance) },
+      opexAmount: { value: opexAmount, type: typeof opexAmount, isNaN: isNaN(opexAmount) },
+      itbmAmount: { value: itbmAmount, type: typeof itbmAmount, isNaN: isNaN(itbmAmount) },
+      profitPercentage: { value: profitPercentage, type: typeof profitPercentage, isNaN: isNaN(profitPercentage), isZero: profitPercentage === 0 },
+      taxReservePercentage: { value: taxReservePercentage, type: typeof taxReservePercentage, isNaN: isNaN(taxReservePercentage), isZero: taxReservePercentage === 0 },
+      notes: { value: notes, type: typeof notes },
+      currentMonthYear
+    });
+
     // OPTIMISTIC UPDATE: Immediately update local state
     const optimisticBalance: MonthlyBalance = {
       id: monthlyBalance?.id || Date.now(), // Use existing ID or temp ID
@@ -144,19 +154,27 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     setMonthlyBalance(optimisticBalance);
 
     try {
-      console.log("useMonthlyBalance: Updating monthly balance with values:", {
-        balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, notes,
+      console.log("🔧 updateMonthlyBalance: PREPARING DATABASE UPDATE with exact values:", {
+        balance, 
+        opex_amount: opexAmount, 
+        itbm_amount: itbmAmount, 
+        profit_percentage: profitPercentage, 
+        tax_reserve_percentage: taxReservePercentage, 
+        notes: notes || null,
         currentMonthYear
       });
       
+      // CRITICAL: Ensure 0 values are explicitly handled
       const updateData: any = {
-        balance,
-        opex_amount: opexAmount,
-        itbm_amount: itbmAmount,
-        profit_percentage: profitPercentage,
-        tax_reserve_percentage: taxReservePercentage,
+        balance: Number(balance), // Ensure it's a number
+        opex_amount: Number(opexAmount), // Ensure it's a number
+        itbm_amount: Number(itbmAmount), // Ensure it's a number
+        profit_percentage: Number(profitPercentage), // Explicitly convert to number, 0 is valid
+        tax_reserve_percentage: Number(taxReservePercentage), // Explicitly convert to number, 0 is valid
         notes: notes || null,
       };
+
+      console.log("🔧 updateMonthlyBalance: FINAL UPDATE DATA OBJECT:", updateData);
       
       // Check if we're updating or inserting
       const existsResult = await checkBalanceExists();
@@ -164,6 +182,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       
       if (existsResult) {
         // Update existing record
+        console.log("🔧 updateMonthlyBalance: UPDATING EXISTING RECORD with data:", updateData);
         const { data, error } = await supabase
           .from('monthly_balances')
           .update(updateData)
@@ -171,17 +190,17 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
           .select();
 
         if (error) {
-          console.error("useMonthlyBalance: Error updating monthly balance:", error);
+          console.error("🚨 updateMonthlyBalance: DATABASE UPDATE ERROR:", error);
+          console.error("🚨 updateMonthlyBalance: Error details:", JSON.stringify(error, null, 2));
           // Revert optimistic update on error
           await fetchMonthlyBalance();
           throw error;
         }
         
-        console.log("useMonthlyBalance: Monthly balance updated:", data);
+        console.log("✅ updateMonthlyBalance: DATABASE UPDATE SUCCESS:", data);
         const updatedBalance = data[0] || null;
-        setMonthlyBalance(updatedBalance);
         
-        console.log("useMonthlyBalance: State updated with new balance:", {
+        console.log("✅ updateMonthlyBalance: VERIFYING SAVED VALUES:", {
           id: updatedBalance?.id,
           balance: updatedBalance?.balance,
           opex_amount: updatedBalance?.opex_amount,
@@ -191,12 +210,19 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
           updated_at: updatedBalance?.updated_at
         });
         
+        setMonthlyBalance(updatedBalance);
+        
         toast({
           title: "Balance actualizado",
           description: `Se actualizó el balance inicial de ${format(currentDate, 'MMMM yyyy')}`,
         });
       } else {
         // Create new record
+        console.log("🔧 updateMonthlyBalance: CREATING NEW RECORD with data:", {
+          month_year: currentMonthYear,
+          ...updateData
+        });
+        
         const { data, error } = await supabase
           .from('monthly_balances')
           .insert({
@@ -206,17 +232,17 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
           .select();
 
         if (error) {
-          console.error("useMonthlyBalance: Error creating monthly balance:", error);
+          console.error("🚨 updateMonthlyBalance: DATABASE INSERT ERROR:", error);
+          console.error("🚨 updateMonthlyBalance: Error details:", JSON.stringify(error, null, 2));
           // Revert optimistic update on error
           await fetchMonthlyBalance();
           throw error;
         }
         
-        console.log("useMonthlyBalance: New monthly balance created:", data);
+        console.log("✅ updateMonthlyBalance: DATABASE INSERT SUCCESS:", data);
         const newBalance = data[0] || null;
-        setMonthlyBalance(newBalance);
         
-        console.log("useMonthlyBalance: State updated with new balance:", {
+        console.log("✅ updateMonthlyBalance: VERIFYING SAVED VALUES:", {
           id: newBalance?.id,
           balance: newBalance?.balance,
           opex_amount: newBalance?.opex_amount,
@@ -226,6 +252,8 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
           updated_at: newBalance?.updated_at
         });
         
+        setMonthlyBalance(newBalance);
+        
         toast({
           title: "Balance creado",
           description: `Se creó el balance inicial de ${format(currentDate, 'MMMM yyyy')}`,
@@ -234,7 +262,9 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       
       return true;
     } catch (err: any) {
-      console.error("useMonthlyBalance: Error updating monthly balance:", err);
+      console.error("🚨 updateMonthlyBalance: FATAL ERROR:", err);
+      console.error("🚨 updateMonthlyBalance: Error message:", err.message);
+      console.error("🚨 updateMonthlyBalance: Error stack:", err.stack);
       setError(err.message || "Error al actualizar el balance mensual");
       
       toast({

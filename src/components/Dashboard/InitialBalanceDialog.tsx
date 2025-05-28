@@ -50,17 +50,53 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
   // Update form values when the dialog opens or currentBalance changes
   useEffect(() => {
     if (open) {
-      console.log("Dialog opened, current balance:", currentBalance);
+      console.log("📝 InitialBalanceDialog: Dialog opened, current balance:", currentBalance);
       
       if (currentBalance) {
+        console.log("📝 InitialBalanceDialog: Setting form values from currentBalance:", {
+          balance: currentBalance.balance,
+          opex_amount: currentBalance.opex_amount,
+          itbm_amount: currentBalance.itbm_amount,
+          profit_percentage: currentBalance.profit_percentage,
+          tax_reserve_percentage: currentBalance.tax_reserve_percentage,
+          notes: currentBalance.notes
+        });
+        
         setBalance(currentBalance.balance.toString());
-        setOpexAmount(currentBalance.opex_amount !== undefined ? currentBalance.opex_amount.toString() : "35");
-        setItbmAmount(currentBalance.itbm_amount !== undefined ? currentBalance.itbm_amount.toString() : "0");
-        setProfitPercentage(currentBalance.profit_percentage !== undefined ? currentBalance.profit_percentage.toString() : "1");
-        setTaxReservePercentage(currentBalance.tax_reserve_percentage !== undefined ? currentBalance.tax_reserve_percentage.toString() : "5");
+        // Use explicit checks for numbers including 0
+        setOpexAmount(currentBalance.opex_amount !== undefined && currentBalance.opex_amount !== null 
+          ? currentBalance.opex_amount.toString() 
+          : "35");
+        setItbmAmount(currentBalance.itbm_amount !== undefined && currentBalance.itbm_amount !== null 
+          ? currentBalance.itbm_amount.toString() 
+          : "0");
+        setProfitPercentage(currentBalance.profit_percentage !== undefined && currentBalance.profit_percentage !== null 
+          ? currentBalance.profit_percentage.toString() 
+          : "1");
+        setTaxReservePercentage(currentBalance.tax_reserve_percentage !== undefined && currentBalance.tax_reserve_percentage !== null 
+          ? currentBalance.tax_reserve_percentage.toString() 
+          : "5");
         setNotes(currentBalance.notes || "");
+        
+        console.log("📝 InitialBalanceDialog: Form values set to:", {
+          balance: currentBalance.balance.toString(),
+          opexAmount: currentBalance.opex_amount !== undefined && currentBalance.opex_amount !== null 
+            ? currentBalance.opex_amount.toString() 
+            : "35",
+          itbmAmount: currentBalance.itbm_amount !== undefined && currentBalance.itbm_amount !== null 
+            ? currentBalance.itbm_amount.toString() 
+            : "0",
+          profitPercentage: currentBalance.profit_percentage !== undefined && currentBalance.profit_percentage !== null 
+            ? currentBalance.profit_percentage.toString() 
+            : "1",
+          taxReservePercentage: currentBalance.tax_reserve_percentage !== undefined && currentBalance.tax_reserve_percentage !== null 
+            ? currentBalance.tax_reserve_percentage.toString() 
+            : "5",
+          notes: currentBalance.notes || ""
+        });
       } else {
         // Reset to defaults if no current balance
+        console.log("📝 InitialBalanceDialog: No current balance, resetting to defaults");
         setBalance("");
         setOpexAmount("35");
         setItbmAmount("0");
@@ -72,7 +108,7 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
   }, [currentBalance, open]);
 
   const handleSave = () => {
-    console.log("Attempting to save with values:", {
+    console.log("📝 InitialBalanceDialog: SAVE BUTTON CLICKED - Current form values:", {
       balance,
       opexAmount,
       itbmAmount,
@@ -86,6 +122,15 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
     const numericItbmAmount = parseFloat(itbmAmount || "0");
     const numericProfitPercentage = parseFloat(profitPercentage || "1");
     const numericTaxReservePercentage = parseFloat(taxReservePercentage || "5");
+    
+    console.log("📝 InitialBalanceDialog: CONVERTED TO NUMBERS:", {
+      numericBalance,
+      numericOpexAmount,
+      numericItbmAmount,
+      numericProfitPercentage,
+      numericTaxReservePercentage,
+      notes
+    });
     
     if (isNaN(numericBalance)) {
       toast({
@@ -105,13 +150,13 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
       return;
     }
     
-    console.log("Calling onBalanceSaved with correct parameter order:", {
+    console.log("📝 InitialBalanceDialog: CALLING onBalanceSaved with parameters:", {
       numericBalance, 
       numericOpexAmount,
       numericItbmAmount,
       numericProfitPercentage,
       numericTaxReservePercentage,
-      notes
+      notes: notes || undefined
     });
     
     // Call with the correct parameter order: balance, opex, itbm, profit, taxReserve, notes
@@ -149,7 +194,10 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
               type="number"
               step="0.01"
               value={balance}
-              onChange={(e) => setBalance(e.target.value)}
+              onChange={(e) => {
+                console.log("📝 Balance input changed to:", e.target.value);
+                setBalance(e.target.value);
+              }}
               placeholder="Ingrese el balance inicial"
               className="w-full"
             />
@@ -162,7 +210,10 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
               type="number"
               step="0.01"
               value={opexAmount}
-              onChange={(e) => setOpexAmount(e.target.value)}
+              onChange={(e) => {
+                console.log("📝 OPEX input changed to:", e.target.value);
+                setOpexAmount(e.target.value);
+              }}
               placeholder="Cantidad fija de OPEX"
               className="w-full"
             />
@@ -176,7 +227,10 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
               type="number"
               step="0.01"
               value={itbmAmount}
-              onChange={(e) => setItbmAmount(e.target.value)}
+              onChange={(e) => {
+                console.log("📝 ITBM input changed to:", e.target.value);
+                setItbmAmount(e.target.value);
+              }}
               placeholder="Cantidad de ITBM"
               className="w-full"
             />
@@ -190,7 +244,10 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
               type="number"
               step="0.1"
               value={profitPercentage}
-              onChange={(e) => setProfitPercentage(e.target.value)}
+              onChange={(e) => {
+                console.log("📝 Profit percentage input changed to:", e.target.value);
+                setProfitPercentage(e.target.value);
+              }}
               placeholder="Porcentaje de beneficio"
               className="w-full"
             />
@@ -206,7 +263,10 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
               min="0"
               max="100"
               value={taxReservePercentage}
-              onChange={(e) => setTaxReservePercentage(e.target.value)}
+              onChange={(e) => {
+                console.log("📝 Tax reserve percentage input changed to:", e.target.value);
+                setTaxReservePercentage(e.target.value);
+              }}
               placeholder="Porcentaje de reserva para impuestos"
               className="w-full"
             />
@@ -218,7 +278,10 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
             <Textarea
               id="notes"
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              onChange={(e) => {
+                console.log("📝 Notes input changed to:", e.target.value);
+                setNotes(e.target.value);
+              }}
               placeholder="Notas sobre este balance mensual"
               rows={isMobile ? 2 : 3}
               className="w-full"

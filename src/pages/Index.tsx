@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
@@ -110,7 +109,7 @@ const Index = () => {
     refreshData(false); // Manual load after balance is set
   };
 
-  // Updated handler for balance changes - now with immediate updates
+  // Updated handler for balance changes - now with immediate updates and comprehensive logging
   const handleBalanceChange = async (
     balance: number, 
     opexAmount: number = 35, 
@@ -118,17 +117,25 @@ const Index = () => {
     profitPercentage: number = 1,
     taxReservePercentage: number = 5
   ) => {
-    console.log("💰 Index: Balance change requested - IMMEDIATE UPDATE:", {
-      balance,
-      opexAmount,
-      itbmAmount,
-      profitPercentage,
-      taxReservePercentage,
+    console.log("💰 Index: handleBalanceChange CALLED WITH PARAMETERS:", {
+      balance: { value: balance, type: typeof balance },
+      opexAmount: { value: opexAmount, type: typeof opexAmount },
+      itbmAmount: { value: itbmAmount, type: typeof itbmAmount },
+      profitPercentage: { value: profitPercentage, type: typeof profitPercentage, isZero: profitPercentage === 0 },
+      taxReservePercentage: { value: taxReservePercentage, type: typeof taxReservePercentage, isZero: taxReservePercentage === 0 },
       timestamp: new Date().toISOString()
     });
     
     try {
       // 1. IMMEDIATE: Update the monthly balance with optimistic update
+      console.log("💰 Index: Calling updateMonthlyBalance with parameters:", {
+        balance,
+        opexAmount,
+        itbmAmount,
+        profitPercentage,
+        taxReservePercentage
+      });
+      
       const success = await updateMonthlyBalance(
         balance, 
         opexAmount,
@@ -139,7 +146,7 @@ const Index = () => {
 
       if (success) {
         // 2. IMMEDIATE: Update local starting balance for immediate UI feedback
-        console.log("💰 Index: Updating local starting balance immediately:", balance);
+        console.log("💰 Index: updateMonthlyBalance SUCCESS - Updating local starting balance to:", balance);
         setStartingBalance(balance);
         
         // 3. Show immediate feedback
@@ -152,10 +159,11 @@ const Index = () => {
         console.log("💰 Index: Triggering background data refresh");
         refreshData(false);
       } else {
+        console.error("💰 Index: updateMonthlyBalance FAILED");
         throw new Error("Failed to update monthly balance");
       }
     } catch (error) {
-      console.error("💰 Index: Error in handleBalanceChange:", error);
+      console.error("💰 Index: ERROR in handleBalanceChange:", error);
       toast({
         title: 'Error',
         description: 'No se pudo actualizar el balance',
