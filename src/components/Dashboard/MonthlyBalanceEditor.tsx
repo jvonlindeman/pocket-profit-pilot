@@ -10,7 +10,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 
 interface MonthlyBalanceEditorProps {
   currentDate: Date;
-  onBalanceChange: (balance: number, opexAmount?: number, itbmAmount?: number, profitPercentage?: number, notes?: string) => void;
+  onBalanceChange: (balance: number, opexAmount?: number, itbmAmount?: number, profitPercentage?: number, taxReservePercentage?: number) => void;
 }
 
 const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({ 
@@ -55,14 +55,15 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
     opexAmount: number = 35,
     itbmAmount: number = 0,
     profitPercentage: number = 1,
+    taxReservePercentage: number = 5,
     notes?: string
   ) => {
     console.log("MonthlyBalanceEditor: Balance saved with values:", {
-      balance, opexAmount, itbmAmount, profitPercentage, notes
+      balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, notes
     });
     
-    // Pass all values to the parent component
-    onBalanceChange(balance, opexAmount, itbmAmount, profitPercentage, notes);
+    // Pass all values to the parent component, including the new taxReservePercentage
+    onBalanceChange(balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage);
     setShowBalanceDialog(false);
   };
 
@@ -86,13 +87,15 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
                   <>
                     ITBM: ${monthlyBalance.itbm_amount?.toFixed(2) || "0.00"}<br />
                     OPEX: ${monthlyBalance.opex_amount?.toFixed(2) || "0.00"}<br />
-                    Profit: {monthlyBalance.profit_percentage?.toFixed(1) || "0.0"}%
+                    Profit: {monthlyBalance.profit_percentage?.toFixed(1) || "0.0"}%<br />
+                    Tax Reserve: {monthlyBalance.tax_reserve_percentage?.toFixed(1) || "5.0"}%
                   </>
                 ) : (
                   <>
                     ITBM: ${monthlyBalance.itbm_amount?.toFixed(2) || "0.00"} | 
                     OPEX: ${monthlyBalance.opex_amount?.toFixed(2) || "0.00"} | 
-                    Profit: {monthlyBalance.profit_percentage?.toFixed(1) || "0.0"}%
+                    Profit: {monthlyBalance.profit_percentage?.toFixed(1) || "0.0"}% | 
+                    Tax Reserve: {monthlyBalance.tax_reserve_percentage?.toFixed(1) || "5.0"}%
                   </>
                 )}
               </p>

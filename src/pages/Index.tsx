@@ -110,7 +110,7 @@ const Index = () => {
     refreshData(false); // Manual load after balance is set
   };
 
-  // Improved handler for balance changes in the MonthlyBalanceEditor - now includes tax reserve percentage
+  // Updated handler for balance changes in the MonthlyBalanceEditor - now includes tax reserve percentage
   const handleBalanceChange = (
     balance: number, 
     opexAmount: number = 35, 

@@ -20,7 +20,7 @@ interface DashboardContentProps {
   currentMonthDate: Date;
   startingBalance: number;
   refreshData: (force: boolean) => void;
-  handleBalanceChange: (balance: number, opexAmount?: number, itbmAmount?: number, profitPercentage?: number, notes?: string) => void;
+  handleBalanceChange: (balance: number, opexAmount?: number, itbmAmount?: number, profitPercentage?: number, taxReservePercentage?: number) => void;
   handleRefresh: () => void;
   loading: boolean;
   stripeIncome: number;
@@ -62,8 +62,9 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   const opexAmount = monthlyBalance?.opex_amount !== null ? monthlyBalance?.opex_amount || 35 : 35;
   const itbmAmount = monthlyBalance?.itbm_amount !== null ? monthlyBalance?.itbm_amount || 0 : 0;
   const profitPercentage = monthlyBalance?.profit_percentage !== null ? monthlyBalance?.profit_percentage || 1 : 1;
+  const taxReservePercentage = monthlyBalance?.tax_reserve_percentage !== null ? monthlyBalance?.tax_reserve_percentage || 5 : 5;
   
-  console.log("DashboardContent: Using values for calculator:", { opexAmount, itbmAmount, profitPercentage });
+  console.log("DashboardContent: Using values for calculator:", { opexAmount, itbmAmount, profitPercentage, taxReservePercentage });
   console.log("DashboardContent: Transaction count:", financialData.transactions.length);
   console.log("DashboardContent: Zoho income transactions:", 
     financialData.transactions.filter(tx => tx.type === 'income' && tx.source === 'Zoho').length
@@ -92,7 +93,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
         />
       </div>
 
-      {/* New Salary Calculator - Updated with additional props */}
+      {/* New Salary Calculator - Updated with additional props including taxReservePercentage */}
       <div className="mb-6">
         <SalaryCalculator 
           zohoIncome={regularIncome}
@@ -100,6 +101,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
           opexAmount={opexAmount}
           itbmAmount={itbmAmount}
           profitPercentage={profitPercentage}
+          taxReservePercentage={taxReservePercentage}
           startingBalance={startingBalance}
           totalZohoExpenses={totalZohoExpenses}
         />
