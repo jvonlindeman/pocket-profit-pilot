@@ -27,12 +27,36 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
   } = useMonthlyBalance({ currentDate });
   const isMobile = useIsMobile();
 
+  // Debug what monthlyBalance we have
+  useEffect(() => {
+    console.log("🔍 EDITOR: monthlyBalance changed:", {
+      monthlyBalance,
+      hasBalance: !!monthlyBalance,
+      values: monthlyBalance ? {
+        balance: monthlyBalance.balance,
+        opex_amount: monthlyBalance.opex_amount,
+        itbm_amount: monthlyBalance.itbm_amount,
+        profit_percentage: monthlyBalance.profit_percentage,
+        tax_reserve_percentage: monthlyBalance.tax_reserve_percentage
+      } : null
+    });
+  }, [monthlyBalance]);
+
   // Ensure we have the latest balance when currentDate changes
   useEffect(() => {
     if (currentDate) {
+      console.log("🔍 EDITOR: currentDate changed, fetching balance");
       fetchMonthlyBalance();
     }
   }, [currentDate, fetchMonthlyBalance]);
+
+  // Handle opening the dialog - refresh data first
+  const handleOpenDialog = async () => {
+    console.log("🔍 EDITOR: Opening dialog, refreshing data first");
+    // Always fetch fresh data before opening the dialog
+    await fetchMonthlyBalance();
+    setShowBalanceDialog(true);
+  };
 
   // Safe formatting of month name in Spanish
   const formattedMonth = (() => {
@@ -58,7 +82,7 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
     taxReservePercentage: number = 5,
     notes?: string
   ) => {
-    console.log("📝 MonthlyBalanceEditor: Balance saved - TRIGGERING IMMEDIATE UPDATE:", {
+    console.log("🔍 EDITOR: Balance saved - TRIGGERING IMMEDIATE UPDATE:", {
       balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, notes,
       timestamp: new Date().toISOString()
     });
@@ -68,6 +92,12 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
     
     // Close dialog
     setShowBalanceDialog(false);
+    
+    // Fetch fresh data after save to ensure we have the latest values
+    setTimeout(() => {
+      console.log("🔍 EDITOR: Fetching fresh data after save");
+      fetchMonthlyBalance();
+    }, 500);
   };
 
   return (
@@ -116,7 +146,10 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => fetchMonthlyBalance()}
+          onClick={() => {
+            console.log("🔍 EDITOR: Manual refresh requested");
+            fetchMonthlyBalance();
+          }}
           disabled={loading}
         >
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -125,7 +158,7 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setShowBalanceDialog(true)}
+          onClick={handleOpenDialog}
           disabled={loading}
         >
           <PencilIcon className="h-4 w-4 mr-2" />
