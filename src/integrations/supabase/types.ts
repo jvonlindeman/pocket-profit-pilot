@@ -214,6 +214,7 @@ export type Database = {
           opex_amount: number | null
           profit_percentage: number | null
           stripe_override: number | null
+          tax_reserve_percentage: number | null
           updated_at: string
         }
         Insert: {
@@ -226,6 +227,7 @@ export type Database = {
           opex_amount?: number | null
           profit_percentage?: number | null
           stripe_override?: number | null
+          tax_reserve_percentage?: number | null
           updated_at?: string
         }
         Update: {
@@ -238,6 +240,7 @@ export type Database = {
           opex_amount?: number | null
           profit_percentage?: number | null
           stripe_override?: number | null
+          tax_reserve_percentage?: number | null
           updated_at?: string
         }
         Relationships: []

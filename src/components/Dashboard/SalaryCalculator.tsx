@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calculator, DollarSign, ArrowDown, ArrowUp, Percent, Info } from 'lucide-react';
@@ -10,6 +9,7 @@ interface SalaryCalculatorProps {
   opexAmount: number;
   itbmAmount: number;
   profitPercentage: number;
+  taxReservePercentage: number; // Now configurable instead of hardcoded
   startingBalance?: number;
   totalZohoExpenses?: number;
 }
@@ -20,14 +20,14 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
   opexAmount,
   itbmAmount,
   profitPercentage,
+  taxReservePercentage, // Use the configurable value
   startingBalance = 0,
   totalZohoExpenses = 0
 }) => {
   // Cálculos
   const adjustedZohoIncome = (startingBalance || 0) + zohoIncome - totalZohoExpenses;
   const profitFirstAmount = (adjustedZohoIncome * profitPercentage) / 100;
-  const taxReservePercentage = 5;
-  const taxReserveAmount = (adjustedZohoIncome * taxReservePercentage) / 100;
+  const taxReserveAmount = (adjustedZohoIncome * taxReservePercentage) / 100; // Use configurable percentage
   const totalZohoDeductions = opexAmount + itbmAmount + profitFirstAmount + taxReserveAmount;
   const remainingZohoIncome = adjustedZohoIncome - totalZohoDeductions;
   const halfStripeIncome = stripeIncome / 2;
@@ -246,7 +246,7 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                   </TooltipContent>
                 </Tooltip>
                 
-                {/* Reserva para Taxes */}
+                {/* Reserva para Taxes - Now shows configurable percentage */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className="bg-white p-3 rounded-md shadow-sm border border-amber-100">
@@ -262,7 +262,7 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="text-xs">Reserva para impuestos</p>
+                    <p className="text-xs">Reserva configurable para impuestos</p>
                   </TooltipContent>
                 </Tooltip>
               </div>

@@ -21,12 +21,13 @@ interface InitialBalanceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currentDate: Date;
-  onBalanceSaved: (balance: number, opexAmount: number, itbmAmount: number, profitPercentage: number, notes?: string) => void;
+  onBalanceSaved: (balance: number, opexAmount: number, itbmAmount: number, profitPercentage: number, taxReservePercentage: number, notes?: string) => void;
   currentBalance?: {
     balance: number;
     opex_amount?: number;
     itbm_amount?: number;
     profit_percentage?: number;
+    tax_reserve_percentage?: number;
     notes?: string;
   } | null;
 }
@@ -42,6 +43,7 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
   const [opexAmount, setOpexAmount] = useState<string>("35"); // Default OPEX amount
   const [itbmAmount, setItbmAmount] = useState<string>("0"); // Default ITBM amount
   const [profitPercentage, setProfitPercentage] = useState<string>("1"); // Default profit percentage
+  const [taxReservePercentage, setTaxReservePercentage] = useState<string>("5"); // Default tax reserve percentage
   const [notes, setNotes] = useState<string>("");
   const isMobile = useIsMobile();
   
@@ -55,6 +57,7 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
         setOpexAmount(currentBalance.opex_amount !== undefined ? currentBalance.opex_amount.toString() : "35");
         setItbmAmount(currentBalance.itbm_amount !== undefined ? currentBalance.itbm_amount.toString() : "0");
         setProfitPercentage(currentBalance.profit_percentage !== undefined ? currentBalance.profit_percentage.toString() : "1");
+        setTaxReservePercentage(currentBalance.tax_reserve_percentage !== undefined ? currentBalance.tax_reserve_percentage.toString() : "5");
         setNotes(currentBalance.notes || "");
       } else {
         // Reset to defaults if no current balance
@@ -62,6 +65,7 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
         setOpexAmount("35");
         setItbmAmount("0");
         setProfitPercentage("1");
+        setTaxReservePercentage("5");
         setNotes("");
       }
     }
@@ -73,6 +77,7 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
       opexAmount,
       itbmAmount,
       profitPercentage,
+      taxReservePercentage,
       notes
     });
     
@@ -80,6 +85,7 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
     const numericOpexAmount = parseFloat(opexAmount || "35");
     const numericItbmAmount = parseFloat(itbmAmount || "0");
     const numericProfitPercentage = parseFloat(profitPercentage || "1");
+    const numericTaxReservePercentage = parseFloat(taxReservePercentage || "5");
     
     if (isNaN(numericBalance)) {
       toast({
@@ -90,11 +96,21 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
       return;
     }
     
+    if (isNaN(numericTaxReservePercentage) || numericTaxReservePercentage < 0 || numericTaxReservePercentage > 100) {
+      toast({
+        title: "Error",
+        description: "Por favor ingrese un porcentaje válido para la reserva de impuestos (0-100%)",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     onBalanceSaved(
       numericBalance, 
       numericOpexAmount,
       numericItbmAmount,
       numericProfitPercentage,
+      numericTaxReservePercentage,
       notes || undefined
     );
     
@@ -111,7 +127,7 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
         <DialogHeader>
           <DialogTitle>Balance Inicial: {capitalizedMonth}</DialogTitle>
           <DialogDescription>
-            Configure el balance financiero inicial para este mes.
+            Configure el balance financiero inicial y parámetros de cálculo para este mes.
           </DialogDescription>
         </DialogHeader>
         
@@ -169,6 +185,22 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
               className="w-full"
             />
             <p className="text-xs text-gray-500">Porcentaje de beneficio mensual</p>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="taxReserve">% Reserva para Impuestos</Label>
+            <Input
+              id="taxReserve"
+              type="number"
+              step="0.1"
+              min="0"
+              max="100"
+              value={taxReservePercentage}
+              onChange={(e) => setTaxReservePercentage(e.target.value)}
+              placeholder="Porcentaje de reserva para impuestos"
+              className="w-full"
+            />
+            <p className="text-xs text-gray-500">Porcentaje de ingresos reservado para impuestos (recomendado: 5%)</p>
           </div>
           
           <div className="space-y-2">

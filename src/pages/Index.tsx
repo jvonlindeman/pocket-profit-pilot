@@ -110,27 +110,30 @@ const Index = () => {
     refreshData(false); // Manual load after balance is set
   };
 
-  // Improved handler for balance changes in the MonthlyBalanceEditor
+  // Improved handler for balance changes in the MonthlyBalanceEditor - now includes tax reserve percentage
   const handleBalanceChange = (
     balance: number, 
     opexAmount: number = 35, 
     itbmAmount: number = 0, 
-    profitPercentage: number = 1
+    profitPercentage: number = 1,
+    taxReservePercentage: number = 5
   ) => {
     console.log("Balance changed in editor:", {
       balance,
       opexAmount,
       itbmAmount,
-      profitPercentage
+      profitPercentage,
+      taxReservePercentage
     });
     
-    // Call the updateStartingBalance function with all parameters
+    // Call the updateStartingBalance function with all parameters including tax reserve percentage
     updateStartingBalance(
       balance, 
       currentMonthDate, 
       opexAmount,
       itbmAmount,
-      profitPercentage
+      profitPercentage,
+      taxReservePercentage
     ).then(success => {
       if (success) {
         // Immediately update local state for faster UI feedback

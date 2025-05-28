@@ -37,18 +37,19 @@ export const useMonthlyBalanceManager = () => {
     }
   }, []);
 
-  // Update the starting balance with additional calculator fields
+  // Update the starting balance with additional calculator fields including tax reserve percentage
   const updateStartingBalance = useCallback(async (
     balance: number, 
     date: Date, 
     opexAmount: number = 35,
     itbmAmount: number = 0,
     profitPercentage: number = 1,
+    taxReservePercentage: number = 5,
     notes?: string
   ) => {
     try {
       console.log("Updating monthly balance with values:", {
-        balance, date, opexAmount, itbmAmount, profitPercentage, notes
+        balance, date, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, notes
       });
       
       const monthYear = formatDate(date, 'yyyy-MM');
@@ -65,6 +66,7 @@ export const useMonthlyBalanceManager = () => {
         opex_amount: opexAmount, 
         itbm_amount: itbmAmount,
         profit_percentage: profitPercentage,
+        tax_reserve_percentage: taxReservePercentage,
         notes: notes || (existingData?.notes || null),
       };
       

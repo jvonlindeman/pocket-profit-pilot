@@ -103,12 +103,13 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     }
   }, [currentMonthYear]);
 
-  // Set or update the monthly balance
+  // Set or update the monthly balance including tax reserve percentage
   const updateMonthlyBalance = useCallback(async (
     balance: number, 
     opexAmount: number = 35,
     itbmAmount: number = 0, 
-    profitPercentage: number = 1, 
+    profitPercentage: number = 1,
+    taxReservePercentage: number = 5,
     notes?: string
   ) => {
     setLoading(true);
@@ -116,7 +117,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
 
     try {
       console.log("Updating monthly balance with values:", {
-        balance, opexAmount, itbmAmount, profitPercentage, notes,
+        balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, notes,
         currentMonthYear
       });
       
@@ -125,6 +126,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
         opex_amount: opexAmount,
         itbm_amount: itbmAmount,
         profit_percentage: profitPercentage,
+        tax_reserve_percentage: taxReservePercentage,
         notes: notes || null,
       };
       

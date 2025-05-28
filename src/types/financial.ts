@@ -1,3 +1,4 @@
+
 export interface Transaction {
   id: string;
   external_id?: string; // Added external_id as optional field
@@ -83,4 +84,5 @@ export interface MonthlyBalance {
   opex_amount: number | null; // Added for OPEX percentage
   itbm_amount: number | null; // Added for ITBM amount
   profit_percentage: number | null; // Added for Profit First percentage
+  tax_reserve_percentage: number | null; // Added for configurable tax reserve percentage
 }
