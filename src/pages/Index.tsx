@@ -50,7 +50,7 @@ const Index = () => {
   // Convert financial date range to compatible format for useMonthlyBalance
   const currentMonthDate = dateRange.startDate || new Date();
   
-  const { checkBalanceExists, monthlyBalance } = useMonthlyBalance({ 
+  const { checkBalanceExists, monthlyBalance, updateMonthlyBalance } = useMonthlyBalance({ 
     currentDate: currentMonthDate
   });
   
@@ -110,45 +110,58 @@ const Index = () => {
     refreshData(false); // Manual load after balance is set
   };
 
-  // Updated handler for balance changes in the MonthlyBalanceEditor - now includes tax reserve percentage
-  const handleBalanceChange = (
+  // Updated handler for balance changes - now with immediate updates
+  const handleBalanceChange = async (
     balance: number, 
     opexAmount: number = 35, 
     itbmAmount: number = 0, 
     profitPercentage: number = 1,
     taxReservePercentage: number = 5
   ) => {
-    console.log("Balance changed in editor:", {
+    console.log("💰 Index: Balance change requested - IMMEDIATE UPDATE:", {
       balance,
       opexAmount,
       itbmAmount,
       profitPercentage,
-      taxReservePercentage
+      taxReservePercentage,
+      timestamp: new Date().toISOString()
     });
     
-    // Call the updateStartingBalance function with all parameters including tax reserve percentage
-    updateStartingBalance(
-      balance, 
-      currentMonthDate, 
-      opexAmount,
-      itbmAmount,
-      profitPercentage,
-      taxReservePercentage
-    ).then(success => {
+    try {
+      // 1. IMMEDIATE: Update the monthly balance with optimistic update
+      const success = await updateMonthlyBalance(
+        balance, 
+        opexAmount,
+        itbmAmount,
+        profitPercentage,
+        taxReservePercentage
+      );
+
       if (success) {
-        // Immediately update local state for faster UI feedback
+        // 2. IMMEDIATE: Update local starting balance for immediate UI feedback
+        console.log("💰 Index: Updating local starting balance immediately:", balance);
         setStartingBalance(balance);
         
-        // Force a refresh to ensure all components get the updated data
+        // 3. Show immediate feedback
         toast({
-          title: 'Balance inicial actualizado',
-          description: 'Actualizando datos financieros...',
+          title: 'Balance actualizado inmediatamente',
+          description: 'Los cálculos se han actualizado',
         });
-        
-        // Refresh data from backend but without showing the loading state
+
+        // 4. BACKGROUND: Update backend data (no loading state)
+        console.log("💰 Index: Triggering background data refresh");
         refreshData(false);
+      } else {
+        throw new Error("Failed to update monthly balance");
       }
-    });
+    } catch (error) {
+      console.error("💰 Index: Error in handleBalanceChange:", error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo actualizar el balance',
+        variant: 'destructive',
+      });
+    }
   };
 
   // Handler for data refresh
@@ -169,7 +182,9 @@ const Index = () => {
     hasCachedData,
     usingCachedData,
     transactionCount: financialData.transactions.length,
-    autoLoadingDisabled: true
+    autoLoadingDisabled: true,
+    monthlyBalanceId: monthlyBalance?.id,
+    monthlyBalanceTimestamp: monthlyBalance?.updated_at
   });
 
   return (

@@ -59,31 +59,34 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   unpaidInvoices = []
 }) => {
   // Enhanced debugging and improved value extraction logic
-  console.log("DashboardContent: Monthly balance data received:", monthlyBalance);
+  console.log("💼 DashboardContent: Monthly balance data received:", monthlyBalance);
   
-  // Improved value extraction with better null/undefined handling
+  // IMMEDIATE VALUES: Use the most current values with better defaults
   const opexAmount = monthlyBalance?.opex_amount ?? 35;
   const itbmAmount = monthlyBalance?.itbm_amount ?? 0;
   const profitPercentage = monthlyBalance?.profit_percentage ?? 1;
   const taxReservePercentage = monthlyBalance?.tax_reserve_percentage ?? 5;
   
-  console.log("DashboardContent: Extracted values for calculator:", { 
+  console.log("💼 DashboardContent: IMMEDIATE VALUES for calculator:", { 
     opexAmount, 
     itbmAmount, 
     profitPercentage, 
     taxReservePercentage,
+    startingBalance,
     monthlyBalanceId: monthlyBalance?.id,
-    monthlyBalanceTimestamp: monthlyBalance?.updated_at
+    monthlyBalanceTimestamp: monthlyBalance?.updated_at,
+    timestamp: new Date().toISOString()
   });
   
-  // Create a unique key for forcing re-render when values change
-  const calculatorKey = `calculator-${monthlyBalance?.id || 'default'}-${monthlyBalance?.updated_at || Date.now()}`;
+  // REACTIVE KEY: Forces complete re-render when ANY value changes
+  const calculatorKey = `calculator-${monthlyBalance?.id || 'default'}-${monthlyBalance?.updated_at || Date.now()}-${startingBalance}-${opexAmount}-${itbmAmount}-${profitPercentage}-${taxReservePercentage}`;
   
-  console.log("DashboardContent: Transaction count:", financialData.transactions.length);
-  console.log("DashboardContent: Zoho income transactions:", 
+  console.log("💼 DashboardContent: Calculator key (forces re-render):", calculatorKey);
+  console.log("💼 DashboardContent: Transaction count:", financialData.transactions.length);
+  console.log("💼 DashboardContent: Zoho income transactions:", 
     financialData.transactions.filter(tx => tx.type === 'income' && tx.source === 'Zoho').length
   );
-  console.log("DashboardContent: Unpaid invoices:", unpaidInvoices?.length || 0);
+  console.log("💼 DashboardContent: Unpaid invoices:", unpaidInvoices?.length || 0);
 
   return (
     <>
@@ -107,7 +110,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
         />
       </div>
 
-      {/* New Salary Calculator with enhanced debugging and forced re-render */}
+      {/* Salary Calculator with IMMEDIATE REACTIVE UPDATES */}
       <div className="mb-6">
         <SalaryCalculator 
           key={calculatorKey}

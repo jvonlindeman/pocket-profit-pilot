@@ -125,6 +125,23 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     setLoading(true);
     setError(null);
 
+    // OPTIMISTIC UPDATE: Immediately update local state
+    const optimisticBalance = {
+      id: monthlyBalance?.id || Date.now(), // Use existing ID or temp ID
+      month_year: currentMonthYear,
+      balance,
+      opex_amount: opexAmount,
+      itbm_amount: itbmAmount,
+      profit_percentage: profitPercentage,
+      tax_reserve_percentage: taxReservePercentage,
+      notes: notes || null,
+      created_at: monthlyBalance?.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    console.log("useMonthlyBalance: OPTIMISTIC UPDATE - Setting local state immediately:", optimisticBalance);
+    setMonthlyBalance(optimisticBalance);
+
     try {
       console.log("useMonthlyBalance: Updating monthly balance with values:", {
         balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, notes,
@@ -154,6 +171,8 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
 
         if (error) {
           console.error("useMonthlyBalance: Error updating monthly balance:", error);
+          // Revert optimistic update on error
+          await fetchMonthlyBalance();
           throw error;
         }
         
@@ -187,6 +206,8 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
 
         if (error) {
           console.error("useMonthlyBalance: Error creating monthly balance:", error);
+          // Revert optimistic update on error
+          await fetchMonthlyBalance();
           throw error;
         }
         
@@ -225,7 +246,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     } finally {
       setLoading(false);
     }
-  }, [checkBalanceExists, currentDate, currentMonthYear, toast]);
+  }, [checkBalanceExists, currentDate, currentMonthYear, toast, monthlyBalance, fetchMonthlyBalance]);
 
   // Fetch the balance when the current date changes
   useEffect(() => {

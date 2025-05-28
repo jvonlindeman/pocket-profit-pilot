@@ -49,8 +49,8 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
   
   const capitalizedMonth = formattedMonth.charAt(0).toUpperCase() + formattedMonth.slice(1);
 
-  // Handle the save event from the dialog with correct parameter order
-  const handleBalanceSaved = (
+  // Handle the save event from the dialog - IMMEDIATE UPDATE
+  const handleBalanceSaved = async (
     balance: number, 
     opexAmount: number = 35,
     itbmAmount: number = 0,
@@ -58,12 +58,15 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
     taxReservePercentage: number = 5,
     notes?: string
   ) => {
-    console.log("MonthlyBalanceEditor: Balance saved with correct parameter order:", {
-      balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, notes
+    console.log("📝 MonthlyBalanceEditor: Balance saved - TRIGGERING IMMEDIATE UPDATE:", {
+      balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, notes,
+      timestamp: new Date().toISOString()
     });
     
-    // Pass all values to the parent component in the correct order
+    // IMMEDIATE: Trigger the parent's immediate update handler
     onBalanceChange(balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage);
+    
+    // Close dialog
     setShowBalanceDialog(false);
   };
 
