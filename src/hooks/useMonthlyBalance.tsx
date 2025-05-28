@@ -126,7 +126,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     setError(null);
 
     // OPTIMISTIC UPDATE: Immediately update local state
-    const optimisticBalance = {
+    const optimisticBalance: MonthlyBalance = {
       id: monthlyBalance?.id || Date.now(), // Use existing ID or temp ID
       month_year: currentMonthYear,
       balance,
@@ -135,6 +135,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       profit_percentage: profitPercentage,
       tax_reserve_percentage: taxReservePercentage,
       notes: notes || null,
+      stripe_override: monthlyBalance?.stripe_override || null, // Include stripe_override
       created_at: monthlyBalance?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
