@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -58,31 +59,42 @@ serve(async (req) => {
     
     let semanticSearchResults = null
     let searchContext = ''
+    let embeddingStats = null
 
     // If this is a semantic search query, perform the search
     if (isSemanticSearchQuery) {
       console.log('Detected semantic search query:', userMessage)
       
       try {
-        semanticSearchResults = await performSemanticSearch(
-          userMessage,
-          dateRange,
-          openaiApiKey,
-          supabase
-        )
+        // Check embedding coverage first
+        embeddingStats = await checkEmbeddingCoverage(supabase)
         
-        if (semanticSearchResults && semanticSearchResults.length > 0) {
-          searchContext = formatSearchResults(semanticSearchResults)
-          console.log(`Found ${semanticSearchResults.length} semantically similar transactions`)
+        if (embeddingStats.coverage < 10) {
+          // Very low coverage, inform user
+          searchContext = `\n=== ADVERTENCIA DE BÚSQUEDA SEMÁNTICA ===\nSolo ${embeddingStats.coverage}% de las transacciones (${embeddingStats.withEmbeddings}/${embeddingStats.total}) tienen embeddings generados.\nLa búsqueda semántica está muy limitada. Se recomienda generar embeddings para todas las transacciones.\n=== FIN DE ADVERTENCIA ===\n`
+        } else {
+          semanticSearchResults = await performSemanticSearch(
+            userMessage,
+            dateRange,
+            openaiApiKey,
+            supabase
+          )
+          
+          if (semanticSearchResults && semanticSearchResults.length > 0) {
+            searchContext = formatSearchResults(semanticSearchResults, embeddingStats)
+            console.log(`Found ${semanticSearchResults.length} semantically similar transactions`)
+          } else {
+            searchContext = `\n=== BÚSQUEDA SEMÁNTICA ===\nNo se encontraron transacciones similares para: "${userMessage}"\nCobertura actual: ${embeddingStats.coverage}% (${embeddingStats.withEmbeddings}/${embeddingStats.total} transacciones)\n=== FIN DE BÚSQUEDA ===\n`
+          }
         }
       } catch (error) {
         console.error('Semantic search failed:', error)
-        // Continue with regular analysis if semantic search fails
+        searchContext = `\n=== ERROR EN BÚSQUEDA SEMÁNTICA ===\nNo se pudo realizar la búsqueda semántica: ${error.message}\nContinuando con análisis regular.\n=== FIN DE ERROR ===\n`
       }
     }
 
     // Build the system prompt with enhanced context including historical data
-    const systemPrompt = buildEnhancedSystemPrompt(uiData, conversationContext, searchContext, isTemporalQuery)
+    const systemPrompt = buildEnhancedSystemPrompt(uiData, conversationContext, searchContext, isTemporalQuery, embeddingStats)
 
     // Prepare messages for OpenAI
     const openaiMessages = [
@@ -90,7 +102,8 @@ serve(async (req) => {
       ...messages.filter((msg: Message) => msg.role !== 'system')
     ]
 
-    // Call OpenAI API
+    // Call OpenAI API with optimized model selection
+    const model = isSemanticSearchQuery || isTemporalQuery ? 'gpt-4o' : 'gpt-4o-mini'
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -98,10 +111,10 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model,
         messages: openaiMessages,
         temperature: 0.7,
-        max_tokens: 2000,
+        max_tokens: 2500,
       }),
     })
 
@@ -118,16 +131,19 @@ serve(async (req) => {
       throw new Error('No response from OpenAI')
     }
 
-    // If we performed a semantic search, also generate embeddings for new transactions
-    if (isSemanticSearchQuery) {
-      await generateMissingEmbeddings(supabase, openaiApiKey)
+    // Background embedding generation for new transactions (don't await)
+    if (isSemanticSearchQuery && embeddingStats && embeddingStats.coverage < 90) {
+      generateMissingEmbeddingsBackground(supabase, openaiApiKey).catch(err => 
+        console.error('Background embedding generation failed:', err)
+      )
     }
 
     return new Response(
       JSON.stringify({
         response: { content: assistantResponse },
         searchResults: semanticSearchResults,
-        searchPerformed: isSemanticSearchQuery
+        searchPerformed: isSemanticSearchQuery,
+        embeddingStats
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -177,6 +193,33 @@ function analyzeTemporalIntent(userMessage: string): boolean {
   return temporalKeywords.some(keyword => lowerMessage.includes(keyword))
 }
 
+async function checkEmbeddingCoverage(supabase: any) {
+  try {
+    // Get total transactions
+    const { count: totalCount } = await supabase
+      .from('cached_transactions')
+      .select('*', { count: 'exact', head: true })
+      .not('description', 'is', null)
+
+    // Get transactions with embeddings
+    const { count: embeddedCount } = await supabase
+      .from('cached_transactions')
+      .select('*', { count: 'exact', head: true })
+      .not('description_embedding', 'is', null)
+
+    const coverage = totalCount > 0 ? Math.round((embeddedCount / totalCount) * 100) : 0
+
+    return {
+      total: totalCount || 0,
+      withEmbeddings: embeddedCount || 0,
+      coverage
+    }
+  } catch (error) {
+    console.error('Error checking embedding coverage:', error)
+    return { total: 0, withEmbeddings: 0, coverage: 0 }
+  }
+}
+
 async function performSemanticSearch(
   query: string, 
   dateRange: any, 
@@ -222,29 +265,29 @@ async function performSemanticSearch(
   return searchResults || []
 }
 
-function formatSearchResults(results: SemanticSearchResult[]): string {
+function formatSearchResults(results: SemanticSearchResult[], embeddingStats: any): string {
   if (!results || results.length === 0) {
     return 'No se encontraron transacciones similares.'
   }
 
   let formatted = `\n=== RESULTADOS DE BÚSQUEDA SEMÁNTICA (${results.length} encontradas) ===\n`
+  formatted += `Cobertura de búsqueda: ${embeddingStats.coverage}% (${embeddingStats.withEmbeddings}/${embeddingStats.total} transacciones indexadas)\n\n`
   
   results.forEach((result, index) => {
     const similarity = Math.round(result.similarity * 100)
-    formatted += `\n${index + 1}. ${result.description}`
-    formatted += `\n   Monto: $${Number(result.amount).toLocaleString()}`
-    formatted += `\n   Fecha: ${result.date}`
-    formatted += `\n   Categoría: ${result.category || 'Sin categoría'}`
-    formatted += `\n   Similitud: ${similarity}%`
-    formatted += `\n   Fuente: ${result.source}`
-    formatted += `\n`
+    formatted += `${index + 1}. ${result.description}\n`
+    formatted += `   Monto: $${Number(result.amount).toLocaleString()}\n`
+    formatted += `   Fecha: ${result.date}\n`
+    formatted += `   Categoría: ${result.category || 'Sin categoría'}\n`
+    formatted += `   Similitud: ${similarity}%\n`
+    formatted += `   Fuente: ${result.source}\n\n`
   })
   
-  formatted += `\n=== FIN DE RESULTADOS ===\n`
+  formatted += `=== FIN DE RESULTADOS ===\n`
   return formatted
 }
 
-function buildEnhancedSystemPrompt(uiData: any, conversationContext: any, searchContext: string, isTemporalQuery: boolean): string {
+function buildEnhancedSystemPrompt(uiData: any, conversationContext: any, searchContext: string, isTemporalQuery: boolean, embeddingStats: any): string {
   let historicalContext = '';
   let temporalAnalysisInstructions = '';
 
@@ -286,6 +329,14 @@ ${index + 1}. ${month.year}-${month.month}:
     historicalContext = '\nDATOS HISTÓRICOS: No disponibles (se está generando en segundo plano)';
   }
 
+  // Add embedding status context
+  let embeddingContext = '';
+  if (embeddingStats) {
+    embeddingContext = `\nESTADO DE BÚSQUEDA SEMÁNTICA:
+- Cobertura: ${embeddingStats.coverage}% (${embeddingStats.withEmbeddings}/${embeddingStats.total} transacciones indexadas)
+- Estado: ${embeddingStats.coverage === 100 ? 'Completo' : embeddingStats.coverage > 80 ? 'Bueno' : embeddingStats.coverage > 50 ? 'Limitado' : 'Muy limitado'}`;
+  }
+
   const basePrompt = `Eres un asistente financiero especializado con acceso completo a datos financieros históricos y capacidades de búsqueda semántica avanzada.
 
 CAPACIDADES PRINCIPALES:
@@ -306,6 +357,8 @@ DATOS DISPONIBLES PERÍODO ACTUAL:
 
 ${historicalContext}
 
+${embeddingContext}
+
 ${searchContext ? `RESULTADOS DE BÚSQUEDA SEMÁNTICA:
 ${searchContext}
 
@@ -314,6 +367,7 @@ INSTRUCCIONES PARA BÚSQUEDA SEMÁNTICA:
 - Explica patrones en las transacciones similares encontradas
 - Destaca las similitudes y diferencias importantes
 - Sugiere acciones o análisis adicionales basados en los resultados
+- Si la cobertura de embeddings es baja, menciona esta limitación
 ` : ''}
 
 ${temporalAnalysisInstructions}
@@ -327,6 +381,7 @@ INSTRUCCIONES GENERALES:
 - Mantén el contexto de conversaciones anteriores cuando sea relevante
 - Sé preciso con números y fechas
 - Cuando sea relevante, proporciona comparaciones mes a mes usando datos reales
+- Si los embeddings están incompletos, sugiere generar embeddings para mejorar las búsquedas
 
 CONTEXTO CONVERSACIONAL:
 ${conversationContext?.sharedInsights?.length ? `Insights previos: ${conversationContext.sharedInsights.slice(-3).join('; ')}` : ''}
@@ -335,65 +390,56 @@ ${conversationContext?.previousQueries?.length ? `Consultas recientes: ${convers
   return basePrompt
 }
 
-async function generateMissingEmbeddings(supabase: any, openaiApiKey: string): Promise<void> {
+async function generateMissingEmbeddingsBackground(supabase: any, openaiApiKey: string): Promise<void> {
   try {
-    // Get transactions without embeddings (limit to recent ones to avoid overwhelming the API)
+    console.log('Starting background embedding generation...')
+    
+    // Get a small batch of transactions without embeddings
     const { data: transactions, error } = await supabase
       .from('cached_transactions')
       .select('id, description')
       .is('description_embedding', null)
       .not('description', 'is', null)
-      .limit(20) // Process in small batches
+      .limit(5) // Small batch for background processing
 
     if (error || !transactions || transactions.length === 0) {
       return
     }
 
-    console.log(`Generating embeddings for ${transactions.length} transactions`)
+    console.log(`Background: generating embeddings for ${transactions.length} transactions`)
 
-    // Generate embeddings in batches to avoid rate limits
-    const batchSize = 5
-    for (let i = 0; i < transactions.length; i += batchSize) {
-      const batch = transactions.slice(i, i + batchSize)
-      
+    for (const transaction of transactions) {
       try {
-        const embeddingPromises = batch.map(async (transaction) => {
-          const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${openaiApiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: 'text-embedding-3-small',
-              input: transaction.description,
-              dimensions: 1536
-            }),
-          })
-
-          if (embeddingResponse.ok) {
-            const embeddingData = await embeddingResponse.json()
-            const embedding = embeddingData.data[0].embedding
-
-            // Update the transaction with its embedding
-            await supabase.rpc('update_transaction_embedding', {
-              transaction_id: transaction.id,
-              embedding: embedding
-            })
-          }
+        const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'text-embedding-3-small',
+            input: transaction.description,
+            dimensions: 1536
+          }),
         })
 
-        await Promise.all(embeddingPromises)
-        
-        // Small delay between batches to respect rate limits
-        if (i + batchSize < transactions.length) {
-          await new Promise(resolve => setTimeout(resolve, 100))
+        if (embeddingResponse.ok) {
+          const embeddingData = await embeddingResponse.json()
+          const embedding = embeddingData.data[0].embedding
+
+          await supabase.rpc('update_transaction_embedding', {
+            transaction_id: transaction.id,
+            embedding: embedding
+          })
         }
-      } catch (batchError) {
-        console.error(`Error processing embedding batch ${i}-${i + batchSize}:`, batchError)
+
+        // Small delay to respect rate limits
+        await new Promise(resolve => setTimeout(resolve, 200))
+      } catch (err) {
+        console.error(`Background embedding error for transaction ${transaction.id}:`, err)
       }
     }
   } catch (error) {
-    console.error('Error generating missing embeddings:', error)
+    console.error('Error in background embedding generation:', error)
   }
 }
