@@ -124,12 +124,11 @@ export const useFinanceData = () => {
   }, [isDataRequested, transactions.length, cacheChecked, hasCachedData, usingCachedData]);
 
   // MANUAL DATA REFRESH FUNCTION - only loads data when explicitly called
-  // FIXED: Always return Promise<boolean> for consistent typing
-  const refreshData = useCallback(async (force = false): Promise<boolean> => {
+  const refreshData = useCallback((force = false) => {
     // If a refresh is already in progress, return early
     if (refreshInProgressRef.current) {
       console.log("🚫 useFinanceData: Refresh already in progress, skipping");
-      return false;
+      return Promise.resolve(false);
     }
     
     // Apply cooldown if not forcing a refresh
@@ -137,7 +136,7 @@ export const useFinanceData = () => {
     const timeSinceLastRefresh = now - lastRefreshTimeRef.current;
     if (timeSinceLastRefresh < 10000 && !force) { // 10 second cooldown
       console.log(`🚫 useFinanceData: Throttling refresh request, last refresh was ${timeSinceLastRefresh}ms ago`);
-      return false;
+      return Promise.resolve(false);
     }
     
     // Set flags to indicate refresh in progress
@@ -150,22 +149,19 @@ export const useFinanceData = () => {
       actualForceNeeded: force || isLegitimateRefresh
     });
     
-    try {
-      // Only force refresh if explicitly requested OR if it's a legitimate user refresh
-      const shouldForceRefresh = force || isLegitimateRefresh;
-      
-      // Use the refetch function from useOptimizedFinancialData
-      const result = await refetch(shouldForceRefresh);
-      
-      console.log("✅ useFinanceData: Completed MANUAL data load successfully");
-      return true;
-    } catch (error) {
-      console.error("❌ useFinanceData: Error during MANUAL data load:", error);
-      return false;
-    } finally {
+    // Only force refresh if explicitly requested OR if it's a legitimate user refresh
+    const shouldForceRefresh = force || isLegitimateRefresh;
+    
+    // Use the refetch function from useOptimizedFinancialData
+    const promise = refetch(shouldForceRefresh);
+    
+    promise.finally(() => {
       // Always clean up when done
+      console.log("✅ useFinanceData: Completed MANUAL data load");
       refreshInProgressRef.current = false;
-    }
+    });
+    
+    return promise;
   }, [refetch, isLegitimateRefresh]);
 
   return {
