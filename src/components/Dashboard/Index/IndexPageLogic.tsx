@@ -16,7 +16,7 @@ export const useIndexPageLogic = () => {
     error,
     getCurrentMonthRange,
     refreshData,
-    dataInitialized,
+    dataInitialized: rawDataInitialized,
     rawResponse,
     stripeIncome,
     stripeFees,
@@ -69,6 +69,26 @@ export const useIndexPageLogic = () => {
     [financialData.transactions]
   );
 
+  // FIXED: Properly calculate dataInitialized based on actual user action
+  const dataInitialized = useMemo(() => {
+    // Data is only initialized when user has explicitly loaded data AND has transactions
+    const hasExplicitlyRequestedData = rawDataInitialized && financialData.transactions.length > 0;
+    
+    console.log("🔍 IndexPageLogic: Data initialization check with FIXED LOGIC", {
+      hasExplicitlyRequestedData,
+      rawDataInitialized,
+      transactionCount: financialData.transactions.length,
+      cacheChecked,
+      hasCachedData,
+      showLoadButton: !hasExplicitlyRequestedData,
+      reason: hasExplicitlyRequestedData ? 
+        'user_has_loaded_data_successfully' : 
+        'waiting_for_user_to_load_data'
+    });
+    
+    return hasExplicitlyRequestedData;
+  }, [rawDataInitialized, financialData.transactions.length, cacheChecked, hasCachedData]);
+
   return {
     // Data state
     dateRange,
@@ -78,7 +98,7 @@ export const useIndexPageLogic = () => {
     error,
     getCurrentMonthRange,
     refreshData,
-    dataInitialized,
+    dataInitialized, // Using the fixed calculation
     rawResponse,
     stripeIncome,
     stripeFees,
