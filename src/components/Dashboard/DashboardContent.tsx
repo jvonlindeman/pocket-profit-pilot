@@ -1,13 +1,9 @@
+
 import React from 'react';
-import { FinancialSummary } from './FinancialSummary';
-import { MonthlyBalanceEditor } from './MonthlyBalanceEditor';
 import { FinancialAssistantPromo } from './FinancialAssistant/FinancialAssistantPromo';
-import { RefinedFinancialSummary } from './RefinedFinancialSummary';
-import { UnpaidInvoicesList } from './UnpaidInvoicesList';
-import { CollaboratorExpensesChart } from './Charts/CollaboratorExpensesChart';
-import { RegularIncomeList } from './RegularIncomeList';
-import { TransactionsTable } from './TransactionsTable';
+import { RefinedFinancialSummary } from './FinancialCards/RefinedFinancialSummary';
 import { EmbeddingManager } from './EmbeddingManager';
+import MonthlyBalanceEditor from './MonthlyBalanceEditor';
 
 interface DashboardContentProps {
   periodTitle: string;
@@ -34,25 +30,8 @@ interface DashboardContentProps {
 
 const DashboardContent: React.FC<DashboardContentProps> = ({
   periodTitle,
-  dateRange,
-  financialData,
   currentMonthDate,
-  startingBalance,
-  refreshData,
   handleBalanceChange,
-  handleRefresh,
-  loading,
-  stripeIncome,
-  stripeFees,
-  stripeTransactionFees,
-  stripePayoutFees,
-  stripeAdditionalFees,
-  stripeNet,
-  stripeFeePercentage,
-  regularIncome,
-  monthlyBalance,
-  totalZohoExpenses,
-  unpaidInvoices
 }) => {
   return (
     <div className="space-y-6">
@@ -73,40 +52,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
       {/* Embedding Manager - New Section */}
       <EmbeddingManager />
 
-      {/* Financial Summary Section */}
-      <RefinedFinancialSummary
-        startingBalance={startingBalance}
-        totalIncome={financialData.summary.totalIncome}
-        totalExpense={financialData.summary.totalExpense}
-        profit={financialData.summary.profit}
-        profitMargin={financialData.summary.profitMargin}
-        stripeIncome={stripeIncome}
-        stripeFees={stripeFees}
-        stripeTransactionFees={stripeTransactionFees}
-        stripePayoutFees={stripePayoutFees}
-        stripeAdditionalFees={stripeAdditionalFees}
-        stripeNet={stripeNet}
-        stripeFeePercentage={stripeFeePercentage}
-        regularIncome={regularIncome}
-        monthlyBalance={monthlyBalance}
-        totalZohoExpenses={totalZohoExpenses}
-      />
-
-      {/* Unpaid Invoices List */}
-      <UnpaidInvoicesList unpaidInvoices={unpaidInvoices} />
-
-      {/* Collaborator Expenses Chart */}
-      <CollaboratorExpensesChart expenses={financialData.collaboratorExpenses} />
-
-      {/* Regular Income List */}
-      <RegularIncomeList regularIncome={regularIncome} />
-
-      {/* Transactions Table */}
-      <TransactionsTable 
-        transactions={financialData.transactions} 
-        loading={loading} 
-        refreshData={refreshData}
-      />
+      {/* Financial Summary Section - Using existing component structure */}
+      <RefinedFinancialSummary />
     </div>
   );
 };

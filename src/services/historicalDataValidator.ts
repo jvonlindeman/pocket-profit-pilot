@@ -36,7 +36,7 @@ export class HistoricalDataValidator {
       
       // Get last update timestamp
       const lastUpdate = availableSummaries.length > 0 
-        ? availableSummaries[0].updated_at 
+        ? (availableSummaries[0] as any).updated_at || null
         : null;
       
       const status: HistoricalDataStatus = {
@@ -71,7 +71,7 @@ export class HistoricalDataValidator {
       const result = await MonthlyAggregationService.backfillHistoricalSummaries();
       
       console.log('Backfill completed:', result);
-      return result;
+      return { success: true, ...result };
     } catch (error) {
       console.error('Error during historical data backfill:', error);
       return { success: false, processed: 0, errors: 1 };
