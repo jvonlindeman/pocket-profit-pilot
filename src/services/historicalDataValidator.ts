@@ -34,8 +34,8 @@ export class HistoricalDataValidator {
         month => !availableKeys.has(`${month.year}-${month.month}`)
       );
       
-      // Get last update timestamp
-      const lastUpdate = availableSummaries.length > 0 
+      // Get last update timestamp - safely access the property
+      const lastUpdate = availableSummaries.length > 0 && availableSummaries[0] 
         ? (availableSummaries[0] as any).updated_at || null
         : null;
       
@@ -71,7 +71,13 @@ export class HistoricalDataValidator {
       const result = await MonthlyAggregationService.backfillHistoricalSummaries();
       
       console.log('Backfill completed:', result);
-      return { success: true, ...result };
+      
+      // Ensure we return the expected interface
+      return { 
+        success: true, 
+        processed: result.processed || 0, 
+        errors: result.errors || 0 
+      };
     } catch (error) {
       console.error('Error during historical data backfill:', error);
       return { success: false, processed: 0, errors: 1 };

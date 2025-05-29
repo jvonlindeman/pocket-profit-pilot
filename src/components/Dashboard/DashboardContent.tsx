@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { FinancialAssistantPromo } from './FinancialAssistant/FinancialAssistantPromo';
-import { RefinedFinancialSummary } from './FinancialCards/RefinedFinancialSummary';
+import RefinedFinancialSummary from './FinancialCards/RefinedFinancialSummary';
 import { EmbeddingManager } from './EmbeddingManager';
 import MonthlyBalanceEditor from './MonthlyBalanceEditor';
 
