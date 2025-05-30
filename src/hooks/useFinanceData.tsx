@@ -43,7 +43,8 @@ export const useFinanceData = () => {
     refetch,
     isDataRequested,
     cacheChecked,
-    hasCachedData
+    hasCachedData,
+    isRefreshing
   } = useOptimizedFinancialData(dateRange.startDate, dateRange.endDate);
 
   console.log("🏠 useFinanceData: Hook rendered with PASSIVE MODE", {
@@ -194,6 +195,7 @@ export const useFinanceData = () => {
     apiConnectivity: { zoho: true, stripe: true }, // Simplified
     checkApiConnectivity,
     cacheChecked,
-    hasCachedData
+    hasCachedData,
+    isRefreshing
   };
 };
