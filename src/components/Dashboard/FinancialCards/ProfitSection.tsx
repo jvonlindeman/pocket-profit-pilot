@@ -27,6 +27,7 @@ const ProfitSection: React.FC = () => {
           iconColor="text-green-500"
           iconBgColor="bg-green-50"
           valueSize={isMobile ? 'small' : 'medium'}
+          tooltip="Fórmula: Ingresos Totales - Gastos Totales"
           additionalContent={
             <div className={`text-sm font-medium ml-2 ${grossProfitMarginColorClass}`}>
               Margen: {formatPercentage(summary.grossProfitMargin)}
@@ -37,7 +38,7 @@ const ProfitSection: React.FC = () => {
 
       {/* Net Profit - Separate Row */}
       <div className={`${isMobile ? 'mt-3' : 'mt-6'} grid grid-cols-1 gap-6`}>
-        <Card className="finance-card">
+        <Card className="finance-card" title="Fórmula: Balance Inicial + Beneficio Bruto">
           <CardContent className={isMobile ? "p-4" : "p-6"}>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium text-gray-500 truncate pr-2">
@@ -57,7 +58,7 @@ const ProfitSection: React.FC = () => {
             </div>
             {!isMobile && (
               <div className="mt-2 text-xs text-gray-500">
-                Ingresos Totales - Gastos Totales
+                Balance Inicial + Ingresos Totales - Gastos Totales
               </div>
             )}
           </CardContent>
