@@ -1,25 +1,55 @@
-
 import { Transaction } from "../../types/financial";
 import { cacheOperations } from "./operations";
 import { cacheMetrics } from "./metrics";
 import { cacheStorage } from "./storage";
+import { cacheStalenessManager } from "./staleness";
 import { supabase } from "../../integrations/supabase/client";
 import type { CacheResponse, CacheResult, DetailedCacheStats, CacheClearOptions, CacheSource, CacheStats } from "./types";
 
 /**
- * CacheService provides a unified API for working with the transaction cache
+ * Enhanced CacheService with staleness management
  */
 const CacheService = {
   /**
-   * Check if data for a date range is in cache
+   * Check if data for a date range is in cache with staleness information
    */
   checkCache: async (
     source: CacheSource,
     startDate: Date,
     endDate: Date,
     forceRefresh = false
-  ): Promise<CacheResponse> => {
-    return cacheOperations.checkCache(source, startDate, endDate, forceRefresh);
+  ): Promise<CacheResponse & { isStale?: boolean }> => {
+    const result = await cacheOperations.checkCache(source, startDate, endDate, forceRefresh);
+    
+    // Add staleness information
+    const isStale = cacheStalenessManager.isCacheStale(source, startDate, endDate);
+    
+    return {
+      ...result,
+      isStale
+    };
+  },
+  
+  /**
+   * Mark cache as stale before refresh operation
+   */
+  markCacheStale: (
+    source: CacheSource,
+    startDate: Date,
+    endDate: Date
+  ): void => {
+    cacheStalenessManager.markCacheStale(source, startDate, endDate);
+  },
+
+  /**
+   * Clear staleness marking after successful refresh
+   */
+  clearStaleness: (
+    source: CacheSource,
+    startDate: Date,
+    endDate: Date
+  ): void => {
+    cacheStalenessManager.clearStaleness(source, startDate, endDate);
   },
   
   /**
@@ -31,7 +61,14 @@ const CacheService = {
     endDate: Date,
     transactions: Transaction[]
   ): Promise<boolean> => {
-    return cacheOperations.storeTransactions(source, startDate, endDate, transactions);
+    const success = await cacheOperations.storeTransactions(source, startDate, endDate, transactions);
+    
+    // Clear staleness on successful store
+    if (success) {
+      cacheStalenessManager.clearStaleness(source, startDate, endDate);
+    }
+    
+    return success;
   },
   
   /**
@@ -45,7 +82,17 @@ const CacheService = {
     const year = date.getFullYear();
     const month = date.getMonth() + 1; // JavaScript months are 0-indexed
     console.log(`CacheService: Storing ${transactions.length} transactions for ${source} ${year}-${month}`);
-    return cacheStorage.storeMonthTransactions(source, year, month, transactions);
+    
+    const success = await cacheStorage.storeMonthTransactions(source, year, month, transactions);
+    
+    // Clear staleness on successful store
+    if (success) {
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0);
+      cacheStalenessManager.clearStaleness(source, startDate, endDate);
+    }
+    
+    return success;
   },
   
   /**
@@ -148,7 +195,6 @@ const CacheService = {
     console.log("CacheService: Attempting to fix cached transactions with missing year/month values");
     
     try {
-      // Use the repository method directly instead of accessing supabase client
       return await cacheStorage.fixLegacyTransactions(source);
     } catch (err) {
       console.error("Error fixing missing year/month values:", err);

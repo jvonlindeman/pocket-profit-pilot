@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { Transaction } from '@/types/financial';
 import CacheService from '@/services/cache';
@@ -19,6 +18,8 @@ interface FinancialData {
   isDataRequested: boolean;
   cacheChecked: boolean;
   hasCachedData: boolean;
+  isRefreshing: boolean;
+  lastRefreshTime?: number;
 }
 
 export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
@@ -33,7 +34,8 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
     },
     isDataRequested: false,
     cacheChecked: false,
-    hasCachedData: false
+    hasCachedData: false,
+    isRefreshing: false
   });
 
   // PASSIVE CACHE CHECK - Only check if cache exists, don't load data automatically
@@ -68,12 +70,14 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
           zoho: { 
             exists: hasZohoCache, 
             count: zohoCacheCheck.data?.length || 0,
-            status: zohoCacheCheck.status 
+            status: zohoCacheCheck.status,
+            isStale: zohoCacheCheck.isStale
           },
           stripe: { 
             exists: hasStripeCache, 
             count: stripeCacheCheck.data?.length || 0,
-            status: stripeCacheCheck.status 
+            status: stripeCacheCheck.status,
+            isStale: stripeCacheCheck.isStale
           },
           hasCachedData,
           autoLoadingPrevented: true
@@ -123,7 +127,75 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
       caller: new Error().stack?.split('\n')[2]?.trim()
     });
     
-    // Always show loading when user explicitly requests data
+    // Smart refresh approach for force refresh
+    if (forceRefresh && data.transactions.length > 0) {
+      console.log("🔄 useOptimizedFinancialData: SMART REFRESH - Keeping existing data visible while refreshing");
+      
+      // Mark cache as stale
+      CacheService.markCacheStale('Zoho', startDate, endDate);
+      CacheService.markCacheStale('Stripe', startDate, endDate);
+      
+      // Show refreshing state but keep existing data
+      setData(prev => ({ 
+        ...prev, 
+        isRefreshing: true,
+        error: null
+      }));
+      
+      try {
+        // Fetch fresh data in background
+        let allTransactions: Transaction[] = [];
+        let stripeData: any = null;
+        
+        console.log("🌐 useOptimizedFinancialData: Fetching fresh data from APIs during smart refresh...");
+        
+        // Fetch Stripe data
+        stripeData = await stripeRepository.getTransactions(startDate, endDate, true);
+        allTransactions = [...allTransactions, ...stripeData.transactions];
+        console.log(`📡 useOptimizedFinancialData: SMART REFRESH - Fetched ${stripeData.transactions.length} fresh Stripe transactions`);
+        
+        // Fetch Zoho data
+        const zohoTransactions = await zohoRepository.getTransactions(startDate, endDate, true);
+        allTransactions = [...allTransactions, ...zohoTransactions];
+        console.log(`📡 useOptimizedFinancialData: SMART REFRESH - Fetched ${zohoTransactions.length} fresh Zoho transactions`);
+        
+        console.log("📊 useOptimizedFinancialData: SMART REFRESH COMPLETED", {
+          totalTransactions: allTransactions.length,
+          previousCount: data.transactions.length,
+          dataUpdated: allTransactions.length !== data.transactions.length,
+          refreshTime: new Date().toISOString()
+        });
+        
+        // Update with fresh data
+        setData(prev => ({
+          ...prev,
+          transactions: allTransactions,
+          stripeData,
+          isRefreshing: false,
+          error: null,
+          usingCachedData: false,
+          cacheStatus: {
+            zoho: { hit: false, partial: false },
+            stripe: { hit: false, partial: false }
+          },
+          lastRefreshTime: Date.now()
+        }));
+        
+        return;
+      } catch (error) {
+        console.error("❌ useOptimizedFinancialData: Error during smart refresh:", error);
+        
+        // Keep existing data on error, just stop refreshing indicator
+        setData(prev => ({
+          ...prev,
+          isRefreshing: false,
+          error: error instanceof Error ? error.message : 'Error refreshing data'
+        }));
+        return;
+      }
+    }
+    
+    // Standard loading for initial load or when no existing data
     setData(prev => ({ 
       ...prev, 
       loading: true, 
@@ -240,7 +312,9 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         cacheStatus,
         isDataRequested: true,
         cacheChecked: true,
-        hasCachedData: allTransactions.length > 0
+        hasCachedData: allTransactions.length > 0,
+        isRefreshing: false,
+        lastRefreshTime: Date.now()
       });
 
     } catch (error) {
@@ -287,6 +361,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
             transactions: fallbackTransactions,
             stripeData: fallbackStripeData,
             loading: false,
+            isRefreshing: false,
             error: null,
             usingCachedData: true,
             cacheStatus: {
@@ -304,12 +379,13 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
       setData(prev => ({
         ...prev,
         loading: false,
+        isRefreshing: false,
         error: error instanceof Error ? error.message : 'Unknown error',
         isDataRequested: true,
         cacheChecked: true
       }));
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, data.transactions.length]);
 
   console.log("🔄 useOptimizedFinancialData: Hook rendered - PASSIVE MODE", {
     dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
@@ -318,6 +394,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
     cacheChecked: data.cacheChecked,
     hasCachedData: data.hasCachedData,
     loading: data.loading,
+    isRefreshing: data.isRefreshing,
     usingCachedData: data.usingCachedData,
     autoLoadingDisabled: true
   });

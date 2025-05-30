@@ -15,6 +15,7 @@ interface DashboardDataHandlersProps {
   ) => Promise<boolean>;
   setStartingBalance: (balance: number) => void;
   hasCachedData: boolean;
+  isRefreshing?: boolean;
 }
 
 export const useDashboardDataHandlers = ({
@@ -24,6 +25,7 @@ export const useDashboardDataHandlers = ({
   updateMonthlyBalance,
   setStartingBalance,
   hasCachedData,
+  isRefreshing = false,
 }: DashboardDataHandlersProps) => {
   const { toast } = useToast();
 
@@ -121,15 +123,24 @@ export const useDashboardDataHandlers = ({
     }
   }, [updateMonthlyBalance, setStartingBalance, toast, refreshData]);
 
-  // Handler for data refresh
+  // Enhanced handler for data refresh with smart refresh feedback
   const handleRefresh = useCallback(() => {
-    console.log("Manual refresh requested - user action");
-    toast({
-      title: 'Actualizando datos',
-      description: 'Obteniendo datos más recientes...',
-    });
+    console.log("🔄 DashboardDataHandlers: Manual refresh requested - user action");
+    
+    if (isRefreshing) {
+      toast({
+        title: 'Actualización en progreso',
+        description: 'Los datos se están actualizando en segundo plano...',
+      });
+    } else {
+      toast({
+        title: 'Actualizando datos',
+        description: 'Obteniendo datos más recientes desde las APIs...',
+      });
+    }
+    
     refreshData(true); // Force refresh for manual user action
-  }, [toast, refreshData]);
+  }, [toast, refreshData, isRefreshing]);
 
   return {
     handleInitialLoad,

@@ -34,7 +34,8 @@ export const useDashboardStateManager = () => {
     usingCachedData,
     cacheStatus,
     cacheChecked,
-    hasCachedData
+    hasCachedData,
+    isRefreshing // Add isRefreshing state from useFinanceData
   } = useFinanceData();
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
@@ -85,6 +86,7 @@ export const useDashboardStateManager = () => {
     startingBalance,
     monthlyBalanceId: monthlyBalance?.id,
     monthlyBalanceTimestamp: monthlyBalance?.updated_at,
+    isRefreshing,
     timestamp: new Date().toISOString()
   });
   
@@ -97,6 +99,7 @@ export const useDashboardStateManager = () => {
     financialData.transactions.filter(tx => tx.type === 'income' && tx.source === 'Zoho').length
   );
   console.log("💼 DashboardStateManager: Unpaid invoices:", unpaidInvoices?.length || 0);
+  console.log("💼 DashboardStateManager: Is refreshing:", isRefreshing);
 
   return {
     // Data state
@@ -110,6 +113,7 @@ export const useDashboardStateManager = () => {
     cacheStatus,
     cacheChecked,
     hasCachedData,
+    isRefreshing,
     
     // Financial data
     stripeIncome,
