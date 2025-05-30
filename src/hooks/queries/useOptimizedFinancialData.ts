@@ -127,43 +127,52 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
       caller: new Error().stack?.split('\n')[2]?.trim()
     });
     
-    // Smart refresh approach for force refresh
+    // ENHANCED SMART REFRESH: Immediately clear cache on force refresh
     if (forceRefresh && data.transactions.length > 0) {
-      console.log("🔄 useOptimizedFinancialData: SMART REFRESH - Keeping existing data visible while refreshing");
+      console.log("🔄 useOptimizedFinancialData: ENHANCED SMART REFRESH - Clearing cache and fetching fresh data");
       
-      // Mark cache as stale
-      CacheService.markCacheStale('Zoho', startDate, endDate);
-      CacheService.markCacheStale('Stripe', startDate, endDate);
+      // Immediately clear cache from database
+      console.log("🗑️ useOptimizedFinancialData: Clearing cache from database...");
+      await Promise.all([
+        CacheService.markCacheStale('Zoho', startDate, endDate),
+        CacheService.markCacheStale('Stripe', startDate, endDate)
+      ]);
       
       // Show refreshing state but keep existing data
       setData(prev => ({ 
         ...prev, 
         isRefreshing: true,
-        error: null
+        error: null,
+        cacheStatus: {
+          zoho: { hit: false, partial: false },
+          stripe: { hit: false, partial: false }
+        },
+        usingCachedData: false
       }));
       
       try {
-        // Fetch fresh data in background
+        // Fetch fresh data from APIs (cache is now cleared, so this will be fresh)
         let allTransactions: Transaction[] = [];
         let stripeData: any = null;
         
-        console.log("🌐 useOptimizedFinancialData: Fetching fresh data from APIs during smart refresh...");
+        console.log("🌐 useOptimizedFinancialData: Fetching completely fresh data from APIs...");
         
-        // Fetch Stripe data
+        // Fetch Stripe data (will hit API since cache was cleared)
         stripeData = await stripeRepository.getTransactions(startDate, endDate, true);
         allTransactions = [...allTransactions, ...stripeData.transactions];
-        console.log(`📡 useOptimizedFinancialData: SMART REFRESH - Fetched ${stripeData.transactions.length} fresh Stripe transactions`);
+        console.log(`📡 useOptimizedFinancialData: ENHANCED REFRESH - Fetched ${stripeData.transactions.length} fresh Stripe transactions`);
         
-        // Fetch Zoho data
+        // Fetch Zoho data (will hit API since cache was cleared)
         const zohoTransactions = await zohoRepository.getTransactions(startDate, endDate, true);
         allTransactions = [...allTransactions, ...zohoTransactions];
-        console.log(`📡 useOptimizedFinancialData: SMART REFRESH - Fetched ${zohoTransactions.length} fresh Zoho transactions`);
+        console.log(`📡 useOptimizedFinancialData: ENHANCED REFRESH - Fetched ${zohoTransactions.length} fresh Zoho transactions`);
         
-        console.log("📊 useOptimizedFinancialData: SMART REFRESH COMPLETED", {
+        console.log("📊 useOptimizedFinancialData: ENHANCED REFRESH COMPLETED", {
           totalTransactions: allTransactions.length,
           previousCount: data.transactions.length,
           dataUpdated: allTransactions.length !== data.transactions.length,
-          refreshTime: new Date().toISOString()
+          refreshTime: new Date().toISOString(),
+          cacheCleared: true
         });
         
         // Update with fresh data
@@ -183,7 +192,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         
         return;
       } catch (error) {
-        console.error("❌ useOptimizedFinancialData: Error during smart refresh:", error);
+        console.error("❌ useOptimizedFinancialData: Error during enhanced refresh:", error);
         
         // Keep existing data on error, just stop refreshing indicator
         setData(prev => ({
@@ -216,7 +225,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
       if (!forceRefresh) {
         console.log("🔍 useOptimizedFinancialData: Using CACHE-FIRST strategy for manual load");
         
-        // Check Stripe cache first
+        // Check Stripe cache first (will return miss if force refresh cleared it)
         const stripeCacheCheck = await CacheService.checkCache('Stripe', startDate, endDate);
         
         if (stripeCacheCheck.cached && stripeCacheCheck.data && stripeCacheCheck.data.length > 0) {
@@ -258,7 +267,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
       // Only fetch from API if we don't have cached data OR if force refresh is requested
       if (allTransactions.length === 0 || forceRefresh) {
         console.log("🌐 useOptimizedFinancialData: Fetching from API", { 
-          reason: forceRefresh ? 'force_refresh' : 'no_cache_data' 
+          reason: forceRefresh ? 'force_refresh_or_cache_cleared' : 'no_cache_data' 
         });
 
         // Reset if force refresh
@@ -299,8 +308,9 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         cacheEfficiency: `${cacheEfficiency.toFixed(1)}%`,
         usingCachedData: usingCache,
         apiCallsMade: totalSources - totalCacheHits,
-        strategy: forceRefresh ? 'FORCE_REFRESH' : 'CACHE_FIRST',
-        userAction: true
+        strategy: forceRefresh ? 'ENHANCED_FORCE_REFRESH' : 'CACHE_FIRST',
+        userAction: true,
+        cacheActuallyCleared: forceRefresh
       });
 
       setData({

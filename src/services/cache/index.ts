@@ -7,7 +7,7 @@ import { supabase } from "../../integrations/supabase/client";
 import type { CacheResponse, CacheResult, DetailedCacheStats, CacheClearOptions, CacheSource, CacheStats } from "./types";
 
 /**
- * Enhanced CacheService with staleness management
+ * Enhanced CacheService with proper cache invalidation
  */
 const CacheService = {
   /**
@@ -19,10 +19,33 @@ const CacheService = {
     endDate: Date,
     forceRefresh = false
   ): Promise<CacheResponse & { isStale?: boolean }> => {
+    // If force refresh, clear cache immediately and return miss
+    if (forceRefresh) {
+      console.log(`🔄 CacheService: Force refresh requested - clearing cache for ${source}`);
+      await cacheStalenessManager.markCacheStale(source, startDate, endDate);
+      return {
+        cached: false,
+        status: "force_refresh_cleared",
+        partial: false,
+        isStale: false
+      };
+    }
+    
     const result = await cacheOperations.checkCache(source, startDate, endDate, forceRefresh);
     
     // Add staleness information
-    const isStale = cacheStalenessManager.isCacheStale(source, startDate, endDate);
+    const isStale = await cacheStalenessManager.isCacheStale(source, startDate, endDate);
+    
+    // If cache is stale, treat it as a miss
+    if (isStale && result.cached) {
+      console.log(`⚠️ CacheService: Cache is stale for ${source}, treating as miss`);
+      return {
+        cached: false,
+        status: "stale_treated_as_miss",
+        partial: false,
+        isStale: true
+      };
+    }
     
     return {
       ...result,
@@ -31,14 +54,14 @@ const CacheService = {
   },
   
   /**
-   * Mark cache as stale before refresh operation
+   * Mark cache as stale and physically clear it
    */
-  markCacheStale: (
+  markCacheStale: async (
     source: CacheSource,
     startDate: Date,
     endDate: Date
-  ): void => {
-    cacheStalenessManager.markCacheStale(source, startDate, endDate);
+  ): Promise<void> => {
+    await cacheStalenessManager.markCacheStale(source, startDate, endDate);
   },
 
   /**
@@ -61,11 +84,13 @@ const CacheService = {
     endDate: Date,
     transactions: Transaction[]
   ): Promise<boolean> => {
+    console.log(`💾 CacheService: Storing ${transactions.length} fresh transactions for ${source}`);
     const success = await cacheOperations.storeTransactions(source, startDate, endDate, transactions);
     
     // Clear staleness on successful store
     if (success) {
       cacheStalenessManager.clearStaleness(source, startDate, endDate);
+      console.log(`✅ CacheService: Successfully stored and cleared staleness for ${source}`);
     }
     
     return success;
@@ -81,7 +106,7 @@ const CacheService = {
   ): Promise<boolean> => {
     const year = date.getFullYear();
     const month = date.getMonth() + 1; // JavaScript months are 0-indexed
-    console.log(`CacheService: Storing ${transactions.length} transactions for ${source} ${year}-${month}`);
+    console.log(`💾 CacheService: Storing ${transactions.length} fresh transactions for ${source} ${year}-${month}`);
     
     const success = await cacheStorage.storeMonthTransactions(source, year, month, transactions);
     
@@ -90,6 +115,7 @@ const CacheService = {
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0);
       cacheStalenessManager.clearStaleness(source, startDate, endDate);
+      console.log(`✅ CacheService: Successfully stored monthly cache and cleared staleness for ${source}`);
     }
     
     return success;
