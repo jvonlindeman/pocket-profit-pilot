@@ -57,7 +57,7 @@ const ProfitSection: React.FC = () => {
             </div>
             {!isMobile && (
               <div className="mt-2 text-xs text-gray-500">
-                Balance Inicial + Ingresos Totales - Gastos Totales
+                Ingresos Totales - Gastos Totales
               </div>
             )}
           </CardContent>

@@ -1,4 +1,3 @@
-
 import { useMemo } from 'react';
 import { Transaction, CategorySummary, FinancialData } from '@/types/financial';
 import { isCollaboratorExpense, validateFinancialValue } from '@/utils/financialUtils';
@@ -57,8 +56,10 @@ export const useFinancialSummaryProcessor = (
     // Calculate profit metrics
     const profit = totalIncome - totalExpense;
     const profitMargin = totalIncome > 0 ? (profit / totalIncome) * 100 : 0;
-    const grossProfit = totalIncome;
-    const grossProfitMargin = totalIncome > 0 ? 100 : 0;
+    
+    // FIXED: Gross profit should be total income minus all expenses
+    const grossProfit = totalIncome - totalExpense;
+    const grossProfitMargin = totalIncome > 0 ? (grossProfit / totalIncome) * 100 : 0;
     
     // Create financial summary
     const summary = {
