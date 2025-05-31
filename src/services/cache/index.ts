@@ -260,11 +260,16 @@ const CacheService = {
       // 2. Clear all cache segments for this date range
       const clearOptions: CacheClearOptions = {
         source,
-        startDate: startDate.toISOString().split('T')[0],
-        endDate: endDate.toISOString().split('T')[0]
+        startDate, // Keep as Date object
+        endDate    // Keep as Date object
       };
       
-      await cacheOperations.clearCache(clearOptions);
+      // Add null check for clearCache method
+      if (cacheOperations.clearCache) {
+        await cacheOperations.clearCache(clearOptions);
+      } else {
+        console.warn(`⚠️ CacheService: clearCache method not available`);
+      }
       
       console.log(`✅ CacheService: Force complete refresh completed for ${source}`);
       return true;
