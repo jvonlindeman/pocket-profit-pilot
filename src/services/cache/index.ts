@@ -258,11 +258,13 @@ const CacheService = {
       await this.markCacheStale(source, startDate, endDate);
       
       // 2. Clear all cache segments for this date range
-      await cacheOperations.clearCache({
+      const clearOptions: CacheClearOptions = {
         source,
         startDate: startDate.toISOString().split('T')[0],
         endDate: endDate.toISOString().split('T')[0]
-      });
+      };
+      
+      await cacheOperations.clearCache(clearOptions);
       
       console.log(`✅ CacheService: Force complete refresh completed for ${source}`);
       return true;
