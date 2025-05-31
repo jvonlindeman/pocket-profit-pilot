@@ -2,7 +2,7 @@
 import { Transaction } from "../../../types/financial";
 import { CacheSource, CacheResponse } from "../types";
 import { monthlyStorage } from "../storage/monthlyStorage";
-import { dataIntegrityValidator } from "../validation/dataIntegrity";
+import { DataIntegrityValidator } from "../validation/dataIntegrity";
 import { startOfMonth, endOfMonth, eachMonthOfInterval, isSameMonth } from "date-fns";
 
 /**
@@ -98,7 +98,7 @@ export class EnhancedCacheChecker {
       }
 
       // Validate retrieved data
-      const validation = dataIntegrityValidator.validateTransactionBatch(transactions);
+      const validation = DataIntegrityValidator.validateTransactionBatch(transactions);
       
       if (validation.invalid.length > 0) {
         console.warn(`[ENHANCED_CACHE_CHECK] Found ${validation.invalid.length} invalid cached transactions`);

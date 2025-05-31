@@ -1,11 +1,12 @@
+
 import { Transaction } from "../../types/financial";
 import { cacheOperations } from "./operations";
 import { cacheMetrics } from "./metrics";
 import { cacheStorage } from "./storage";
 import { cacheStalenessManager } from "./staleness";
-import { enhancedCacheChecker } from "./operations/enhancedCheckCache";
-import { enhancedTransactionStorage } from "./operations/enhancedStoreTransactions";
-import { atomicCacheRefresh } from "./operations/atomicRefresh";
+import { EnhancedCacheChecker } from "./operations/enhancedCheckCache";
+import { EnhancedTransactionStorage } from "./operations/enhancedStoreTransactions";
+import { AtomicCacheRefresh } from "./operations/atomicRefresh";
 import { supabase } from "../../integrations/supabase/client";
 import type { CacheResponse, CacheResult, DetailedCacheStats, CacheClearOptions, CacheSource, CacheStats } from "./types";
 
@@ -36,7 +37,7 @@ const CacheService = {
     }
     
     // Use enhanced cache checker for better data retrieval
-    const result = await enhancedCacheChecker.checkCache(source, startDate, endDate, forceRefresh);
+    const result = await EnhancedCacheChecker.checkCache(source, startDate, endDate, forceRefresh);
     
     // Add staleness information
     const isStale = await cacheStalenessManager.isCacheStale(source, startDate, endDate);
@@ -92,7 +93,7 @@ const CacheService = {
   ): Promise<boolean> => {
     console.log(`💾 CacheService: Storing ${transactions.length} transactions with enhanced preservation for ${source}`);
     
-    const result = await enhancedTransactionStorage.storeTransactions(source, startDate, endDate, transactions);
+    const result = await EnhancedTransactionStorage.storeTransactions(source, startDate, endDate, transactions);
     
     // Clear staleness on successful store
     if (result.success && result.storedCount > 0) {
@@ -117,7 +118,7 @@ const CacheService = {
     const month = date.getMonth() + 1;
     console.log(`💾 CacheService: Storing ${transactions.length} monthly transactions with enhanced preservation for ${source} ${year}-${month}`);
     
-    const result = await enhancedTransactionStorage.storeTransactions(
+    const result = await EnhancedTransactionStorage.storeTransactions(
       source,
       new Date(year, month - 1, 1),
       new Date(year, month, 0),
@@ -146,7 +147,7 @@ const CacheService = {
   ): Promise<{ success: boolean; transactionCount: number }> => {
     console.log(`🔄 CacheService: Performing atomic refresh for ${source}`);
     
-    const result = await atomicCacheRefresh.refreshCache(source, startDate, endDate, fetchFunction);
+    const result = await AtomicCacheRefresh.refreshCache(source, startDate, endDate, fetchFunction);
     
     console.log(`${result.success ? '✅' : '❌'} CacheService: Atomic refresh ${result.success ? 'completed' : 'failed'} for ${source}`, {
       transactionCount: result.transactionCount,

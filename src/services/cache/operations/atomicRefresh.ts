@@ -1,9 +1,9 @@
 
 import { Transaction } from "../../../types/financial";
 import { CacheSource } from "../types";
-import { enhancedTransactionStorage } from "./enhancedStoreTransactions";
+import { EnhancedTransactionStorage } from "./enhancedStoreTransactions";
 import { cacheStalenessManager } from "../staleness";
-import { dataIntegrityValidator } from "../validation/dataIntegrity";
+import { DataIntegrityValidator } from "../validation/dataIntegrity";
 
 /**
  * Atomic cache refresh operations
@@ -45,7 +45,7 @@ export class AtomicCacheRefresh {
       console.log(`[ATOMIC_REFRESH] Fetched ${freshTransactions.length} fresh transactions from API`);
 
       // Step 3: Validate fresh data
-      const validation = dataIntegrityValidator.validateTransactionBatch(freshTransactions);
+      const validation = DataIntegrityValidator.validateTransactionBatch(freshTransactions);
       
       if (validation.invalid.length > 0) {
         console.warn(`[ATOMIC_REFRESH] Found ${validation.invalid.length} invalid transactions in fresh data`);
@@ -62,7 +62,7 @@ export class AtomicCacheRefresh {
 
       // Step 4: Store fresh data in cache
       console.log(`[ATOMIC_REFRESH] Step 3: Storing ${validation.valid.length} valid transactions in cache`);
-      const storageResult = await enhancedTransactionStorage.storeTransactions(
+      const storageResult = await EnhancedTransactionStorage.storeTransactions(
         source,
         startDate,
         endDate,
@@ -115,7 +115,7 @@ export class AtomicCacheRefresh {
     
     console.log(`[ATOMIC_REFRESH] Validating refresh completeness for ${source}`);
     
-    const comparison = dataIntegrityValidator.compareDataCompleteness(
+    const comparison = DataIntegrityValidator.compareDataCompleteness(
       refreshedData,
       originalData,
       source

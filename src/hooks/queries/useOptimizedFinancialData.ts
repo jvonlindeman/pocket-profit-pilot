@@ -4,7 +4,7 @@ import CacheService from '@/services/cache';
 import { stripeRepository } from '@/repositories/stripeRepository';
 import { zohoRepository } from '@/repositories/zohoRepository';
 import { MonthlyCacheSync } from '@/services/cache/syncMonthlyCache';
-import { dataIntegrityValidator } from '@/services/cache/validation/dataIntegrity';
+import { DataIntegrityValidator } from '@/services/cache/validation/dataIntegrity';
 
 interface FinancialData {
   transactions: Transaction[];
@@ -69,7 +69,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
 
         // Enhanced logging with data validation
         if (hasZohoCache) {
-          const validation = dataIntegrityValidator.validateTransactionBatch(zohoCacheCheck.data || []);
+          const validation = DataIntegrityValidator.validateTransactionBatch(zohoCacheCheck.data || []);
           console.log("🔍 useOptimizedFinancialData: Zoho cache validation", {
             total: zohoCacheCheck.data?.length || 0,
             valid: validation.valid.length,
@@ -78,7 +78,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         }
 
         if (hasStripeCache) {
-          const validation = dataIntegrityValidator.validateTransactionBatch(stripeCacheCheck.data || []);
+          const validation = DataIntegrityValidator.validateTransactionBatch(stripeCacheCheck.data || []);
           console.log("🔍 useOptimizedFinancialData: Stripe cache validation", {
             total: stripeCacheCheck.data?.length || 0,
             valid: validation.valid.length,
@@ -228,7 +228,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         }
         
         // Validate final data completeness
-        const validation = dataIntegrityValidator.validateTransactionBatch(allTransactions);
+        const validation = DataIntegrityValidator.validateTransactionBatch(allTransactions);
         
         console.log("📊 useOptimizedFinancialData: ATOMIC REFRESH COMPLETED", {
           totalTransactions: allTransactions.length,
@@ -296,7 +296,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         
         if (stripeCacheCheck.cached && stripeCacheCheck.data && stripeCacheCheck.data.length > 0) {
           // Validate cached Stripe data
-          const validation = dataIntegrityValidator.validateTransactionBatch(stripeCacheCheck.data);
+          const validation = DataIntegrityValidator.validateTransactionBatch(stripeCacheCheck.data);
           const validTransactions = validation.valid.length > 0 ? validation.valid : stripeCacheCheck.data;
           
           console.log(`✅ useOptimizedFinancialData: CACHE HIT - Loading validated Stripe data (${validTransactions.length} transactions)`);
@@ -327,7 +327,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         
         if (zohoCacheCheck.cached && zohoCacheCheck.data && zohoCacheCheck.data.length > 0) {
           // Validate cached Zoho data
-          const validation = dataIntegrityValidator.validateTransactionBatch(zohoCacheCheck.data);
+          const validation = DataIntegrityValidator.validateTransactionBatch(zohoCacheCheck.data);
           const validTransactions = validation.valid.length > 0 ? validation.valid : zohoCacheCheck.data;
           
           console.log(`✅ useOptimizedFinancialData: CACHE HIT - Loading validated Zoho data (${validTransactions.length} transactions)`);
@@ -356,7 +356,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
           const apiStripeData = await stripeRepository.getTransactions(startDate, endDate, forceRefresh);
           
           // Validate API data before storing
-          const validation = dataIntegrityValidator.validateTransactionBatch(apiStripeData.transactions);
+          const validation = DataIntegrityValidator.validateTransactionBatch(apiStripeData.transactions);
           const validTransactions = validation.valid.length > 0 ? validation.valid : apiStripeData.transactions;
           
           stripeData = {
@@ -374,7 +374,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
           const apiZohoTransactions = await zohoRepository.getTransactions(startDate, endDate, forceRefresh);
           
           // Validate API data before adding
-          const validation = dataIntegrityValidator.validateTransactionBatch(apiZohoTransactions);
+          const validation = DataIntegrityValidator.validateTransactionBatch(apiZohoTransactions);
           const validTransactions = validation.valid.length > 0 ? validation.valid : apiZohoTransactions;
           
           allTransactions = [...allTransactions, ...validTransactions];
@@ -384,7 +384,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
       }
 
       // Final validation of all transactions
-      const finalValidation = dataIntegrityValidator.validateTransactionBatch(allTransactions);
+      const finalValidation = DataIntegrityValidator.validateTransactionBatch(allTransactions);
       const finalTransactions = finalValidation.valid.length > 0 ? finalValidation.valid : allTransactions;
 
       // Final summary
@@ -434,7 +434,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         let fallbackStripeData: any = null;
         
         if (stripeCacheCheck.cached && stripeCacheCheck.data) {
-          const validation = dataIntegrityValidator.validateTransactionBatch(stripeCacheCheck.data);
+          const validation = DataIntegrityValidator.validateTransactionBatch(stripeCacheCheck.data);
           const validTransactions = validation.valid.length > 0 ? validation.valid : stripeCacheCheck.data;
           fallbackTransactions = [...fallbackTransactions, ...validTransactions];
           
@@ -454,7 +454,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         }
         
         if (zohoCacheCheck.cached && zohoCacheCheck.data) {
-          const validation = dataIntegrityValidator.validateTransactionBatch(zohoCacheCheck.data);
+          const validation = DataIntegrityValidator.validateTransactionBatch(zohoCacheCheck.data);
           const validTransactions = validation.valid.length > 0 ? validation.valid : zohoCacheCheck.data;
           fallbackTransactions = [...fallbackTransactions, ...validTransactions];
         }

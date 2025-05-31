@@ -2,7 +2,7 @@
 import { Transaction } from "../../../types/financial";
 import { CacheSource } from "../types";
 import { monthlyStorage } from "../storage/monthlyStorage";
-import { dataIntegrityValidator } from "../validation/dataIntegrity";
+import { DataIntegrityValidator } from "../validation/dataIntegrity";
 import { cacheMetrics } from "../metrics";
 import { startOfMonth, endOfMonth, isSameMonth } from "date-fns";
 
@@ -34,7 +34,7 @@ export class EnhancedTransactionStorage {
       }
 
       // Step 2: Validate transaction integrity
-      const validation = dataIntegrityValidator.validateTransactionBatch(transactions);
+      const validation = DataIntegrityValidator.validateTransactionBatch(transactions);
       
       if (validation.invalid.length > 0) {
         console.error(`[ENHANCED_STORAGE] Found ${validation.invalid.length} invalid transactions:`, validation.errors);
@@ -164,14 +164,13 @@ export class EnhancedTransactionStorage {
         // Financial fields (preserve null/undefined distinction)
         fees: tx.fees !== undefined ? tx.fees : null,
         gross: tx.gross !== undefined ? tx.gross : null,
-        net: tx.net !== undefined ? tx.net : null,
         
         // Metadata and additional fields
         metadata: tx.metadata || {},
         
         // Preserve any additional fields that might exist
         ...Object.keys(tx).reduce((acc, key) => {
-          if (!['id', 'external_id', 'date', 'amount', 'description', 'category', 'type', 'source', 'fees', 'gross', 'net', 'metadata'].includes(key)) {
+          if (!['id', 'external_id', 'date', 'amount', 'description', 'category', 'type', 'source', 'fees', 'gross', 'metadata'].includes(key)) {
             acc[key] = tx[key];
           }
           return acc;
@@ -179,7 +178,7 @@ export class EnhancedTransactionStorage {
       };
 
       // Validate field preservation
-      const preservation = dataIntegrityValidator.validateFieldPreservation(tx, preservedTransaction);
+      const preservation = DataIntegrityValidator.validateFieldPreservation(tx, preservedTransaction);
       if (!preservation.preserved) {
         console.warn(`[ENHANCED_STORAGE] Field preservation issue for transaction ${index}:`, preservation.missingFields);
       }
