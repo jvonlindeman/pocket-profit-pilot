@@ -1,3 +1,4 @@
+
 import React, { useCallback } from 'react';
 import { useCache } from '@/contexts/CacheContext';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,35 @@ interface CacheMonitorProps {
 }
 
 const CacheMonitor = ({ dateRange, onRefresh }: CacheMonitorProps) => {
-  const { isCacheEnabled, toggleCache, forceCacheRefresh, cacheStats, isLoading } = useCache();
+  // Safely try to use the cache context with error handling
+  let cacheContext;
+  try {
+    cacheContext = useCache();
+  } catch (error) {
+    console.warn('CacheMonitor: Not wrapped in CacheProvider, rendering fallback UI');
+    cacheContext = null;
+  }
+  
+  // If no cache context available, render a minimal fallback
+  if (!cacheContext) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-white shadow-sm rounded-lg p-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-2">
+              <Database className="h-5 w-5 text-gray-400" />
+              <h3 className="font-medium text-gray-500">Cache no disponible</h3>
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                Contexto no encontrado
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  const { isCacheEnabled, toggleCache, forceCacheRefresh, cacheStats, isLoading } = cacheContext;
   
   const handleRefresh = useCallback(() => {
     forceCacheRefresh();
