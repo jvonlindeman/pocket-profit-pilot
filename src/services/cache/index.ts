@@ -7,7 +7,7 @@ import { supabase } from "../../integrations/supabase/client";
 import type { CacheResponse, CacheResult, DetailedCacheStats, CacheClearOptions, CacheSource, CacheStats } from "./types";
 
 /**
- * Enhanced CacheService with proper cache invalidation
+ * Enhanced CacheService with improved collaborator data handling
  */
 const CacheService = {
   /**
@@ -54,13 +54,16 @@ const CacheService = {
   },
   
   /**
-   * Mark cache as stale and physically clear it
+   * Mark cache as stale and physically clear it - Enhanced for collaborator data
    */
   markCacheStale: async (
     source: CacheSource,
     startDate: Date,
     endDate: Date
   ): Promise<void> => {
+    console.log(`🗑️ CacheService: Marking cache as stale and clearing for ${source}`, {
+      dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`
+    });
     await cacheStalenessManager.markCacheStale(source, startDate, endDate);
   },
 
@@ -76,7 +79,7 @@ const CacheService = {
   },
   
   /**
-   * Store transactions in cache
+   * Store transactions in cache with enhanced logging for collaborators
    */
   storeTransactions: async (
     source: CacheSource,
@@ -84,7 +87,17 @@ const CacheService = {
     endDate: Date,
     transactions: Transaction[]
   ): Promise<boolean> => {
-    console.log(`💾 CacheService: Storing ${transactions.length} fresh transactions for ${source}`);
+    const collaboratorTransactions = transactions.filter(tx => 
+      tx.category === 'Pagos a colaboradores' || 
+      tx.description?.toLowerCase().includes('colaborador')
+    );
+    
+    console.log(`💾 CacheService: Storing ${transactions.length} fresh transactions for ${source}`, {
+      total: transactions.length,
+      collaborators: collaboratorTransactions.length,
+      dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`
+    });
+    
     const success = await cacheOperations.storeTransactions(source, startDate, endDate, transactions);
     
     // Clear staleness on successful store
@@ -225,6 +238,37 @@ const CacheService = {
     } catch (err) {
       console.error("Error fixing missing year/month values:", err);
       return 0;
+    }
+  },
+  
+  /**
+   * Force complete cache refresh for troubleshooting collaborator issues
+   */
+  forceCompleteRefresh: async (
+    source: CacheSource,
+    startDate: Date,
+    endDate: Date
+  ): Promise<boolean> => {
+    console.log(`🔄 CacheService: Starting force complete refresh for ${source}`, {
+      dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`
+    });
+    
+    try {
+      // 1. Mark cache as stale
+      await this.markCacheStale(source, startDate, endDate);
+      
+      // 2. Clear all cache segments for this date range
+      await cacheOperations.clearCache({
+        source,
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0]
+      });
+      
+      console.log(`✅ CacheService: Force complete refresh completed for ${source}`);
+      return true;
+    } catch (error) {
+      console.error(`❌ CacheService: Force complete refresh failed for ${source}:`, error);
+      return false;
     }
   }
 };

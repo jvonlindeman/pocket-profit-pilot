@@ -4,10 +4,34 @@ import { parseToPanamaTime, formatDateYYYYMMDD_Panama } from "@/utils/timezoneUt
 import { ZohoTransactionResponse } from "./types";
 import { excludedVendors } from "./config";
 
+// Enhanced collaborator detection keywords
+const COLLABORATOR_KEYWORDS = [
+  'colaborador', 'colaboradores',
+  'freelancer', 'freelancers', 
+  'contractor', 'contractors',
+  'consultant', 'consultants',
+  'colaboracion', 'colaborativo',
+  'external', 'externo', 'externos',
+  'partner', 'socio', 'socios',
+  'vendor', 'proveedor', 'proveedores',
+  'independiente', 'autonomo',
+  'servicios profesionales',
+  'consultoria', 'asesoria'
+];
+
+// Enhanced function to detect collaborator transactions
+const isCollaboratorTransaction = (vendorName: string, accountName: string, description?: string): boolean => {
+  const searchText = `${vendorName} ${accountName} ${description || ''}`.toLowerCase();
+  
+  return COLLABORATOR_KEYWORDS.some(keyword => 
+    searchText.includes(keyword)
+  );
+};
+
 // Helper function to process raw transaction data from the API into the Transaction type
 export const processRawTransactions = (data: ZohoTransactionResponse): Transaction[] => {
   if (!data) {
-    console.error("No data received from webhook");
+    console.error("❌ ZohoProcessor: No data received from webhook");
     return [];
   }
   
@@ -15,9 +39,16 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
   
   // If we received a raw_response instead of structured data, log it but return empty array
   if (data.raw_response && (!data.stripe && !data.colaboradores && !data.expenses && !data.payments)) {
-    console.error("Received raw_response but no structured data:", data.raw_response);
+    console.error("❌ ZohoProcessor: Received raw_response but no structured data:", data.raw_response);
     return [];
   }
+  
+  console.log("🔄 ZohoProcessor: Starting transaction processing", {
+    hasStripe: !!data.stripe,
+    colaboradoresCount: data.colaboradores?.length || 0,
+    expensesCount: data.expenses?.length || 0,
+    paymentsCount: data.payments?.length || 0
+  });
   
   // Process Stripe income if available (new format)
   if (data.stripe) {
@@ -35,19 +66,22 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
           source: 'Stripe',
           type: 'income'
         });
+        console.log("💳 ZohoProcessor: Processed Stripe income:", stripeAmount);
       }
     } catch (e) {
-      console.error("Error processing Stripe income:", e);
+      console.error("❌ ZohoProcessor: Error processing Stripe income:", e);
     }
   }
   
-  // Process collaborator expenses with Panama timezone handling
+  // Process collaborator expenses with enhanced detection
   if (Array.isArray(data.colaboradores)) {
+    console.log(`👥 ZohoProcessor: Processing ${data.colaboradores.length} collaborator entries`);
+    
     data.colaboradores.forEach((item: any, index: number) => {
       if (item && typeof item.total !== 'undefined' && item.vendor_name) {
         // Skip excluded vendors
         if (excludedVendors.includes(item.vendor_name)) {
-          console.log(`Skipping excluded vendor: ${item.vendor_name}`);
+          console.log(`🚫 ZohoProcessor: Skipping excluded collaborator vendor: ${item.vendor_name}`);
           return; // Skip this collaborator
         }
         
@@ -57,21 +91,18 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
           let collaboratorDate: string;
           
           if (item.date) {
-            // Log raw date field from API
-            console.log(`Raw collaborator date for ${item.vendor_name}:`, item.date);
+            console.log(`📅 ZohoProcessor: Raw collaborator date for ${item.vendor_name}:`, item.date);
             
-            // Ensure we have a valid YYYY-MM-DD format in Panama timezone
             try {
-              // Try to parse and format the date in Panama timezone
               const parsedDate = parseToPanamaTime(item.date);
               collaboratorDate = formatDateYYYYMMDD_Panama(parsedDate);
-              console.log(`Processed collaborator date for ${item.vendor_name} in Panama timezone:`, collaboratorDate);
+              console.log(`📅 ZohoProcessor: Processed collaborator date for ${item.vendor_name} in Panama timezone:`, collaboratorDate);
             } catch (err) {
-              console.error(`Error parsing collaborator date for ${item.vendor_name}:`, err);
+              console.error(`❌ ZohoProcessor: Error parsing collaborator date for ${item.vendor_name}:`, err);
               collaboratorDate = formatDateYYYYMMDD_Panama(new Date());
             }
           } else {
-            console.log(`No date provided for collaborator ${item.vendor_name}, using current date`);
+            console.log(`📅 ZohoProcessor: No date provided for collaborator ${item.vendor_name}, using current date`);
             collaboratorDate = formatDateYYYYMMDD_Panama(new Date());
           }
           
@@ -87,18 +118,22 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
             source: 'Zoho',
             type: 'expense'
           });
+          
+          console.log(`✅ ZohoProcessor: Added collaborator transaction: ${item.vendor_name} - $${amount}`);
         }
       }
     });
   }
   
-  // Process regular expenses (ignoring "Impuestos" category)
+  // Process regular expenses with enhanced collaborator detection
   if (Array.isArray(data.expenses)) {
+    console.log(`💰 ZohoProcessor: Processing ${data.expenses.length} expense entries`);
+    
     data.expenses.forEach((item: any, index: number) => {
       if (item && typeof item.total !== 'undefined' && item.account_name !== "Impuestos") {
         // Skip expenses from excluded vendors
         if (item.vendor_name && excludedVendors.includes(item.vendor_name)) {
-          console.log(`Skipping expense from excluded vendor: ${item.vendor_name}`);
+          console.log(`🚫 ZohoProcessor: Skipping expense from excluded vendor: ${item.vendor_name}`);
           return;
         }
 
@@ -108,6 +143,18 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
           const vendorName = item.vendor_name || '';
           const accountName = item.account_name || 'Gastos generales';
           
+          // Enhanced collaborator detection for regular expenses
+          let category = accountName;
+          let description = vendorName 
+            ? `Pago a ${vendorName}` 
+            : `${accountName}`;
+          
+          if (isCollaboratorTransaction(vendorName, accountName, item.description)) {
+            category = 'Pagos a colaboradores';
+            description = `Pago a colaborador: ${vendorName || accountName}`;
+            console.log(`👥 ZohoProcessor: Detected collaborator expense: ${vendorName || accountName} - $${amount}`);
+          }
+          
           const externalId = `expense-${(vendorName || accountName || '').replace(/\s/g, '-')}-${expenseDate}-${amount}-${index}`;
           
           result.push({
@@ -115,10 +162,8 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
             external_id: externalId,
             date: expenseDate,
             amount,
-            description: vendorName 
-              ? `Pago a ${vendorName}` 
-              : `${accountName}`,
-            category: accountName,
+            description,
+            category,
             source: 'Zoho',
             type: 'expense'
           });
@@ -129,6 +174,8 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
   
   // Process payments (income)
   if (Array.isArray(data.payments)) {
+    console.log(`💵 ZohoProcessor: Processing ${data.payments.length} payment entries`);
+    
     data.payments.forEach((item: any, index: number) => {
       if (item && typeof item.amount !== 'undefined') {
         const amount = Number(item.amount);
@@ -149,14 +196,17 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
             source: 'Zoho',
             type: 'income'
           });
+          
+          console.log(`💵 ZohoProcessor: Added payment transaction: ${customerName} - $${amount}`);
         }
       }
     });
   }
   
-  console.log(`Processed ${result.length} transactions from Zoho data:`, {
+  console.log(`📊 ZohoProcessor: Processing complete. Generated ${result.length} transactions:`, {
     incomes: result.filter(tx => tx.type === 'income').length,
-    expenses: result.filter(tx => tx.type === 'expense').length
+    expenses: result.filter(tx => tx.type === 'expense').length,
+    collaboratorExpenses: result.filter(tx => tx.category === 'Pagos a colaboradores').length
   });
   
   return result;

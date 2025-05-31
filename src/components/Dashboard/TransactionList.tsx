@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Bug } from 'lucide-react';
 import { Transaction } from '@/types/financial';
 import CacheInfo from './CacheInfo';
 import TransactionFilters, { FilterOptions } from './TransactionFilters';
 import TransactionCategorySummary from './TransactionCategorySummary';
 import TransactionTable from './TransactionTable';
+import CollaboratorDebugHelper from './DebugTools/CollaboratorDebugHelper';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface TransactionListProps {
@@ -19,6 +20,7 @@ interface TransactionListProps {
     stripe: { hit: boolean, partial: boolean }
   };
   isUsingCache?: boolean;
+  rawResponse?: any;
 }
 
 const TransactionList: React.FC<TransactionListProps> = ({
@@ -27,11 +29,13 @@ const TransactionList: React.FC<TransactionListProps> = ({
   isLoading,
   dateRange,
   cacheStatus,
-  isUsingCache
+  isUsingCache,
+  rawResponse
 }) => {
   // State for filtered transactions
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>(transactions);
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
+  const [showDebug, setShowDebug] = useState<boolean>(false);
   const isMobile = useIsMobile();
   
   // Update filtered transactions when original transactions change
@@ -54,12 +58,26 @@ const TransactionList: React.FC<TransactionListProps> = ({
     isUsingCache: isUsingCache || false,
     onRefresh
   };
+
+  const handleForceRefresh = () => {
+    console.log("🔄 TransactionList: Forcing complete refresh");
+    onRefresh();
+  };
   
   return (
     <div className="space-y-4">
       {/* Cache information */}
       {dateRange && cacheStatus && (
         <CacheInfo {...cacheProps} />
+      )}
+
+      {/* Debug Helper - Show when there are potential collaborator issues */}
+      {showDebug && (
+        <CollaboratorDebugHelper 
+          transactions={transactions}
+          rawResponse={rawResponse}
+          onForceRefresh={handleForceRefresh}
+        />
       )}
       
       <div className={`${isMobile ? 'flex flex-col space-y-3' : 'flex justify-between items-center'} mb-4`}>
@@ -73,6 +91,15 @@ const TransactionList: React.FC<TransactionListProps> = ({
             onFilterChange={handleFilterChange}
             onFilterOptionsChange={setFilterOptions}
           />
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowDebug(!showDebug)}
+            className={showDebug ? 'bg-blue-50 border-blue-200' : ''}
+          >
+            <Bug className="h-4 w-4 mr-2" />
+            {showDebug ? 'Ocultar' : 'Debug'}
+          </Button>
           <Button variant="outline" size="sm" onClick={onRefresh} disabled={isLoading}>
             <RefreshCw className="h-4 w-4 mr-2" />
             {isMobile ? "Actualizar" : "Actualizar"}
