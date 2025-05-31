@@ -3,15 +3,18 @@ import { cacheOperations } from "./operations";
 import { cacheMetrics } from "./metrics";
 import { cacheStorage } from "./storage";
 import { cacheStalenessManager } from "./staleness";
+import { enhancedCacheChecker } from "./operations/enhancedCheckCache";
+import { enhancedTransactionStorage } from "./operations/enhancedStoreTransactions";
+import { atomicCacheRefresh } from "./operations/atomicRefresh";
 import { supabase } from "../../integrations/supabase/client";
 import type { CacheResponse, CacheResult, DetailedCacheStats, CacheClearOptions, CacheSource, CacheStats } from "./types";
 
 /**
- * Enhanced CacheService with proper cache invalidation
+ * Enhanced CacheService with proper data preservation and validation
  */
 const CacheService = {
   /**
-   * Check if data for a date range is in cache with staleness information
+   * Check if data for a date range is in cache with enhanced validation
    */
   checkCache: async (
     source: CacheSource,
@@ -27,11 +30,13 @@ const CacheService = {
         cached: false,
         status: "force_refresh_cleared",
         partial: false,
-        isStale: false
+        isStale: false,
+        data: []
       };
     }
     
-    const result = await cacheOperations.checkCache(source, startDate, endDate, forceRefresh);
+    // Use enhanced cache checker for better data retrieval
+    const result = await enhancedCacheChecker.checkCache(source, startDate, endDate, forceRefresh);
     
     // Add staleness information
     const isStale = await cacheStalenessManager.isCacheStale(source, startDate, endDate);
@@ -43,7 +48,8 @@ const CacheService = {
         cached: false,
         status: "stale_treated_as_miss",
         partial: false,
-        isStale: true
+        isStale: true,
+        data: []
       };
     }
     
@@ -76,7 +82,7 @@ const CacheService = {
   },
   
   /**
-   * Store transactions in cache
+   * Store transactions in cache with enhanced data preservation
    */
   storeTransactions: async (
     source: CacheSource,
@@ -84,20 +90,23 @@ const CacheService = {
     endDate: Date,
     transactions: Transaction[]
   ): Promise<boolean> => {
-    console.log(`💾 CacheService: Storing ${transactions.length} fresh transactions for ${source}`);
-    const success = await cacheOperations.storeTransactions(source, startDate, endDate, transactions);
+    console.log(`💾 CacheService: Storing ${transactions.length} transactions with enhanced preservation for ${source}`);
+    
+    const result = await enhancedTransactionStorage.storeTransactions(source, startDate, endDate, transactions);
     
     // Clear staleness on successful store
-    if (success) {
+    if (result.success && result.storedCount > 0) {
       cacheStalenessManager.clearStaleness(source, startDate, endDate);
-      console.log(`✅ CacheService: Successfully stored and cleared staleness for ${source}`);
+      console.log(`✅ CacheService: Successfully stored ${result.storedCount} transactions and cleared staleness for ${source}`);
+    } else if (!result.success) {
+      console.error(`❌ CacheService: Failed to store transactions for ${source}:`, result.errors);
     }
     
-    return success;
+    return result.success;
   },
   
   /**
-   * Store transactions in monthly cache (preferred method)
+   * Store transactions in monthly cache with enhanced validation
    */
   storeMonthTransactions: async (
     source: CacheSource,
@@ -105,20 +114,49 @@ const CacheService = {
     transactions: Transaction[]
   ): Promise<boolean> => {
     const year = date.getFullYear();
-    const month = date.getMonth() + 1; // JavaScript months are 0-indexed
-    console.log(`💾 CacheService: Storing ${transactions.length} fresh transactions for ${source} ${year}-${month}`);
+    const month = date.getMonth() + 1;
+    console.log(`💾 CacheService: Storing ${transactions.length} monthly transactions with enhanced preservation for ${source} ${year}-${month}`);
     
-    const success = await cacheStorage.storeMonthTransactions(source, year, month, transactions);
+    const result = await enhancedTransactionStorage.storeTransactions(
+      source,
+      new Date(year, month - 1, 1),
+      new Date(year, month, 0),
+      transactions
+    );
     
     // Clear staleness on successful store
-    if (success) {
+    if (result.success && result.storedCount > 0) {
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0);
       cacheStalenessManager.clearStaleness(source, startDate, endDate);
-      console.log(`✅ CacheService: Successfully stored monthly cache and cleared staleness for ${source}`);
+      console.log(`✅ CacheService: Successfully stored ${result.storedCount} monthly transactions and cleared staleness for ${source}`);
     }
     
-    return success;
+    return result.success;
+  },
+  
+  /**
+   * Perform atomic cache refresh
+   */
+  atomicRefresh: async (
+    source: CacheSource,
+    startDate: Date,
+    endDate: Date,
+    fetchFunction: () => Promise<Transaction[]>
+  ): Promise<{ success: boolean; transactionCount: number }> => {
+    console.log(`🔄 CacheService: Performing atomic refresh for ${source}`);
+    
+    const result = await atomicCacheRefresh.refreshCache(source, startDate, endDate, fetchFunction);
+    
+    console.log(`${result.success ? '✅' : '❌'} CacheService: Atomic refresh ${result.success ? 'completed' : 'failed'} for ${source}`, {
+      transactionCount: result.transactionCount,
+      errorCount: result.errors.length
+    });
+    
+    return {
+      success: result.success,
+      transactionCount: result.transactionCount
+    };
   },
   
   /**

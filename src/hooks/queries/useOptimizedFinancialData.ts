@@ -4,6 +4,7 @@ import CacheService from '@/services/cache';
 import { stripeRepository } from '@/repositories/stripeRepository';
 import { zohoRepository } from '@/repositories/zohoRepository';
 import { MonthlyCacheSync } from '@/services/cache/syncMonthlyCache';
+import { dataIntegrityValidator } from '@/services/cache/validation/dataIntegrity';
 
 interface FinancialData {
   transactions: Transaction[];
@@ -43,7 +44,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
     let isMounted = true;
 
     const checkCacheExistence = async () => {
-      console.log("🔍 useOptimizedFinancialData: PASSIVE cache existence check only", {
+      console.log("🔍 useOptimizedFinancialData: PASSIVE cache existence check with enhanced validation", {
         dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`
       });
 
@@ -65,6 +66,25 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         const hasZohoCache = zohoCacheCheck.cached && zohoCacheCheck.data && zohoCacheCheck.data.length > 0;
         const hasStripeCache = stripeCacheCheck.cached && stripeCacheCheck.data && stripeCacheCheck.data.length > 0;
         const hasCachedData = hasZohoCache || hasStripeCache;
+
+        // Enhanced logging with data validation
+        if (hasZohoCache) {
+          const validation = dataIntegrityValidator.validateTransactionBatch(zohoCacheCheck.data || []);
+          console.log("🔍 useOptimizedFinancialData: Zoho cache validation", {
+            total: zohoCacheCheck.data?.length || 0,
+            valid: validation.valid.length,
+            invalid: validation.invalid.length
+          });
+        }
+
+        if (hasStripeCache) {
+          const validation = dataIntegrityValidator.validateTransactionBatch(stripeCacheCheck.data || []);
+          console.log("🔍 useOptimizedFinancialData: Stripe cache validation", {
+            total: stripeCacheCheck.data?.length || 0,
+            valid: validation.valid.length,
+            invalid: validation.invalid.length
+          });
+        }
 
         console.log("🔍 useOptimizedFinancialData: PASSIVE cache check results", {
           zoho: { 
@@ -120,23 +140,16 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
   }, [startDate, endDate]);
 
   const fetchData = useCallback(async (forceRefresh = false) => {
-    console.log("🚀 useOptimizedFinancialData: MANUAL fetch requested by user action", {
+    console.log("🚀 useOptimizedFinancialData: MANUAL fetch with enhanced operations", {
       dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
       forceRefresh,
       currentDataCount: data.transactions.length,
       caller: new Error().stack?.split('\n')[2]?.trim()
     });
     
-    // ENHANCED SMART REFRESH: Immediately clear cache on force refresh
+    // ENHANCED ATOMIC REFRESH: Use new atomic refresh operations
     if (forceRefresh && data.transactions.length > 0) {
-      console.log("🔄 useOptimizedFinancialData: ENHANCED SMART REFRESH - Clearing cache and fetching fresh data");
-      
-      // Immediately clear cache from database
-      console.log("🗑️ useOptimizedFinancialData: Clearing cache from database...");
-      await Promise.all([
-        CacheService.markCacheStale('Zoho', startDate, endDate),
-        CacheService.markCacheStale('Stripe', startDate, endDate)
-      ]);
+      console.log("🔄 useOptimizedFinancialData: ENHANCED ATOMIC REFRESH - Using atomic operations");
       
       // Show refreshing state but keep existing data
       setData(prev => ({ 
@@ -151,34 +164,87 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
       }));
       
       try {
-        // Fetch fresh data from APIs (cache is now cleared, so this will be fresh)
         let allTransactions: Transaction[] = [];
         let stripeData: any = null;
         
-        console.log("🌐 useOptimizedFinancialData: Fetching completely fresh data from APIs...");
+        console.log("🌐 useOptimizedFinancialData: Using atomic refresh for both sources...");
         
-        // Fetch Stripe data (will hit API since cache was cleared)
-        stripeData = await stripeRepository.getTransactions(startDate, endDate, true);
-        allTransactions = [...allTransactions, ...stripeData.transactions];
-        console.log(`📡 useOptimizedFinancialData: ENHANCED REFRESH - Fetched ${stripeData.transactions.length} fresh Stripe transactions`);
+        // Atomic refresh for Stripe data
+        const stripeRefreshResult = await CacheService.atomicRefresh(
+          'Stripe',
+          startDate,
+          endDate,
+          async () => {
+            const result = await stripeRepository.getTransactions(startDate, endDate, true);
+            return result.transactions;
+          }
+        );
+
+        if (stripeRefreshResult.success) {
+          // Get fresh Stripe data from cache after atomic refresh
+          const freshStripeCheck = await CacheService.checkCache('Stripe', startDate, endDate);
+          if (freshStripeCheck.cached && freshStripeCheck.data) {
+            const transactions = freshStripeCheck.data;
+            allTransactions = [...allTransactions, ...transactions];
+            
+            // Reconstruct Stripe data object
+            const gross = transactions.reduce((sum, tx) => sum + (tx.gross || tx.amount), 0);
+            const fees = transactions.reduce((sum, tx) => sum + (tx.fees || 0), 0);
+            const net = gross - fees;
+            const feePercentage = gross > 0 ? (fees / gross) * 100 : 0;
+            
+            stripeData = {
+              transactions,
+              gross,
+              fees,
+              transactionFees: fees,
+              payoutFees: 0,
+              additionalFees: 0,
+              net,
+              feePercentage
+            };
+            
+            console.log(`📡 useOptimizedFinancialData: ATOMIC REFRESH - Refreshed ${transactions.length} Stripe transactions`);
+          }
+        }
         
-        // Fetch Zoho data (will hit API since cache was cleared)
-        const zohoTransactions = await zohoRepository.getTransactions(startDate, endDate, true);
-        allTransactions = [...allTransactions, ...zohoTransactions];
-        console.log(`📡 useOptimizedFinancialData: ENHANCED REFRESH - Fetched ${zohoTransactions.length} fresh Zoho transactions`);
+        // Atomic refresh for Zoho data
+        const zohoRefreshResult = await CacheService.atomicRefresh(
+          'Zoho',
+          startDate,
+          endDate,
+          async () => {
+            return await zohoRepository.getTransactions(startDate, endDate, true);
+          }
+        );
+
+        if (zohoRefreshResult.success) {
+          // Get fresh Zoho data from cache after atomic refresh
+          const freshZohoCheck = await CacheService.checkCache('Zoho', startDate, endDate);
+          if (freshZohoCheck.cached && freshZohoCheck.data) {
+            allTransactions = [...allTransactions, ...freshZohoCheck.data];
+            console.log(`📡 useOptimizedFinancialData: ATOMIC REFRESH - Refreshed ${freshZohoCheck.data.length} Zoho transactions`);
+          }
+        }
         
-        console.log("📊 useOptimizedFinancialData: ENHANCED REFRESH COMPLETED", {
+        // Validate final data completeness
+        const validation = dataIntegrityValidator.validateTransactionBatch(allTransactions);
+        
+        console.log("📊 useOptimizedFinancialData: ATOMIC REFRESH COMPLETED", {
           totalTransactions: allTransactions.length,
+          validTransactions: validation.valid.length,
+          invalidTransactions: validation.invalid.length,
           previousCount: data.transactions.length,
           dataUpdated: allTransactions.length !== data.transactions.length,
           refreshTime: new Date().toISOString(),
-          cacheCleared: true
+          stripeSuccess: stripeRefreshResult.success,
+          zohoSuccess: zohoRefreshResult.success
         });
         
         // Update with fresh data
         setData(prev => ({
           ...prev,
-          transactions: allTransactions,
+          transactions: validation.valid.length > 0 ? validation.valid : allTransactions,
           stripeData,
           isRefreshing: false,
           error: null,
@@ -192,7 +258,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         
         return;
       } catch (error) {
-        console.error("❌ useOptimizedFinancialData: Error during enhanced refresh:", error);
+        console.error("❌ useOptimizedFinancialData: Error during atomic refresh:", error);
         
         // Keep existing data on error, just stop refreshing indicator
         setData(prev => ({
@@ -221,24 +287,27 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         stripe: { hit: false, partial: false }
       };
 
-      // CACHE-FIRST STRATEGY: Only bypass cache if explicitly force refreshing
+      // CACHE-FIRST STRATEGY with enhanced validation
       if (!forceRefresh) {
-        console.log("🔍 useOptimizedFinancialData: Using CACHE-FIRST strategy for manual load");
+        console.log("🔍 useOptimizedFinancialData: Using CACHE-FIRST strategy with enhanced validation");
         
-        // Check Stripe cache first (will return miss if force refresh cleared it)
+        // Check Stripe cache first
         const stripeCacheCheck = await CacheService.checkCache('Stripe', startDate, endDate);
         
         if (stripeCacheCheck.cached && stripeCacheCheck.data && stripeCacheCheck.data.length > 0) {
-          console.log(`✅ useOptimizedFinancialData: CACHE HIT - Loading cached Stripe data (${stripeCacheCheck.data.length} transactions)`);
+          // Validate cached Stripe data
+          const validation = dataIntegrityValidator.validateTransactionBatch(stripeCacheCheck.data);
+          const validTransactions = validation.valid.length > 0 ? validation.valid : stripeCacheCheck.data;
           
-          const transactions = stripeCacheCheck.data;
-          const gross = transactions.reduce((sum, tx) => sum + (tx.gross || tx.amount), 0);
-          const fees = transactions.reduce((sum, tx) => sum + (tx.fees || 0), 0);
+          console.log(`✅ useOptimizedFinancialData: CACHE HIT - Loading validated Stripe data (${validTransactions.length} transactions)`);
+          
+          const gross = validTransactions.reduce((sum, tx) => sum + (tx.gross || tx.amount), 0);
+          const fees = validTransactions.reduce((sum, tx) => sum + (tx.fees || 0), 0);
           const net = gross - fees;
           const feePercentage = gross > 0 ? (fees / gross) * 100 : 0;
           
           stripeData = {
-            transactions,
+            transactions: validTransactions,
             gross,
             fees,
             transactionFees: fees,
@@ -248,7 +317,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
             feePercentage
           };
           
-          allTransactions = [...allTransactions, ...transactions];
+          allTransactions = [...allTransactions, ...validTransactions];
           usingCache = true;
           cacheStatus.stripe = { hit: true, partial: stripeCacheCheck.partial };
         }
@@ -257,8 +326,12 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         const zohoCacheCheck = await CacheService.checkCache('Zoho', startDate, endDate);
         
         if (zohoCacheCheck.cached && zohoCacheCheck.data && zohoCacheCheck.data.length > 0) {
-          console.log(`✅ useOptimizedFinancialData: CACHE HIT - Loading cached Zoho data (${zohoCacheCheck.data.length} transactions)`);
-          allTransactions = [...allTransactions, ...zohoCacheCheck.data];
+          // Validate cached Zoho data
+          const validation = dataIntegrityValidator.validateTransactionBatch(zohoCacheCheck.data);
+          const validTransactions = validation.valid.length > 0 ? validation.valid : zohoCacheCheck.data;
+          
+          console.log(`✅ useOptimizedFinancialData: CACHE HIT - Loading validated Zoho data (${validTransactions.length} transactions)`);
+          allTransactions = [...allTransactions, ...validTransactions];
           usingCache = true;
           cacheStatus.zoho = { hit: true, partial: zohoCacheCheck.partial };
         }
@@ -266,7 +339,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
 
       // Only fetch from API if we don't have cached data OR if force refresh is requested
       if (allTransactions.length === 0 || forceRefresh) {
-        console.log("🌐 useOptimizedFinancialData: Fetching from API", { 
+        console.log("🌐 useOptimizedFinancialData: Fetching from API with enhanced storage", { 
           reason: forceRefresh ? 'force_refresh_or_cache_cleared' : 'no_cache_data' 
         });
 
@@ -280,41 +353,60 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         // Fetch Stripe data if not cached or force refresh
         if (!stripeData || forceRefresh) {
           console.log("🌐 useOptimizedFinancialData: Fetching Stripe data from API...");
-          stripeData = await stripeRepository.getTransactions(startDate, endDate, forceRefresh);
-          allTransactions = [...allTransactions, ...stripeData.transactions];
+          const apiStripeData = await stripeRepository.getTransactions(startDate, endDate, forceRefresh);
+          
+          // Validate API data before storing
+          const validation = dataIntegrityValidator.validateTransactionBatch(apiStripeData.transactions);
+          const validTransactions = validation.valid.length > 0 ? validation.valid : apiStripeData.transactions;
+          
+          stripeData = {
+            ...apiStripeData,
+            transactions: validTransactions
+          };
+          allTransactions = [...allTransactions, ...validTransactions];
           cacheStatus.stripe = { hit: false, partial: false };
-          console.log(`📡 useOptimizedFinancialData: API CALL - Fetched ${stripeData.transactions.length} Stripe transactions`);
+          console.log(`📡 useOptimizedFinancialData: API CALL - Fetched and validated ${validTransactions.length} Stripe transactions`);
         }
 
         // Fetch Zoho data if not cached or force refresh
         if (!cacheStatus.zoho.hit || forceRefresh) {
           console.log("🌐 useOptimizedFinancialData: Fetching Zoho data from API...");
-          const zohoTransactions = await zohoRepository.getTransactions(startDate, endDate, forceRefresh);
-          allTransactions = [...allTransactions, ...zohoTransactions];
+          const apiZohoTransactions = await zohoRepository.getTransactions(startDate, endDate, forceRefresh);
+          
+          // Validate API data before adding
+          const validation = dataIntegrityValidator.validateTransactionBatch(apiZohoTransactions);
+          const validTransactions = validation.valid.length > 0 ? validation.valid : apiZohoTransactions;
+          
+          allTransactions = [...allTransactions, ...validTransactions];
           cacheStatus.zoho = { hit: false, partial: false };
-          console.log(`📡 useOptimizedFinancialData: API CALL - Fetched ${zohoTransactions.length} Zoho transactions`);
+          console.log(`📡 useOptimizedFinancialData: API CALL - Fetched and validated ${validTransactions.length} Zoho transactions`);
         }
       }
+
+      // Final validation of all transactions
+      const finalValidation = dataIntegrityValidator.validateTransactionBatch(allTransactions);
+      const finalTransactions = finalValidation.valid.length > 0 ? finalValidation.valid : allTransactions;
 
       // Final summary
       const totalCacheHits = (cacheStatus.zoho.hit ? 1 : 0) + (cacheStatus.stripe.hit ? 1 : 0);
       const totalSources = 2;
       const cacheEfficiency = (totalCacheHits / totalSources) * 100;
       
-      console.log("📊 useOptimizedFinancialData: MANUAL LOAD SUMMARY", {
-        totalTransactions: allTransactions.length,
+      console.log("📊 useOptimizedFinancialData: ENHANCED LOAD SUMMARY", {
+        totalTransactions: finalTransactions.length,
+        validTransactions: finalValidation.valid.length,
+        invalidTransactions: finalValidation.invalid.length,
         zohoSource: cacheStatus.zoho.hit ? 'CACHE' : 'API',
         stripeSource: cacheStatus.stripe.hit ? 'CACHE' : 'API',
         cacheEfficiency: `${cacheEfficiency.toFixed(1)}%`,
         usingCachedData: usingCache,
         apiCallsMade: totalSources - totalCacheHits,
-        strategy: forceRefresh ? 'ENHANCED_FORCE_REFRESH' : 'CACHE_FIRST',
-        userAction: true,
-        cacheActuallyCleared: forceRefresh
+        strategy: forceRefresh ? 'ENHANCED_ATOMIC_REFRESH' : 'CACHE_FIRST_ENHANCED',
+        userAction: true
       });
 
       setData({
-        transactions: allTransactions,
+        transactions: finalTransactions,
         stripeData,
         loading: false,
         error: null,
@@ -322,16 +414,16 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         cacheStatus,
         isDataRequested: true,
         cacheChecked: true,
-        hasCachedData: allTransactions.length > 0,
+        hasCachedData: finalTransactions.length > 0,
         isRefreshing: false,
         lastRefreshTime: Date.now()
       });
 
     } catch (error) {
-      console.error("❌ useOptimizedFinancialData: Error during manual fetch:", error);
+      console.error("❌ useOptimizedFinancialData: Error during enhanced fetch:", error);
       
       // Fallback to cached data if API fails
-      console.log("🔄 useOptimizedFinancialData: API failed, attempting cache fallback");
+      console.log("🔄 useOptimizedFinancialData: API failed, attempting enhanced cache fallback");
       try {
         const [zohoCacheCheck, stripeCacheCheck] = await Promise.all([
           CacheService.checkCache('Zoho', startDate, endDate),
@@ -342,14 +434,15 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         let fallbackStripeData: any = null;
         
         if (stripeCacheCheck.cached && stripeCacheCheck.data) {
-          const transactions = stripeCacheCheck.data;
-          fallbackTransactions = [...fallbackTransactions, ...transactions];
+          const validation = dataIntegrityValidator.validateTransactionBatch(stripeCacheCheck.data);
+          const validTransactions = validation.valid.length > 0 ? validation.valid : stripeCacheCheck.data;
+          fallbackTransactions = [...fallbackTransactions, ...validTransactions];
           
-          const gross = transactions.reduce((sum, tx) => sum + (tx.gross || tx.amount), 0);
-          const fees = transactions.reduce((sum, tx) => sum + (tx.fees || 0), 0);
+          const gross = validTransactions.reduce((sum, tx) => sum + (tx.gross || tx.amount), 0);
+          const fees = validTransactions.reduce((sum, tx) => sum + (tx.fees || 0), 0);
           
           fallbackStripeData = {
-            transactions,
+            transactions: validTransactions,
             gross,
             fees,
             transactionFees: fees,
@@ -361,11 +454,13 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         }
         
         if (zohoCacheCheck.cached && zohoCacheCheck.data) {
-          fallbackTransactions = [...fallbackTransactions, ...zohoCacheCheck.data];
+          const validation = dataIntegrityValidator.validateTransactionBatch(zohoCacheCheck.data);
+          const validTransactions = validation.valid.length > 0 ? validation.valid : zohoCacheCheck.data;
+          fallbackTransactions = [...fallbackTransactions, ...validTransactions];
         }
         
         if (fallbackTransactions.length > 0) {
-          console.log("✅ useOptimizedFinancialData: Using cached data as fallback after API error");
+          console.log("✅ useOptimizedFinancialData: Using enhanced cached data as fallback after API error");
           setData(prev => ({
             ...prev,
             transactions: fallbackTransactions,
@@ -383,7 +478,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
           return;
         }
       } catch (fallbackError) {
-        console.error("❌ useOptimizedFinancialData: Cache fallback also failed:", fallbackError);
+        console.error("❌ useOptimizedFinancialData: Enhanced cache fallback also failed:", fallbackError);
       }
       
       setData(prev => ({
@@ -397,7 +492,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
     }
   }, [startDate, endDate, data.transactions.length]);
 
-  console.log("🔄 useOptimizedFinancialData: Hook rendered - PASSIVE MODE", {
+  console.log("🔄 useOptimizedFinancialData: Hook rendered - ENHANCED PASSIVE MODE", {
     dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
     hasData: data.transactions.length > 0,
     isDataRequested: data.isDataRequested,
@@ -406,11 +501,11 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
     loading: data.loading,
     isRefreshing: data.isRefreshing,
     usingCachedData: data.usingCachedData,
-    autoLoadingDisabled: true
+    enhancedOperations: true
   });
 
   const refetch = useCallback((forceRefresh = false) => {
-    console.log("🔄 useOptimizedFinancialData: Manual refetch requested by user", { 
+    console.log("🔄 useOptimizedFinancialData: Enhanced manual refetch requested by user", { 
       forceRefresh,
       reason: forceRefresh ? 'user_force_refresh' : 'user_refresh',
       caller: new Error().stack?.split('\n')[2]?.trim()
