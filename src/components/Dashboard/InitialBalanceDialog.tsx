@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,10 +50,10 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
   useEffect(() => {
     if (open && currentBalance) {
       setBalance(currentBalance.balance.toString());
-      setOpexAmount((currentBalance.opex_amount || 35).toString());
-      setItbmAmount((currentBalance.itbm_amount || 0).toString());
-      setProfitPercentage((currentBalance.profit_percentage || 1).toString());
-      setTaxReservePercentage((currentBalance.tax_reserve_percentage || 5).toString());
+      setOpexAmount((currentBalance.opex_amount ?? 35).toString());
+      setItbmAmount((currentBalance.itbm_amount ?? 0).toString());
+      setProfitPercentage((currentBalance.profit_percentage ?? 1).toString());
+      setTaxReservePercentage((currentBalance.tax_reserve_percentage ?? 5).toString());
       setIncludeZohoFiftyPercent(currentBalance.include_zoho_fifty_percent ?? true);
       setNotes(currentBalance.notes || '');
     } else if (open && !currentBalance) {
