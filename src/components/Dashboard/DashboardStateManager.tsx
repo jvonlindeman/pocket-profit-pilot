@@ -72,17 +72,19 @@ export const useDashboardStateManager = () => {
   // Enhanced debugging and improved value extraction logic
   console.log("💼 DashboardStateManager: Monthly balance data received:", monthlyBalance);
   
-  // IMMEDIATE VALUES: Use the most current values with better defaults
+  // IMMEDIATE VALUES: Use the most current values with better defaults - FIXED: Added include_zoho_fifty_percent
   const opexAmount = monthlyBalance?.opex_amount ?? 35;
   const itbmAmount = monthlyBalance?.itbm_amount ?? 0;
   const profitPercentage = monthlyBalance?.profit_percentage ?? 1;
   const taxReservePercentage = monthlyBalance?.tax_reserve_percentage ?? 5;
+  const includeZohoFiftyPercent = monthlyBalance?.include_zoho_fifty_percent ?? true;
   
-  console.log("💼 DashboardStateManager: IMMEDIATE VALUES for calculator:", { 
+  console.log("💼 DashboardStateManager: IMMEDIATE VALUES for calculator (FIXED):", { 
     opexAmount, 
     itbmAmount, 
     profitPercentage, 
     taxReservePercentage,
+    includeZohoFiftyPercent, // NOW INCLUDED
     startingBalance,
     monthlyBalanceId: monthlyBalance?.id,
     monthlyBalanceTimestamp: monthlyBalance?.updated_at,
@@ -90,16 +92,17 @@ export const useDashboardStateManager = () => {
     timestamp: new Date().toISOString()
   });
   
-  // REACTIVE KEY: Forces complete re-render when ANY value changes
-  const calculatorKey = `calculator-${monthlyBalance?.id || 'default'}-${monthlyBalance?.updated_at || Date.now()}-${startingBalance}-${opexAmount}-${itbmAmount}-${profitPercentage}-${taxReservePercentage}`;
+  // REACTIVE KEY: Forces complete re-render when ANY value changes - FIXED: Added includeZohoFiftyPercent
+  const calculatorKey = `calculator-${monthlyBalance?.id || 'default'}-${monthlyBalance?.updated_at || Date.now()}-${startingBalance}-${opexAmount}-${itbmAmount}-${profitPercentage}-${taxReservePercentage}-${includeZohoFiftyPercent}`;
   
-  console.log("💼 DashboardStateManager: Calculator key (forces re-render):", calculatorKey);
+  console.log("💼 DashboardStateManager: Calculator key (forces re-render - FIXED):", calculatorKey);
   console.log("💼 DashboardStateManager: Transaction count:", financialData.transactions.length);
   console.log("💼 DashboardStateManager: Zoho income transactions:", 
     financialData.transactions.filter(tx => tx.type === 'income' && tx.source === 'Zoho').length
   );
   console.log("💼 DashboardStateManager: Unpaid invoices:", unpaidInvoices?.length || 0);
   console.log("💼 DashboardStateManager: Is refreshing:", isRefreshing);
+  console.log("💼 DashboardStateManager: Include Zoho 50% (TRACKING):", includeZohoFiftyPercent);
 
   return {
     // Data state
@@ -137,6 +140,7 @@ export const useDashboardStateManager = () => {
     itbmAmount,
     profitPercentage,
     taxReservePercentage,
+    includeZohoFiftyPercent, // NOW EXPORTED
     
     // Monthly balance
     monthlyBalance,

@@ -23,7 +23,8 @@ export const useMonthlyBalanceManager = () => {
       }
 
       if (data) {
-        console.log("Fetched monthly balance:", data);
+        console.log("✅ useMonthlyBalanceManager: Fetched monthly balance with all fields:", data);
+        console.log("✅ useMonthlyBalanceManager: Include Zoho 50%:", data.include_zoho_fifty_percent);
         // Update the local state with the balance and notes from the database
         setStartingBalance(data.balance);
         setNotes(data.notes || undefined);
@@ -49,7 +50,7 @@ export const useMonthlyBalanceManager = () => {
     notes?: string
   ) => {
     try {
-      console.log("Updating monthly balance with values:", {
+      console.log("✅ useMonthlyBalanceManager: Updating monthly balance with values:", {
         balance, date, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, includeZohoFiftyPercent, notes
       });
       
@@ -71,6 +72,8 @@ export const useMonthlyBalanceManager = () => {
         include_zoho_fifty_percent: includeZohoFiftyPercent,
         notes: notes || (existingData?.notes || null),
       };
+      
+      console.log("✅ useMonthlyBalanceManager: Saving data with include_zoho_fifty_percent:", includeZohoFiftyPercent);
       
       let result;
       
@@ -98,7 +101,7 @@ export const useMonthlyBalanceManager = () => {
       // Immediately update local state for faster UI feedback
       setStartingBalance(balance);
       setNotes(notes);
-      console.log("Starting balance updated to:", balance);
+      console.log("✅ useMonthlyBalanceManager: Starting balance updated successfully with include_zoho_fifty_percent:", includeZohoFiftyPercent);
       return true;
     } catch (err) {
       console.error("Error updating starting balance:", err);

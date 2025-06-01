@@ -27,7 +27,7 @@ const DashboardPageWrapper: React.FC = () => {
     isRefreshing: dashboardState.isRefreshing,
   });
 
-  console.log("🏠 DashboardPageWrapper: Rendering with PASSIVE MODE + SMART REFRESH", {
+  console.log("🏠 DashboardPageWrapper: Rendering with PASSIVE MODE + SMART REFRESH (FIXED)", {
     dataInitialized: dashboardState.dataInitialized,
     loading: dashboardState.loading,
     isRefreshing: dashboardState.isRefreshing,
@@ -39,7 +39,8 @@ const DashboardPageWrapper: React.FC = () => {
     autoLoadingDisabled: true,
     smartRefreshEnabled: true,
     monthlyBalanceId: dashboardState.monthlyBalance?.id,
-    monthlyBalanceTimestamp: dashboardState.monthlyBalance?.updated_at
+    monthlyBalanceTimestamp: dashboardState.monthlyBalance?.updated_at,
+    includeZohoFiftyPercent: dashboardState.includeZohoFiftyPercent // TRACKING THE NEW VALUE
   });
 
   return (

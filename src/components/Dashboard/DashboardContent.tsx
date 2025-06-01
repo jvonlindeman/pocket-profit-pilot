@@ -68,34 +68,35 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   // Enhanced debugging and improved value extraction logic
   console.log("💼 DashboardContent: Monthly balance data received:", monthlyBalance);
   
-  // IMMEDIATE VALUES: Use the most current values with better defaults
+  // IMMEDIATE VALUES: Use the most current values with better defaults - FIXED: Added include_zoho_fifty_percent tracking
   const opexAmount = monthlyBalance?.opex_amount ?? 35;
   const itbmAmount = monthlyBalance?.itbm_amount ?? 0;
   const profitPercentage = monthlyBalance?.profit_percentage ?? 1;
   const taxReservePercentage = monthlyBalance?.tax_reserve_percentage ?? 5;
   const includeZohoFiftyPercent = monthlyBalance?.include_zoho_fifty_percent ?? true;
   
-  console.log("💼 DashboardContent: IMMEDIATE VALUES for calculator:", { 
+  console.log("💼 DashboardContent: IMMEDIATE VALUES for calculator (FIXED WITH TRACKING):", { 
     opexAmount, 
     itbmAmount, 
     profitPercentage, 
     taxReservePercentage,
-    includeZohoFiftyPercent,
+    includeZohoFiftyPercent, // NOW PROPERLY TRACKED
     startingBalance,
     monthlyBalanceId: monthlyBalance?.id,
     monthlyBalanceTimestamp: monthlyBalance?.updated_at,
     timestamp: new Date().toISOString()
   });
   
-  // REACTIVE KEY: Forces complete re-render when ANY value changes
+  // REACTIVE KEY: Forces complete re-render when ANY value changes - FIXED: Added includeZohoFiftyPercent
   const calculatorKey = `calculator-${monthlyBalance?.id || 'default'}-${monthlyBalance?.updated_at || Date.now()}-${startingBalance}-${opexAmount}-${itbmAmount}-${profitPercentage}-${taxReservePercentage}-${includeZohoFiftyPercent}`;
   
-  console.log("💼 DashboardContent: Calculator key (forces re-render):", calculatorKey);
+  console.log("💼 DashboardContent: Calculator key (forces re-render - FIXED):", calculatorKey);
   console.log("💼 DashboardContent: Transaction count:", financialData.transactions.length);
   console.log("💼 DashboardContent: Zoho income transactions:", 
     financialData.transactions.filter(tx => tx.type === 'income' && tx.source === 'Zoho').length
   );
   console.log("💼 DashboardContent: Unpaid invoices:", unpaidInvoices?.length || 0);
+  console.log("💼 DashboardContent: PASSING includeZohoFiftyPercent to SalaryCalculator:", includeZohoFiftyPercent);
 
   return (
     <>
@@ -119,7 +120,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
         />
       </div>
 
-      {/* Salary Calculator with IMMEDIATE REACTIVE UPDATES */}
+      {/* Salary Calculator with IMMEDIATE REACTIVE UPDATES - FIXED: Now properly passing includeZohoFiftyPercent */}
       <div className="mb-6">
         <SalaryCalculator 
           key={calculatorKey}
