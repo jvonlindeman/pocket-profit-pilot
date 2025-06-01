@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,18 +47,57 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
   const [includeZohoFiftyPercent, setIncludeZohoFiftyPercent] = useState(true);
   const [notes, setNotes] = useState('');
 
-  // Load existing values when dialog opens
+  // Load existing values when dialog opens - FIXED: Better data handling
   useEffect(() => {
+    console.log("🔧 InitialBalanceDialog: useEffect triggered with:", {
+      open,
+      currentBalance,
+      currentBalanceData: currentBalance ? {
+        balance: currentBalance.balance,
+        opex_amount: currentBalance.opex_amount,
+        itbm_amount: currentBalance.itbm_amount,
+        profit_percentage: currentBalance.profit_percentage,
+        tax_reserve_percentage: currentBalance.tax_reserve_percentage,
+        include_zoho_fifty_percent: currentBalance.include_zoho_fifty_percent,
+        notes: currentBalance.notes
+      } : null
+    });
+
     if (open && currentBalance) {
-      setBalance(currentBalance.balance.toString());
+      // FIXED: Better number conversion and null handling
+      console.log("🔧 InitialBalanceDialog: Loading existing values from currentBalance:", currentBalance);
+      
+      setBalance(currentBalance.balance?.toString() || '');
       setOpexAmount((currentBalance.opex_amount ?? 35).toString());
       setItbmAmount((currentBalance.itbm_amount ?? 0).toString());
-      setProfitPercentage((currentBalance.profit_percentage ?? 1).toString());
-      setTaxReservePercentage((currentBalance.tax_reserve_percentage ?? 5).toString());
+      
+      // FIXED: Explicit conversion and fallback for profit and tax percentages
+      const profitValue = currentBalance.profit_percentage;
+      const taxValue = currentBalance.tax_reserve_percentage;
+      
+      console.log("🔧 InitialBalanceDialog: Converting percentage values:", {
+        profitValue: { raw: profitValue, type: typeof profitValue, isNull: profitValue === null, isUndefined: profitValue === undefined },
+        taxValue: { raw: taxValue, type: typeof taxValue, isNull: taxValue === null, isUndefined: taxValue === undefined }
+      });
+      
+      setProfitPercentage(profitValue !== null && profitValue !== undefined ? profitValue.toString() : '1');
+      setTaxReservePercentage(taxValue !== null && taxValue !== undefined ? taxValue.toString() : '5');
+      
       setIncludeZohoFiftyPercent(currentBalance.include_zoho_fifty_percent ?? true);
       setNotes(currentBalance.notes || '');
+      
+      console.log("🔧 InitialBalanceDialog: State set to:", {
+        balance: currentBalance.balance?.toString() || '',
+        opexAmount: (currentBalance.opex_amount ?? 35).toString(),
+        itbmAmount: (currentBalance.itbm_amount ?? 0).toString(),
+        profitPercentage: profitValue !== null && profitValue !== undefined ? profitValue.toString() : '1',
+        taxReservePercentage: taxValue !== null && taxValue !== undefined ? taxValue.toString() : '5',
+        includeZohoFiftyPercent: currentBalance.include_zoho_fifty_percent ?? true,
+        notes: currentBalance.notes || ''
+      });
     } else if (open && !currentBalance) {
       // Reset to defaults for new balance
+      console.log("🔧 InitialBalanceDialog: Resetting to defaults (no currentBalance)");
       setBalance('');
       setOpexAmount('35');
       setItbmAmount('0');
@@ -74,6 +114,16 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
     const itbmNum = parseFloat(itbmAmount) || 0;
     const profitNum = parseFloat(profitPercentage) || 1;
     const taxReserveNum = parseFloat(taxReservePercentage) || 5;
+    
+    console.log("🔧 InitialBalanceDialog: handleSave called with values:", {
+      balanceNum,
+      opexNum,
+      itbmNum,
+      profitNum,
+      taxReserveNum,
+      includeZohoFiftyPercent,
+      notes: notes.trim() || undefined
+    });
     
     onBalanceSaved(
       balanceNum, 
