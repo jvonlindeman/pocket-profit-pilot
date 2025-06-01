@@ -22,7 +22,9 @@ const CacheService = {
     // If force refresh, clear cache immediately and return miss
     if (forceRefresh) {
       console.log(`🔄 CacheService: Force refresh requested - clearing cache for ${source}`);
-      await cacheStalenessManager.markCacheStale(source, startDate, endDate);
+      if (cacheStalenessManager) {
+        await cacheStalenessManager.markCacheStale(source, startDate, endDate);
+      }
       return {
         cached: false,
         status: "force_refresh_cleared",
@@ -34,7 +36,7 @@ const CacheService = {
     const result = await cacheOperations.checkCache(source, startDate, endDate, forceRefresh);
     
     // Add staleness information
-    const isStale = await cacheStalenessManager.isCacheStale(source, startDate, endDate);
+    const isStale = cacheStalenessManager ? await cacheStalenessManager.isCacheStale(source, startDate, endDate) : false;
     
     // If cache is stale, treat it as a miss
     if (isStale && result.cached) {
@@ -64,7 +66,9 @@ const CacheService = {
     console.log(`🗑️ CacheService: Marking cache as stale and clearing for ${source}`, {
       dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`
     });
-    await cacheStalenessManager.markCacheStale(source, startDate, endDate);
+    if (cacheStalenessManager) {
+      await cacheStalenessManager.markCacheStale(source, startDate, endDate);
+    }
   },
 
   /**
@@ -75,7 +79,9 @@ const CacheService = {
     startDate: Date,
     endDate: Date
   ): void => {
-    cacheStalenessManager.clearStaleness(source, startDate, endDate);
+    if (cacheStalenessManager) {
+      cacheStalenessManager.clearStaleness(source, startDate, endDate);
+    }
   },
   
   /**
@@ -101,7 +107,7 @@ const CacheService = {
     const success = await cacheOperations.storeTransactions(source, startDate, endDate, transactions);
     
     // Clear staleness on successful store
-    if (success) {
+    if (success && cacheStalenessManager) {
       cacheStalenessManager.clearStaleness(source, startDate, endDate);
       console.log(`✅ CacheService: Successfully stored and cleared staleness for ${source}`);
     }
@@ -124,7 +130,7 @@ const CacheService = {
     const success = await cacheStorage.storeMonthTransactions(source, year, month, transactions);
     
     // Clear staleness on successful store
-    if (success) {
+    if (success && cacheStalenessManager) {
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0);
       cacheStalenessManager.clearStaleness(source, startDate, endDate);
@@ -255,7 +261,9 @@ const CacheService = {
     
     try {
       // 1. Mark cache as stale
-      await this.markCacheStale(source, startDate, endDate);
+      if (cacheStalenessManager) {
+        await cacheStalenessManager.markCacheStale(source, startDate, endDate);
+      }
       
       // 2. Clear all cache segments for this date range
       const clearOptions: CacheClearOptions = {
