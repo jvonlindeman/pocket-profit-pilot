@@ -11,7 +11,8 @@ interface DashboardDataHandlersProps {
     opexAmount?: number,
     itbmAmount?: number,
     profitPercentage?: number,
-    taxReservePercentage?: number
+    taxReservePercentage?: number,
+    includeZohoFiftyPercent?: boolean
   ) => Promise<boolean>;
   setStartingBalance: (balance: number) => void;
   hasCachedData: boolean;
@@ -60,31 +61,34 @@ export const useDashboardDataHandlers = ({
     refreshData(false); // Manual load after balance is set
   }, [toast, refreshData]);
 
-  // Updated handler for balance changes - now with immediate updates and comprehensive logging
+  // Updated handler for balance changes - now with all 6 parameters including includeZohoFiftyPercent
   const handleBalanceChange = useCallback(async (
     balance: number, 
     opexAmount: number = 35, 
     itbmAmount: number = 0, 
     profitPercentage: number = 1,
-    taxReservePercentage: number = 5
+    taxReservePercentage: number = 5,
+    includeZohoFiftyPercent: boolean = true
   ) => {
-    console.log("💰 DashboardDataHandlers: handleBalanceChange CALLED WITH PARAMETERS:", {
+    console.log("💰 DashboardDataHandlers: handleBalanceChange CALLED WITH ALL 6 PARAMETERS (FIXED):", {
       balance: { value: balance, type: typeof balance },
       opexAmount: { value: opexAmount, type: typeof opexAmount },
       itbmAmount: { value: itbmAmount, type: typeof itbmAmount },
       profitPercentage: { value: profitPercentage, type: typeof profitPercentage, isZero: profitPercentage === 0 },
       taxReservePercentage: { value: taxReservePercentage, type: typeof taxReservePercentage, isZero: taxReservePercentage === 0 },
+      includeZohoFiftyPercent: { value: includeZohoFiftyPercent, type: typeof includeZohoFiftyPercent },
       timestamp: new Date().toISOString()
     });
     
     try {
-      // 1. IMMEDIATE: Update the monthly balance with optimistic update
-      console.log("💰 DashboardDataHandlers: Calling updateMonthlyBalance with parameters:", {
+      // 1. IMMEDIATE: Update the monthly balance with all parameters including includeZohoFiftyPercent
+      console.log("💰 DashboardDataHandlers: Calling updateMonthlyBalance with ALL 6 parameters (FIXED):", {
         balance,
         opexAmount,
         itbmAmount,
         profitPercentage,
-        taxReservePercentage
+        taxReservePercentage,
+        includeZohoFiftyPercent
       });
       
       const success = await updateMonthlyBalance(
@@ -92,7 +96,8 @@ export const useDashboardDataHandlers = ({
         opexAmount,
         itbmAmount,
         profitPercentage,
-        taxReservePercentage
+        taxReservePercentage,
+        includeZohoFiftyPercent
       );
 
       if (success) {
@@ -103,7 +108,7 @@ export const useDashboardDataHandlers = ({
         // 3. Show immediate feedback
         toast({
           title: 'Balance actualizado inmediatamente',
-          description: 'Los cálculos se han actualizado',
+          description: 'Los cálculos se han actualizado con todos los parámetros',
         });
 
         // 4. BACKGROUND: Update backend data (no loading state)
