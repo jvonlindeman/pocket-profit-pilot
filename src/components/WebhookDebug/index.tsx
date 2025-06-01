@@ -13,7 +13,7 @@ interface WebhookDebugLegacyProps {
   rawResponse?: any;
 }
 
-// Legacy wrapper to maintain backward compatibility
+// Legacy wrapper to maintain backward compatibility - kept minimal
 export default function WebhookDebugLegacy({ 
   dateRange, 
   refreshDataFunction,

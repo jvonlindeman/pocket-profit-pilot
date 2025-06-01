@@ -41,12 +41,6 @@ export const useCollaboratorProcessor = () => {
 
   // Function to process collaborator data with enhanced detection
   const processCollaboratorData = useCallback((rawResponse: any) => {
-    console.log("🔍 CollaboratorProcessor: Starting enhanced processing", {
-      rawResponse: !!rawResponse,
-      colaboradoresArray: Array.isArray(rawResponse?.colaboradores),
-      colaboradoresCount: rawResponse?.colaboradores?.length || 0
-    });
-    
     if (!rawResponse || !rawResponse.colaboradores || !Array.isArray(rawResponse.colaboradores)) {
       console.warn("⚠️ CollaboratorProcessor: No valid collaborator data found in raw response");
       setCollaboratorExpenses([]);
@@ -64,14 +58,11 @@ export const useCollaboratorProcessor = () => {
     let identifiedCount = 0;
     const potentialMissed: string[] = [];
 
-    console.log(`📊 CollaboratorProcessor: Processing ${allCollaborators.length} total collaborator entries`);
-
     // Enhanced filtering and processing
     const validCollaborators = allCollaborators
       .filter((item: any) => {
         // Basic validation
         if (!item || typeof item.total === 'undefined' || !item.vendor_name) {
-          console.log("❌ CollaboratorProcessor: Invalid item (missing total or vendor_name)", item);
           return false;
         }
 
@@ -80,14 +71,12 @@ export const useCollaboratorProcessor = () => {
 
         // Check if excluded
         if (excludedVendors.includes(vendorName)) {
-          console.log(`🚫 CollaboratorProcessor: Excluded vendor: ${vendorName} ($${amount})`);
           excludedCount++;
           return false;
         }
 
         // Check if amount is valid
         if (amount <= 0) {
-          console.log(`💰 CollaboratorProcessor: Invalid amount for ${vendorName}: $${amount}`);
           return false;
         }
 
@@ -95,23 +84,13 @@ export const useCollaboratorProcessor = () => {
         const isCollaborator = isLikelyCollaborator(vendorName, item.description);
         
         if (isCollaborator) {
-          console.log(`✅ CollaboratorProcessor: Identified collaborator: ${vendorName} - $${amount}`);
           identifiedCount++;
         } else {
-          console.log(`❓ CollaboratorProcessor: Potential missed collaborator: ${vendorName} - $${amount}`);
           potentialMissed.push(`${vendorName} ($${amount})`);
         }
 
         return true; // Include all valid items, not just identified collaborators
       });
-    
-    console.log(`📈 CollaboratorProcessor: Filtering results:`, {
-      total: allCollaborators.length,
-      valid: validCollaborators.length,
-      excluded: excludedCount,
-      identified: identifiedCount,
-      potentialMissed: potentialMissed.length
-    });
       
     // Group collaborators by name and sum their amounts
     const collaboratorMap = validCollaborators.reduce((acc: Record<string, number>, item: any) => {
@@ -120,13 +99,10 @@ export const useCollaboratorProcessor = () => {
       
       if (amount > 0) {
         acc[vendorName] = (acc[vendorName] || 0) + amount;
-        console.log(`💼 CollaboratorProcessor: Adding to map: ${vendorName} - $${amount} (total: $${acc[vendorName]})`);
       }
       
       return acc;
     }, {});
-    
-    console.log("🗂️ CollaboratorProcessor: Grouped collaborator map:", collaboratorMap);
     
     // Convert the grouped map to an array of CategorySummary objects
     const groupedCollaborators = Object.entries(collaboratorMap)
@@ -142,20 +118,12 @@ export const useCollaboratorProcessor = () => {
       (sum, item) => sum + validateFinancialValue(item.amount), 0
     );
     
-    console.log(`💵 CollaboratorProcessor: Total collaborator expense: $${totalAmount}`);
-    
     // Calculate percentages and format for the chart
     const formattedData = groupedCollaborators.map(item => ({
       category: item.category,
       amount: validateFinancialValue(item.amount),
       percentage: totalAmount > 0 ? (item.amount / totalAmount) * 100 : 0
     })).sort((a, b) => b.amount - a.amount);
-    
-    console.log("📊 CollaboratorProcessor: Final formatted collaborator data:", {
-      count: formattedData.length,
-      total: totalAmount,
-      items: formattedData
-    });
 
     // Update debug info
     setDebugInfo({
@@ -171,12 +139,8 @@ export const useCollaboratorProcessor = () => {
 
   // Log debug info when it changes
   useEffect(() => {
-    if (debugInfo.totalProcessed > 0) {
-      console.log("🔍 CollaboratorProcessor: Debug Summary:", debugInfo);
-      
-      if (debugInfo.potentialMissed.length > 0) {
-        console.warn("⚠️ CollaboratorProcessor: Potential missed collaborators:", debugInfo.potentialMissed);
-      }
+    if (debugInfo.totalProcessed > 0 && debugInfo.potentialMissed.length > 0) {
+      console.warn("⚠️ CollaboratorProcessor: Potential missed collaborators:", debugInfo.potentialMissed);
     }
   }, [debugInfo]);
 

@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { Bug } from 'lucide-react';
 import StripeDebug from '@/components/Dashboard/DebugTools/StripeDebug';
 import WebhookDebug from '@/components/Dashboard/DebugTools/WebhookDebug';
-import WebhookRequestDebug from '@/components/WebhookRequestDebug';
 import { stripeRepository } from '@/repositories/stripeRepository';
 import { dataFetcherService } from '@/services/dataFetcherService';
 
@@ -61,9 +60,6 @@ const DebugSection: React.FC<DebugSectionProps> = ({
         refreshDataFunction={refreshData}
         rawResponse={rawResponse}
       />
-      
-      {/* Webhook request debug component */}
-      <WebhookRequestDebug dateRange={dateRange} />
     </div>
   );
 };
