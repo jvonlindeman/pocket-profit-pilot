@@ -10,7 +10,14 @@ import { useIsMobile } from '@/hooks/use-mobile';
 
 interface MonthlyBalanceEditorProps {
   currentDate: Date;
-  onBalanceChange: (balance: number, opexAmount?: number, itbmAmount?: number, profitPercentage?: number, taxReservePercentage?: number) => void;
+  onBalanceChange: (
+    balance: number, 
+    opexAmount?: number, 
+    itbmAmount?: number, 
+    profitPercentage?: number, 
+    taxReservePercentage?: number,
+    includeZohoFiftyPercent?: boolean
+  ) => void;
 }
 
 const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({ 
@@ -37,7 +44,8 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
         opex_amount: monthlyBalance.opex_amount,
         itbm_amount: monthlyBalance.itbm_amount,
         profit_percentage: monthlyBalance.profit_percentage,
-        tax_reserve_percentage: monthlyBalance.tax_reserve_percentage
+        tax_reserve_percentage: monthlyBalance.tax_reserve_percentage,
+        include_zoho_fifty_percent: monthlyBalance.include_zoho_fifty_percent
       } : null
     });
   }, [monthlyBalance]);
@@ -80,15 +88,16 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
     itbmAmount: number = 0,
     profitPercentage: number = 1,
     taxReservePercentage: number = 5,
+    includeZohoFiftyPercent: boolean = true,
     notes?: string
   ) => {
     console.log("🔍 EDITOR: Balance saved - TRIGGERING IMMEDIATE UPDATE:", {
-      balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, notes,
+      balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, includeZohoFiftyPercent, notes,
       timestamp: new Date().toISOString()
     });
     
     // IMMEDIATE: Trigger the parent's immediate update handler
-    onBalanceChange(balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage);
+    onBalanceChange(balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, includeZohoFiftyPercent);
     
     // Close dialog
     setShowBalanceDialog(false);
@@ -121,14 +130,16 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
                     ITBM: ${monthlyBalance.itbm_amount?.toFixed(2) || "0.00"}<br />
                     OPEX: ${monthlyBalance.opex_amount?.toFixed(2) || "0.00"}<br />
                     Profit: {monthlyBalance.profit_percentage?.toFixed(1) || "0.0"}%<br />
-                    Tax Reserve: {monthlyBalance.tax_reserve_percentage?.toFixed(1) || "5.0"}%
+                    Tax Reserve: {monthlyBalance.tax_reserve_percentage?.toFixed(1) || "5.0"}%<br />
+                    50% Zoho: {monthlyBalance.include_zoho_fifty_percent ? "Sí" : "No"}
                   </>
                 ) : (
                   <>
                     ITBM: ${monthlyBalance.itbm_amount?.toFixed(2) || "0.00"} | 
                     OPEX: ${monthlyBalance.opex_amount?.toFixed(2) || "0.00"} | 
                     Profit: {monthlyBalance.profit_percentage?.toFixed(1) || "0.0"}% | 
-                    Tax Reserve: {monthlyBalance.tax_reserve_percentage?.toFixed(1) || "5.0"}%
+                    Tax Reserve: {monthlyBalance.tax_reserve_percentage?.toFixed(1) || "5.0"}% | 
+                    50% Zoho: {monthlyBalance.include_zoho_fifty_percent ? "Sí" : "No"}
                   </>
                 )}
               </p>

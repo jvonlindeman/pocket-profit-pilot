@@ -37,7 +37,7 @@ export const useMonthlyBalanceManager = () => {
     }
   }, []);
 
-  // Update the starting balance with additional calculator fields including tax reserve percentage
+  // Update the starting balance with additional calculator fields including tax reserve percentage and zoho fifty percent toggle
   const updateStartingBalance = useCallback(async (
     balance: number, 
     date: Date, 
@@ -45,11 +45,12 @@ export const useMonthlyBalanceManager = () => {
     itbmAmount: number = 0,
     profitPercentage: number = 1,
     taxReservePercentage: number = 5,
+    includeZohoFiftyPercent: boolean = true,
     notes?: string
   ) => {
     try {
       console.log("Updating monthly balance with values:", {
-        balance, date, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, notes
+        balance, date, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, includeZohoFiftyPercent, notes
       });
       
       const monthYear = formatDate(date, 'yyyy-MM');
@@ -67,6 +68,7 @@ export const useMonthlyBalanceManager = () => {
         itbm_amount: itbmAmount,
         profit_percentage: profitPercentage,
         tax_reserve_percentage: taxReservePercentage,
+        include_zoho_fifty_percent: includeZohoFiftyPercent,
         notes: notes || (existingData?.notes || null),
       };
       

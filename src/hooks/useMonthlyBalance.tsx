@@ -78,6 +78,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
         itbm_amount: data?.itbm_amount,
         profit_percentage: data?.profit_percentage,
         tax_reserve_percentage: data?.tax_reserve_percentage,
+        include_zoho_fifty_percent: data?.include_zoho_fifty_percent,
         updated_at: data?.updated_at
       });
       
@@ -113,13 +114,14 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     }
   }, [currentMonthYear]);
 
-  // Set or update the monthly balance including tax reserve percentage
+  // Set or update the monthly balance including tax reserve percentage and zoho fifty percent toggle
   const updateMonthlyBalance = useCallback(async (
     balance: number, 
     opexAmount: number = 35,
     itbmAmount: number = 0, 
     profitPercentage: number = 1,
     taxReservePercentage: number = 5,
+    includeZohoFiftyPercent: boolean = true,
     notes?: string
   ) => {
     setLoading(true);
@@ -131,6 +133,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       itbmAmount: { value: itbmAmount, type: typeof itbmAmount, isNaN: isNaN(itbmAmount) },
       profitPercentage: { value: profitPercentage, type: typeof profitPercentage, isNaN: isNaN(profitPercentage), isZero: profitPercentage === 0 },
       taxReservePercentage: { value: taxReservePercentage, type: typeof taxReservePercentage, isNaN: isNaN(taxReservePercentage), isZero: taxReservePercentage === 0 },
+      includeZohoFiftyPercent: { value: includeZohoFiftyPercent, type: typeof includeZohoFiftyPercent },
       notes: { value: notes, type: typeof notes },
       currentMonthYear
     });
@@ -144,6 +147,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       itbm_amount: itbmAmount,
       profit_percentage: profitPercentage,
       tax_reserve_percentage: taxReservePercentage,
+      include_zoho_fifty_percent: includeZohoFiftyPercent,
       notes: notes || null,
       stripe_override: monthlyBalance?.stripe_override || null, // Include stripe_override
       created_at: monthlyBalance?.created_at || new Date().toISOString(),
@@ -159,7 +163,8 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
         opex_amount: opexAmount, 
         itbm_amount: itbmAmount, 
         profit_percentage: profitPercentage, 
-        tax_reserve_percentage: taxReservePercentage, 
+        tax_reserve_percentage: taxReservePercentage,
+        include_zoho_fifty_percent: includeZohoFiftyPercent,
         notes: notes || null,
         currentMonthYear
       });
@@ -171,6 +176,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
         itbm_amount: Number(itbmAmount), // Ensure it's a number
         profit_percentage: Number(profitPercentage), // Explicitly convert to number, 0 is valid
         tax_reserve_percentage: Number(taxReservePercentage), // Explicitly convert to number, 0 is valid
+        include_zoho_fifty_percent: Boolean(includeZohoFiftyPercent), // Ensure it's a boolean
         notes: notes || null,
       };
 
@@ -207,6 +213,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
           itbm_amount: updatedBalance?.itbm_amount,
           profit_percentage: updatedBalance?.profit_percentage,
           tax_reserve_percentage: updatedBalance?.tax_reserve_percentage,
+          include_zoho_fifty_percent: updatedBalance?.include_zoho_fifty_percent,
           updated_at: updatedBalance?.updated_at
         });
         
@@ -249,6 +256,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
           itbm_amount: newBalance?.itbm_amount,
           profit_percentage: newBalance?.profit_percentage,
           tax_reserve_percentage: newBalance?.tax_reserve_percentage,
+          include_zoho_fifty_percent: newBalance?.include_zoho_fifty_percent,
           updated_at: newBalance?.updated_at
         });
         

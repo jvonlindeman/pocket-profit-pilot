@@ -20,7 +20,14 @@ interface DashboardContentProps {
   currentMonthDate: Date;
   startingBalance: number;
   refreshData: (force: boolean) => void;
-  handleBalanceChange: (balance: number, opexAmount?: number, itbmAmount?: number, profitPercentage?: number, taxReservePercentage?: number) => void;
+  handleBalanceChange: (
+    balance: number, 
+    opexAmount?: number, 
+    itbmAmount?: number, 
+    profitPercentage?: number, 
+    taxReservePercentage?: number,
+    includeZohoFiftyPercent?: boolean
+  ) => void;
   handleRefresh: () => void;
   loading: boolean;
   stripeIncome: number;
@@ -66,12 +73,14 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   const itbmAmount = monthlyBalance?.itbm_amount ?? 0;
   const profitPercentage = monthlyBalance?.profit_percentage ?? 1;
   const taxReservePercentage = monthlyBalance?.tax_reserve_percentage ?? 5;
+  const includeZohoFiftyPercent = monthlyBalance?.include_zoho_fifty_percent ?? true;
   
   console.log("💼 DashboardContent: IMMEDIATE VALUES for calculator:", { 
     opexAmount, 
     itbmAmount, 
     profitPercentage, 
     taxReservePercentage,
+    includeZohoFiftyPercent,
     startingBalance,
     monthlyBalanceId: monthlyBalance?.id,
     monthlyBalanceTimestamp: monthlyBalance?.updated_at,
@@ -79,7 +88,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   });
   
   // REACTIVE KEY: Forces complete re-render when ANY value changes
-  const calculatorKey = `calculator-${monthlyBalance?.id || 'default'}-${monthlyBalance?.updated_at || Date.now()}-${startingBalance}-${opexAmount}-${itbmAmount}-${profitPercentage}-${taxReservePercentage}`;
+  const calculatorKey = `calculator-${monthlyBalance?.id || 'default'}-${monthlyBalance?.updated_at || Date.now()}-${startingBalance}-${opexAmount}-${itbmAmount}-${profitPercentage}-${taxReservePercentage}-${includeZohoFiftyPercent}`;
   
   console.log("💼 DashboardContent: Calculator key (forces re-render):", calculatorKey);
   console.log("💼 DashboardContent: Transaction count:", financialData.transactions.length);
@@ -120,6 +129,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
           itbmAmount={itbmAmount}
           profitPercentage={profitPercentage}
           taxReservePercentage={taxReservePercentage}
+          includeZohoFiftyPercent={includeZohoFiftyPercent}
           startingBalance={startingBalance}
           totalZohoExpenses={totalZohoExpenses}
         />

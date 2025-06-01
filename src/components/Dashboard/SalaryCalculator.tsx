@@ -1,6 +1,7 @@
+
 import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calculator, DollarSign, ArrowDown, ArrowUp, Percent, Info } from 'lucide-react';
+import { Calculator, DollarSign, ArrowDown, ArrowUp, Percent, Info, ToggleLeft, ToggleRight } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface SalaryCalculatorProps {
@@ -10,6 +11,7 @@ interface SalaryCalculatorProps {
   itbmAmount: number;
   profitPercentage: number;
   taxReservePercentage: number;
+  includeZohoFiftyPercent: boolean;
   startingBalance?: number;
   totalZohoExpenses?: number;
 }
@@ -21,6 +23,7 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
   itbmAmount,
   profitPercentage,
   taxReservePercentage,
+  includeZohoFiftyPercent,
   startingBalance = 0,
   totalZohoExpenses = 0
 }) => {
@@ -33,11 +36,12 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
       itbmAmount,
       profitPercentage,
       taxReservePercentage,
+      includeZohoFiftyPercent,
       startingBalance,
       totalZohoExpenses,
       timestamp: new Date().toISOString()
     });
-  }, [zohoIncome, stripeIncome, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, startingBalance, totalZohoExpenses]);
+  }, [zohoIncome, stripeIncome, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, includeZohoFiftyPercent, startingBalance, totalZohoExpenses]);
 
   // Cálculos
   const adjustedZohoIncome = (startingBalance || 0) + zohoIncome - totalZohoExpenses;
@@ -47,7 +51,11 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
   const remainingZohoIncome = adjustedZohoIncome - totalZohoDeductions;
   const halfStripeIncome = stripeIncome / 2;
   const halfRemainingZoho = remainingZohoIncome / 2;
-  const salary = halfStripeIncome + halfRemainingZoho;
+  
+  // NEW: Calculate salary based on toggle
+  const salary = includeZohoFiftyPercent 
+    ? halfStripeIncome + halfRemainingZoho  // Include both
+    : halfStripeIncome;                     // Only Stripe
   
   // Debug calculation results
   console.log("SalaryCalculator: Calculation results:", {
@@ -56,6 +64,9 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
     taxReserveAmount,
     totalZohoDeductions,
     remainingZohoIncome,
+    halfStripeIncome,
+    halfRemainingZoho,
+    includeZohoFiftyPercent,
     salary,
     profitPercentageUsed: profitPercentage,
     taxReservePercentageUsed: taxReservePercentage
@@ -80,6 +91,16 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
             <span className="ml-2 text-xs opacity-75">
               (Profit: {profitPercentage}% | Tax Reserve: {taxReservePercentage}%)
             </span>
+            <div className="ml-auto flex items-center space-x-2">
+              {includeZohoFiftyPercent ? (
+                <ToggleRight className="h-5 w-5 text-green-300" />
+              ) : (
+                <ToggleLeft className="h-5 w-5 text-red-300" />
+              )}
+              <span className="text-xs">
+                50% Zoho: {includeZohoFiftyPercent ? "Incluido" : "Excluido"}
+              </span>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -87,12 +108,21 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
           <div className="p-6 bg-gradient-to-br from-blue-500/10 to-indigo-500/5">
             <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-6">
               <div className="w-full">
-                <div className="text-center p-5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shadow-md">
-                  <h3 className="text-sm font-medium text-blue-100 mb-1">Salario Calculado</h3>
+                <div className={`text-center p-5 rounded-lg shadow-md ${
+                  includeZohoFiftyPercent 
+                    ? 'bg-gradient-to-br from-blue-500 to-indigo-600' 
+                    : 'bg-gradient-to-br from-orange-500 to-red-600'
+                }`}>
+                  <h3 className="text-sm font-medium text-white mb-1">Salario Calculado</h3>
                   <div className="flex items-center justify-center">
                     <DollarSign className="h-6 w-6 text-white mr-1" />
                     <span className="text-3xl font-bold text-white">{formatCurrency(salary)}</span>
                   </div>
+                  <p className="text-xs text-white/80 mt-1">
+                    {includeZohoFiftyPercent 
+                      ? "50% Stripe + 50% Zoho Restante" 
+                      : "Solo 50% Stripe"}
+                  </p>
                 </div>
               </div>
             </div>
@@ -338,35 +368,64 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                   </TooltipContent>
                 </Tooltip>
 
-                {/* 50% de Zoho Restante */}
+                {/* 50% de Zoho Restante - Now shows if it's included or not */}
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="bg-white p-3 rounded-md shadow-sm border border-blue-100">
+                    <div className={`bg-white p-3 rounded-md shadow-sm border ${
+                      includeZohoFiftyPercent ? 'border-blue-100' : 'border-gray-200'
+                    }`}>
                       <div className="flex justify-between items-center">
                         <div>
-                          <p className="text-xs text-gray-500">50% de Zoho Restante</p>
-                          <p className="font-medium text-blue-600">{formatCurrency(halfRemainingZoho)}</p>
+                          <p className={`text-xs ${includeZohoFiftyPercent ? 'text-gray-500' : 'text-gray-400'}`}>
+                            50% de Zoho Restante
+                          </p>
+                          <p className={`font-medium ${
+                            includeZohoFiftyPercent ? 'text-blue-600' : 'text-gray-400'
+                          }`}>
+                            {includeZohoFiftyPercent ? formatCurrency(halfRemainingZoho) : formatCurrency(0)}
+                          </p>
                         </div>
-                        <div className="bg-blue-100 p-2 rounded-full">
-                          <Percent className="h-4 w-4 text-blue-600" />
+                        <div className={`p-2 rounded-full ${
+                          includeZohoFiftyPercent ? 'bg-blue-100' : 'bg-gray-100'
+                        }`}>
+                          {includeZohoFiftyPercent ? (
+                            <Percent className="h-4 w-4 text-blue-600" />
+                          ) : (
+                            <ToggleLeft className="h-4 w-4 text-gray-400" />
+                          )}
                         </div>
                       </div>
+                      {!includeZohoFiftyPercent && (
+                        <p className="text-xs text-red-500 mt-1">Excluido del cálculo</p>
+                      )}
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="text-xs">Mitad del ingreso restante de Zoho</p>
+                    <p className="text-xs">
+                      {includeZohoFiftyPercent 
+                        ? "Mitad del ingreso restante de Zoho (incluido en salario)"
+                        : "Mitad del ingreso restante de Zoho (excluido del salario)"}
+                    </p>
                   </TooltipContent>
                 </Tooltip>
               </div>
             </div>
             
-            {/* Resultado final del cálculo con explicación */}
+            {/* Resultado final del cálculo con explicación actualizada */}
             <div className="mt-6">
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 rounded-lg text-white">
+              <div className={`p-4 rounded-lg text-white ${
+                includeZohoFiftyPercent 
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600' 
+                  : 'bg-gradient-to-r from-orange-600 to-red-600'
+              }`}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-blue-100">Fórmula del cálculo:</p>
-                    <p className="font-medium">50% de Stripe + 50% de Zoho Restante = Salario</p>
+                    <p className="text-xs text-white/80">Fórmula del cálculo:</p>
+                    <p className="font-medium">
+                      {includeZohoFiftyPercent 
+                        ? "50% de Stripe + 50% de Zoho Restante = Salario"
+                        : "50% de Stripe = Salario (Zoho excluido)"}
+                    </p>
                   </div>
                   <div className="text-xl font-bold">
                     {formatCurrency(salary)}

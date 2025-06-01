@@ -85,4 +85,5 @@ export interface MonthlyBalance {
   itbm_amount: number | null; // Added for ITBM amount
   profit_percentage: number | null; // Added for Profit First percentage
   tax_reserve_percentage: number | null; // Added for configurable tax reserve percentage
+  include_zoho_fifty_percent: boolean | null; // Added for controlling 50% Zoho inclusion in salary
 }

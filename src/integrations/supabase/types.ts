@@ -208,6 +208,7 @@ export type Database = {
           balance: number
           created_at: string
           id: number
+          include_zoho_fifty_percent: boolean | null
           itbm_amount: number | null
           month_year: string
           notes: string | null
@@ -221,6 +222,7 @@ export type Database = {
           balance: number
           created_at?: string
           id?: number
+          include_zoho_fifty_percent?: boolean | null
           itbm_amount?: number | null
           month_year: string
           notes?: string | null
@@ -234,6 +236,7 @@ export type Database = {
           balance?: number
           created_at?: string
           id?: number
+          include_zoho_fifty_percent?: boolean | null
           itbm_amount?: number | null
           month_year?: string
           notes?: string | null

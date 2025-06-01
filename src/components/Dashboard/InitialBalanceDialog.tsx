@@ -1,35 +1,35 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { format } from "date-fns";
+import { MonthlyBalance } from '@/types/financial';
+import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Textarea } from "@/components/ui/textarea";
-import { toast } from "@/hooks/use-toast";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 interface InitialBalanceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currentDate: Date;
-  onBalanceSaved: (balance: number, opexAmount: number, itbmAmount: number, profitPercentage: number, taxReservePercentage: number, notes?: string) => void;
-  currentBalance?: {
-    balance: number;
-    opex_amount?: number;
-    itbm_amount?: number;
-    profit_percentage?: number;
-    tax_reserve_percentage?: number;
-    notes?: string;
-  } | null;
+  onBalanceSaved: (
+    balance: number, 
+    opexAmount?: number, 
+    itbmAmount?: number, 
+    profitPercentage?: number,
+    taxReservePercentage?: number,
+    includeZohoFiftyPercent?: boolean,
+    notes?: string
+  ) => void;
+  currentBalance?: MonthlyBalance | null;
 }
 
 const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
@@ -37,272 +37,196 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
   onOpenChange,
   currentDate,
   onBalanceSaved,
-  currentBalance,
+  currentBalance
 }) => {
-  const [balance, setBalance] = useState<string>("");
-  const [opexAmount, setOpexAmount] = useState<string>("35");
-  const [itbmAmount, setItbmAmount] = useState<string>("0");
-  const [profitPercentage, setProfitPercentage] = useState<string>("1");
-  const [taxReservePercentage, setTaxReservePercentage] = useState<string>("5");
-  const [notes, setNotes] = useState<string>("");
-  const isMobile = useIsMobile();
-  
-  // Debug: Log what currentBalance we receive
+  const [balance, setBalance] = useState('');
+  const [opexAmount, setOpexAmount] = useState('35');
+  const [itbmAmount, setItbmAmount] = useState('0');
+  const [profitPercentage, setProfitPercentage] = useState('1');
+  const [taxReservePercentage, setTaxReservePercentage] = useState('5');
+  const [includeZohoFiftyPercent, setIncludeZohoFiftyPercent] = useState(true);
+  const [notes, setNotes] = useState('');
+
+  // Load existing values when dialog opens
   useEffect(() => {
-    console.log("🔍 DIALOG DEBUG: currentBalance prop changed:", {
-      currentBalance,
-      hasCurrentBalance: !!currentBalance,
-      values: currentBalance ? {
-        balance: currentBalance.balance,
-        opex_amount: currentBalance.opex_amount,
-        itbm_amount: currentBalance.itbm_amount,
-        profit_percentage: currentBalance.profit_percentage,
-        tax_reserve_percentage: currentBalance.tax_reserve_percentage,
-        notes: currentBalance.notes
-      } : null
-    });
-  }, [currentBalance]);
-  
-  // Update form values when the dialog opens AND currentBalance changes
-  useEffect(() => {
-    if (open) {
-      console.log("🔍 DIALOG OPENING: Setting form values from currentBalance:", currentBalance);
-      
-      if (currentBalance) {
-        // Use the EXACT values from the database, including 0
-        const balanceValue = currentBalance.balance.toString();
-        const opexValue = typeof currentBalance.opex_amount === 'number' ? currentBalance.opex_amount.toString() : "35";
-        const itbmValue = typeof currentBalance.itbm_amount === 'number' ? currentBalance.itbm_amount.toString() : "0";
-        const profitValue = typeof currentBalance.profit_percentage === 'number' ? currentBalance.profit_percentage.toString() : "1";
-        const taxReserveValue = typeof currentBalance.tax_reserve_percentage === 'number' ? currentBalance.tax_reserve_percentage.toString() : "5";
-        const notesValue = currentBalance.notes || "";
-        
-        console.log("🔍 SETTING FORM VALUES:", {
-          balance: balanceValue,
-          opex: opexValue,
-          itbm: itbmValue,
-          profit: profitValue,
-          taxReserve: taxReserveValue,
-          notes: notesValue
-        });
-        
-        setBalance(balanceValue);
-        setOpexAmount(opexValue);
-        setItbmAmount(itbmValue);
-        setProfitPercentage(profitValue);
-        setTaxReservePercentage(taxReserveValue);
-        setNotes(notesValue);
-      } else {
-        // Reset to defaults if no current balance
-        console.log("🔍 NO CURRENT BALANCE: Resetting to defaults");
-        setBalance("");
-        setOpexAmount("35");
-        setItbmAmount("0");
-        setProfitPercentage("1");
-        setTaxReservePercentage("5");
-        setNotes("");
-      }
+    if (open && currentBalance) {
+      setBalance(currentBalance.balance.toString());
+      setOpexAmount((currentBalance.opex_amount || 35).toString());
+      setItbmAmount((currentBalance.itbm_amount || 0).toString());
+      setProfitPercentage((currentBalance.profit_percentage || 1).toString());
+      setTaxReservePercentage((currentBalance.tax_reserve_percentage || 5).toString());
+      setIncludeZohoFiftyPercent(currentBalance.include_zoho_fifty_percent ?? true);
+      setNotes(currentBalance.notes || '');
+    } else if (open && !currentBalance) {
+      // Reset to defaults for new balance
+      setBalance('');
+      setOpexAmount('35');
+      setItbmAmount('0');
+      setProfitPercentage('1');
+      setTaxReservePercentage('5');
+      setIncludeZohoFiftyPercent(true);
+      setNotes('');
     }
-  }, [open, currentBalance]); // React to BOTH open state AND currentBalance changes
+  }, [open, currentBalance]);
 
   const handleSave = () => {
-    console.log("🔍 SAVE CLICKED: Current form values:", {
-      balance,
-      opexAmount,
-      itbmAmount,
-      profitPercentage,
-      taxReservePercentage,
-      notes
-    });
-    
-    const numericBalance = parseFloat(balance);
-    const numericOpexAmount = parseFloat(opexAmount || "35");
-    const numericItbmAmount = parseFloat(itbmAmount || "0");
-    const numericProfitPercentage = parseFloat(profitPercentage || "1");
-    const numericTaxReservePercentage = parseFloat(taxReservePercentage || "5");
-    
-    console.log("🔍 CONVERTED VALUES:", {
-      numericBalance,
-      numericOpexAmount,
-      numericItbmAmount,
-      numericProfitPercentage,
-      numericTaxReservePercentage,
-      notes
-    });
-    
-    if (isNaN(numericBalance)) {
-      toast({
-        title: "Error",
-        description: "Por favor ingrese un valor numérico válido para el balance",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    if (isNaN(numericTaxReservePercentage) || numericTaxReservePercentage < 0 || numericTaxReservePercentage > 100) {
-      toast({
-        title: "Error",
-        description: "Por favor ingrese un porcentaje válido para la reserva de impuestos (0-100%)",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    console.log("🔍 CALLING onBalanceSaved with:", {
-      numericBalance, 
-      numericOpexAmount,
-      numericItbmAmount,
-      numericProfitPercentage,
-      numericTaxReservePercentage,
-      notes: notes || undefined
-    });
+    const balanceNum = parseFloat(balance) || 0;
+    const opexNum = parseFloat(opexAmount) || 35;
+    const itbmNum = parseFloat(itbmAmount) || 0;
+    const profitNum = parseFloat(profitPercentage) || 1;
+    const taxReserveNum = parseFloat(taxReservePercentage) || 5;
     
     onBalanceSaved(
-      numericBalance, 
-      numericOpexAmount,
-      numericItbmAmount,
-      numericProfitPercentage,
-      numericTaxReservePercentage,
-      notes || undefined
+      balanceNum, 
+      opexNum, 
+      itbmNum, 
+      profitNum, 
+      taxReserveNum,
+      includeZohoFiftyPercent,
+      notes.trim() || undefined
     );
-    
-    onOpenChange(false);
   };
 
-  // Format month name in Spanish
-  const monthName = format(currentDate, 'MMMM yyyy', { locale: es });
-  const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+  const formattedMonth = (() => {
+    try {
+      if (currentDate && !isNaN(currentDate.getTime())) {
+        return format(currentDate, 'MMMM yyyy', { locale: es });
+      }
+      return format(new Date(), 'MMMM yyyy', { locale: es });
+    } catch (err) {
+      return format(new Date(), 'MMMM yyyy', { locale: es });
+    }
+  })();
+  
+  const capitalizedMonth = formattedMonth.charAt(0).toUpperCase() + formattedMonth.slice(1);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={isMobile ? "w-[90vw] max-w-md p-4" : "sm:max-w-md"}>
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Balance Inicial: {capitalizedMonth}</DialogTitle>
+          <DialogTitle>
+            {currentBalance ? 'Editar' : 'Configurar'} Balance Inicial - {capitalizedMonth}
+          </DialogTitle>
           <DialogDescription>
-            Configure el balance financiero inicial y parámetros de cálculo para este mes.
+            Configure el balance inicial y parámetros para {capitalizedMonth}.
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
-          <div className="space-y-2">
-            <Label htmlFor="balance">Balance Inicial ($)</Label>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="balance" className="text-right">
+              Balance Inicial
+            </Label>
             <Input
               id="balance"
               type="number"
               step="0.01"
+              placeholder="0.00"
               value={balance}
-              onChange={(e) => {
-                console.log("🔍 Balance input changed to:", e.target.value);
-                setBalance(e.target.value);
-              }}
-              placeholder="Ingrese el balance inicial"
-              className="w-full"
+              onChange={(e) => setBalance(e.target.value)}
+              className="col-span-3"
             />
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="opex">OPEX ($)</Label>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="opex" className="text-right">
+              OPEX ($)
+            </Label>
             <Input
               id="opex"
               type="number"
               step="0.01"
+              placeholder="35.00"
               value={opexAmount}
-              onChange={(e) => {
-                console.log("🔍 OPEX input changed to:", e.target.value);
-                setOpexAmount(e.target.value);
-              }}
-              placeholder="Cantidad fija de OPEX"
-              className="w-full"
+              onChange={(e) => setOpexAmount(e.target.value)}
+              className="col-span-3"
             />
-            <p className="text-xs text-gray-500">Gastos operativos fijos mensuales</p>
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="itbm">ITBM ($)</Label>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="itbm" className="text-right">
+              ITBM ($)
+            </Label>
             <Input
               id="itbm"
               type="number"
               step="0.01"
+              placeholder="0.00"
               value={itbmAmount}
-              onChange={(e) => {
-                console.log("🔍 ITBM input changed to:", e.target.value);
-                setItbmAmount(e.target.value);
-              }}
-              placeholder="Cantidad de ITBM"
-              className="w-full"
+              onChange={(e) => setItbmAmount(e.target.value)}
+              className="col-span-3"
             />
-            <p className="text-xs text-gray-500">Impuestos a pagar (si aplican)</p>
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="profit">% Beneficio</Label>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="profit" className="text-right">
+              Profit First (%)
+            </Label>
             <Input
               id="profit"
               type="number"
               step="0.1"
+              placeholder="1.0"
               value={profitPercentage}
-              onChange={(e) => {
-                console.log("🔍 Profit percentage input changed to:", e.target.value);
-                setProfitPercentage(e.target.value);
-              }}
-              placeholder="Porcentaje de beneficio"
-              className="w-full"
+              onChange={(e) => setProfitPercentage(e.target.value)}
+              className="col-span-3"
             />
-            <p className="text-xs text-gray-500">Porcentaje de beneficio mensual</p>
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="taxReserve">% Reserva para Impuestos</Label>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="taxReserve" className="text-right">
+              Tax Reserve (%)
+            </Label>
             <Input
               id="taxReserve"
               type="number"
               step="0.1"
-              min="0"
-              max="100"
+              placeholder="5.0"
               value={taxReservePercentage}
-              onChange={(e) => {
-                console.log("🔍 Tax reserve percentage input changed to:", e.target.value);
-                setTaxReservePercentage(e.target.value);
-              }}
-              placeholder="Porcentaje de reserva para impuestos"
-              className="w-full"
+              onChange={(e) => setTaxReservePercentage(e.target.value)}
+              className="col-span-3"
             />
-            <p className="text-xs text-gray-500">Porcentaje de ingresos reservado para impuestos (recomendado: 5%)</p>
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="includeZoho" className="text-right">
+              Incluir 50% Zoho
+            </Label>
+            <div className="col-span-3 flex items-center space-x-2">
+              <Switch
+                id="includeZoho"
+                checked={includeZohoFiftyPercent}
+                onCheckedChange={setIncludeZohoFiftyPercent}
+              />
+              <Label htmlFor="includeZoho" className="text-sm text-gray-600">
+                Incluir 50% del Zoho restante en el cálculo del salario
+              </Label>
+            </div>
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notas</Label>
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label htmlFor="notes" className="text-right pt-2">
+              Notas
+            </Label>
             <Textarea
               id="notes"
+              placeholder="Notas opcionales..."
               value={notes}
-              onChange={(e) => {
-                console.log("🔍 Notes input changed to:", e.target.value);
-                setNotes(e.target.value);
-              }}
-              placeholder="Notas sobre este balance mensual"
-              rows={isMobile ? 2 : 3}
-              className="w-full"
+              onChange={(e) => setNotes(e.target.value)}
+              className="col-span-3"
+              rows={3}
             />
           </div>
         </div>
         
-        <DialogFooter className={isMobile ? "flex-col space-y-2" : "flex-row space-x-2"}>
-          <Button 
-            type="button" 
-            variant="outline" 
-            onClick={() => onOpenChange(false)}
-            className={isMobile ? "w-full" : ""}
-          >
+        <div className="flex justify-end space-x-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button 
-            type="button" 
-            onClick={handleSave}
-            className={isMobile ? "w-full" : ""}
-          >
-            Guardar
+          <Button onClick={handleSave}>
+            {currentBalance ? 'Actualizar' : 'Guardar'}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
