@@ -16,7 +16,7 @@ export const useBalanceForm = ({ open, currentBalance }: UseBalanceFormProps) =>
   const [includeZohoFiftyPercent, setIncludeZohoFiftyPercent] = useState(true);
   const [notes, setNotes] = useState('');
 
-  // Load existing values when dialog opens - FIXED: Better data handling
+  // Load existing values when dialog opens - ENHANCED with better logging and validation
   useEffect(() => {
     console.log("🔧 useBalanceForm: useEffect triggered with:", {
       open,
@@ -33,34 +33,58 @@ export const useBalanceForm = ({ open, currentBalance }: UseBalanceFormProps) =>
     });
 
     if (open && currentBalance) {
-      // FIXED: Better number conversion and null handling
       console.log("🔧 useBalanceForm: Loading existing values from currentBalance:", currentBalance);
       
       setBalance(currentBalance.balance?.toString() || '');
       setOpexAmount((currentBalance.opex_amount ?? 35).toString());
       setItbmAmount((currentBalance.itbm_amount ?? 0).toString());
       
-      // FIXED: Explicit conversion and fallback for profit and tax percentages
+      // ENHANCED: Better percentage handling with explicit validation
       const profitValue = currentBalance.profit_percentage;
       const taxValue = currentBalance.tax_reserve_percentage;
       
-      console.log("🔧 useBalanceForm: Converting percentage values:", {
-        profitValue: { raw: profitValue, type: typeof profitValue, isNull: profitValue === null, isUndefined: profitValue === undefined },
-        taxValue: { raw: taxValue, type: typeof taxValue, isNull: taxValue === null, isUndefined: taxValue === undefined }
+      console.log("🔧 useBalanceForm: DETAILED percentage analysis:", {
+        profitValue: { 
+          raw: profitValue, 
+          type: typeof profitValue, 
+          isNull: profitValue === null, 
+          isUndefined: profitValue === undefined,
+          isZero: profitValue === 0,
+          toString: profitValue?.toString()
+        },
+        taxValue: { 
+          raw: taxValue, 
+          type: typeof taxValue, 
+          isNull: taxValue === null, 
+          isUndefined: taxValue === undefined,
+          isZero: taxValue === 0,
+          toString: taxValue?.toString()
+        }
       });
       
-      setProfitPercentage(profitValue !== null && profitValue !== undefined ? profitValue.toString() : '1');
-      setTaxReservePercentage(taxValue !== null && taxValue !== undefined ? taxValue.toString() : '5');
+      // CRITICAL FIX: Handle 0 values correctly - 0 is a valid percentage
+      const profitStr = (profitValue !== null && profitValue !== undefined) ? profitValue.toString() : '1';
+      const taxStr = (taxValue !== null && taxValue !== undefined) ? taxValue.toString() : '5';
+      
+      console.log("🔧 useBalanceForm: Setting percentage strings:", {
+        profitStr,
+        taxStr,
+        profitOriginal: profitValue,
+        taxOriginal: taxValue
+      });
+      
+      setProfitPercentage(profitStr);
+      setTaxReservePercentage(taxStr);
       
       setIncludeZohoFiftyPercent(currentBalance.include_zoho_fifty_percent ?? true);
       setNotes(currentBalance.notes || '');
       
-      console.log("🔧 useBalanceForm: State set to:", {
+      console.log("🔧 useBalanceForm: Final state set to:", {
         balance: currentBalance.balance?.toString() || '',
         opexAmount: (currentBalance.opex_amount ?? 35).toString(),
         itbmAmount: (currentBalance.itbm_amount ?? 0).toString(),
-        profitPercentage: profitValue !== null && profitValue !== undefined ? profitValue.toString() : '1',
-        taxReservePercentage: taxValue !== null && taxValue !== undefined ? taxValue.toString() : '5',
+        profitPercentage: profitStr,
+        taxReservePercentage: taxStr,
         includeZohoFiftyPercent: currentBalance.include_zoho_fifty_percent ?? true,
         notes: currentBalance.notes || ''
       });
@@ -78,23 +102,27 @@ export const useBalanceForm = ({ open, currentBalance }: UseBalanceFormProps) =>
   }, [open, currentBalance]);
 
   const getFormValues = () => {
-    const balanceNum = parseFloat(balance) || 0;
-    const opexNum = parseFloat(opexAmount) || 35;
-    const itbmNum = parseFloat(itbmAmount) || 0;
-    const profitNum = parseFloat(profitPercentage) || 1;
-    const taxReserveNum = parseFloat(taxReservePercentage) || 5;
-    
-    console.log("🔧 useBalanceForm: getFormValues called with values:", {
-      balanceNum,
-      opexNum,
-      itbmNum,
-      profitNum,
-      taxReserveNum,
-      includeZohoFiftyPercent,
-      notes: notes.trim() || undefined
+    // ENHANCED: Better number parsing with detailed logging
+    console.log("🔧 getFormValues: DETAILED INPUT ANALYSIS:", {
+      balance: { value: balance, type: typeof balance, isEmpty: balance === '' },
+      opexAmount: { value: opexAmount, type: typeof opexAmount, isEmpty: opexAmount === '' },
+      itbmAmount: { value: itbmAmount, type: typeof itbmAmount, isEmpty: itbmAmount === '' },
+      profitPercentage: { value: profitPercentage, type: typeof profitPercentage, isEmpty: profitPercentage === '' },
+      taxReservePercentage: { value: taxReservePercentage, type: typeof taxReservePercentage, isEmpty: taxReservePercentage === '' },
+      includeZohoFiftyPercent: { value: includeZohoFiftyPercent, type: typeof includeZohoFiftyPercent },
+      notes: { value: notes, type: typeof notes, isEmpty: notes === '' }
     });
+
+    // CRITICAL FIX: Don't use fallback defaults - preserve user input or use 0
+    const balanceNum = balance === '' ? 0 : parseFloat(balance) || 0;
+    const opexNum = opexAmount === '' ? 0 : parseFloat(opexAmount) || 0;
+    const itbmNum = itbmAmount === '' ? 0 : parseFloat(itbmAmount) || 0;
     
-    return {
+    // CRITICAL: For percentages, if empty use 0, not defaults
+    const profitNum = profitPercentage === '' ? 0 : parseFloat(profitPercentage) || 0;
+    const taxReserveNum = taxReservePercentage === '' ? 0 : parseFloat(taxReservePercentage) || 0;
+    
+    const finalValues = {
       balanceNum,
       opexNum,
       itbmNum,
@@ -103,6 +131,10 @@ export const useBalanceForm = ({ open, currentBalance }: UseBalanceFormProps) =>
       includeZohoFiftyPercent,
       notes: notes.trim() || undefined
     };
+    
+    console.log("🔧 getFormValues: FINAL PARSED VALUES:", finalValues);
+    
+    return finalValues;
   };
 
   return {

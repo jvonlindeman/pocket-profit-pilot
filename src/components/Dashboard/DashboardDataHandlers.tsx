@@ -61,7 +61,7 @@ export const useDashboardDataHandlers = ({
     refreshData(false); // Manual load after balance is set
   }, [toast, refreshData]);
 
-  // Updated handler for balance changes - now with all 6 parameters including includeZohoFiftyPercent
+  // ENHANCED handler for balance changes - with detailed parameter logging
   const handleBalanceChange = useCallback(async (
     balance: number, 
     opexAmount: number = 35, 
@@ -70,19 +70,19 @@ export const useDashboardDataHandlers = ({
     taxReservePercentage: number = 5,
     includeZohoFiftyPercent: boolean = true
   ) => {
-    console.log("💰 DashboardDataHandlers: handleBalanceChange CALLED WITH ALL 6 PARAMETERS (FIXED):", {
+    console.log("💰 DashboardDataHandlers: handleBalanceChange CALLED WITH ENHANCED LOGGING:", {
       balance: { value: balance, type: typeof balance },
       opexAmount: { value: opexAmount, type: typeof opexAmount },
       itbmAmount: { value: itbmAmount, type: typeof itbmAmount },
-      profitPercentage: { value: profitPercentage, type: typeof profitPercentage, isZero: profitPercentage === 0 },
-      taxReservePercentage: { value: taxReservePercentage, type: typeof taxReservePercentage, isZero: taxReservePercentage === 0 },
+      profitPercentage: { value: profitPercentage, type: typeof profitPercentage, isZero: profitPercentage === 0, isDefault: profitPercentage === 1 },
+      taxReservePercentage: { value: taxReservePercentage, type: typeof taxReservePercentage, isZero: taxReservePercentage === 0, isDefault: taxReservePercentage === 5 },
       includeZohoFiftyPercent: { value: includeZohoFiftyPercent, type: typeof includeZohoFiftyPercent },
       timestamp: new Date().toISOString()
     });
     
     try {
-      // 1. IMMEDIATE: Update the monthly balance with all parameters including includeZohoFiftyPercent
-      console.log("💰 DashboardDataHandlers: Calling updateMonthlyBalance with ALL 6 parameters (FIXED):", {
+      // ENHANCED: Log exactly what we're passing to updateMonthlyBalance
+      console.log("💰 DashboardDataHandlers: About to call updateMonthlyBalance with EXACT parameters:", {
         balance,
         opexAmount,
         itbmAmount,
@@ -101,17 +101,14 @@ export const useDashboardDataHandlers = ({
       );
 
       if (success) {
-        // 2. IMMEDIATE: Update local starting balance for immediate UI feedback
         console.log("💰 DashboardDataHandlers: updateMonthlyBalance SUCCESS - Updating local starting balance to:", balance);
         setStartingBalance(balance);
         
-        // 3. Show immediate feedback
         toast({
           title: 'Balance actualizado inmediatamente',
-          description: 'Los cálculos se han actualizado con todos los parámetros',
+          description: `Profit: ${profitPercentage}%, Tax: ${taxReservePercentage}%`,
         });
 
-        // 4. BACKGROUND: Update backend data (no loading state)
         console.log("💰 DashboardDataHandlers: Triggering background data refresh");
         refreshData(false);
       } else {

@@ -62,6 +62,17 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
       notes: formNotes
     } = getFormValues();
     
+    console.log("💾 InitialBalanceDialog: handleSave CALLED WITH VALUES:", {
+      balanceNum,
+      opexNum,
+      itbmNum,
+      profitNum,
+      taxReserveNum,
+      includeZoho,
+      formNotes
+    });
+    
+    // ENHANCED: Pass ALL parameters explicitly to onBalanceSaved
     onBalanceSaved(
       balanceNum, 
       opexNum, 
