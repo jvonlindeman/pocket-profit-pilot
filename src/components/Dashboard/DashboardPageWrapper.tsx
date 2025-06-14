@@ -43,6 +43,34 @@ const DashboardPageWrapper: React.FC = () => {
     includeZohoFiftyPercent: dashboardState.includeZohoFiftyPercent // TRACKING THE NEW VALUE
   });
 
+  const coreData = {
+    periodTitle: dashboardState.periodTitle,
+    dateRange: dashboardState.dateRange,
+    financialData: dashboardState.financialData,
+    currentMonthDate: dashboardState.currentMonthDate,
+    monthlyBalance: dashboardState.monthlyBalance,
+    totalZohoExpenses: dashboardState.totalZohoExpenses,
+    unpaidInvoices: dashboardState.unpaidInvoices,
+    startingBalance: dashboardState.startingBalance,
+    regularIncome: dashboardState.regularIncome,
+  };
+
+  const stripeData = {
+    stripeIncome: dashboardState.stripeIncome,
+    stripeFees: dashboardState.stripeFees,
+    stripeTransactionFees: dashboardState.stripeTransactionFees,
+    stripePayoutFees: dashboardState.stripePayoutFees,
+    stripeAdditionalFees: dashboardState.stripeAdditionalFees,
+    stripeNet: dashboardState.stripeNet,
+    stripeFeePercentage: dashboardState.stripeFeePercentage,
+  };
+
+  const actions = {
+    refreshData: dashboardState.refreshData,
+    handleBalanceChange: handleBalanceChange,
+    handleRefresh: handleRefresh,
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Initial setup components - now requires explicit user action */}
@@ -88,26 +116,10 @@ const DashboardPageWrapper: React.FC = () => {
         {/* Dashboard content - only shows when data is explicitly loaded */}
         {dashboardState.dataInitialized && !dashboardState.error && (
           <DashboardContent 
-            periodTitle={dashboardState.periodTitle}
-            dateRange={dashboardState.dateRange}
-            financialData={dashboardState.financialData}
-            currentMonthDate={dashboardState.currentMonthDate}
-            startingBalance={dashboardState.startingBalance}
-            refreshData={dashboardState.refreshData}
-            handleBalanceChange={handleBalanceChange}
-            handleRefresh={handleRefresh}
+            coreData={coreData}
+            stripeData={stripeData}
+            actions={actions}
             loading={dashboardState.loading}
-            stripeIncome={dashboardState.stripeIncome}
-            stripeFees={dashboardState.stripeFees}
-            stripeTransactionFees={dashboardState.stripeTransactionFees}
-            stripePayoutFees={dashboardState.stripePayoutFees}
-            stripeAdditionalFees={dashboardState.stripeAdditionalFees}
-            stripeNet={dashboardState.stripeNet}
-            stripeFeePercentage={dashboardState.stripeFeePercentage}
-            regularIncome={dashboardState.regularIncome}
-            monthlyBalance={dashboardState.monthlyBalance}
-            totalZohoExpenses={dashboardState.totalZohoExpenses}
-            unpaidInvoices={dashboardState.unpaidInvoices}
           />
         )}
 

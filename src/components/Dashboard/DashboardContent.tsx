@@ -1,4 +1,3 @@
-
 import React from 'react';
 import PeriodHeader from './PeriodHeader';
 import CacheMonitor from './CacheMonitor';
@@ -9,7 +8,8 @@ import FinanceSummary from './FinanceSummary';
 import TransactionList from './TransactionList';
 import { FinancialSummary, Transaction, UnpaidInvoice } from '@/types/financial';
 
-interface DashboardContentProps {
+// --- NEW TYPE DEFINITIONS ---
+interface CoreData {
   periodTitle: string;
   dateRange: { startDate: Date; endDate: Date };
   financialData: {
@@ -18,18 +18,14 @@ interface DashboardContentProps {
     expenseByCategory: any[];
   };
   currentMonthDate: Date;
+  monthlyBalance: any;
+  totalZohoExpenses: number;
+  unpaidInvoices?: UnpaidInvoice[];
   startingBalance: number;
-  refreshData: (force: boolean) => void;
-  handleBalanceChange: (
-    balance: number, 
-    opexAmount?: number, 
-    itbmAmount?: number, 
-    profitPercentage?: number, 
-    taxReservePercentage?: number,
-    includeZohoFiftyPercent?: boolean
-  ) => void;
-  handleRefresh: () => void;
-  loading: boolean;
+  regularIncome: number;
+}
+
+interface StripeData {
   stripeIncome: number;
   stripeFees: number;
   stripeTransactionFees: number;
@@ -37,34 +33,58 @@ interface DashboardContentProps {
   stripeAdditionalFees: number;
   stripeNet: number;
   stripeFeePercentage: number;
-  regularIncome: number;
-  monthlyBalance: any;
-  totalZohoExpenses: number;
-  unpaidInvoices?: UnpaidInvoice[];
+}
+
+interface ActionHandlers {
+  refreshData: (force: boolean) => void;
+  handleBalanceChange: (
+    balance: number,
+    opexAmount?: number,
+    itbmAmount?: number,
+    profitPercentage?: number,
+    taxReservePercentage?: number,
+    includeZohoFiftyPercent?: boolean
+  ) => void;
+  handleRefresh: () => void;
+}
+
+interface DashboardContentProps {
+  coreData: CoreData;
+  stripeData: StripeData;
+  actions: ActionHandlers;
+  loading: boolean;
 }
 
 const DashboardContent: React.FC<DashboardContentProps> = ({
-  periodTitle,
-  dateRange,
-  financialData,
-  currentMonthDate,
-  startingBalance,
-  refreshData,
-  handleBalanceChange,
-  handleRefresh,
+  coreData,
+  stripeData,
+  actions,
   loading,
-  stripeIncome,
-  stripeFees,
-  stripeTransactionFees,
-  stripePayoutFees,
-  stripeAdditionalFees,
-  stripeNet,
-  stripeFeePercentage,
-  regularIncome,
-  monthlyBalance,
-  totalZohoExpenses,
-  unpaidInvoices = []
 }) => {
+  const {
+    periodTitle,
+    dateRange,
+    financialData,
+    currentMonthDate,
+    monthlyBalance,
+    totalZohoExpenses,
+    unpaidInvoices = [],
+    startingBalance,
+    regularIncome,
+  } = coreData;
+
+  const {
+    stripeIncome,
+    stripeFees,
+    stripeTransactionFees,
+    stripePayoutFees,
+    stripeAdditionalFees,
+    stripeNet,
+    stripeFeePercentage,
+  } = stripeData;
+  
+  const { refreshData, handleBalanceChange, handleRefresh } = actions;
+
   // Enhanced debugging and improved value extraction logic
   console.log("💼 DashboardContent: Monthly balance data received:", monthlyBalance);
   
