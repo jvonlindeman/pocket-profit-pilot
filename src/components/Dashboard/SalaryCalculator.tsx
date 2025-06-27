@@ -43,8 +43,9 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
     });
   }, [zohoIncome, stripeIncome, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, includeZohoFiftyPercent, startingBalance, totalZohoExpenses]);
 
-  // Cálculos
-  const adjustedZohoIncome = (startingBalance || 0) + zohoIncome - totalZohoExpenses;
+  // FIXED CALCULATION: Remove double-subtraction of expenses
+  // Starting balance already represents net money from previous month
+  const adjustedZohoIncome = (startingBalance || 0) + zohoIncome;
   const profitFirstAmount = (adjustedZohoIncome * profitPercentage) / 100;
   const taxReserveAmount = (adjustedZohoIncome * taxReservePercentage) / 100;
   const totalZohoDeductions = opexAmount + itbmAmount + profitFirstAmount + taxReserveAmount;
@@ -52,14 +53,19 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
   const halfStripeIncome = stripeIncome / 2;
   const halfRemainingZoho = remainingZohoIncome / 2;
   
-  // NEW: Calculate salary based on toggle
+  // Calculate salary based on toggle
   const salary = includeZohoFiftyPercent 
     ? halfStripeIncome + halfRemainingZoho  // Include both
     : halfStripeIncome;                     // Only Stripe
   
-  // Debug calculation results
-  console.log("SalaryCalculator: Calculation results:", {
-    adjustedZohoIncome,
+  // Debug calculation results with FIXED formula
+  console.log("SalaryCalculator: FIXED Calculation results:", {
+    startingBalance,
+    zohoIncome,
+    totalZohoExpenses,
+    adjustedZohoIncome_OLD_FORMULA: (startingBalance || 0) + zohoIncome - totalZohoExpenses,
+    adjustedZohoIncome_NEW_FIXED: adjustedZohoIncome,
+    difference: adjustedZohoIncome - ((startingBalance || 0) + zohoIncome - totalZohoExpenses),
     profitFirstAmount,
     taxReserveAmount,
     totalZohoDeductions,
@@ -167,7 +173,7 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p className="text-xs">Balance inicial del periodo</p>
+                      <p className="text-xs">Dinero dejado en el banco al final del mes anterior (ya neto de gastos)</p>
                     </TooltipContent>
                   </Tooltip>
                   
@@ -185,7 +191,7 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p className="text-xs">Ingresos registrados en Zoho</p>
+                      <p className="text-xs">Ingresos nuevos registrados en Zoho para este mes</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -198,24 +204,6 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                 </h4>
                 
                 <div className="grid grid-cols-1 gap-3">
-                  {/* Gastos Zoho */}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="bg-white rounded-md p-3 shadow-sm border border-red-50 flex justify-between items-center">
-                        <div>
-                          <p className="text-xs text-gray-500">Gastos Zoho</p>
-                          <p className="font-medium text-red-600">- {formatCurrency(totalZohoExpenses)}</p>
-                        </div>
-                        <div className="bg-red-50 p-2 rounded-full">
-                          <ArrowDown className="h-4 w-4 text-red-500" />
-                        </div>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="text-xs">Total de gastos registrados en Zoho</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  
                   {/* OPEX */}
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -251,6 +239,14 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                       <p className="text-xs">Impuesto sobre la transferencia de bienes muebles</p>
                     </TooltipContent>
                   </Tooltip>
+
+                  {/* Note about current month expenses */}
+                  <div className="bg-yellow-50 rounded-md p-3 border border-yellow-200">
+                    <p className="text-xs text-yellow-700">
+                      <strong>Nota:</strong> Los gastos del mes actual ({formatCurrency(totalZohoExpenses)}) 
+                      ya están reflejados en las transacciones y no se deducen aquí para evitar doble contabilización.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -265,24 +261,24 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
-                {/* Ajuste Ingresos Zoho */}
+                {/* Fondos Disponibles Zoho - UPDATED explanation */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-3 rounded-lg border border-blue-200">
                       <div className="flex justify-between items-center">
                         <div>
-                          <p className="text-xs text-blue-700">Ajuste Ingresos Zoho</p>
+                          <p className="text-xs text-blue-700">Fondos Disponibles Zoho</p>
                           <p className="font-medium text-blue-800">{formatCurrency(adjustedZohoIncome)}</p>
                         </div>
                         <div className="bg-blue-200 p-2 rounded-full">
                           <Calculator className="h-4 w-4 text-blue-700" />
                         </div>
                       </div>
-                      <p className="text-xs text-blue-600 mt-2">Balance Inicial + Ingresos Zoho - Gastos Totales Zoho</p>
+                      <p className="text-xs text-blue-600 mt-2">Balance Inicial + Ingresos Zoho del Mes</p>
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="text-xs">Ingresos de Zoho ajustados después de considerar el balance inicial y los gastos</p>
+                    <p className="text-xs">Total de fondos disponibles antes de deducciones del mes actual. El balance inicial ya refleja gastos previos.</p>
                   </TooltipContent>
                 </Tooltip>
 
@@ -344,7 +340,7 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="text-xs">Ingreso de Zoho después de todas las deducciones</p>
+                    <p className="text-xs">Fondos de Zoho después de todas las deducciones</p>
                   </TooltipContent>
                 </Tooltip>
 
