@@ -1,3 +1,4 @@
+
 import { Transaction, FinancialSummary, CategorySummary, UnpaidInvoice, FinancialData } from "@/types/financial";
 import { stripeRepository } from "@/repositories/stripeRepository";
 import { zohoRepository } from "@/repositories/zohoRepository";
@@ -92,15 +93,59 @@ export class FinancialService {
 // Export a singleton instance
 export const financialService = new FinancialService();
 
-// Add the processTransactionData function
+/**
+ * Helper function to identify Stripe fee transactions
+ */
+const isStripeFeeTransaction = (transaction: Transaction): boolean => {
+  // Check if transaction is from Stripe and has fee-related keywords
+  if (transaction.source !== 'Stripe') return false;
+  
+  const description = transaction.description?.toLowerCase() || '';
+  const category = transaction.category?.toLowerCase() || '';
+  
+  // Common Stripe fee patterns
+  const feePatterns = [
+    'stripe fee',
+    'processing fee',
+    'transaction fee',
+    'billing - usage fee',
+    'stripe charge',
+    'payment processing',
+    'fee'
+  ];
+  
+  // Check if it's a fee transaction based on description, category, or if it has negative amount with fee metadata
+  return feePatterns.some(pattern => 
+    description.includes(pattern) || 
+    category.includes(pattern)
+  ) || (transaction.type === 'expense' && transaction.category === 'fee');
+};
+
+// Add the processTransactionData function with corrected Stripe fee handling
 export const processTransactionData = (
   transactions: Transaction[],
   startingBalance: number = 0,
   additionalCollaboratorExpenses: CategorySummary[] = []
 ): FinancialData => {
-  // Calculate total income and expense
+  // Separate operational expenses from Stripe fees
+  const operationalExpenses = transactions.filter(tx => 
+    tx.type === 'expense' && !isStripeFeeTransaction(tx)
+  );
+  
+  const stripeFees = transactions.filter(tx => 
+    tx.type === 'expense' && isStripeFeeTransaction(tx)
+  );
+
+  console.log("💰 processTransactionData: Separating expenses", {
+    totalTransactions: transactions.length,
+    operationalExpenses: operationalExpenses.length,
+    stripeFees: stripeFees.length,
+    stripeFeesTotal: stripeFees.reduce((sum, tx) => sum + tx.amount, 0)
+  });
+
+  // Calculate total income and operational expense (excluding Stripe fees)
   let totalIncome = 0;
-  let totalExpense = 0;
+  let totalOperationalExpense = 0;
   let collaboratorExpense = 0;
   let otherExpense = 0;
 
@@ -108,33 +153,36 @@ export const processTransactionData = (
   const incomeBySource: { [key: string]: number } = {};
   const expenseByCategory: { [key: string]: number } = {};
 
-  // Process each transaction
+  // Process income transactions
   transactions.forEach(transaction => {
     if (transaction.type === 'income') {
       totalIncome += transaction.amount;
       incomeBySource[transaction.category] = (incomeBySource[transaction.category] || 0) + transaction.amount;
-    } else if (transaction.type === 'expense') {
-      totalExpense += transaction.amount;
-      expenseByCategory[transaction.category] = (expenseByCategory[transaction.category] || 0) + transaction.amount;
     }
   });
 
-  // Process collaborator expenses
+  // Process ONLY operational expenses (excluding Stripe fees)
+  operationalExpenses.forEach(transaction => {
+    totalOperationalExpense += transaction.amount;
+    expenseByCategory[transaction.category] = (expenseByCategory[transaction.category] || 0) + transaction.amount;
+  });
+
+  // Process collaborator expenses from additional data
   if (additionalCollaboratorExpenses && additionalCollaboratorExpenses.length > 0) {
     additionalCollaboratorExpenses.forEach(expense => {
       collaboratorExpense += expense.amount;
     });
   }
 
-  // Calculate collaborator expense from transactions
-  transactions.forEach(transaction => {
-    if (transaction.type === 'expense' && transaction.category === 'Pagos a colaboradores') {
+  // Calculate collaborator expense from operational transactions only
+  operationalExpenses.forEach(transaction => {
+    if (transaction.category === 'Pagos a colaboradores') {
       collaboratorExpense += transaction.amount;
     }
   });
 
-  // Calculate other expenses
-  otherExpense = totalExpense - collaboratorExpense;
+  // Calculate other operational expenses (excluding collaborators)
+  otherExpense = totalOperationalExpense - collaboratorExpense;
 
   // Convert incomeBySource to array
   const incomeBySourceArray: CategorySummary[] = Object.keys(incomeBySource).map(category => ({
@@ -143,15 +191,15 @@ export const processTransactionData = (
     percentage: (incomeBySource[category] / totalIncome) * 100
   }));
 
-  // Convert expenseByCategory to array
+  // Convert expenseByCategory to array (operational expenses only)
   const expenseByCategoryArray: CategorySummary[] = Object.keys(expenseByCategory).map(category => ({
     category,
     amount: expenseByCategory[category],
-    percentage: (expenseByCategory[category] / totalExpense) * 100
+    percentage: (expenseByCategory[category] / totalOperationalExpense) * 100
   }));
 
-  // Calculate profit
-  const profit = totalIncome - totalExpense;
+  // Calculate profit using operational expenses only
+  const profit = totalIncome - totalOperationalExpense;
 
   // Calculate profit margin
   const profitMargin = (profit / totalIncome) * 100;
@@ -162,7 +210,7 @@ export const processTransactionData = (
   // Calculate gross profit margin
   const grossProfitMargin = (grossProfit / totalIncome) * 100;
 
-  // Prepare data for charts (daily and monthly)
+  // Prepare data for charts (daily and monthly) - using operational expenses only
   const incomeByDay: { [key: string]: number } = {};
   const expenseByDay: { [key: string]: number } = {};
   const incomeByMonth: { [key: string]: number } = {};
@@ -176,13 +224,14 @@ export const processTransactionData = (
     if (transaction.type === 'income') {
       incomeByDay[date] = (incomeByDay[date] || 0) + transaction.amount;
       incomeByMonth[month] = (incomeByMonth[month] || 0) + transaction.amount;
-    } else if (transaction.type === 'expense') {
+    } else if (transaction.type === 'expense' && !isStripeFeeTransaction(transaction)) {
+      // Only include operational expenses in charts
       expenseByDay[date] = (expenseByDay[date] || 0) + transaction.amount;
       expenseByMonth[month] = (expenseByMonth[month] || 0) + transaction.amount;
     }
   });
 
-  // Calculate profit by month
+  // Calculate profit by month using operational expenses only
   Object.keys(incomeByMonth).forEach(month => {
     const monthlyIncome = incomeByMonth[month] || 0;
     const monthlyExpense = expenseByMonth[month] || 0;
@@ -202,10 +251,20 @@ export const processTransactionData = (
   const expenseByMonthChart = createChartData(expenseByMonth);
   const profitByMonthChart = createChartData(profitByMonth);
 
+  console.log("💰 processTransactionData: Final calculation results", {
+    totalIncome,
+    totalOperationalExpense,
+    totalStripeFeesExcluded: stripeFees.reduce((sum, tx) => sum + tx.amount, 0),
+    profit,
+    profitMargin,
+    collaboratorExpense,
+    otherExpense
+  });
+
   return {
     summary: {
       totalIncome: totalIncome,
-      totalExpense: totalExpense,
+      totalExpense: totalOperationalExpense, // Now excludes Stripe fees
       collaboratorExpense: collaboratorExpense,
       otherExpense: otherExpense,
       profit: profit,
