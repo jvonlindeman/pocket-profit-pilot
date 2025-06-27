@@ -71,8 +71,8 @@ export const useFinancialAssistant = () => {
       console.log('Capturing enhanced UI data for financial assistant...');
       const uiData = await captureUIData(financeContext);
       
-      // Enhance UI data with stored financial data
-      let enhancedUIData = { ...uiData };
+      // Create enhanced UI data with stored financial data
+      let enhancedUIData: any = { ...uiData };
       
       // Try to get stored data for current date range first
       if (financeContext.dateRange?.startDate && financeContext.dateRange?.endDate) {
