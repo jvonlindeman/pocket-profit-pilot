@@ -63,6 +63,29 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   actions,
   loading,
 }) => {
+  console.log("💼 DashboardContent: Rendering started with data:", {
+    coreDataKeys: Object.keys(coreData || {}),
+    stripeDataKeys: Object.keys(stripeData || {}),
+    actionsKeys: Object.keys(actions || {}),
+    loading
+  });
+
+  // Defensive checks for required data
+  if (!coreData) {
+    console.error("❌ DashboardContent: coreData is missing!");
+    return <div className="p-4 text-red-600">Error: Core data is missing</div>;
+  }
+
+  if (!stripeData) {
+    console.error("❌ DashboardContent: stripeData is missing!");
+    return <div className="p-4 text-red-600">Error: Stripe data is missing</div>;
+  }
+
+  if (!actions) {
+    console.error("❌ DashboardContent: actions are missing!");
+    return <div className="p-4 text-red-600">Error: Action handlers are missing</div>;
+  }
+
   const {
     periodTitle,
     dateRange,
@@ -113,16 +136,16 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   const calculatorKey = `calculator-${monthlyBalance?.id || 'default'}-${monthlyBalance?.updated_at || Date.now()}-${startingBalance}-${opexAmount}-${itbmAmount}-${profitPercentage}-${taxReservePercentage}-${includeZohoFiftyPercent}`;
   
   console.log("💼 DashboardContent: Calculator key (forces re-render - FIXED):", calculatorKey);
-  console.log("💼 DashboardContent: Transaction count:", financialData.transactions.length);
+  console.log("💼 DashboardContent: Transaction count:", financialData?.transactions?.length || 0);
   console.log("💼 DashboardContent: Zoho income transactions:", 
-    financialData.transactions.filter(tx => tx.type === 'income' && tx.source === 'Zoho').length
+    financialData?.transactions?.filter(tx => tx.type === 'income' && tx.source === 'Zoho').length || 0
   );
   console.log("💼 DashboardContent: Unpaid invoices:", unpaidInvoices?.length || 0);
   console.log("💼 DashboardContent: PASSING includeZohoFiftyPercent to SalaryCalculator:", includeZohoFiftyPercent);
 
-  // Filter collaborator expenses for FinanceProvider
-  const collaboratorExpenses = financialData.expenseByCategory?.filter(
-    category => category.category && (
+  // Filter collaborator expenses for FinanceProvider - add defensive checks
+  const collaboratorExpenses = financialData?.expenseByCategory?.filter(
+    category => category?.category && (
       category.category.toLowerCase().includes('colaborador') ||
       category.category.toLowerCase().includes('collaborator') ||
       category.category === 'Colaboradores' ||
@@ -130,11 +153,33 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
     )
   ) || [];
 
+  console.log("💼 DashboardContent: Filtered collaborator expenses:", collaboratorExpenses.length);
+
+  // Ensure we have valid data for FinanceProvider
+  const safeFinancialData = financialData || {
+    summary: {
+      totalIncome: 0,
+      totalExpense: 0,
+      collaboratorExpense: 0,
+      otherExpense: 0,
+      profit: 0,
+      profitMargin: 0,
+      grossProfit: 0,
+      grossProfitMargin: 0,
+    },
+    transactions: [],
+    expenseByCategory: []
+  };
+
+  const safeDateRange = dateRange || { startDate: null, endDate: null };
+
+  console.log("💼 DashboardContent: About to render FinanceProvider with safe data");
+
   return (
     <FinanceProvider
-      summary={financialData.summary}
-      transactions={financialData.transactions}
-      dateRange={dateRange}
+      summary={safeFinancialData.summary}
+      transactions={safeFinancialData.transactions}
+      dateRange={safeDateRange}
       stripeIncome={stripeIncome}
       stripeFees={stripeFees}
       stripeTransactionFees={stripeTransactionFees}
@@ -157,7 +202,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
         />
 
         {/* Warning message when no transactions exist */}
-        {financialData.transactions.length === 0 && <NoTransactionsWarning />}
+        {safeFinancialData.transactions.length === 0 && <NoTransactionsWarning />}
 
         {/* Monthly Balance Editor moved up to be above FinanceSummary */}
         <div className="mb-6">
@@ -185,8 +230,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
 
         {/* Financial Summary with improved organization */}
         <FinanceSummary 
-          summary={financialData.summary} 
-          expenseCategories={financialData.expenseByCategory}
+          summary={safeFinancialData.summary} 
+          expenseCategories={safeFinancialData.expenseByCategory}
           stripeIncome={stripeIncome}
           stripeFees={stripeFees}
           stripeTransactionFees={stripeTransactionFees}
@@ -196,14 +241,14 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
           stripeFeePercentage={stripeFeePercentage}
           regularIncome={regularIncome}
           dateRange={dateRange}
-          transactions={financialData.transactions}
+          transactions={safeFinancialData.transactions}
           unpaidInvoices={unpaidInvoices}
         />
 
         {/* Listado de transacciones */}
         <div className="mt-6">
           <TransactionList 
-            transactions={financialData.transactions} 
+            transactions={safeFinancialData.transactions} 
             onRefresh={handleRefresh}
             isLoading={loading}
           />

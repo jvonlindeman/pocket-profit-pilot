@@ -9,6 +9,7 @@ interface Props {
 interface State {
   hasError: boolean;
   error?: Error;
+  errorInfo?: React.ErrorInfo;
 }
 
 class ErrorBoundary extends Component<Props, State> {
@@ -18,33 +19,65 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   static getDerivedStateFromError(error: Error): State {
-    console.error('ErrorBoundary caught an error:', error);
+    console.error('🚨 ErrorBoundary caught an error:', error);
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('ErrorBoundary details:', error, errorInfo);
+    console.error('🚨 ErrorBoundary details:', {
+      error: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack,
+      errorBoundary: errorInfo.errorBoundary
+    });
+    
+    this.setState({
+      error,
+      errorInfo
+    });
   }
 
   render() {
     if (this.state.hasError) {
       return (
         this.props.fallback || (
-          <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-            <div className="max-w-md mx-auto text-center">
+          <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+            <div className="max-w-2xl mx-auto text-center">
               <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-                <h2 className="text-lg font-semibold text-red-800 mb-2">
-                  Something went wrong
+                <h2 className="text-lg font-semibold text-red-800 mb-4">
+                  Oops! Something went wrong
                 </h2>
-                <p className="text-red-600 mb-4">
-                  {this.state.error?.message || 'An unexpected error occurred'}
-                </p>
-                <button
-                  onClick={() => window.location.reload()}
-                  className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-                >
-                  Reload Page
-                </button>
+                <div className="text-left mb-4">
+                  <p className="text-red-600 mb-2 font-medium">
+                    Error: {this.state.error?.message || 'An unexpected error occurred'}
+                  </p>
+                  {this.state.error?.stack && (
+                    <details className="mt-2">
+                      <summary className="text-sm text-red-700 cursor-pointer hover:text-red-800">
+                        Technical Details (Click to expand)
+                      </summary>
+                      <pre className="mt-2 text-xs text-red-600 bg-red-100 p-2 rounded overflow-auto max-h-40">
+                        {this.state.error.stack}
+                      </pre>
+                    </details>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 mr-2"
+                  >
+                    Reload Page
+                  </button>
+                  <button
+                    onClick={() => {
+                      this.setState({ hasError: false, error: undefined, errorInfo: undefined });
+                    }}
+                    className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+                  >
+                    Try Again
+                  </button>
+                </div>
               </div>
             </div>
           </div>

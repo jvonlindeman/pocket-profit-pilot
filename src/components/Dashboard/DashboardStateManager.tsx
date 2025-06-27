@@ -7,6 +7,8 @@ import { useDateFormatter } from '@/hooks/useDateFormatter';
 import { UnpaidInvoice } from '@/types/financial';
 
 export const useDashboardStateManager = () => {
+  console.log("🏠 DashboardStateManager: Initializing...");
+  
   // PASSIVE MODE: useFinanceData no longer auto-loads data
   const {
     dateRange,
@@ -41,7 +43,10 @@ export const useDashboardStateManager = () => {
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
   
   // Convert financial date range to compatible format for useMonthlyBalance
-  const currentMonthDate = dateRange.startDate || new Date();
+  // Add defensive check for dateRange.startDate
+  const currentMonthDate = dateRange?.startDate || new Date();
+  
+  console.log("🏠 DashboardStateManager: Current month date:", currentMonthDate);
   
   const { checkBalanceExists, monthlyBalance, updateMonthlyBalance } = useMonthlyBalance({ 
     currentDate: currentMonthDate
@@ -55,19 +60,24 @@ export const useDashboardStateManager = () => {
   
   const { createPeriodTitle } = useDateFormatter();
   
-  // Title of the period
-  const periodTitle = useMemo(() => 
-    createPeriodTitle(dateRange.startDate, dateRange.endDate),
-    [createPeriodTitle, dateRange.startDate, dateRange.endDate]
-  );
+  // Title of the period - add defensive check
+  const periodTitle = useMemo(() => {
+    if (!dateRange?.startDate || !dateRange?.endDate) {
+      return 'Sin fecha seleccionada';
+    }
+    return createPeriodTitle(dateRange.startDate, dateRange.endDate);
+  }, [createPeriodTitle, dateRange?.startDate, dateRange?.endDate]);
 
   // Calculate total Zoho expenses - all expenses except those from Stripe
-  const totalZohoExpenses = useMemo(() => 
-    financialData.transactions
+  // Add defensive check for financialData.transactions
+  const totalZohoExpenses = useMemo(() => {
+    if (!financialData?.transactions || !Array.isArray(financialData.transactions)) {
+      return 0;
+    }
+    return financialData.transactions
       .filter(tx => tx.type === 'expense' && tx.source !== 'Stripe')
-      .reduce((sum, tx) => sum + tx.amount, 0),
-    [financialData.transactions]
-  );
+      .reduce((sum, tx) => sum + (tx.amount || 0), 0);
+  }, [financialData?.transactions]);
 
   // Enhanced debugging and improved value extraction logic
   console.log("💼 DashboardStateManager: Monthly balance data received:", monthlyBalance);
@@ -96,9 +106,9 @@ export const useDashboardStateManager = () => {
   const calculatorKey = `calculator-${monthlyBalance?.id || 'default'}-${monthlyBalance?.updated_at || Date.now()}-${startingBalance}-${opexAmount}-${itbmAmount}-${profitPercentage}-${taxReservePercentage}-${includeZohoFiftyPercent}`;
   
   console.log("💼 DashboardStateManager: Calculator key (forces re-render - FIXED):", calculatorKey);
-  console.log("💼 DashboardStateManager: Transaction count:", financialData.transactions.length);
+  console.log("💼 DashboardStateManager: Transaction count:", financialData?.transactions?.length || 0);
   console.log("💼 DashboardStateManager: Zoho income transactions:", 
-    financialData.transactions.filter(tx => tx.type === 'income' && tx.source === 'Zoho').length
+    financialData?.transactions?.filter(tx => tx.type === 'income' && tx.source === 'Zoho').length || 0
   );
   console.log("💼 DashboardStateManager: Unpaid invoices:", unpaidInvoices?.length || 0);
   console.log("💼 DashboardStateManager: Is refreshing:", isRefreshing);
@@ -107,7 +117,7 @@ export const useDashboardStateManager = () => {
   return {
     // Data state
     dateRange,
-    financialData,
+    financialData: financialData || { summary: { totalIncome: 0, totalExpense: 0, collaboratorExpense: 0, otherExpense: 0, profit: 0, profitMargin: 0, grossProfit: 0, grossProfitMargin: 0 }, transactions: [], expenseByCategory: [] },
     loading,
     error,
     dataInitialized,
@@ -119,17 +129,17 @@ export const useDashboardStateManager = () => {
     isRefreshing,
     
     // Financial data
-    stripeIncome,
-    stripeFees,
-    stripeTransactionFees,
-    stripePayoutFees,
-    stripeAdditionalFees,
-    stripeNet,
-    stripeFeePercentage,
-    regularIncome,
-    collaboratorExpenses,
-    unpaidInvoices,
-    startingBalance,
+    stripeIncome: stripeIncome || 0,
+    stripeFees: stripeFees || 0,
+    stripeTransactionFees: stripeTransactionFees || 0,
+    stripePayoutFees: stripePayoutFees || 0,
+    stripeAdditionalFees: stripeAdditionalFees || 0,
+    stripeNet: stripeNet || 0,
+    stripeFeePercentage: stripeFeePercentage || 0,
+    regularIncome: regularIncome || 0,
+    collaboratorExpenses: collaboratorExpenses || [],
+    unpaidInvoices: unpaidInvoices || [],
+    startingBalance: startingBalance || 0,
     totalZohoExpenses,
     
     // Derived values
