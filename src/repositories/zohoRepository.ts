@@ -64,7 +64,10 @@ export class ZohoRepository {
         if (cacheResult.cached && !cacheResult.partial) {
           console.log(`✅ ZohoRepository: Cache HIT - Loading from cache without webhook call`);
           
-          const cachedTransactions = await CacheService.getTransactions('Zoho', startDate, endDate);
+          // Use the cache storage to get transactions directly
+          const startDateStr = formatDateYYYYMMDD(startDate);
+          const endDateStr = formatDateYYYYMMDD(endDate);
+          const cachedTransactions = await CacheService.getTransactions('Zoho', startDateStr, endDateStr);
           
           if (cachedTransactions && cachedTransactions.length > 0) {
             console.log(`📋 ZohoRepository: Successfully loaded ${cachedTransactions.length} transactions from cache`);
@@ -76,7 +79,11 @@ export class ZohoRepository {
       } else {
         console.log(`🔄 ZohoRepository: Force refresh requested - Clearing cache and calling webhook`);
         // Clear cache entries for force refresh
-        await CacheService.clearCache('Zoho', formatDateYYYYMMDD(startDate), formatDateYYYYMMDD(endDate));
+        await CacheService.clearCache({
+          source: 'Zoho',
+          startDate,
+          endDate
+        });
         apiRequestManager.clearCacheEntry(cacheKey);
       }
       
