@@ -4,6 +4,7 @@ import { useFinanceData } from '@/hooks/useFinanceData';
 import { ApiStatusIndicator } from './ApiStatusIndicator';
 import ExpenseCalculationVerifier from './ExpenseCalculationVerifier';
 import { StoredDataManager } from '../StoredDataManager';
+import MonthlyCacheSyncTool from './MonthlyCacheSyncTool';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -33,6 +34,7 @@ export default function FinancialDebugHelper() {
         description: "Obteniendo datos frescos y verificando cálculos..."
       });
       
+      console.log("🔄 FinancialDebugHelper: MANUAL refresh triggered - WEBHOOK CALLS ALLOWED");
       const success = await refreshData(true);
       
       if (success) {
@@ -60,6 +62,9 @@ export default function FinancialDebugHelper() {
   
   return (
     <div className="mt-4 space-y-4">
+      {/* Manual Cache Sync Tool */}
+      <MonthlyCacheSyncTool />
+      
       {/* Stored Data Manager */}
       <StoredDataManager />
       
@@ -88,7 +93,7 @@ export default function FinancialDebugHelper() {
             className="text-xs"
           >
             <RefreshCw className={`h-3 w-3 mr-1 ${loading ? 'animate-spin' : ''}`} />
-            Verificar Cálculos
+            Verificar Cálculos (Webhooks)
           </Button>
         </div>
       </div>

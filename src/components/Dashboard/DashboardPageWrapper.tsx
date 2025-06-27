@@ -1,4 +1,3 @@
-
 import React from 'react';
 import DashboardHeader from '@/components/Dashboard/Header/DashboardHeader';
 import LoadingErrorState from '@/components/Dashboard/LoadingErrorState';
@@ -27,7 +26,7 @@ const DashboardPageWrapper: React.FC = () => {
     isRefreshing: dashboardState.isRefreshing,
   });
 
-  console.log("🏠 DashboardPageWrapper: Rendering with PASSIVE MODE + SMART REFRESH (FIXED)", {
+  console.log("🏠 DashboardPageWrapper: Rendering with PASSIVE MODE + NO AUTO WEBHOOK CALLS", {
     dataInitialized: dashboardState.dataInitialized,
     loading: dashboardState.loading,
     isRefreshing: dashboardState.isRefreshing,
@@ -37,10 +36,12 @@ const DashboardPageWrapper: React.FC = () => {
     usingCachedData: dashboardState.usingCachedData,
     transactionCount: dashboardState.financialData.transactions.length,
     autoLoadingDisabled: true,
+    autoSyncDisabled: true,
+    webhookCallsPrevented: true,
     smartRefreshEnabled: true,
     monthlyBalanceId: dashboardState.monthlyBalance?.id,
     monthlyBalanceTimestamp: dashboardState.monthlyBalance?.updated_at,
-    includeZohoFiftyPercent: dashboardState.includeZohoFiftyPercent // TRACKING THE NEW VALUE
+    includeZohoFiftyPercent: dashboardState.includeZohoFiftyPercent
   });
 
   const coreData = {
@@ -107,7 +108,7 @@ const DashboardPageWrapper: React.FC = () => {
             <div className="flex items-center">
               <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full mr-2"></div>
               <span className="text-blue-800 text-sm">
-                Actualizando datos en segundo plano...
+                Actualizando datos en segundo plano (webhooks activos)...
               </span>
             </div>
           </div>

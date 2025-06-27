@@ -3,7 +3,6 @@ import { Transaction } from '@/types/financial';
 import CacheService from '@/services/cache';
 import { stripeRepository } from '@/repositories/stripeRepository';
 import { zohoRepository } from '@/repositories/zohoRepository';
-import { MonthlyCacheSync } from '@/services/cache/syncMonthlyCache';
 
 interface FinancialData {
   transactions: Transaction[];
@@ -43,18 +42,15 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
     let isMounted = true;
 
     const checkCacheExistence = async () => {
-      console.log("🔍 useOptimizedFinancialData: PASSIVE cache existence check only", {
+      console.log("🔍 useOptimizedFinancialData: PASSIVE cache existence check only (NO AUTO SYNC)", {
         dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`
       });
 
       try {
-        // Run monthly cache sync in background
-        console.log("🔄 useOptimizedFinancialData: Running background monthly cache sync...");
-        MonthlyCacheSync.syncAllMissingEntries().catch(error => {
-          console.warn("Background sync failed:", error);
-        });
+        // ✅ REMOVED AUTOMATIC MONTHLY CACHE SYNC - No more webhook calls on app load
+        console.log("🚫 useOptimizedFinancialData: Automatic monthly cache sync DISABLED to prevent webhook calls on app load");
 
-        // Check cache existence WITHOUT loading data
+        // Check cache existence WITHOUT loading data - PASSIVE ONLY
         const [zohoCacheCheck, stripeCacheCheck] = await Promise.all([
           CacheService.checkCache('Zoho', startDate, endDate),
           CacheService.checkCache('Stripe', startDate, endDate)
@@ -66,7 +62,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         const hasStripeCache = stripeCacheCheck.cached && stripeCacheCheck.data && stripeCacheCheck.data.length > 0;
         const hasCachedData = hasZohoCache || hasStripeCache;
 
-        console.log("🔍 useOptimizedFinancialData: PASSIVE cache check results", {
+        console.log("🔍 useOptimizedFinancialData: PASSIVE cache check results (NO WEBHOOK CALLS)", {
           zoho: { 
             exists: hasZohoCache, 
             count: zohoCacheCheck.data?.length || 0,
@@ -80,7 +76,8 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
             isStale: stripeCacheCheck.isStale
           },
           hasCachedData,
-          autoLoadingPrevented: true
+          autoLoadingPrevented: true,
+          webhookCallsPrevented: true
         });
 
         // ONLY update cache status - DO NOT load data automatically
@@ -95,9 +92,9 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         }));
 
         if (hasCachedData) {
-          console.log("✅ useOptimizedFinancialData: Cache exists but NOT auto-loading - waiting for user action");
+          console.log("✅ useOptimizedFinancialData: Cache exists but NOT auto-loading - waiting for user action (NO WEBHOOK CALLS)");
         } else {
-          console.log("❌ useOptimizedFinancialData: No cache found - user interaction required");
+          console.log("❌ useOptimizedFinancialData: No cache found - user interaction required (NO WEBHOOK CALLS)");
         }
       } catch (error) {
         console.error("❌ useOptimizedFinancialData: Error during passive cache check:", error);
@@ -120,7 +117,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
   }, [startDate, endDate]);
 
   const fetchData = useCallback(async (forceRefresh = false) => {
-    console.log("🚀 useOptimizedFinancialData: MANUAL fetch requested by user action", {
+    console.log("🚀 useOptimizedFinancialData: MANUAL fetch requested by user action (WEBHOOK CALLS ALLOWED)", {
       dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
       forceRefresh,
       currentDataCount: data.transactions.length,
@@ -129,7 +126,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
     
     // ENHANCED SMART REFRESH: Immediately clear cache on force refresh
     if (forceRefresh && data.transactions.length > 0) {
-      console.log("🔄 useOptimizedFinancialData: ENHANCED SMART REFRESH - Clearing cache and fetching fresh data");
+      console.log("🔄 useOptimizedFinancialData: ENHANCED SMART REFRESH - Clearing cache and fetching fresh data (WEBHOOK CALLS WILL BE MADE)");
       
       // Immediately clear cache from database
       console.log("🗑️ useOptimizedFinancialData: Clearing cache from database...");
@@ -155,24 +152,27 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         let allTransactions: Transaction[] = [];
         let stripeData: any = null;
         
-        console.log("🌐 useOptimizedFinancialData: Fetching completely fresh data from APIs...");
+        console.log("🌐 useOptimizedFinancialData: Fetching completely fresh data from APIs (WEBHOOK CALLS WILL BE MADE)...");
         
         // Fetch Stripe data (will hit API since cache was cleared)
+        console.log("📡 WEBHOOK CALL: Stripe API request starting...");
         stripeData = await stripeRepository.getTransactions(startDate, endDate, true);
         allTransactions = [...allTransactions, ...stripeData.transactions];
-        console.log(`📡 useOptimizedFinancialData: ENHANCED REFRESH - Fetched ${stripeData.transactions.length} fresh Stripe transactions`);
+        console.log(`📡 WEBHOOK CALL COMPLETED: Fetched ${stripeData.transactions.length} fresh Stripe transactions`);
         
         // Fetch Zoho data (will hit API since cache was cleared)
+        console.log("📡 WEBHOOK CALL: Zoho API request starting...");
         const zohoTransactions = await zohoRepository.getTransactions(startDate, endDate, true);
         allTransactions = [...allTransactions, ...zohoTransactions];
-        console.log(`📡 useOptimizedFinancialData: ENHANCED REFRESH - Fetched ${zohoTransactions.length} fresh Zoho transactions`);
+        console.log(`📡 WEBHOOK CALL COMPLETED: Fetched ${zohoTransactions.length} fresh Zoho transactions`);
         
         console.log("📊 useOptimizedFinancialData: ENHANCED REFRESH COMPLETED", {
           totalTransactions: allTransactions.length,
           previousCount: data.transactions.length,
           dataUpdated: allTransactions.length !== data.transactions.length,
           refreshTime: new Date().toISOString(),
-          cacheCleared: true
+          cacheCleared: true,
+          webhookCallsMade: 2
         });
         
         // Update with fresh data
@@ -216,6 +216,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
       let allTransactions: Transaction[] = [];
       let stripeData: any = null;
       let usingCache = false;
+      let webhookCallsCount = 0;
       const cacheStatus = {
         zoho: { hit: false, partial: false },
         stripe: { hit: false, partial: false }
@@ -223,13 +224,13 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
 
       // CACHE-FIRST STRATEGY: Only bypass cache if explicitly force refreshing
       if (!forceRefresh) {
-        console.log("🔍 useOptimizedFinancialData: Using CACHE-FIRST strategy for manual load");
+        console.log("🔍 useOptimizedFinancialData: Using CACHE-FIRST strategy for manual load (NO WEBHOOK CALLS IF CACHE EXISTS)");
         
         // Check Stripe cache first (will return miss if force refresh cleared it)
         const stripeCacheCheck = await CacheService.checkCache('Stripe', startDate, endDate);
         
         if (stripeCacheCheck.cached && stripeCacheCheck.data && stripeCacheCheck.data.length > 0) {
-          console.log(`✅ useOptimizedFinancialData: CACHE HIT - Loading cached Stripe data (${stripeCacheCheck.data.length} transactions)`);
+          console.log(`✅ useOptimizedFinancialData: CACHE HIT - Loading cached Stripe data (${stripeCacheCheck.data.length} transactions) - NO WEBHOOK CALL`);
           
           const transactions = stripeCacheCheck.data;
           const gross = transactions.reduce((sum, tx) => sum + (tx.gross || tx.amount), 0);
@@ -257,7 +258,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         const zohoCacheCheck = await CacheService.checkCache('Zoho', startDate, endDate);
         
         if (zohoCacheCheck.cached && zohoCacheCheck.data && zohoCacheCheck.data.length > 0) {
-          console.log(`✅ useOptimizedFinancialData: CACHE HIT - Loading cached Zoho data (${zohoCacheCheck.data.length} transactions)`);
+          console.log(`✅ useOptimizedFinancialData: CACHE HIT - Loading cached Zoho data (${zohoCacheCheck.data.length} transactions) - NO WEBHOOK CALL`);
           allTransactions = [...allTransactions, ...zohoCacheCheck.data];
           usingCache = true;
           cacheStatus.zoho = { hit: true, partial: zohoCacheCheck.partial };
@@ -266,7 +267,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
 
       // Only fetch from API if we don't have cached data OR if force refresh is requested
       if (allTransactions.length === 0 || forceRefresh) {
-        console.log("🌐 useOptimizedFinancialData: Fetching from API", { 
+        console.log("🌐 useOptimizedFinancialData: Fetching from API (WEBHOOK CALLS WILL BE MADE)", { 
           reason: forceRefresh ? 'force_refresh_or_cache_cleared' : 'no_cache_data' 
         });
 
@@ -279,20 +280,22 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
 
         // Fetch Stripe data if not cached or force refresh
         if (!stripeData || forceRefresh) {
-          console.log("🌐 useOptimizedFinancialData: Fetching Stripe data from API...");
+          console.log("📡 WEBHOOK CALL: Stripe API request starting...");
           stripeData = await stripeRepository.getTransactions(startDate, endDate, forceRefresh);
           allTransactions = [...allTransactions, ...stripeData.transactions];
           cacheStatus.stripe = { hit: false, partial: false };
-          console.log(`📡 useOptimizedFinancialData: API CALL - Fetched ${stripeData.transactions.length} Stripe transactions`);
+          webhookCallsCount++;
+          console.log(`📡 WEBHOOK CALL COMPLETED: Fetched ${stripeData.transactions.length} Stripe transactions`);
         }
 
         // Fetch Zoho data if not cached or force refresh
         if (!cacheStatus.zoho.hit || forceRefresh) {
-          console.log("🌐 useOptimizedFinancialData: Fetching Zoho data from API...");
+          console.log("📡 WEBHOOK CALL: Zoho API request starting...");
           const zohoTransactions = await zohoRepository.getTransactions(startDate, endDate, forceRefresh);
           allTransactions = [...allTransactions, ...zohoTransactions];
           cacheStatus.zoho = { hit: false, partial: false };
-          console.log(`📡 useOptimizedFinancialData: API CALL - Fetched ${zohoTransactions.length} Zoho transactions`);
+          webhookCallsCount++;
+          console.log(`📡 WEBHOOK CALL COMPLETED: Fetched ${zohoTransactions.length} Zoho transactions`);
         }
       }
 
@@ -307,7 +310,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         stripeSource: cacheStatus.stripe.hit ? 'CACHE' : 'API',
         cacheEfficiency: `${cacheEfficiency.toFixed(1)}%`,
         usingCachedData: usingCache,
-        apiCallsMade: totalSources - totalCacheHits,
+        webhookCallsMade: webhookCallsCount,
         strategy: forceRefresh ? 'ENHANCED_FORCE_REFRESH' : 'CACHE_FIRST',
         userAction: true,
         cacheActuallyCleared: forceRefresh
@@ -397,7 +400,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
     }
   }, [startDate, endDate, data.transactions.length]);
 
-  console.log("🔄 useOptimizedFinancialData: Hook rendered - PASSIVE MODE", {
+  console.log("🔄 useOptimizedFinancialData: Hook rendered - PASSIVE MODE (NO AUTO WEBHOOK CALLS)", {
     dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
     hasData: data.transactions.length > 0,
     isDataRequested: data.isDataRequested,
@@ -406,11 +409,13 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
     loading: data.loading,
     isRefreshing: data.isRefreshing,
     usingCachedData: data.usingCachedData,
-    autoLoadingDisabled: true
+    autoLoadingDisabled: true,
+    autoSyncDisabled: true,
+    webhookCallsPrevented: true
   });
 
   const refetch = useCallback((forceRefresh = false) => {
-    console.log("🔄 useOptimizedFinancialData: Manual refetch requested by user", { 
+    console.log("🔄 useOptimizedFinancialData: Manual refetch requested by user (WEBHOOK CALLS ALLOWED)", { 
       forceRefresh,
       reason: forceRefresh ? 'user_force_refresh' : 'user_refresh',
       caller: new Error().stack?.split('\n')[2]?.trim()

@@ -38,13 +38,16 @@ export class ZohoApiOperations {
     endDate: Date,
     forceRefresh: boolean
   ): Promise<Transaction[]> {
-    console.log(`🚀 ZohoApiOperations: WEBHOOK CALL - Making actual API request for ${cacheKey}`);
+    console.log(`🚀 ZohoApiOperations: WEBHOOK CALL STARTING - Making actual API request for ${cacheKey}`);
+    console.log(`📡 WEBHOOK CALL: Zoho webhook will be called for date range ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
     
     // Track the API call
     this.trackApiCall();
     
     // Use the unified API client gateway function
     const response = await zohoApiClient.fetchZohoData(startDate, endDate, forceRefresh);
+    
+    console.log(`📡 WEBHOOK CALL COMPLETED: Zoho webhook call finished for ${cacheKey}`);
     
     // Store the raw response for debugging
     this.lastRawResponse = response;
@@ -81,7 +84,7 @@ export class ZohoApiOperations {
       }
     }
     
-    console.log(`✅ ZohoApiOperations: Final transaction count: ${transactions.length}`);
+    console.log(`✅ ZohoApiOperations: WEBHOOK CALL RESULT - Final transaction count: ${transactions.length}`);
     return transactions;
   }
 
@@ -94,7 +97,8 @@ export class ZohoApiOperations {
     endDate: Date,
     forceRefresh: boolean
   ): Promise<any> {
-    console.log(`🚀 ZohoApiOperations: RAW WEBHOOK CALL - Making raw API request for ${cacheKey}`);
+    console.log(`🚀 ZohoApiOperations: RAW WEBHOOK CALL STARTING - Making raw API request for ${cacheKey}`);
+    console.log(`📡 WEBHOOK CALL: Zoho raw webhook will be called for date range ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
     
     // Track the API call
     this.trackApiCall();
@@ -102,6 +106,8 @@ export class ZohoApiOperations {
     // Fetch raw data
     const rawData = await zohoApiClient.fetchZohoData(startDate, endDate, forceRefresh, true);
     this.lastRawResponse = rawData;
+    
+    console.log(`📡 WEBHOOK CALL COMPLETED: Zoho raw webhook call finished for ${cacheKey}`);
     return rawData;
   }
 
@@ -116,7 +122,8 @@ export class ZohoApiOperations {
       return await apiRequestManager.executeRequest(
         cacheKey,
         async () => {
-          console.log(`🔌 ZohoApiOperations: CONNECTIVITY WEBHOOK CALL - Checking API connectivity`);
+          console.log(`🔌 ZohoApiOperations: CONNECTIVITY WEBHOOK CALL STARTING - Checking API connectivity`);
+          console.log(`📡 WEBHOOK CALL: Zoho connectivity webhook will be called`);
           
           // Track the API call
           this.trackApiCall();
@@ -128,12 +135,15 @@ export class ZohoApiOperations {
             false,
             true
           );
+          
+          console.log(`📡 WEBHOOK CALL COMPLETED: Zoho connectivity webhook call finished`);
           return !!response && !response.error;
         },
         5 * 60 * 1000, // 5 minute TTL for connectivity checks
         30000   // 30 second cooldown
       );
     } catch {
+      console.log(`❌ WEBHOOK CALL FAILED: Zoho connectivity check failed`);
       return false;
     }
   }
