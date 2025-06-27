@@ -21,53 +21,40 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
   // Format the month_year for database queries (YYYY-MM)
   const formatMonthYear = useCallback((date: Date) => {
     try {
-      // ENHANCED SAFETY: Ensure we have a valid date
+      // Ensure we have a valid date
       if (!date || isNaN(date.getTime())) {
-        console.error("🚨 useMonthlyBalance: Invalid date provided to formatMonthYear:", date);
+        console.error("Invalid date provided to formatMonthYear:", date);
         // Return current month as fallback
-        const fallbackDate = new Date();
-        console.log("🔧 useMonthlyBalance: Using fallback date:", fallbackDate);
-        return format(fallbackDate, 'yyyy-MM');
+        return format(new Date(), 'yyyy-MM');
       }
       return format(date, 'yyyy-MM');
     } catch (err) {
-      console.error("🚨 useMonthlyBalance: Error formatting month-year:", err);
-      // Fallback to current month
-      const fallbackDate = new Date();
-      console.log("🔧 useMonthlyBalance: Using fallback date after error:", fallbackDate);
-      return format(fallbackDate, 'yyyy-MM');
+      console.error("Error formatting month-year:", err);
+      return format(new Date(), 'yyyy-MM');
     }
   }, []);
 
-  // Get the current month-year string with enhanced safety
+  // Get the current month-year string
   const currentMonthYear = formatMonthYear(currentDate);
 
   // Fetch the monthly balance for the given date
   const fetchMonthlyBalance = useCallback(async () => {
-    // SAFETY CHECK: Don't proceed if we don't have a valid current date
-    if (!currentDate || isNaN(currentDate.getTime())) {
-      console.error("🚨 useMonthlyBalance: Cannot fetch without valid currentDate:", currentDate);
-      setError("Fecha inválida");
-      return null;
-    }
-
     setLoading(true);
     setError(null);
 
     try {
-      console.log("🔍 useMonthlyBalance: Fetching monthly balance for:", currentMonthYear);
+      console.log("useMonthlyBalance: Fetching monthly balance for:", currentMonthYear);
       
       const { data, error } = await supabase
         .from('monthly_balances')
         .select('*')
         .eq('month_year', currentMonthYear)
-        .maybeSingle(); // FIXED: Using maybeSingle() to handle no data gracefully
+        .maybeSingle();
 
       if (error) {
-        console.error("🚨 useMonthlyBalance: Error fetching monthly balance:", error);
+        console.error("useMonthlyBalance: Error fetching monthly balance:", error);
         
-        // Only show toast on mobile for user-facing errors
-        if (isMobile && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+        if (isMobile) {
           toast({
             title: "Error",
             description: "No se pudo cargar el balance mensual. Intentando de nuevo...",
@@ -80,14 +67,11 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
           }, 2000);
         }
         
-        // Set a user-friendly error message instead of throwing
-        setError(`Error al cargar balance: ${error.message}`);
-        setMonthlyBalance(null);
-        return null;
+        throw error;
       }
 
-      console.log("✅ useMonthlyBalance: Monthly balance data received:", data);
-      console.log("✅ useMonthlyBalance: Setting monthly balance state with:", {
+      console.log("useMonthlyBalance: Monthly balance data received:", data);
+      console.log("useMonthlyBalance: Setting monthly balance state with:", {
         id: data?.id,
         balance: data?.balance,
         opex_amount: data?.opex_amount,
@@ -101,42 +85,34 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       setMonthlyBalance(data || null);
       return data || null;
     } catch (err: any) {
-      console.error("🚨 useMonthlyBalance: Unexpected error fetching monthly balance:", err);
-      const errorMessage = err.message || "Error inesperado al cargar el balance mensual";
-      setError(errorMessage);
-      setMonthlyBalance(null);
+      console.error("useMonthlyBalance: Error fetching monthly balance:", err);
+      setError(err.message || "Error al cargar el balance mensual");
       return null;
     } finally {
       setLoading(false);
     }
-  }, [currentMonthYear, toast, isMobile, currentDate]);
+  }, [currentMonthYear, toast, isMobile]);
 
   // Check if a balance exists for the current month
   const checkBalanceExists = useCallback(async (): Promise<boolean> => {
-    // SAFETY CHECK: Don't proceed if we don't have a valid current date
-    if (!currentDate || isNaN(currentDate.getTime())) {
-      console.error("🚨 useMonthlyBalance: Cannot check balance without valid currentDate:", currentDate);
-      return false;
-    }
-
     try {
       const { data, error } = await supabase
         .from('monthly_balances')
         .select('id')
         .eq('month_year', currentMonthYear)
-        .maybeSingle(); // FIXED: Using maybeSingle() to handle no data gracefully
+        .maybeSingle();
 
       if (error) {
-        console.error("🚨 useMonthlyBalance: Error checking monthly balance:", error);
+        console.error("useMonthlyBalance: Error checking monthly balance:", error);
         return false;
       }
 
       return !!data;
     } catch (err) {
-      console.error("🚨 useMonthlyBalance: Unexpected error in checkBalanceExists:", err);
+      console.error("useMonthlyBalance: Error in checkBalanceExists:", err);
       return false;
     }
-  }, [currentMonthYear, currentDate]);
+  }, [currentMonthYear]);
 
   // Set or update the monthly balance including tax reserve percentage and zoho fifty percent toggle
   const updateMonthlyBalance = useCallback(async (
@@ -148,13 +124,6 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     includeZohoFiftyPercent: boolean = true,
     notes?: string
   ) => {
-    // SAFETY CHECK: Don't proceed if we don't have a valid current date
-    if (!currentDate || isNaN(currentDate.getTime())) {
-      console.error("🚨 useMonthlyBalance: Cannot update balance without valid currentDate:", currentDate);
-      setError("Fecha inválida para actualizar balance");
-      return false;
-    }
-
     setLoading(true);
     setError(null);
 
@@ -185,7 +154,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       updated_at: new Date().toISOString()
     };
 
-    console.log("✅ useMonthlyBalance: OPTIMISTIC UPDATE - Setting local state immediately:", optimisticBalance);
+    console.log("useMonthlyBalance: OPTIMISTIC UPDATE - Setting local state immediately:", optimisticBalance);
     setMonthlyBalance(optimisticBalance);
 
     try {
@@ -215,7 +184,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       
       // Check if we're updating or inserting
       const existsResult = await checkBalanceExists();
-      console.log("✅ useMonthlyBalance: Balance exists check:", existsResult);
+      console.log("useMonthlyBalance: Balance exists check:", existsResult);
       
       if (existsResult) {
         // Update existing record
@@ -231,8 +200,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
           console.error("🚨 updateMonthlyBalance: Error details:", JSON.stringify(error, null, 2));
           // Revert optimistic update on error
           await fetchMonthlyBalance();
-          setError(`Error al actualizar: ${error.message}`);
-          return false;
+          throw error;
         }
         
         console.log("✅ updateMonthlyBalance: DATABASE UPDATE SUCCESS:", data);
@@ -275,8 +243,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
           console.error("🚨 updateMonthlyBalance: Error details:", JSON.stringify(error, null, 2));
           // Revert optimistic update on error
           await fetchMonthlyBalance();
-          setError(`Error al crear: ${error.message}`);
-          return false;
+          throw error;
         }
         
         console.log("✅ updateMonthlyBalance: DATABASE INSERT SUCCESS:", data);
@@ -306,8 +273,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       console.error("🚨 updateMonthlyBalance: FATAL ERROR:", err);
       console.error("🚨 updateMonthlyBalance: Error message:", err.message);
       console.error("🚨 updateMonthlyBalance: Error stack:", err.stack);
-      const errorMessage = err.message || "Error inesperado al actualizar el balance mensual";
-      setError(errorMessage);
+      setError(err.message || "Error al actualizar el balance mensual");
       
       toast({
         title: "Error",
@@ -321,14 +287,11 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     }
   }, [checkBalanceExists, currentDate, currentMonthYear, toast, monthlyBalance, fetchMonthlyBalance]);
 
-  // Fetch the balance when the current date changes, with enhanced safety
+  // Fetch the balance when the current date changes
   useEffect(() => {
     if (currentDate && !isNaN(currentDate.getTime())) {
-      console.log("✅ useMonthlyBalance: Date changed, fetching balance for:", currentMonthYear);
+      console.log("useMonthlyBalance: Date changed, fetching balance for:", currentMonthYear);
       fetchMonthlyBalance();
-    } else {
-      console.warn("🚨 useMonthlyBalance: Invalid currentDate, skipping fetch:", currentDate);
-      setError("Fecha inválida");
     }
   }, [currentMonthYear, fetchMonthlyBalance, currentDate]);
 

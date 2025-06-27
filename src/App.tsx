@@ -1,39 +1,41 @@
 
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { Toaster } from "@/components/ui/toaster";
-import { ApiCallsProvider } from "@/contexts/ApiCallsContext";
-import { CacheProvider } from "@/contexts/CacheContext";
-import { WebhookPreventionProvider } from "@/contexts/WebhookPreventionContext";
-import Index from "@/pages/Index";
-import NotFound from "@/pages/NotFound";
-import Settings from "@/pages/Settings";
-import ZohoCallback from "@/pages/ZohoCallback";
-import { queryClient } from "@/lib/react-query/queryClient";
-import "./App.css";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { CacheProvider } from "./contexts/CacheContext";
+import { ApiCallsProvider } from "./contexts/ApiCallsContext";
+import { FinancialAssistantButton } from "./components/FinancialAssistant/FinancialAssistantButton";
+import { queryClient } from "./lib/react-query/queryClient";
+import { QueryDevTools } from "./components/ReactQueryDevTools";
+import Index from "./pages/Index";
+import NotFound from "./pages/NotFound";
+import Settings from "./pages/Settings";
+import ZohoCallback from "./pages/ZohoCallback";
 
-function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <WebhookPreventionProvider>
-        <ApiCallsProvider>
-          <CacheProvider>
-            <Router>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/zoho-callback" element={<ZohoCallback />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-              <Toaster />
-            </Router>
-            <ReactQueryDevtools initialIsOpen={false} />
-          </CacheProvider>
-        </ApiCallsProvider>
-      </WebhookPreventionProvider>
-    </QueryClientProvider>
-  );
-}
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <BrowserRouter>
+        <CacheProvider>
+          <ApiCallsProvider>
+            <Toaster />
+            <Sonner />
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/zoho-callback" element={<ZohoCallback />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <FinancialAssistantButton />
+            <QueryDevTools />
+          </ApiCallsProvider>
+        </CacheProvider>
+      </BrowserRouter>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
 
 export default App;

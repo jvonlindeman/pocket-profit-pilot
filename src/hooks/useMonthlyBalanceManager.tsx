@@ -12,20 +12,14 @@ export const useMonthlyBalanceManager = () => {
     try {
       const monthYear = formatDate(date, 'yyyy-MM');
       
-      console.log("📊 useMonthlyBalanceManager: Fetching monthly balance for:", monthYear);
-      
       const { data, error } = await supabase
         .from('monthly_balances')
         .select('*')
         .eq('month_year', monthYear)
-        .maybeSingle(); // FIXED: Changed from .single() to .maybeSingle()
+        .single();
       
-      if (error) {
-        console.error("❌ useMonthlyBalanceManager: Error fetching monthly balance:", error);
-        // Don't throw the error, just log it and continue
-        setStartingBalance(undefined);
-        setNotes(undefined);
-        return;
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
+        console.error("Error fetching monthly balance:", error);
       }
 
       if (data) {
@@ -35,15 +29,12 @@ export const useMonthlyBalanceManager = () => {
         setStartingBalance(data.balance);
         setNotes(data.notes || undefined);
       } else {
-        console.log("ℹ️ useMonthlyBalanceManager: No monthly balance found for:", monthYear);
+        console.log("No monthly balance found for:", monthYear);
         setStartingBalance(undefined);
         setNotes(undefined);
       }
     } catch (err) {
-      console.error("❌ useMonthlyBalanceManager: Unexpected error in fetchMonthlyBalance:", err);
-      // Don't let the error bubble up - set safe defaults
-      setStartingBalance(undefined);
-      setNotes(undefined);
+      console.error("Error in fetchMonthlyBalance:", err);
     }
   }, []);
 
@@ -65,17 +56,12 @@ export const useMonthlyBalanceManager = () => {
       
       const monthYear = formatDate(date, 'yyyy-MM');
       
-      // Check if a record already exists - use maybeSingle() here too
-      const { data: existingData, error: fetchError } = await supabase
+      // Check if a record already exists
+      const { data: existingData } = await supabase
         .from('monthly_balances')
         .select('*')
         .eq('month_year', monthYear)
-        .maybeSingle(); // FIXED: Changed from .single() to .maybeSingle()
-      
-      if (fetchError) {
-        console.error("❌ useMonthlyBalanceManager: Error checking existing balance:", fetchError);
-        return false;
-      }
+        .single();
       
       const updateData: any = {
         balance,
@@ -108,7 +94,7 @@ export const useMonthlyBalanceManager = () => {
       }
       
       if (result.error) {
-        console.error("❌ useMonthlyBalanceManager: Error updating starting balance:", result.error);
+        console.error("Error updating starting balance:", result.error);
         return false;
       }
       
@@ -118,7 +104,7 @@ export const useMonthlyBalanceManager = () => {
       console.log("✅ useMonthlyBalanceManager: Starting balance updated successfully with include_zoho_fifty_percent:", includeZohoFiftyPercent);
       return true;
     } catch (err) {
-      console.error("❌ useMonthlyBalanceManager: Unexpected error updating starting balance:", err);
+      console.error("Error updating starting balance:", err);
       return false;
     }
   }, []);

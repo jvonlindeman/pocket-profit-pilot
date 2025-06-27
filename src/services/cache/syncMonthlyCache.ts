@@ -6,37 +6,34 @@ import { supabase } from "../../integrations/supabase/client";
  */
 export class MonthlyCacheSync {
   /**
-   * DIAGNOSTIC ONLY: Check what entries are missing without making any changes
+   * Sync all missing monthly cache entries
    */
-  static async diagnoseMissingEntries(): Promise<{ 
-    missingEntries: Array<{ source: string; year: number; month: number; transactionCount: number }>;
-    totalMissing: number;
-    errors: number;
-  }> {
+  static async syncAllMissingEntries(): Promise<{ synced: number; errors: number }> {
     try {
-      console.log("[MONTHLY_CACHE_DIAGNOSTIC] Starting READ-ONLY diagnostic of missing monthly cache entries");
+      console.log("[MONTHLY_CACHE_SYNC] Starting sync of all missing monthly cache entries");
       
       // Get all unique source/year/month combinations from cached_transactions
-      const { data: transactionGroups, error } = await supabase
+      // that don't exist in monthly_cache
+      const { data: missingEntries, error } = await supabase
         .from('cached_transactions')
         .select('source, year, month')
         .not('year', 'is', null)
         .not('month', 'is', null);
         
       if (error) {
-        console.error("[MONTHLY_CACHE_DIAGNOSTIC] Error fetching cached transactions:", error);
-        return { missingEntries: [], totalMissing: 0, errors: 1 };
+        console.error("[MONTHLY_CACHE_SYNC] Error fetching cached transactions:", error);
+        return { synced: 0, errors: 1 };
       }
       
-      if (!transactionGroups || transactionGroups.length === 0) {
-        console.log("[MONTHLY_CACHE_DIAGNOSTIC] No cached transactions found");
-        return { missingEntries: [], totalMissing: 0, errors: 0 };
+      if (!missingEntries || missingEntries.length === 0) {
+        console.log("[MONTHLY_CACHE_SYNC] No cached transactions found");
+        return { synced: 0, errors: 0 };
       }
       
       // Group by source/year/month and count transactions
       const groupedEntries = new Map<string, { source: string; year: number; month: number; count: number }>();
       
-      transactionGroups.forEach(entry => {
+      missingEntries.forEach(entry => {
         if (entry.year && entry.month) {
           const key = `${entry.source}-${entry.year}-${entry.month}`;
           if (groupedEntries.has(key)) {
@@ -52,14 +49,16 @@ export class MonthlyCacheSync {
         }
       });
       
-      console.log(`[MONTHLY_CACHE_DIAGNOSTIC] Found ${groupedEntries.size} unique source/year/month combinations`);
+      console.log(`[MONTHLY_CACHE_SYNC] Found ${groupedEntries.size} unique source/year/month combinations`);
       
-      const missingEntries: Array<{ source: string; year: number; month: number; transactionCount: number }> = [];
+      let synced = 0;
       let errors = 0;
       
-      // Check which entries are missing in monthly_cache (READ-ONLY)
+      // Process each unique combination
       for (const [key, entry] of groupedEntries) {
         try {
+          console.log(`[MONTHLY_CACHE_SYNC] Processing ${key} with ${entry.count} transactions`);
+          
           // Check if this entry already exists in monthly_cache
           const { data: existingEntry } = await supabase
             .from('monthly_cache')
@@ -69,93 +68,53 @@ export class MonthlyCacheSync {
             .eq('month', entry.month)
             .single();
             
-          if (!existingEntry) {
-            // Get actual count from database
-            const { count, error: countError } = await supabase
-              .from('cached_transactions')
-              .select('id', { count: 'exact' })
-              .eq('source', entry.source)
-              .eq('year', entry.year)
-              .eq('month', entry.month);
-              
-            if (countError) {
-              console.error(`[MONTHLY_CACHE_DIAGNOSTIC] Error counting transactions for ${key}:`, countError);
-              errors++;
-              continue;
-            }
-            
-            const actualCount = count || 0;
-            
-            if (actualCount > 0) {
-              missingEntries.push({
-                source: entry.source,
-                year: entry.year,
-                month: entry.month,
-                transactionCount: actualCount
-              });
-              console.log(`[MONTHLY_CACHE_DIAGNOSTIC] Missing: ${key} with ${actualCount} transactions`);
-            }
+          if (existingEntry) {
+            console.log(`[MONTHLY_CACHE_SYNC] Entry ${key} already exists in monthly_cache, skipping`);
+            continue;
           }
-        } catch (err) {
-          console.error(`[MONTHLY_CACHE_DIAGNOSTIC] Exception checking ${key}:`, err);
-          errors++;
-        }
-      }
-      
-      console.log(`[MONTHLY_CACHE_DIAGNOSTIC] Diagnostic complete: ${missingEntries.length} missing entries found, ${errors} errors`);
-      return { missingEntries, totalMissing: missingEntries.length, errors };
-    } catch (err) {
-      console.error("[MONTHLY_CACHE_DIAGNOSTIC] Exception during diagnostic:", err);
-      return { missingEntries: [], totalMissing: 0, errors: 1 };
-    }
-  }
-
-  /**
-   * DANGEROUS: Actually sync missing entries (requires explicit confirmation)
-   */
-  static async syncAllMissingEntries(): Promise<{ synced: number; errors: number }> {
-    console.warn("[MONTHLY_CACHE_SYNC] ⚠️  DANGER: This operation will write to database and may trigger webhooks!");
-    
-    try {
-      console.log("[MONTHLY_CACHE_SYNC] Starting ACTUAL sync of missing monthly cache entries");
-      
-      // First get the diagnostic
-      const diagnostic = await this.diagnoseMissingEntries();
-      
-      if (diagnostic.totalMissing === 0) {
-        console.log("[MONTHLY_CACHE_SYNC] No missing entries to sync");
-        return { synced: 0, errors: diagnostic.errors };
-      }
-      
-      let synced = 0;
-      let errors = diagnostic.errors;
-      
-      // Process each missing entry
-      for (const entry of diagnostic.missingEntries) {
-        try {
-          console.log(`[MONTHLY_CACHE_SYNC] Syncing ${entry.source} ${entry.year}/${entry.month} with ${entry.transactionCount} transactions`);
           
-          // Insert into monthly_cache (THIS MAY TRIGGER WEBHOOKS)
+          // Get actual count from database
+          const { count, error: countError } = await supabase
+            .from('cached_transactions')
+            .select('id', { count: 'exact' })
+            .eq('source', entry.source)
+            .eq('year', entry.year)
+            .eq('month', entry.month);
+            
+          if (countError) {
+            console.error(`[MONTHLY_CACHE_SYNC] Error counting transactions for ${key}:`, countError);
+            errors++;
+            continue;
+          }
+          
+          const actualCount = count || 0;
+          
+          if (actualCount === 0) {
+            console.log(`[MONTHLY_CACHE_SYNC] No transactions found for ${key}, skipping`);
+            continue;
+          }
+          
+          // Insert into monthly_cache
           const { error: insertError } = await supabase
             .from('monthly_cache')
             .insert({
               source: entry.source,
               year: entry.year,
               month: entry.month,
-              transaction_count: entry.transactionCount,
+              transaction_count: actualCount,
               status: 'complete',
               updated_at: new Date().toISOString()
             });
             
           if (insertError) {
-            console.error(`[MONTHLY_CACHE_SYNC] Error inserting monthly_cache entry for ${entry.source} ${entry.year}/${entry.month}:`, insertError);
+            console.error(`[MONTHLY_CACHE_SYNC] Error inserting monthly_cache entry for ${key}:`, insertError);
             errors++;
           } else {
-            console.log(`[MONTHLY_CACHE_SYNC] Successfully synced ${entry.source} ${entry.year}/${entry.month}`);
+            console.log(`[MONTHLY_CACHE_SYNC] Successfully synced ${key} with ${actualCount} transactions`);
             synced++;
           }
         } catch (err) {
-          console.error(`[MONTHLY_CACHE_SYNC] Exception processing ${entry.source} ${entry.year}/${entry.month}:`, err);
+          console.error(`[MONTHLY_CACHE_SYNC] Exception processing ${key}:`, err);
           errors++;
         }
       }
@@ -172,8 +131,6 @@ export class MonthlyCacheSync {
    * Sync a specific month's cache entry
    */
   static async syncMonth(source: string, year: number, month: number): Promise<boolean> {
-    console.warn("[MONTHLY_CACHE_SYNC] ⚠️  DANGER: This operation will write to database and may trigger webhooks!");
-    
     try {
       console.log(`[MONTHLY_CACHE_SYNC] Syncing specific month: ${source} ${year}/${month}`);
       
@@ -197,7 +154,7 @@ export class MonthlyCacheSync {
         return false;
       }
       
-      // Upsert the monthly cache entry (THIS MAY TRIGGER WEBHOOKS)
+      // Upsert the monthly cache entry
       const { error: upsertError } = await supabase
         .from('monthly_cache')
         .upsert({
