@@ -1,11 +1,11 @@
-
-import { useMemo, useCallback, useRef } from 'react';
+import { useMemo, useCallback, useRef, useEffect } from 'react';
 import { useFinanceDateRange } from '@/hooks/useFinanceDateRange';
 import { useCollaboratorProcessor } from '@/hooks/useCollaboratorProcessor';
 import { useIncomeProcessor } from '@/hooks/useIncomeProcessor';
 import { useMonthlyBalanceManager } from '@/hooks/useMonthlyBalanceManager';
 import { useOptimizedFinancialData } from '@/hooks/queries/useOptimizedFinancialData';
 import { useUrlParamCleaner } from '@/hooks/useUrlParamCleaner';
+import { useStoredFinancialData } from '@/hooks/useStoredFinancialData';
 import { processTransactionData } from '@/services/financialService';
 import { getCurrentMonthRange } from '@/utils/dateUtils';
 import { zohoRepository } from '@/repositories/zohoRepository';
@@ -28,6 +28,9 @@ export const useFinanceData = () => {
     stripeNet, stripeFeePercentage, 
     regularIncome, processIncomeTypes 
   } = useIncomeProcessor();
+
+  // Storage hook for saving financial data
+  const { saveSnapshot } = useStoredFinancialData();
 
   // Use the date range hook
   const { dateRange, updateDateRange } = useFinanceDateRange(fetchMonthlyBalance);
@@ -91,6 +94,59 @@ export const useFinanceData = () => {
     // Pass collaboratorExpenses to ensure they're included in the summary
     return processTransactionData(transactions, startingBalance, collaboratorExpenses);
   }, [transactions, startingBalance, collaboratorExpenses]);
+
+  // Auto-save financial data snapshot when data is successfully loaded
+  useEffect(() => {
+    if (transactions.length > 0 && isDataRequested && !loading) {
+      const snapshotData = {
+        transactions,
+        zohoTransactions: transactions.filter(tx => tx.source === 'Zoho'),
+        stripeTransactions: transactions.filter(tx => tx.source === 'Stripe'),
+        stripeData,
+        summary: financialData,
+        collaboratorExpenses,
+        unpaidInvoices,
+        startingBalance,
+        regularIncome,
+        stripeIncome,
+        stripeFees,
+        stripeNet,
+        cacheStatus,
+        apiConnectivity: { zoho: true, stripe: true },
+      };
+
+      saveSnapshot(
+        dateRange,
+        snapshotData,
+        {
+          dataSource: 'useFinanceData',
+          usingCachedData,
+        }
+      );
+
+      console.log('💾 Auto-saved financial data snapshot', {
+        dateRange,
+        transactionCount: transactions.length,
+        usingCachedData,
+      });
+    }
+  }, [
+    transactions.length,
+    isDataRequested,
+    loading,
+    dateRange,
+    financialData,
+    collaboratorExpenses,
+    unpaidInvoices,
+    startingBalance,
+    regularIncome,
+    stripeIncome,
+    stripeFees,
+    stripeNet,
+    cacheStatus,
+    usingCachedData,
+    saveSnapshot
+  ]);
 
   // Check API connectivity (simplified)
   const checkApiConnectivity = useCallback(async () => {

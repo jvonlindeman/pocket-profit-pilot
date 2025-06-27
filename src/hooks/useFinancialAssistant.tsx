@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useFinance } from '@/contexts/FinanceContext';
+import { useStoredFinancialData } from '@/hooks/useStoredFinancialData';
 import { captureUIData, registerInteraction } from '@/utils/uiCapture';
 import { ChatMessage, ConversationMemory } from '@/types/chat';
 import { extractInsights } from '@/utils/insightExtraction';
@@ -14,13 +15,14 @@ export const useFinancialAssistant = () => {
     {
       id: 'welcome',
       role: 'assistant',
-      content: '¡Hola! Soy tu asistente financiero con acceso completo a tu historial de datos y capacidades de búsqueda semántica avanzada. Puedo ayudarte a:\n\n• Analizar tus finanzas y identificar tendencias\n• Buscar transacciones específicas por descripción\n• Encontrar patrones de gasto similares\n• Responder preguntas sobre tu historial financiero\n\n¿En qué puedo ayudarte hoy?',
+      content: '¡Hola! Soy tu asistente financiero con acceso completo a tu historial de datos almacenados localmente y capacidades de búsqueda semántica avanzada. Puedo ayudarte a:\n\n• Analizar tus finanzas usando datos guardados localmente\n• Buscar transacciones específicas por descripción\n• Comparar períodos usando datos históricos almacenados\n• Responder preguntas sobre tu historial financiero completo\n\n¿En qué puedo ayudarte hoy?',
       timestamp: new Date(),
     },
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [semanticSearchResults, setSemanticSearchResults] = useState<SemanticSearchResult[]>([]);
   const financeContext = useFinance();
+  const { latestSnapshot, getSnapshotForDateRange, formatForGPT } = useStoredFinancialData();
   const [conversationContext, setConversationContext] = useState<ConversationMemory>({
     lastQuery: {
       timestamp: '',
@@ -63,19 +65,42 @@ export const useFinancialAssistant = () => {
       // Trigger data fetch if needed
       if (!dataFetchInProgress) {
         setDataFetchInProgress(true);
-        // You could add logic here to refresh financial data if needed
       }
       
       // Capture current UI data with detailed logging - await the Promise
       console.log('Capturing enhanced UI data for financial assistant...');
       const uiData = await captureUIData(financeContext);
       
-      console.log('Enhanced UI data captured:', {
-        activeComponents: uiData.activeComponents,
-        hasSummary: Boolean(uiData.summary),
-        transactionCount: uiData.transactions?.length || 0,
-        expenseCount: uiData.collaboratorExpenses?.length || 0,
-        insightCount: uiData.transactionInsights?.length || 0
+      // Enhance UI data with stored financial data
+      let enhancedUIData = { ...uiData };
+      
+      // Try to get stored data for current date range first
+      if (financeContext.dateRange?.startDate && financeContext.dateRange?.endDate) {
+        const storedSnapshot = getSnapshotForDateRange(
+          financeContext.dateRange.startDate,
+          financeContext.dateRange.endDate
+        );
+        
+        if (storedSnapshot) {
+          console.log('📁 Using stored financial data for current date range');
+          enhancedUIData.storedFinancialData = formatForGPT(storedSnapshot);
+          enhancedUIData.dataSource = 'stored_snapshot';
+        }
+      }
+      
+      // If no specific snapshot found, use latest available
+      if (!enhancedUIData.storedFinancialData && latestSnapshot) {
+        console.log('📁 Using latest stored financial data snapshot');
+        enhancedUIData.storedFinancialData = formatForGPT(latestSnapshot);
+        enhancedUIData.dataSource = 'latest_snapshot';
+      }
+      
+      console.log('Enhanced UI data with stored financial data:', {
+        activeComponents: enhancedUIData.activeComponents,
+        hasSummary: Boolean(enhancedUIData.summary),
+        transactionCount: enhancedUIData.transactions?.length || 0,
+        hasStoredData: Boolean(enhancedUIData.storedFinancialData),
+        dataSource: enhancedUIData.dataSource,
       });
       
       // Track which UI elements were visible for this question
@@ -83,8 +108,8 @@ export const useFinancialAssistant = () => {
         ...conversationContext,
         lastQuery: {
           timestamp: new Date().toISOString(),
-          visibleComponents: uiData.activeComponents || [],
-          focusedElement: uiData.focusedElement
+          visibleComponents: enhancedUIData.activeComponents || [],
+          focusedElement: enhancedUIData.focusedElement
         },
         previousQueries: [
           ...conversationContext.previousQueries,
@@ -97,12 +122,12 @@ export const useFinancialAssistant = () => {
       
       setConversationContext(updatedContext);
       
-      // Send the message to the assistant
+      // Send the message to the assistant with enhanced data
       const assistantResponse = await sendMessageToAssistant(
         messages,
         userMessage,
         financeContext.dateRange,
-        uiData,
+        enhancedUIData,
         updatedContext
       );
       
@@ -170,7 +195,7 @@ export const useFinancialAssistant = () => {
       setIsLoading(false);
       setDataFetchInProgress(false);
     }
-  }, [messages, financeContext, setMessages, conversationContext, dataFetchInProgress]);
+  }, [messages, financeContext, setMessages, conversationContext, dataFetchInProgress, latestSnapshot, getSnapshotForDateRange, formatForGPT]);
   
   // Clear all messages and reset to initial state
   const resetChat = useCallback(() => {
@@ -178,7 +203,7 @@ export const useFinancialAssistant = () => {
       {
         id: 'welcome',
         role: 'assistant',
-        content: '¡Hola! Soy tu asistente financiero con acceso completo a tu historial de datos y capacidades de búsqueda semántica avanzada. Puedo ayudarte a:\n\n• Analizar tus finanzas y identificar tendencias\n• Buscar transacciones específicas por descripción\n• Encontrar patrones de gasto similares\n• Responder preguntas sobre tu historial financiero\n\n¿En qué puedo ayudarte hoy?',
+        content: '¡Hola! Soy tu asistente financiero con acceso completo a tu historial de datos almacenados localmente y capacidades de búsqueda semántica avanzada. Puedo ayudarte a:\n\n• Analizar tus finanzas usando datos guardados localmente\n• Buscar transacciones específicas por descripción\n• Comparar períodos usando datos históricos almacenados\n• Responder preguntas sobre tu historial financiero completo\n\n¿En qué puedo ayudarte hoy?',
         timestamp: new Date(),
       },
     ]);
@@ -194,9 +219,17 @@ export const useFinancialAssistant = () => {
     }); 
   }, []);
 
-  // Suggest questions based on the current financial context and historical data
+  // Suggest questions based on the current financial context and stored data
   const getSuggestedQuestions = useCallback((): string[] => {
     const baseQuestions = generateSuggestedQuestions(financeContext);
+    
+    // Add questions based on stored data availability
+    const storedDataQuestions = [
+      "Compara este mes con datos históricos almacenados",
+      "¿Qué patrones encuentras en mis datos guardados?",
+      "Analiza las tendencias usando datos almacenados",
+      "Busca transacciones similares en datos históricos"
+    ];
     
     // Add semantic search specific suggestions
     const semanticQuestions = [
@@ -206,7 +239,7 @@ export const useFinancialAssistant = () => {
       "Busca pagos similares a servicios públicos"
     ];
     
-    return [...baseQuestions, ...semanticQuestions];
+    return [...baseQuestions, ...storedDataQuestions, ...semanticQuestions];
   }, [financeContext]);
 
   return {
