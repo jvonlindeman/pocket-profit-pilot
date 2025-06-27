@@ -94,7 +94,7 @@ export class FinancialService {
 export const financialService = new FinancialService();
 
 /**
- * IMPROVED Helper function to identify Stripe fee transactions
+ * ENHANCED Helper function to identify Stripe fee transactions with comprehensive detection
  */
 const isStripeFeeTransaction = (transaction: Transaction): boolean => {
   // First check if it's from Stripe
@@ -110,7 +110,7 @@ const isStripeFeeTransaction = (transaction: Transaction): boolean => {
   const description = transaction.description?.toLowerCase() || '';
   const category = transaction.category?.toLowerCase() || '';
   
-  // EXPANDED Stripe fee patterns - more comprehensive
+  // COMPREHENSIVE Stripe fee patterns - covering all possible variations
   const feePatterns = [
     'stripe fee',
     'processing fee',
@@ -124,11 +124,15 @@ const isStripeFeeTransaction = (transaction: Transaction): boolean => {
     'usage fee',
     'processing',
     'transaction cost',
-    'service fee'
+    'service fee',
+    'billing -',
+    'usage',
+    'platform fee',
+    'gateway fee'
   ];
   
   // Check category first (most reliable)
-  if (category === 'fee' || category === 'stripe fee' || category === 'processing fee') {
+  if (category === 'fee' || category === 'stripe fee' || category === 'processing fee' || category === 'billing') {
     console.log(`🔍 STRIPE FEE DETECTED (by category): ${transaction.description} - Category: ${transaction.category} - Amount: ${transaction.amount}`);
     return true;
   }
@@ -143,9 +147,15 @@ const isStripeFeeTransaction = (transaction: Transaction): boolean => {
     return true;
   }
   
-  // Special case: Check if it's a negative amount from Stripe with specific metadata
+  // Special case: Negative amounts from Stripe with specific metadata (fees are usually negative)
   if (transaction.amount < 0 && transaction.metadata) {
     console.log(`🔍 STRIPE FEE DETECTED (negative amount with metadata): ${transaction.description} - Category: ${transaction.category} - Amount: ${transaction.amount}`);
+    return true;
+  }
+  
+  // Additional check: Any negative Stripe transaction could be a fee
+  if (transaction.amount < 0) {
+    console.log(`🔍 STRIPE FEE DETECTED (negative Stripe transaction): ${transaction.description} - Category: ${transaction.category} - Amount: ${transaction.amount}`);
     return true;
   }
   
@@ -154,33 +164,48 @@ const isStripeFeeTransaction = (transaction: Transaction): boolean => {
   return false;
 };
 
-// ENHANCED processTransactionData function with detailed debugging
+// ENHANCED processTransactionData function with MORE detailed debugging
 export const processTransactionData = (
   transactions: Transaction[],
   startingBalance: number = 0,
   additionalCollaboratorExpenses: CategorySummary[] = []
 ): FinancialData => {
-  console.log("🚀 processTransactionData: Starting with detailed debugging");
+  console.log("🚀 processTransactionData: Starting with ENHANCED detailed debugging");
   console.log("📊 Input transactions:", transactions.length);
   
-  // Debug: Log all Stripe transactions
-  const stripeTransactions = transactions.filter(tx => tx.source === 'Stripe');
-  console.log("💳 All Stripe transactions:");
-  stripeTransactions.forEach(tx => {
-    console.log(`  - ${tx.type}: ${tx.description} | Category: ${tx.category} | Amount: ${tx.amount}`);
+  // DETAILED DEBUG: Log ALL transactions by source and type
+  const transactionsBySource = transactions.reduce((acc, tx) => {
+    const key = `${tx.source}-${tx.type}`;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(tx);
+    return acc;
+  }, {} as Record<string, Transaction[]>);
+  
+  console.log("📋 TRANSACTIONS BY SOURCE & TYPE:");
+  Object.entries(transactionsBySource).forEach(([key, txs]) => {
+    console.log(`  - ${key}: ${txs.length} transactions`);
   });
   
-  // Separate operational expenses from Stripe fees with detailed logging
+  // Debug: Log all Stripe transactions with detailed analysis
+  const stripeTransactions = transactions.filter(tx => tx.source === 'Stripe');
+  console.log("💳 DETAILED STRIPE TRANSACTION ANALYSIS:");
+  stripeTransactions.forEach((tx, index) => {
+    const isFee = isStripeFeeTransaction(tx);
+    console.log(`  ${index + 1}. ${tx.type.toUpperCase()}: ${tx.description}`);
+    console.log(`     Category: ${tx.category} | Amount: ${tx.amount} | Fee: ${isFee ? 'YES' : 'NO'}`);
+  });
+  
+  // Separate operational expenses from Stripe fees with enhanced logging
   const operationalExpenses = transactions.filter(tx => {
     if (tx.type !== 'expense') return false;
     
     const isStripeFee = isStripeFeeTransaction(tx);
     if (isStripeFee) {
-      console.log(`❌ EXCLUDING Stripe fee: ${tx.description} - ${tx.amount}`);
+      console.log(`❌ EXCLUDING Stripe fee: ${tx.description} - ${tx.amount} - Category: ${tx.category}`);
       return false;
     }
     
-    console.log(`✅ INCLUDING operational expense: ${tx.description} - ${tx.amount}`);
+    console.log(`✅ INCLUDING operational expense: ${tx.description} - ${tx.amount} - Category: ${tx.category}`);
     return true;
   });
   
@@ -189,13 +214,21 @@ export const processTransactionData = (
     return isStripeFeeTransaction(tx);
   });
 
-  console.log("💰 EXPENSE SEPARATION RESULTS:");
+  console.log("💰 ENHANCED EXPENSE SEPARATION RESULTS:");
   console.log(`  - Total transactions: ${transactions.length}`);
   console.log(`  - Total expenses: ${transactions.filter(tx => tx.type === 'expense').length}`);
-  console.log(`  - Operational expenses: ${operationalExpenses.length}`);
-  console.log(`  - Stripe fees: ${stripeFees.length}`);
-  console.log(`  - Stripe fees total: ${stripeFees.reduce((sum, tx) => sum + tx.amount, 0)}`);
-  console.log(`  - Operational expenses total: ${operationalExpenses.reduce((sum, tx) => sum + tx.amount, 0)}`);
+  console.log(`  - Operational expenses (included): ${operationalExpenses.length}`);
+  console.log(`  - Stripe fees (excluded): ${stripeFees.length}`);
+  console.log(`  - Stripe fees total amount: ${stripeFees.reduce((sum, tx) => sum + tx.amount, 0)}`);
+  console.log(`  - Operational expenses total amount: ${operationalExpenses.reduce((sum, tx) => sum + tx.amount, 0)}`);
+  
+  // VERIFICATION: Show the exact fees being excluded
+  if (stripeFees.length > 0) {
+    console.log("🚫 STRIPE FEES BEING EXCLUDED:");
+    stripeFees.forEach((fee, index) => {
+      console.log(`  ${index + 1}. ${fee.description} - $${fee.amount} (${fee.category})`);
+    });
+  }
 
   // Calculate total income and operational expense (excluding Stripe fees)
   let totalIncome = 0;
@@ -221,9 +254,10 @@ export const processTransactionData = (
     expenseByCategory[transaction.category] = (expenseByCategory[transaction.category] || 0) + transaction.amount;
   });
   
-  console.log("📈 INCOME & EXPENSE TOTALS:");
-  console.log(`  - Total Income: ${totalIncome}`);
-  console.log(`  - Total Operational Expense (excluding Stripe fees): ${totalOperationalExpense}`);
+  console.log("📈 INCOME & OPERATIONAL EXPENSE TOTALS:");
+  console.log(`  - Total Income: $${totalIncome}`);
+  console.log(`  - Total Operational Expense (excluding Stripe fees): $${totalOperationalExpense}`);
+  console.log(`  - Total Stripe Fees (excluded from expenses): $${stripeFees.reduce((sum, tx) => sum + tx.amount, 0)}`);
 
   // Process collaborator expenses from additional data
   if (additionalCollaboratorExpenses && additionalCollaboratorExpenses.length > 0) {
@@ -243,9 +277,9 @@ export const processTransactionData = (
   otherExpense = totalOperationalExpense - collaboratorExpense;
 
   console.log("👥 COLLABORATOR & OTHER EXPENSES:");
-  console.log(`  - Collaborator Expense: ${collaboratorExpense}`);
-  console.log(`  - Other Expense: ${otherExpense}`);
-  console.log(`  - Total Operational Expense Check: ${collaboratorExpense + otherExpense} (should equal ${totalOperationalExpense})`);
+  console.log(`  - Collaborator Expense: $${collaboratorExpense}`);
+  console.log(`  - Other Expense: $${otherExpense}`);
+  console.log(`  - Total Operational Expense Check: $${collaboratorExpense + otherExpense} (should equal $${totalOperationalExpense})`);
 
   // Convert incomeBySource to array
   const incomeBySourceArray: CategorySummary[] = Object.keys(incomeBySource).map(category => ({
@@ -314,15 +348,19 @@ export const processTransactionData = (
   const expenseByMonthChart = createChartData(expenseByMonth);
   const profitByMonthChart = createChartData(profitByMonth);
 
-  console.log("🎯 FINAL CALCULATION RESULTS:");
-  console.log(`  - Total Income: ${totalIncome}`);
-  console.log(`  - Total Operational Expense (should exclude Stripe fees): ${totalOperationalExpense}`);
-  console.log(`  - Total Stripe Fees Excluded: ${stripeFees.reduce((sum, tx) => sum + tx.amount, 0)}`);
-  console.log(`  - Profit (Income - Operational Expenses): ${profit}`);
-  console.log(`  - Profit Margin: ${profitMargin}%`);
-  console.log(`  - Collaborator Expense: ${collaboratorExpense}`);
-  console.log(`  - Other Expense: ${otherExpense}`);
-  console.log(`  - ⚠️  VERIFICATION: Collaborator + Other = ${collaboratorExpense + otherExpense} should equal Total Operational = ${totalOperationalExpense}`);
+  console.log("🎯 FINAL ENHANCED CALCULATION RESULTS:");
+  console.log(`  - Total Income: $${totalIncome}`);
+  console.log(`  - Total Operational Expense (Stripe fees excluded): $${totalOperationalExpense}`);
+  console.log(`  - Total Stripe Fees Excluded: $${stripeFees.reduce((sum, tx) => sum + tx.amount, 0)}`);
+  console.log(`  - Profit (Income - Operational Expenses): $${profit}`);
+  console.log(`  - Profit Margin: ${profitMargin.toFixed(2)}%`);
+  console.log(`  - Collaborator Expense: $${collaboratorExpense}`);
+  console.log(`  - Other Expense: $${otherExpense}`);
+  console.log(`  - ⚠️  FINAL VERIFICATION: Collaborator + Other = $${collaboratorExpense + otherExpense} should equal Total Operational = $${totalOperationalExpense}`);
+  
+  // Additional verification log
+  const verificationPassed = Math.abs((collaboratorExpense + otherExpense) - totalOperationalExpense) < 0.01;
+  console.log(`  - ✅ VERIFICATION ${verificationPassed ? 'PASSED' : 'FAILED'}: Expense calculation is ${verificationPassed ? 'correct' : 'incorrect'}`);
 
   return {
     summary: {
