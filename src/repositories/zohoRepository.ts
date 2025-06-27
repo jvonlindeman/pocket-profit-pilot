@@ -1,12 +1,14 @@
+
 import { Transaction, UnpaidInvoice } from "../types/financial";
 import * as zohoApiClient from "../services/zoho/apiClient";
 import { formatDateYYYYMMDD } from "../utils/dateUtils";
 import { useApiCalls } from "@/contexts/ApiCallsContext";
 import { apiRequestManager } from "@/utils/ApiRequestManager";
+import CacheService from "@/services/cache";
 
 /**
  * ZohoRepository handles all data access related to Zoho,
- * with minimal in-memory caching for UI performance
+ * with cache-first approach to prevent unnecessary webhook calls
  */
 export class ZohoRepository {
   private lastRawResponse: any = null;
@@ -33,7 +35,7 @@ export class ZohoRepository {
   }
   
   /**
-   * Get transactions for a date range with improved deduplication
+   * Get transactions for a date range with cache-first approach
    */
   async getTransactions(
     startDate: Date,
@@ -41,25 +43,45 @@ export class ZohoRepository {
     forceRefresh = false
   ): Promise<Transaction[]> {
     try {
-      console.log(`Getting Zoho transactions from ${startDate} to ${endDate}, forceRefresh: ${forceRefresh}`);
+      console.log(`🔍 ZohoRepository: Getting transactions from ${startDate.toDateString()} to ${endDate.toDateString()}, forceRefresh: ${forceRefresh}`);
       
       // Generate a cache key for deduplication
       const cacheKey = `zoho-transactions-${formatDateYYYYMMDD(startDate)}-${formatDateYYYYMMDD(endDate)}`;
-      
-      // Store the last request key for deduplication
       this.lastRequestKey = cacheKey;
       
       // Check if there's already a request in progress with this key
       if (this.inProgressRequestsMap.has(cacheKey) && !forceRefresh) {
-        console.log(`ZohoRepository: Reusing in-progress request for ${cacheKey}`);
+        console.log(`♻️ ZohoRepository: Reusing in-progress request for ${cacheKey}`);
         return await this.inProgressRequestsMap.get(cacheKey)!;
       }
       
-      // If forcing a refresh, clear the cache entry and in-progress request
-      if (forceRefresh) {
+      // **CACHE-FIRST APPROACH**: Check cache before making any API calls
+      if (!forceRefresh) {
+        console.log(`📦 ZohoRepository: Checking cache first for ${cacheKey}`);
+        
+        const cacheResult = await CacheService.checkCache('Zoho', startDate, endDate);
+        
+        if (cacheResult.cached && !cacheResult.partial) {
+          console.log(`✅ ZohoRepository: Cache HIT - Loading from cache without webhook call`);
+          
+          const cachedTransactions = await CacheService.getTransactions('Zoho', startDate, endDate);
+          
+          if (cachedTransactions && cachedTransactions.length > 0) {
+            console.log(`📋 ZohoRepository: Successfully loaded ${cachedTransactions.length} transactions from cache`);
+            return cachedTransactions;
+          }
+        } else {
+          console.log(`❌ ZohoRepository: Cache MISS or partial cache - Will need to call webhook`);
+        }
+      } else {
+        console.log(`🔄 ZohoRepository: Force refresh requested - Clearing cache and calling webhook`);
+        // Clear cache entries for force refresh
+        await CacheService.clearCache('Zoho', formatDateYYYYMMDD(startDate), formatDateYYYYMMDD(endDate));
         apiRequestManager.clearCacheEntry(cacheKey);
-        this.inProgressRequestsMap.delete(cacheKey);
       }
+      
+      // Only reach here if cache miss or force refresh
+      console.log(`🌐 ZohoRepository: Cache miss or force refresh - Making webhook call`);
       
       // Create and store the promise
       const requestPromise = this.executeTransactionsRequest(cacheKey, startDate, endDate, forceRefresh);
@@ -73,13 +95,13 @@ export class ZohoRepository {
         this.inProgressRequestsMap.delete(cacheKey);
       }
     } catch (error) {
-      console.error("Error fetching transactions from Zoho:", error);
+      console.error("❌ ZohoRepository: Error fetching transactions:", error);
       return []; 
     }
   }
   
   /**
-   * Execute the actual transactions request with ApiRequestManager
+   * Execute the actual transactions request with webhook call tracking
    */
   private async executeTransactionsRequest(
     cacheKey: string,
@@ -87,56 +109,62 @@ export class ZohoRepository {
     endDate: Date,
     forceRefresh: boolean
   ): Promise<Transaction[]> {
-    return await apiRequestManager.executeRequest(
-      cacheKey,
-      async () => {
-        // Track the API call
-        this.trackApiCall();
+    console.log(`🚀 ZohoRepository: WEBHOOK CALL - Making actual API request for ${cacheKey}`);
+    
+    // Track the API call
+    this.trackApiCall();
+    
+    // Use the unified API client gateway function
+    const response = await zohoApiClient.fetchZohoData(startDate, endDate, forceRefresh);
+    
+    // Store the raw response for debugging
+    this.lastRawResponse = response;
+    
+    let transactions: Transaction[] = [];
+    
+    if (Array.isArray(response)) {
+      // If the response is already an array of Transaction objects
+      console.log(`📊 ZohoRepository: Received ${response.length} already processed Zoho transactions`);
+      transactions = response;
+    } 
+    else if (response && typeof response === 'object') {
+      if (response.cached_transactions && Array.isArray(response.cached_transactions)) {
+        // If we received a structured response with transactions inside
+        console.log(`📋 ZohoRepository: Received ${response.cached_transactions.length} cached Zoho transactions`);
+        transactions = response.cached_transactions;
+      } 
+      else {
+        // Process the raw response through our processor
+        console.log("⚙️ ZohoRepository: Processing raw Zoho response data");
+        const processed = zohoApiClient.processTransactionResponse(response);
+        transactions = processed;
         
-        // Use the unified API client gateway function
-        const response = await zohoApiClient.fetchZohoData(startDate, endDate, forceRefresh);
+        // Also process unpaid invoices if available
+        this.unpaidInvoices = zohoApiClient.processUnpaidInvoicesResponse(response);
         
-        // Store the raw response for debugging
-        this.lastRawResponse = response;
-        
-        let transactions: Transaction[] = [];
-        
-        if (Array.isArray(response)) {
-          // If the response is already an array of Transaction objects
-          console.log(`Received ${response.length} already processed Zoho transactions`);
-          transactions = response;
-        } 
-        else if (response && typeof response === 'object') {
-          if (response.cached_transactions && Array.isArray(response.cached_transactions)) {
-            // If we received a structured response with transactions inside
-            console.log(`Received ${response.cached_transactions.length} cached Zoho transactions`);
-            transactions = response.cached_transactions;
-          } 
-          else {
-            // Process the raw response through our processor
-            console.log("Processing raw Zoho response data");
-            const processed = zohoApiClient.processTransactionResponse(response);
-            transactions = processed;
-            
-            // Also process unpaid invoices if available
-            this.unpaidInvoices = zohoApiClient.processUnpaidInvoicesResponse(response);
-            
-            // Process collaborator data if available
-            if (response.colaboradores && Array.isArray(response.colaboradores)) {
-              this.collaboratorExpenses = response.colaboradores;
-              console.log(`Processed ${this.collaboratorExpenses.length} collaborator expenses`);
-            }
-            
-            console.log(`Processed ${this.unpaidInvoices.length} unpaid invoices`);
-          }
+        // Process collaborator data if available
+        if (response.colaboradores && Array.isArray(response.colaboradores)) {
+          this.collaboratorExpenses = response.colaboradores;
+          console.log(`👥 ZohoRepository: Processed ${this.collaboratorExpenses.length} collaborator expenses`);
         }
         
-        console.log(`Final transaction count: ${transactions.length}`);
-        return transactions;
-      },
-      forceRefresh ? 0 : 5 * 60 * 1000, // 5 minutes TTL, or 0 if force refresh
-      30000 // 30 second cooldown (increased from default)
-    );
+        console.log(`📋 ZohoRepository: Processed ${this.unpaidInvoices.length} unpaid invoices`);
+      }
+    }
+    
+    // Store in cache after successful fetch
+    if (transactions.length > 0) {
+      console.log(`💾 ZohoRepository: Storing ${transactions.length} transactions in cache`);
+      try {
+        await CacheService.storeTransactions('Zoho', startDate, endDate, transactions);
+      } catch (cacheError) {
+        console.error("⚠️ ZohoRepository: Failed to store transactions in cache:", cacheError);
+        // Continue without failing the request
+      }
+    }
+    
+    console.log(`✅ ZohoRepository: Final transaction count: ${transactions.length}`);
+    return transactions;
   }
   
   /**
@@ -161,25 +189,25 @@ export class ZohoRepository {
   }
 
   /**
-   * Get raw response data directly with improved deduplication
+   * Get raw response data directly with cache-first approach
    */
   async getRawResponse(startDate: Date, endDate: Date, forceRefresh = false): Promise<any> {
     try {
-      console.log("Fetching Zoho raw response for", startDate, "to", endDate);
+      console.log("🔍 ZohoRepository: Fetching raw response for", startDate.toDateString(), "to", endDate.toDateString());
       
       // Generate a cache key for deduplication
       const cacheKey = `zoho-raw-response-${formatDateYYYYMMDD(startDate)}-${formatDateYYYYMMDD(endDate)}`;
       
       // Check if there's already a request in progress with this key
       if (this.inProgressRequestsMap.has(cacheKey) && !forceRefresh) {
-        console.log(`ZohoRepository: Reusing in-progress raw request for ${cacheKey}`);
+        console.log(`♻️ ZohoRepository: Reusing in-progress raw request for ${cacheKey}`);
         return await this.inProgressRequestsMap.get(cacheKey)!;
       }
       
-      // If forcing a refresh, clear the cache entry and in-progress request
+      // For raw responses, we always call the API as this is typically for debugging
       if (forceRefresh) {
+        console.log(`🔄 ZohoRepository: Force refresh for raw response - clearing cache`);
         apiRequestManager.clearCacheEntry(cacheKey);
-        this.inProgressRequestsMap.delete(cacheKey);
       }
       
       // Create and store the promise
@@ -194,13 +222,13 @@ export class ZohoRepository {
         this.inProgressRequestsMap.delete(cacheKey);
       }
     } catch (error) {
-      console.error("Error fetching raw Zoho response:", error);
+      console.error("❌ ZohoRepository: Error fetching raw response:", error);
       return { error: error.message || "Unknown error" };
     }
   }
   
   /**
-   * Execute the actual raw response request with ApiRequestManager
+   * Execute the actual raw response request
    */
   private async executeRawResponseRequest(
     cacheKey: string,
@@ -208,34 +236,30 @@ export class ZohoRepository {
     endDate: Date,
     forceRefresh: boolean
   ): Promise<any> {
-    return await apiRequestManager.executeRequest(
-      cacheKey,
-      async () => {
-        // Track the API call
-        this.trackApiCall();
-        
-        // Fetch raw data
-        const rawData = await zohoApiClient.fetchZohoData(startDate, endDate, forceRefresh, true);
-        this.lastRawResponse = rawData;
-        return rawData;
-      },
-      forceRefresh ? 0 : 5 * 60 * 1000, // 5 minutes TTL, or 0 if force refresh
-      30000 // 30 second cooldown (increased from default)
-    );
+    console.log(`🚀 ZohoRepository: RAW WEBHOOK CALL - Making raw API request for ${cacheKey}`);
+    
+    // Track the API call
+    this.trackApiCall();
+    
+    // Fetch raw data
+    const rawData = await zohoApiClient.fetchZohoData(startDate, endDate, forceRefresh, true);
+    this.lastRawResponse = rawData;
+    return rawData;
   }
 
   /**
-   * Check if API is accessible
+   * Check if API is accessible with minimal cache
    */
   async checkApiConnectivity(): Promise<boolean> {
     try {
       // Use a fixed cache key for connectivity checks with long cooldown
       const cacheKey = `zoho-connectivity-check`;
       
-      // Use the ApiRequestManager to deduplicate requests
       return await apiRequestManager.executeRequest(
         cacheKey,
         async () => {
+          console.log(`🔌 ZohoRepository: CONNECTIVITY WEBHOOK CALL - Checking API connectivity`);
+          
           // Track the API call
           this.trackApiCall();
           
@@ -248,8 +272,8 @@ export class ZohoRepository {
           );
           return !!response && !response.error;
         },
-        60000, // 60 second TTL for connectivity checks (increased)
-        5000   // 5 second cooldown
+        5 * 60 * 1000, // 5 minute TTL for connectivity checks
+        30000   // 30 second cooldown
       );
     } catch {
       return false;

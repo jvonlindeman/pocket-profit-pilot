@@ -1,92 +1,187 @@
 
 /**
- * ApiRequestManager - Gestiona las peticiones API para prevenir duplicados y mejorar el rendimiento
+ * ApiRequestManager handles request deduplication and caching at the application level
+ * This ensures that identical requests are not made multiple times and provides
+ * a consistent caching layer across all API operations.
  */
-class ApiRequestManager {
-  private activeRequests = new Map<string, Promise<any>>();
-  private requestCooldowns = new Map<string, number>();
-  private lastRequestTimes = new Map<string, number>();
-  
+
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+  ttl: number;
+}
+
+interface RequestState {
+  promise: Promise<any>;
+  timestamp: number;
+}
+
+export class ApiRequestManager {
+  private cache: Map<string, CacheEntry<any>> = new Map();
+  private inFlightRequests: Map<string, RequestState> = new Map();
+  private requestCooldowns: Map<string, number> = new Map();
+
   /**
-   * Ejecuta una petición con deduplicación y cooldown
+   * Execute a request with deduplication and caching
    */
   async executeRequest<T>(
     key: string,
     requestFn: () => Promise<T>,
-    ttl: number = 30000, // 30 segundos por defecto
-    cooldown: number = 5000 // 5 segundos entre requests
+    ttl: number = 5 * 60 * 1000, // 5 minutes default TTL
+    cooldownMs: number = 1000 // 1 second default cooldown
   ): Promise<T> {
+    console.log(`🔧 ApiRequestManager: Executing request for key: ${key}`);
+    
+    // Check if there's a valid cached entry
+    const cachedEntry = this.cache.get(key);
     const now = Date.now();
     
-    // Verificar cooldown
-    const lastRequestTime = this.lastRequestTimes.get(key) || 0;
+    if (cachedEntry && (now - cachedEntry.timestamp) < cachedEntry.ttl) {
+      console.log(`💾 ApiRequestManager: Cache HIT for ${key} (age: ${Math.round((now - cachedEntry.timestamp) / 1000)}s)`);
+      return cachedEntry.data;
+    }
+
+    // Check if there's already an in-flight request
+    const inFlight = this.inFlightRequests.get(key);
+    if (inFlight) {
+      console.log(`✈️ ApiRequestManager: Request already in-flight for ${key}, waiting for completion`);
+      return await inFlight.promise;
+    }
+
+    // Check cooldown period
+    const lastRequestTime = this.requestCooldowns.get(key) || 0;
     const timeSinceLastRequest = now - lastRequestTime;
     
-    if (timeSinceLastRequest < cooldown) {
-      console.log(`[API_REQUEST_MANAGER] Request ${key} en cooldown, esperando ${cooldown - timeSinceLastRequest}ms`);
-      throw new Error(`Request too frequent. Wait ${cooldown - timeSinceLastRequest}ms`);
+    if (timeSinceLastRequest < cooldownMs) {
+      const remainingCooldown = cooldownMs - timeSinceLastRequest;
+      console.log(`⏰ ApiRequestManager: Request ${key} is in cooldown, waiting ${remainingCooldown}ms`);
+      
+      // Return cached data if available during cooldown
+      if (cachedEntry) {
+        console.log(`💾 ApiRequestManager: Returning stale cache during cooldown for ${key}`);
+        return cachedEntry.data;
+      }
+      
+      // Wait for cooldown to complete
+      await new Promise(resolve => setTimeout(resolve, remainingCooldown));
     }
+
+    // Create and execute the request
+    console.log(`🚀 ApiRequestManager: Making fresh request for ${key}`);
+    const requestPromise = requestFn();
     
-    // Verificar si hay una petición activa para esta key
-    if (this.activeRequests.has(key)) {
-      console.log(`[API_REQUEST_MANAGER] Reutilizando request activo para ${key}`);
-      return this.activeRequests.get(key)!;
+    // Store in-flight request
+    this.inFlightRequests.set(key, {
+      promise: requestPromise,
+      timestamp: now
+    });
+
+    // Update request time for cooldown tracking
+    this.requestCooldowns.set(key, now);
+
+    try {
+      const result = await requestPromise;
+      
+      // Cache the successful result
+      if (ttl > 0) {
+        this.cache.set(key, {
+          data: result,
+          timestamp: now,
+          ttl
+        });
+        console.log(`💾 ApiRequestManager: Cached result for ${key} (TTL: ${Math.round(ttl / 1000)}s)`);
+      }
+
+      return result;
+    } catch (error) {
+      console.error(`❌ ApiRequestManager: Request failed for ${key}:`, error);
+      throw error;
+    } finally {
+      // Clean up in-flight request
+      this.inFlightRequests.delete(key);
     }
-    
-    // Crear nueva petición
-    console.log(`[API_REQUEST_MANAGER] Iniciando nueva petición ${key}`);
-    this.lastRequestTimes.set(key, now);
-    
-    const requestPromise = requestFn()
-      .finally(() => {
-        // Limpiar la petición activa después del TTL
-        setTimeout(() => {
-          this.activeRequests.delete(key);
-        }, ttl);
-      });
-    
-    this.activeRequests.set(key, requestPromise);
-    return requestPromise;
   }
-  
+
   /**
-   * Limpia una entrada específica de caché
+   * Clear a specific cache entry (useful for force refresh)
    */
   clearCacheEntry(key: string): void {
-    this.activeRequests.delete(key);
+    const cleared = this.cache.delete(key);
+    if (cleared) {
+      console.log(`🗑️ ApiRequestManager: Cleared cache entry for ${key}`);
+    }
+    
+    // Also clear any cooldown for immediate refresh
     this.requestCooldowns.delete(key);
-    this.lastRequestTimes.delete(key);
-    console.log(`[API_REQUEST_MANAGER] Cache entry cleared for ${key}`);
+    console.log(`🔄 ApiRequestManager: Cleared cooldown for ${key}`);
   }
-  
+
   /**
-   * Limpia una petición específica
+   * Clear all cache entries (useful for global refresh)
    */
-  clearRequest(key: string): void {
-    this.activeRequests.delete(key);
-    this.requestCooldowns.delete(key);
-    this.lastRequestTimes.delete(key);
-  }
-  
-  /**
-   * Limpia todas las peticiones
-   */
-  clearAllRequests(): void {
-    this.activeRequests.clear();
+  clearAllCache(): void {
+    const cacheSize = this.cache.size;
+    this.cache.clear();
     this.requestCooldowns.clear();
-    this.lastRequestTimes.clear();
+    console.log(`🗑️ ApiRequestManager: Cleared all cache (${cacheSize} entries)`);
   }
-  
+
   /**
-   * Obtiene el estado de las peticiones activas
+   * Get cache statistics
    */
-  getActiveRequestsStatus(): Record<string, any> {
+  getCacheStats(): {
+    totalEntries: number;
+    totalInFlight: number;
+    entries: Array<{
+      key: string;
+      age: number;
+      ttl: number;
+      isExpired: boolean;
+    }>;
+  } {
+    const now = Date.now();
+    const entries = Array.from(this.cache.entries()).map(([key, entry]) => ({
+      key,
+      age: now - entry.timestamp,
+      ttl: entry.ttl,
+      isExpired: (now - entry.timestamp) >= entry.ttl
+    }));
+
     return {
-      activeRequests: Array.from(this.activeRequests.keys()),
-      cooldowns: Object.fromEntries(this.requestCooldowns),
-      lastRequestTimes: Object.fromEntries(this.lastRequestTimes)
+      totalEntries: this.cache.size,
+      totalInFlight: this.inFlightRequests.size,
+      entries
     };
+  }
+
+  /**
+   * Clean up expired cache entries
+   */
+  cleanupExpiredEntries(): number {
+    const now = Date.now();
+    let cleanedCount = 0;
+
+    for (const [key, entry] of this.cache.entries()) {
+      if ((now - entry.timestamp) >= entry.ttl) {
+        this.cache.delete(key);
+        cleanedCount++;
+      }
+    }
+
+    if (cleanedCount > 0) {
+      console.log(`🧹 ApiRequestManager: Cleaned up ${cleanedCount} expired cache entries`);
+    }
+
+    return cleanedCount;
   }
 }
 
+// Export a singleton instance
 export const apiRequestManager = new ApiRequestManager();
+
+// Auto-cleanup expired entries every 5 minutes
+if (typeof window !== 'undefined') {
+  setInterval(() => {
+    apiRequestManager.cleanupExpiredEntries();
+  }, 5 * 60 * 1000);
+}
