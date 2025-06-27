@@ -27,6 +27,13 @@ export class ZohoRepository implements IRepository {
   setApiCallsContext(context: ReturnType<typeof useApiCalls>) {
     this.apiOps.setApiCallsContext(context);
   }
+
+  /**
+   * Set webhook prevention flag
+   */
+  setWebhooksDisabled(disabled: boolean) {
+    this.apiOps.setWebhooksDisabled(disabled);
+  }
   
   /**
    * Get transactions for a date range with cache-first approach

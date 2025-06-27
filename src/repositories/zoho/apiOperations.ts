@@ -12,12 +12,21 @@ export class ZohoApiOperations {
   private unpaidInvoices: UnpaidInvoice[] = [];
   private collaboratorExpenses: any[] = [];
   private apiCallsContext?: any;
+  private webhooksDisabled = false;
 
   /**
    * Set the API calls context for tracking
    */
   setApiCallsContext(context: any) {
     this.apiCallsContext = context;
+  }
+
+  /**
+   * Set webhook prevention flag
+   */
+  setWebhooksDisabled(disabled: boolean) {
+    this.webhooksDisabled = disabled;
+    console.log(`🔧 ZohoApiOperations: Webhooks ${disabled ? 'DISABLED' : 'ENABLED'}`);
   }
 
   /**
@@ -30,6 +39,17 @@ export class ZohoApiOperations {
   }
 
   /**
+   * Check if webhooks should be prevented
+   */
+  private shouldPreventWebhook(): boolean {
+    if (this.webhooksDisabled) {
+      console.warn("🚫 ZohoApiOperations: WEBHOOK CALL PREVENTED - Webhooks are disabled");
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Execute the actual transactions request with webhook call tracking
    */
   async executeTransactionsRequest(
@@ -38,6 +58,11 @@ export class ZohoApiOperations {
     endDate: Date,
     forceRefresh: boolean
   ): Promise<Transaction[]> {
+    if (this.shouldPreventWebhook()) {
+      console.warn("🚫 ZohoApiOperations: WEBHOOK CALL BLOCKED - Returning empty array");
+      return [];
+    }
+
     console.log(`🚀 ZohoApiOperations: WEBHOOK CALL STARTING - Making actual API request for ${cacheKey}`);
     console.log(`📡 WEBHOOK CALL: Zoho webhook will be called for date range ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
     
@@ -97,6 +122,11 @@ export class ZohoApiOperations {
     endDate: Date,
     forceRefresh: boolean
   ): Promise<any> {
+    if (this.shouldPreventWebhook()) {
+      console.warn("🚫 ZohoApiOperations: RAW WEBHOOK CALL BLOCKED - Returning empty object");
+      return { error: "Webhooks disabled" };
+    }
+
     console.log(`🚀 ZohoApiOperations: RAW WEBHOOK CALL STARTING - Making raw API request for ${cacheKey}`);
     console.log(`📡 WEBHOOK CALL: Zoho raw webhook will be called for date range ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
     
@@ -115,6 +145,11 @@ export class ZohoApiOperations {
    * Check API connectivity
    */
   async checkConnectivity(): Promise<boolean> {
+    if (this.shouldPreventWebhook()) {
+      console.warn("🚫 ZohoApiOperations: CONNECTIVITY CHECK BLOCKED - Returning false");
+      return false;
+    }
+
     try {
       // Use a fixed cache key for connectivity checks with long cooldown
       const cacheKey = `zoho-connectivity-check`;
