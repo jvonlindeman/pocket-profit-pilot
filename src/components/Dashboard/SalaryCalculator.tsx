@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calculator, DollarSign, ArrowDown, ArrowUp, Percent, Info, ToggleLeft, ToggleRight } from 'lucide-react';
@@ -43,9 +42,9 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
     });
   }, [zohoIncome, stripeIncome, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, includeZohoFiftyPercent, startingBalance, totalZohoExpenses]);
 
-  // FIXED CALCULATION: Remove double-subtraction of expenses
-  // Starting balance already represents net money from previous month
-  const adjustedZohoIncome = (startingBalance || 0) + zohoIncome;
+  // CORRECTED CALCULATION: Restore proper expense deduction to reflect real bank balance
+  // Starting balance + new income - current month expenses = actual money in bank
+  const adjustedZohoIncome = (startingBalance || 0) + zohoIncome - totalZohoExpenses;
   const profitFirstAmount = (adjustedZohoIncome * profitPercentage) / 100;
   const taxReserveAmount = (adjustedZohoIncome * taxReservePercentage) / 100;
   const totalZohoDeductions = opexAmount + itbmAmount + profitFirstAmount + taxReserveAmount;
@@ -58,14 +57,13 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
     ? halfStripeIncome + halfRemainingZoho  // Include both
     : halfStripeIncome;                     // Only Stripe
   
-  // Debug calculation results with FIXED formula
-  console.log("SalaryCalculator: FIXED Calculation results:", {
+  // Debug calculation results with CORRECTED formula
+  console.log("SalaryCalculator: CORRECTED Calculation results:", {
     startingBalance,
     zohoIncome,
     totalZohoExpenses,
-    adjustedZohoIncome_OLD_FORMULA: (startingBalance || 0) + zohoIncome - totalZohoExpenses,
-    adjustedZohoIncome_NEW_FIXED: adjustedZohoIncome,
-    difference: adjustedZohoIncome - ((startingBalance || 0) + zohoIncome - totalZohoExpenses),
+    adjustedZohoIncome_CORRECTED: adjustedZohoIncome,
+    explanation: "startingBalance + zohoIncome - totalZohoExpenses = real bank balance",
     profitFirstAmount,
     taxReserveAmount,
     totalZohoDeductions,
@@ -173,7 +171,7 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p className="text-xs">Dinero dejado en el banco al final del mes anterior (ya neto de gastos)</p>
+                      <p className="text-xs">Dinero dejado en el banco al final del mes anterior</p>
                     </TooltipContent>
                   </Tooltip>
                   
@@ -240,11 +238,10 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                     </TooltipContent>
                   </Tooltip>
 
-                  {/* Note about current month expenses */}
-                  <div className="bg-yellow-50 rounded-md p-3 border border-yellow-200">
-                    <p className="text-xs text-yellow-700">
-                      <strong>Nota:</strong> Los gastos del mes actual ({formatCurrency(totalZohoExpenses)}) 
-                      ya están reflejados en las transacciones y no se deducen aquí para evitar doble contabilización.
+                  {/* Current month expenses note - UPDATED */}
+                  <div className="bg-blue-50 rounded-md p-3 border border-blue-200">
+                    <p className="text-xs text-blue-700">
+                      <strong>Gastos del mes actual:</strong> {formatCurrency(totalZohoExpenses)} ya descontados del balance para reflejar el dinero real disponible en el banco.
                     </p>
                   </div>
                 </div>
@@ -267,18 +264,18 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                     <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-3 rounded-lg border border-blue-200">
                       <div className="flex justify-between items-center">
                         <div>
-                          <p className="text-xs text-blue-700">Fondos Disponibles Zoho</p>
+                          <p className="text-xs text-blue-700">Dinero Real en Banco (Zoho)</p>
                           <p className="font-medium text-blue-800">{formatCurrency(adjustedZohoIncome)}</p>
                         </div>
                         <div className="bg-blue-200 p-2 rounded-full">
                           <Calculator className="h-4 w-4 text-blue-700" />
                         </div>
                       </div>
-                      <p className="text-xs text-blue-600 mt-2">Balance Inicial + Ingresos Zoho del Mes</p>
+                      <p className="text-xs text-blue-600 mt-2">Balance Inicial + Ingresos - Gastos del Mes</p>
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="text-xs">Total de fondos disponibles antes de deducciones del mes actual. El balance inicial ya refleja gastos previos.</p>
+                    <p className="text-xs">Dinero real disponible en el banco después de gastos del mes actual. Fórmula: Balance Inicial + Ingresos Zoho - Gastos del Mes.</p>
                   </TooltipContent>
                 </Tooltip>
 
@@ -340,7 +337,7 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="text-xs">Fondos de Zoho después de todas las deducciones</p>
+                    <p className="text-xs">Dinero real de Zoho después de todas las deducciones</p>
                   </TooltipContent>
                 </Tooltip>
 
