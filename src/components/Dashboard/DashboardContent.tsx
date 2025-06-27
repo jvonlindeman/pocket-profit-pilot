@@ -1,3 +1,4 @@
+
 import React from 'react';
 import PeriodHeader from './PeriodHeader';
 import CacheMonitor from './CacheMonitor';
@@ -6,9 +7,10 @@ import MonthlyBalanceEditor from './MonthlyBalanceEditor';
 import SalaryCalculator from './SalaryCalculator';
 import FinanceSummary from './FinanceSummary';
 import TransactionList from './TransactionList';
+import { FinanceProvider } from '@/contexts/FinanceContext';
 import { FinancialSummary, Transaction, UnpaidInvoice } from '@/types/financial';
 
-// --- NEW TYPE DEFINITIONS ---
+// --- TYPE DEFINITIONS ---
 interface CoreData {
   periodTitle: string;
   dateRange: { startDate: Date; endDate: Date };
@@ -118,70 +120,96 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   console.log("💼 DashboardContent: Unpaid invoices:", unpaidInvoices?.length || 0);
   console.log("💼 DashboardContent: PASSING includeZohoFiftyPercent to SalaryCalculator:", includeZohoFiftyPercent);
 
+  // Filter collaborator expenses for FinanceProvider
+  const collaboratorExpenses = financialData.expenseByCategory?.filter(
+    category => category.category && (
+      category.category.toLowerCase().includes('colaborador') ||
+      category.category.toLowerCase().includes('collaborator') ||
+      category.category === 'Colaboradores' ||
+      category.category === 'Collaborators'
+    )
+  ) || [];
+
   return (
-    <>
-      {/* Period and refresh button */}
-      <PeriodHeader periodTitle={periodTitle} onRefresh={handleRefresh} />
-      
-      {/* Use our new CacheMonitor component */}
-      <CacheMonitor 
-        dateRange={dateRange}
-        onRefresh={() => refreshData(true)}
-      />
-
-      {/* Warning message when no transactions exist */}
-      {financialData.transactions.length === 0 && <NoTransactionsWarning />}
-
-      {/* Monthly Balance Editor moved up to be above FinanceSummary */}
-      <div className="mb-6">
-        <MonthlyBalanceEditor 
-          currentDate={currentMonthDate}
-          onBalanceChange={handleBalanceChange}
+    <FinanceProvider
+      summary={financialData.summary}
+      transactions={financialData.transactions}
+      dateRange={dateRange}
+      stripeIncome={stripeIncome}
+      stripeFees={stripeFees}
+      stripeTransactionFees={stripeTransactionFees}
+      stripePayoutFees={stripePayoutFees}
+      stripeAdditionalFees={stripeAdditionalFees}
+      stripeNet={stripeNet}
+      stripeFeePercentage={stripeFeePercentage}
+      regularIncome={regularIncome}
+      collaboratorExpenses={collaboratorExpenses}
+      unpaidInvoices={unpaidInvoices}
+    >
+      <>
+        {/* Period and refresh button */}
+        <PeriodHeader periodTitle={periodTitle} onRefresh={handleRefresh} />
+        
+        {/* Use our new CacheMonitor component */}
+        <CacheMonitor 
+          dateRange={dateRange}
+          onRefresh={() => refreshData(true)}
         />
-      </div>
 
-      {/* Salary Calculator with IMMEDIATE REACTIVE UPDATES - FIXED: Now properly passing includeZohoFiftyPercent */}
-      <div className="mb-6">
-        <SalaryCalculator 
-          key={calculatorKey}
-          zohoIncome={regularIncome}
-          stripeIncome={stripeNet}
-          opexAmount={opexAmount}
-          itbmAmount={itbmAmount}
-          profitPercentage={profitPercentage}
-          taxReservePercentage={taxReservePercentage}
-          includeZohoFiftyPercent={includeZohoFiftyPercent}
-          startingBalance={startingBalance}
-          totalZohoExpenses={totalZohoExpenses}
+        {/* Warning message when no transactions exist */}
+        {financialData.transactions.length === 0 && <NoTransactionsWarning />}
+
+        {/* Monthly Balance Editor moved up to be above FinanceSummary */}
+        <div className="mb-6">
+          <MonthlyBalanceEditor 
+            currentDate={currentMonthDate}
+            onBalanceChange={handleBalanceChange}
+          />
+        </div>
+
+        {/* Salary Calculator with IMMEDIATE REACTIVE UPDATES - FIXED: Now properly passing includeZohoFiftyPercent */}
+        <div className="mb-6">
+          <SalaryCalculator 
+            key={calculatorKey}
+            zohoIncome={regularIncome}
+            stripeIncome={stripeNet}
+            opexAmount={opexAmount}
+            itbmAmount={itbmAmount}
+            profitPercentage={profitPercentage}
+            taxReservePercentage={taxReservePercentage}
+            includeZohoFiftyPercent={includeZohoFiftyPercent}
+            startingBalance={startingBalance}
+            totalZohoExpenses={totalZohoExpenses}
+          />
+        </div>
+
+        {/* Financial Summary with improved organization */}
+        <FinanceSummary 
+          summary={financialData.summary} 
+          expenseCategories={financialData.expenseByCategory}
+          stripeIncome={stripeIncome}
+          stripeFees={stripeFees}
+          stripeTransactionFees={stripeTransactionFees}
+          stripePayoutFees={stripePayoutFees}
+          stripeAdditionalFees={stripeAdditionalFees}
+          stripeNet={stripeNet}
+          stripeFeePercentage={stripeFeePercentage}
+          regularIncome={regularIncome}
+          dateRange={dateRange}
+          transactions={financialData.transactions}
+          unpaidInvoices={unpaidInvoices}
         />
-      </div>
 
-      {/* Financial Summary with improved organization */}
-      <FinanceSummary 
-        summary={financialData.summary} 
-        expenseCategories={financialData.expenseByCategory}
-        stripeIncome={stripeIncome}
-        stripeFees={stripeFees}
-        stripeTransactionFees={stripeTransactionFees}
-        stripePayoutFees={stripePayoutFees}
-        stripeAdditionalFees={stripeAdditionalFees}
-        stripeNet={stripeNet}
-        stripeFeePercentage={stripeFeePercentage}
-        regularIncome={regularIncome}
-        dateRange={dateRange}
-        transactions={financialData.transactions}
-        unpaidInvoices={unpaidInvoices}
-      />
-
-      {/* Listado de transacciones */}
-      <div className="mt-6">
-        <TransactionList 
-          transactions={financialData.transactions} 
-          onRefresh={handleRefresh}
-          isLoading={loading}
-        />
-      </div>
-    </>
+        {/* Listado de transacciones */}
+        <div className="mt-6">
+          <TransactionList 
+            transactions={financialData.transactions} 
+            onRefresh={handleRefresh}
+            isLoading={loading}
+          />
+        </div>
+      </>
+    </FinanceProvider>
   );
 };
 
