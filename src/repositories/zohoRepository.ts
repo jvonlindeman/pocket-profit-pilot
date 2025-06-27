@@ -5,6 +5,7 @@ import { formatDateYYYYMMDD } from "../utils/dateUtils";
 import { useApiCalls } from "@/contexts/ApiCallsContext";
 import { apiRequestManager } from "@/utils/ApiRequestManager";
 import CacheService from "@/services/cache";
+import { cacheStorage } from "@/services/cache/storage";
 
 /**
  * ZohoRepository handles all data access related to Zoho,
@@ -67,7 +68,7 @@ export class ZohoRepository {
           // Use the cache storage to get transactions directly
           const startDateStr = formatDateYYYYMMDD(startDate);
           const endDateStr = formatDateYYYYMMDD(endDate);
-          const cachedTransactions = await CacheService.getTransactions('Zoho', startDateStr, endDateStr);
+          const cachedTransactions = await cacheStorage.getTransactions('Zoho', startDateStr, endDateStr);
           
           if (cachedTransactions && cachedTransactions.length > 0) {
             console.log(`📋 ZohoRepository: Successfully loaded ${cachedTransactions.length} transactions from cache`);
