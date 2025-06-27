@@ -5,7 +5,6 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { Toaster } from "@/components/ui/toaster";
 import { ApiCallsProvider } from "@/contexts/ApiCallsContext";
 import { CacheProvider } from "@/contexts/CacheContext";
-import { FinanceProvider } from "@/contexts/FinanceContext";
 import { WebhookPreventionProvider } from "@/contexts/WebhookPreventionContext";
 import Index from "@/pages/Index";
 import NotFound from "@/pages/NotFound";
@@ -20,18 +19,16 @@ function App() {
       <WebhookPreventionProvider>
         <ApiCallsProvider>
           <CacheProvider>
-            <FinanceProvider>
-              <Router>
-                <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/zoho-callback" element={<ZohoCallback />} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-                <Toaster />
-              </Router>
-              <ReactQueryDevtools initialIsOpen={false} />
-            </FinanceProvider>
+            <Router>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/zoho-callback" element={<ZohoCallback />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+              <Toaster />
+            </Router>
+            <ReactQueryDevtools initialIsOpen={false} />
           </CacheProvider>
         </ApiCallsProvider>
       </WebhookPreventionProvider>
