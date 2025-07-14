@@ -67,7 +67,7 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
         notes: formNotes
       } = getFormValues();
       
-      console.log("💾 InitialBalanceDialog: handleSave CALLED WITH VALUES:", {
+      console.log("💾 InitialBalanceDialog: Starting save process with values:", {
         balanceNum,
         opexNum,
         itbmNum,
@@ -90,6 +90,9 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
       
       // Only close dialog if save was successful
       if (success) {
+        console.log("💾 InitialBalanceDialog: Save successful, allowing state propagation before closing");
+        // Small delay to ensure state propagation before closing
+        await new Promise(resolve => setTimeout(resolve, 150));
         onOpenChange(false);
       }
     } finally {

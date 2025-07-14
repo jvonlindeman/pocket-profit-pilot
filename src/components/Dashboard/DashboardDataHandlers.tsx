@@ -53,7 +53,7 @@ export const useDashboardDataHandlers = ({
     }
   }, [checkBalanceExists, setShowBalanceDialog, toast, hasCachedData, refreshData]);
 
-  // Handle balance saved in dialog
+  // Handle balance saved in dialog - ENHANCED with immediate state propagation
   const handleBalanceSaved = useCallback(async (
     balance: number,
     opexAmount: number = 35,
@@ -68,6 +68,11 @@ export const useDashboardDataHandlers = ({
     });
     
     try {
+      // PHASE 1: Immediate state propagation - update starting balance first
+      console.log("💾 DashboardDataHandlers: Immediately updating starting balance before database save");
+      setStartingBalance(balance);
+      
+      // PHASE 2: Save to database
       const success = await updateMonthlyBalance(
         balance,
         opexAmount,
@@ -79,11 +84,17 @@ export const useDashboardDataHandlers = ({
       );
 
       if (success) {
-        setStartingBalance(balance);
         toast({
           title: 'Balance inicial guardado',
           description: 'Configuración actualizada exitosamente',
         });
+        
+        // PHASE 3: Small delay before refresh to allow UI to update
+        console.log("💾 DashboardDataHandlers: Waiting 100ms before refresh to allow UI update");
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // PHASE 4: Background refresh
+        console.log("💾 DashboardDataHandlers: Starting background refresh");
         refreshData(false); // Refresh data after successful save
         return true;
       } else {

@@ -95,10 +95,13 @@ export const useDashboardStateManager = () => {
     timestamp: new Date().toISOString()
   });
   
-  // REACTIVE KEY: Forces complete re-render when ANY value changes - FIXED: Added includeZohoFiftyPercent
-  const calculatorKey = `calculator-${monthlyBalance?.id || 'default'}-${monthlyBalance?.updated_at || Date.now()}-${startingBalance}-${opexAmount}-${itbmAmount}-${profitPercentage}-${taxReservePercentage}-${includeZohoFiftyPercent}`;
+  // ENHANCED REACTIVE KEY: More granular with timestamp for better synchronization
+  const calculatorKey = `calculator-${monthlyBalance?.id || 'default'}-${monthlyBalance?.updated_at || Date.now()}-${startingBalance}-${opexAmount}-${itbmAmount}-${profitPercentage}-${taxReservePercentage}-${includeZohoFiftyPercent}-${Date.now()}`;
   
-  console.log("💼 DashboardStateManager: Calculator key (forces re-render - FIXED):", calculatorKey);
+  console.log("💼 DashboardStateManager: Enhanced calculator key (forces re-render):", calculatorKey);
+  console.log("💼 DashboardStateManager: Immediate calculator values:", {
+    opexAmount, itbmAmount, profitPercentage, taxReservePercentage, includeZohoFiftyPercent, startingBalance
+  });
   console.log("💼 DashboardStateManager: Transaction count:", financialData.transactions.length);
   console.log("💼 DashboardStateManager: Zoho income transactions:", 
     financialData.transactions.filter(tx => tx.type === 'income' && tx.source === 'Zoho').length
