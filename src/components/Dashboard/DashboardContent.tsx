@@ -57,7 +57,7 @@ interface DashboardContentProps {
   showBalanceDialog: boolean;
   setShowBalanceDialog: (show: boolean) => void;
   currentDate: Date;
-  onBalanceSaved: (balance: number, opexAmount?: number, itbmAmount?: number, profitPercentage?: number, taxReservePercentage?: number, includeZohoFiftyPercent?: boolean, notes?: string) => void;
+  onBalanceSaved: (balance: number, opexAmount?: number, itbmAmount?: number, profitPercentage?: number, taxReservePercentage?: number, includeZohoFiftyPercent?: boolean, notes?: string) => Promise<boolean>;
 }
 
 const DashboardContent: React.FC<DashboardContentProps> = ({

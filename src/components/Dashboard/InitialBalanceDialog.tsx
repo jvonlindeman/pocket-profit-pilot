@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,7 +22,7 @@ interface InitialBalanceDialogProps {
     taxReservePercentage?: number,
     includeZohoFiftyPercent?: boolean,
     notes?: string
-  ) => void;
+  ) => Promise<boolean>;
   currentBalance?: MonthlyBalance | null;
 }
 
@@ -33,6 +33,8 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
   onBalanceSaved,
   currentBalance
 }) => {
+  const [saving, setSaving] = useState(false);
+  
   const {
     balance,
     setBalance,
@@ -51,37 +53,48 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
     getFormValues,
   } = useBalanceForm({ open, currentBalance });
 
-  const handleSave = () => {
-    const {
-      balanceNum,
-      opexNum,
-      itbmNum,
-      profitNum,
-      taxReserveNum,
-      includeZohoFiftyPercent: includeZoho,
-      notes: formNotes
-    } = getFormValues();
+  const handleSave = async () => {
+    setSaving(true);
     
-    console.log("💾 InitialBalanceDialog: handleSave CALLED WITH VALUES:", {
-      balanceNum,
-      opexNum,
-      itbmNum,
-      profitNum,
-      taxReserveNum,
-      includeZoho,
-      formNotes
-    });
-    
-    // ENHANCED: Pass ALL parameters explicitly to onBalanceSaved
-    onBalanceSaved(
-      balanceNum, 
-      opexNum, 
-      itbmNum, 
-      profitNum, 
-      taxReserveNum,
-      includeZoho,
-      formNotes
-    );
+    try {
+      const {
+        balanceNum,
+        opexNum,
+        itbmNum,
+        profitNum,
+        taxReserveNum,
+        includeZohoFiftyPercent: includeZoho,
+        notes: formNotes
+      } = getFormValues();
+      
+      console.log("💾 InitialBalanceDialog: handleSave CALLED WITH VALUES:", {
+        balanceNum,
+        opexNum,
+        itbmNum,
+        profitNum,
+        taxReserveNum,
+        includeZoho,
+        formNotes
+      });
+      
+      // Call onBalanceSaved and wait for result
+      const success = await onBalanceSaved(
+        balanceNum, 
+        opexNum, 
+        itbmNum, 
+        profitNum, 
+        taxReserveNum,
+        includeZoho,
+        formNotes
+      );
+      
+      // Only close dialog if save was successful
+      if (success) {
+        onOpenChange(false);
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -110,11 +123,11 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
         />
         
         <div className="flex justify-end space-x-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancelar
           </Button>
-          <Button onClick={handleSave}>
-            {currentBalance ? 'Actualizar' : 'Guardar'}
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? 'Guardando...' : (currentBalance ? 'Actualizar' : 'Guardar')}
           </Button>
         </div>
       </DialogContent>

@@ -17,7 +17,7 @@ interface MonthlyBalanceEditorProps {
     profitPercentage?: number, 
     taxReservePercentage?: number,
     includeZohoFiftyPercent?: boolean
-  ) => void;
+  ) => Promise<boolean>;
 }
 
 const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({ 
@@ -90,23 +90,30 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
     taxReservePercentage: number = 5,
     includeZohoFiftyPercent: boolean = true,
     notes?: string
-  ) => {
+  ): Promise<boolean> => {
     console.log("🔍 EDITOR: Balance saved - TRIGGERING IMMEDIATE UPDATE:", {
       balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, includeZohoFiftyPercent, notes,
       timestamp: new Date().toISOString()
     });
     
-    // IMMEDIATE: Trigger the parent's immediate update handler
-    onBalanceChange(balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, includeZohoFiftyPercent);
-    
-    // Close dialog
-    setShowBalanceDialog(false);
-    
-    // Fetch fresh data after save to ensure we have the latest values
-    setTimeout(() => {
-      console.log("🔍 EDITOR: Fetching fresh data after save");
-      fetchMonthlyBalance();
-    }, 500);
+    try {
+      // IMMEDIATE: Trigger the parent's immediate update handler
+      await onBalanceChange(balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, includeZohoFiftyPercent);
+      
+      // Close dialog only on success
+      setShowBalanceDialog(false);
+      
+      // Fetch fresh data after save to ensure we have the latest values
+      setTimeout(() => {
+        console.log("🔍 EDITOR: Fetching fresh data after save");
+        fetchMonthlyBalance();
+      }, 500);
+      
+      return true;
+    } catch (error) {
+      console.error("🔍 EDITOR: Error saving balance:", error);
+      return false;
+    }
   };
 
   return (

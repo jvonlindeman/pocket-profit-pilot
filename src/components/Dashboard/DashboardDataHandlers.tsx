@@ -12,7 +12,8 @@ interface DashboardDataHandlersProps {
     itbmAmount?: number,
     profitPercentage?: number,
     taxReservePercentage?: number,
-    includeZohoFiftyPercent?: boolean
+    includeZohoFiftyPercent?: boolean,
+    notes?: string
   ) => Promise<boolean>;
   setStartingBalance: (balance: number) => void;
   hasCachedData: boolean;
@@ -53,13 +54,51 @@ export const useDashboardDataHandlers = ({
   }, [checkBalanceExists, setShowBalanceDialog, toast, hasCachedData, refreshData]);
 
   // Handle balance saved in dialog
-  const handleBalanceSaved = useCallback(() => {
-    toast({
-      title: 'Balance inicial guardado',
-      description: 'Cargando datos financieros...',
+  const handleBalanceSaved = useCallback(async (
+    balance: number,
+    opexAmount: number = 35,
+    itbmAmount: number = 0,
+    profitPercentage: number = 1,
+    taxReservePercentage: number = 5,
+    includeZohoFiftyPercent: boolean = true,
+    notes?: string
+  ) => {
+    console.log("💾 DashboardDataHandlers: handleBalanceSaved CALLED WITH VALUES:", {
+      balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, includeZohoFiftyPercent, notes
     });
-    refreshData(false); // Manual load after balance is set
-  }, [toast, refreshData]);
+    
+    try {
+      const success = await updateMonthlyBalance(
+        balance,
+        opexAmount,
+        itbmAmount,
+        profitPercentage,
+        taxReservePercentage,
+        includeZohoFiftyPercent,
+        notes
+      );
+
+      if (success) {
+        setStartingBalance(balance);
+        toast({
+          title: 'Balance inicial guardado',
+          description: 'Configuración actualizada exitosamente',
+        });
+        refreshData(false); // Refresh data after successful save
+        return true;
+      } else {
+        throw new Error("Failed to save balance");
+      }
+    } catch (error) {
+      console.error("💾 DashboardDataHandlers: ERROR saving balance:", error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo guardar la configuración',
+        variant: 'destructive',
+      });
+      return false;
+    }
+  }, [updateMonthlyBalance, setStartingBalance, toast, refreshData]);
 
   // ENHANCED handler for balance changes - with detailed parameter logging
   const handleBalanceChange = useCallback(async (
@@ -69,7 +108,7 @@ export const useDashboardDataHandlers = ({
     profitPercentage: number = 1,
     taxReservePercentage: number = 5,
     includeZohoFiftyPercent: boolean = true
-  ) => {
+  ): Promise<boolean> => {
     console.log("💰 DashboardDataHandlers: handleBalanceChange CALLED WITH ENHANCED LOGGING:", {
       balance: { value: balance, type: typeof balance },
       opexAmount: { value: opexAmount, type: typeof opexAmount },
@@ -111,6 +150,7 @@ export const useDashboardDataHandlers = ({
 
         console.log("💰 DashboardDataHandlers: Triggering background data refresh");
         refreshData(false);
+        return true;
       } else {
         console.error("💰 DashboardDataHandlers: updateMonthlyBalance FAILED");
         throw new Error("Failed to update monthly balance");
@@ -122,6 +162,7 @@ export const useDashboardDataHandlers = ({
         description: 'No se pudo actualizar el balance',
         variant: 'destructive',
       });
+      return false;
     }
   }, [updateMonthlyBalance, setStartingBalance, toast, refreshData]);
 

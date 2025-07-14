@@ -10,7 +10,7 @@ interface InitialSetupProps {
   showBalanceDialog: boolean;
   setShowBalanceDialog: (show: boolean) => void;
   currentMonthDate: Date;
-  onBalanceSaved: () => void;
+  onBalanceSaved: (balance: number, opexAmount?: number, itbmAmount?: number, profitPercentage?: number, taxReservePercentage?: number, includeZohoFiftyPercent?: boolean, notes?: string) => Promise<boolean>;
   cacheChecked?: boolean;
   hasCachedData?: boolean;
 }
