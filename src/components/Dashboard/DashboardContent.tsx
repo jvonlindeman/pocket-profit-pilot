@@ -56,6 +56,8 @@ interface DashboardContentProps {
   refreshData: (forceRefresh?: boolean) => void;
   showBalanceDialog: boolean;
   setShowBalanceDialog: (show: boolean) => void;
+  currentDate: Date;
+  onBalanceSaved: (balance: number, opexAmount?: number, itbmAmount?: number, profitPercentage?: number, taxReservePercentage?: number, includeZohoFiftyPercent?: boolean, notes?: string) => void;
 }
 
 const DashboardContent: React.FC<DashboardContentProps> = ({
@@ -88,7 +90,9 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   includeZohoFiftyPercent,
   refreshData,
   showBalanceDialog,
-  setShowBalanceDialog
+  setShowBalanceDialog,
+  currentDate,
+  onBalanceSaved
 }) => {
   return (
     <div className="min-h-screen bg-gray-50">
@@ -96,8 +100,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
       <InitialBalanceDialog 
         open={showBalanceDialog} 
         onOpenChange={setShowBalanceDialog}
-        currentDate={new Date()}
-        onBalanceSaved={() => {}}
+        currentDate={currentDate}
+        onBalanceSaved={onBalanceSaved}
       />
 
       {/* Main content area */}
@@ -143,6 +147,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
               includeZohoFiftyPercent={includeZohoFiftyPercent}
               startingBalance={startingBalance}
               totalZohoExpenses={totalZohoExpenses}
+              onConfigureClick={() => setShowBalanceDialog(true)}
             />
 
             <Separator />

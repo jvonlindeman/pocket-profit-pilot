@@ -149,6 +149,8 @@ const DashboardPageWrapper: React.FC = () => {
             refreshData={dashboardState.refreshData}
             showBalanceDialog={dashboardState.showBalanceDialog}
             setShowBalanceDialog={dashboardState.setShowBalanceDialog}
+            currentDate={dashboardState.dateRange.endDate || new Date()}
+            onBalanceSaved={handleBalanceSaved}
           />
         )}
 

@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calculator, DollarSign, ArrowDown, ArrowUp, Percent, Info, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Calculator, DollarSign, ArrowDown, ArrowUp, Percent, Info, ToggleLeft, ToggleRight, Settings } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 
 interface SalaryCalculatorProps {
   zohoIncome: number;
@@ -13,6 +14,7 @@ interface SalaryCalculatorProps {
   includeZohoFiftyPercent: boolean;
   startingBalance?: number;
   totalZohoExpenses?: number;
+  onConfigureClick?: () => void;
 }
 
 const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({ 
@@ -24,7 +26,8 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
   taxReservePercentage,
   includeZohoFiftyPercent,
   startingBalance = 0,
-  totalZohoExpenses = 0
+  totalZohoExpenses = 0,
+  onConfigureClick
 }) => {
   // Enhanced debugging to track value changes - SAFE: Only logs, no data fetching
   useEffect(() => {
@@ -96,15 +99,34 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
             <span className="ml-2 text-xs opacity-75">
               (Profit: {profitPercentage}% | Tax Reserve: {taxReservePercentage}%)
             </span>
-            <div className="ml-auto flex items-center space-x-2">
-              {includeZohoFiftyPercent ? (
-                <ToggleRight className="h-5 w-5 text-green-300" />
-              ) : (
-                <ToggleLeft className="h-5 w-5 text-red-300" />
+            <div className="ml-auto flex items-center space-x-3">
+              <div className="flex items-center space-x-2">
+                {includeZohoFiftyPercent ? (
+                  <ToggleRight className="h-5 w-5 text-green-300" />
+                ) : (
+                  <ToggleLeft className="h-5 w-5 text-red-300" />
+                )}
+                <span className="text-xs">
+                  50% Zoho: {includeZohoFiftyPercent ? "Incluido" : "Excluido"}
+                </span>
+              </div>
+              {onConfigureClick && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={onConfigureClick}
+                      className="text-white hover:bg-white/20 h-8 w-8 p-0"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">Configurar balance inicial, OPEX, ITBM y porcentajes</p>
+                  </TooltipContent>
+                </Tooltip>
               )}
-              <span className="text-xs">
-                50% Zoho: {includeZohoFiftyPercent ? "Incluido" : "Excluido"}
-              </span>
             </div>
           </CardTitle>
         </CardHeader>
