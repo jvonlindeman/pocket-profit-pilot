@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StripeIncomeTab from './StripeTabs/StripeIncomeTab';
 import ZohoIncomeTab from './StripeTabs/ZohoIncomeTab';
@@ -9,7 +9,17 @@ const IncomeTabs: React.FC = () => {
   // Track active tab for possible performance optimizations
   const [activeTab, setActiveTab] = useState('stripe');
 
+  // Safe logging - no data fetching
+  useEffect(() => {
+    console.log('📊 IncomeTabs: Component mounted/updated (DISPLAY ONLY - NO API CALLS):', {
+      activeTab,
+      timestamp: new Date().toISOString(),
+      note: "This component only displays data from FinanceContext - no webhook calls"
+    });
+  }, [activeTab]);
+
   const handleTabChange = (value: string) => {
+    console.log('📊 IncomeTabs: Tab changed to:', value, '(DISPLAY ONLY)');
     setActiveTab(value);
   };
 

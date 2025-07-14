@@ -1,5 +1,5 @@
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 import { useDateRangeManager } from '@/hooks/useDateRangeManager';
@@ -7,6 +7,9 @@ import { useDateFormatter } from '@/hooks/useDateFormatter';
 import { UnpaidInvoice } from '@/types/financial';
 
 export const useDashboardStateManager = () => {
+  const [globalRefreshInProgress, setGlobalRefreshInProgress] = useState(false);
+  const refreshCancelRef = useRef<AbortController | null>(null);
+
   // PASSIVE MODE: useFinanceData no longer auto-loads data
   const {
     dateRange,
@@ -104,6 +107,41 @@ export const useDashboardStateManager = () => {
   console.log("💼 DashboardStateManager: Is refreshing:", isRefreshing);
   console.log("💼 DashboardStateManager: Include Zoho 50% (TRACKING):", includeZohoFiftyPercent);
 
+  // Enhanced refresh function with global state management
+  const enhancedRefreshData = async (force?: boolean) => {
+    // Prevent concurrent refresh operations
+    if (globalRefreshInProgress) {
+      console.log('🚫 DashboardStateManager: Refresh blocked - operation already in progress');
+      return false;
+    }
+
+    // Cancel any pending refresh
+    if (refreshCancelRef.current) {
+      console.log('🚫 DashboardStateManager: Cancelling previous refresh operation');
+      refreshCancelRef.current.abort();
+    }
+
+    // Create new abort controller for this request
+    refreshCancelRef.current = new AbortController();
+    const requestId = `refresh-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    try {
+      setGlobalRefreshInProgress(true);
+      console.log(`🔄 DashboardStateManager: Starting refresh operation [${requestId}] - Force: ${force}`);
+      
+      const result = await refreshData(force);
+      
+      console.log(`✅ DashboardStateManager: Refresh completed [${requestId}] - Success: ${result}`);
+      return result;
+    } catch (error) {
+      console.error(`❌ DashboardStateManager: Refresh failed [${requestId}]:`, error);
+      return false;
+    } finally {
+      setGlobalRefreshInProgress(false);
+      refreshCancelRef.current = null;
+    }
+  };
+
   return {
     // Data state
     dateRange,
@@ -153,8 +191,11 @@ export const useDashboardStateManager = () => {
     setShowBalanceDialog,
     
     // Functions
-    refreshData,
+    refreshData: enhancedRefreshData,
     handleDateRangeChange,
     getDatePickerCurrentMonthRange,
+    
+    // Global state
+    globalRefreshInProgress,
   };
 };

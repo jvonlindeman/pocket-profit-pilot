@@ -26,9 +26,9 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
   startingBalance = 0,
   totalZohoExpenses = 0
 }) => {
-  // Enhanced debugging to track value changes
+  // Enhanced debugging to track value changes - SAFE: Only logs, no data fetching
   useEffect(() => {
-    console.log("SalaryCalculator: Received props:", {
+    console.log("💰 SalaryCalculator: Received props (DISPLAY ONLY - NO API CALLS):", {
       zohoIncome,
       stripeIncome,
       opexAmount,
@@ -38,7 +38,8 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
       includeZohoFiftyPercent,
       startingBalance,
       totalZohoExpenses,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      note: "This component only displays calculations - no webhook calls"
     });
   }, [zohoIncome, stripeIncome, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, includeZohoFiftyPercent, startingBalance, totalZohoExpenses]);
 

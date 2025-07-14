@@ -102,12 +102,15 @@ const DashboardPageWrapper: React.FC = () => {
         />
         
         {/* Show refreshing indicator if data exists but is being refreshed */}
-        {dashboardState.isRefreshing && dashboardState.dataInitialized && (
+        {(dashboardState.isRefreshing || dashboardState.globalRefreshInProgress) && dashboardState.dataInitialized && (
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-center">
               <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full mr-2"></div>
               <span className="text-blue-800 text-sm">
-                Actualizando datos en segundo plano...
+                {dashboardState.globalRefreshInProgress 
+                  ? "Actualizando datos (deduplicado)..." 
+                  : "Actualizando datos en segundo plano..."
+                }
               </span>
             </div>
           </div>
@@ -123,7 +126,7 @@ const DashboardPageWrapper: React.FC = () => {
             dataInitialized={dashboardState.dataInitialized}
             hasCachedData={dashboardState.hasCachedData}
             usingCachedData={dashboardState.usingCachedData}
-            isRefreshing={dashboardState.isRefreshing}
+            isRefreshing={dashboardState.isRefreshing || dashboardState.globalRefreshInProgress}
             cacheStatus={dashboardState.cacheStatus}
             stripeIncome={dashboardState.stripeIncome}
             stripeFees={dashboardState.stripeFees}

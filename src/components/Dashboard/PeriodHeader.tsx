@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { RefreshCw, Database, Cloud, ChevronDown } from 'lucide-react';
@@ -26,13 +26,42 @@ const PeriodHeader: React.FC<PeriodHeaderProps> = ({
   cacheStatus
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const lastRefreshRef = useRef<number>(0);
+  const requestIdRef = useRef<string>('');
+
+  // Generate unique request ID and prevent duplicate calls
+  const generateRequestId = () => `refresh-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
   const handleCacheRefresh = () => {
+    const now = Date.now();
+    // Debounce: prevent calls within 1 second
+    if (now - lastRefreshRef.current < 1000) {
+      console.log('🚫 PeriodHeader: Cache refresh blocked - too soon after last call');
+      return;
+    }
+    
+    const requestId = generateRequestId();
+    requestIdRef.current = requestId;
+    lastRefreshRef.current = now;
+    
+    console.log(`🔄 PeriodHeader: Cache refresh initiated [${requestId}]`);
     onRefresh(false); // Use cache if available
     setIsDropdownOpen(false);
   };
 
   const handleFreshRefresh = () => {
+    const now = Date.now();
+    // Debounce: prevent calls within 2 seconds for fresh data (more expensive)
+    if (now - lastRefreshRef.current < 2000) {
+      console.log('🚫 PeriodHeader: Fresh refresh blocked - too soon after last call');
+      return;
+    }
+    
+    const requestId = generateRequestId();
+    requestIdRef.current = requestId;
+    lastRefreshRef.current = now;
+    
+    console.log(`🔄 PeriodHeader: Fresh refresh initiated [${requestId}] - Force API call`);
     onRefresh(true); // Force fresh data from API
     setIsDropdownOpen(false);
   };
