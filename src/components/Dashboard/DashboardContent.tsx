@@ -52,6 +52,9 @@ interface DashboardContentProps {
   taxReservePercentage: number;
   includeZohoFiftyPercent: boolean;
 
+  // Monthly balance data
+  monthlyBalance: any;
+
   // Functions
   refreshData: (forceRefresh?: boolean) => void;
   showBalanceDialog: boolean;
@@ -88,6 +91,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   profitPercentage,
   taxReservePercentage,
   includeZohoFiftyPercent,
+  monthlyBalance,
   refreshData,
   showBalanceDialog,
   setShowBalanceDialog,
@@ -102,6 +106,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
         onOpenChange={setShowBalanceDialog}
         currentDate={currentDate}
         onBalanceSaved={onBalanceSaved}
+        currentBalance={monthlyBalance}
       />
 
       {/* Main content area */}

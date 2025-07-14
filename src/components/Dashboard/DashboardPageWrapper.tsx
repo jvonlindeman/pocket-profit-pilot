@@ -146,6 +146,7 @@ const DashboardPageWrapper: React.FC = () => {
             profitPercentage={dashboardState.profitPercentage}
             taxReservePercentage={dashboardState.taxReservePercentage}
             includeZohoFiftyPercent={dashboardState.includeZohoFiftyPercent}
+            monthlyBalance={dashboardState.monthlyBalance}
             refreshData={dashboardState.refreshData}
             showBalanceDialog={dashboardState.showBalanceDialog}
             setShowBalanceDialog={dashboardState.setShowBalanceDialog}
