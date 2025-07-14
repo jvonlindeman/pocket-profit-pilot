@@ -10,6 +10,7 @@ import NoDataLoadedState from './NoDataLoadedState';
 import { Separator } from '@/components/ui/separator';
 import CacheEfficiencyDashboard from './CacheEfficiencyDashboard';
 import TransactionCategorySummary from './TransactionCategorySummary';
+import { FinanceProvider } from '@/contexts/FinanceContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileText } from 'lucide-react';
 
@@ -37,7 +38,7 @@ interface DashboardContentProps {
   stripeNet: number;
   stripeFeePercentage: number;
   regularIncome: number;
-  collaboratorExpenses: number;
+  collaboratorExpenses: any[];
   unpaidInvoices: any[];
   startingBalance: number;
   totalZohoExpenses: number;
@@ -129,7 +130,38 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
 
         {dataInitialized && (
           <>
-            <RefinedFinancialSummary />
+            {/* Log financial data before providing to context */}
+            {(() => {
+              console.log("💰 DashboardContent: Providing financial data to FinanceProvider:", {
+                summaryTotalIncome: financialData.summary?.totalIncome,
+                summaryTotalExpense: financialData.summary?.totalExpense,
+                summaryProfit: financialData.summary?.profit,
+                transactionCount: financialData.transactions?.length,
+                stripeIncome,
+                stripeFees,
+                regularIncome,
+                collaboratorExpensesCount: Array.isArray(collaboratorExpenses) ? collaboratorExpenses.length : 0,
+                unpaidInvoicesCount: unpaidInvoices?.length
+              });
+              return null;
+            })()}
+            <FinanceProvider
+              summary={financialData.summary}
+              transactions={financialData.transactions}
+              dateRange={{ startDate: null, endDate: null }}
+              stripeIncome={stripeIncome}
+              stripeFees={stripeFees}
+              stripeTransactionFees={stripeTransactionFees}
+              stripePayoutFees={stripePayoutFees}
+              stripeAdditionalFees={stripeAdditionalFees}
+              stripeNet={stripeNet}
+              stripeFeePercentage={stripeFeePercentage}
+              regularIncome={regularIncome}
+              collaboratorExpenses={Array.isArray(collaboratorExpenses) ? collaboratorExpenses : []}
+              unpaidInvoices={unpaidInvoices}
+            >
+              <RefinedFinancialSummary />
+            </FinanceProvider>
 
             <Separator />
 

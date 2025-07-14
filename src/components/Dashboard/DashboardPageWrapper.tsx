@@ -133,7 +133,7 @@ const DashboardPageWrapper: React.FC = () => {
             stripeNet={dashboardState.stripeNet}
             stripeFeePercentage={dashboardState.stripeFeePercentage}
             regularIncome={dashboardState.regularIncome}
-            collaboratorExpenses={typeof dashboardState.collaboratorExpenses === 'number' ? dashboardState.collaboratorExpenses : 0}
+            collaboratorExpenses={dashboardState.collaboratorExpenses}
             unpaidInvoices={dashboardState.unpaidInvoices}
             startingBalance={dashboardState.startingBalance}
             totalZohoExpenses={dashboardState.totalZohoExpenses}
