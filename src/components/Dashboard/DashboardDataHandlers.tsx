@@ -93,9 +93,9 @@ export const useDashboardDataHandlers = ({
         console.log("💾 DashboardDataHandlers: Waiting 100ms before refresh to allow UI update");
         await new Promise(resolve => setTimeout(resolve, 100));
         
-        // PHASE 4: Background refresh
-        console.log("💾 DashboardDataHandlers: Starting background refresh");
-        refreshData(false); // Refresh data after successful save
+        // PHASE 4: Background refresh with FRESH API CALLS
+        console.log("💾 DashboardDataHandlers: Starting FRESH API refresh (no cache)");
+        refreshData(true); // Force fresh API calls after balance changes
         return true;
       } else {
         throw new Error("Failed to save balance");
@@ -159,8 +159,8 @@ export const useDashboardDataHandlers = ({
           description: `Profit: ${profitPercentage}%, Tax: ${taxReservePercentage}%`,
         });
 
-        console.log("💰 DashboardDataHandlers: Triggering background data refresh");
-        refreshData(false);
+        console.log("💰 DashboardDataHandlers: Triggering FRESH API refresh (no cache)");
+        refreshData(true); // Force fresh API calls after balance changes
         return true;
       } else {
         console.error("💰 DashboardDataHandlers: updateMonthlyBalance FAILED");
