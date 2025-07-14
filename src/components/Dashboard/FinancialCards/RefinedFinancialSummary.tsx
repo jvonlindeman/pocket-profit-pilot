@@ -10,6 +10,7 @@ import { FinancialAssistantPromo } from '../FinancialAssistant/FinancialAssistan
 import { useFinance } from '@/contexts/FinanceContext';
 import { registerInteraction } from '@/utils/uiCapture';
 import { useIsMobile } from '@/hooks/use-mobile';
+import IncomeTabs from './IncomeTabs';
 
 const RefinedFinancialSummary: React.FC = () => {
   const { dateRange, unpaidInvoices } = useFinance();
@@ -23,6 +24,11 @@ const RefinedFinancialSummary: React.FC = () => {
   
   return (
     <div className="space-y-4">
+      {/* Income Tabs - First section showing Stripe, Zoho, Combined */}
+      <SummaryCardSection title="Fuentes de Ingresos" data-component="income-tabs" className="income-tabs-section">
+        <IncomeTabs />
+      </SummaryCardSection>
+
       <SummaryCardSection title="Resumen Financiero" data-component="financial-summary" className="financial-summary-section">
         {/* Refined Expenses Section */}
         <RefinedExpensesSection />

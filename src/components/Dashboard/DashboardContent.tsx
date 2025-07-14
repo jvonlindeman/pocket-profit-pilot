@@ -13,6 +13,7 @@ import TransactionCategorySummary from './TransactionCategorySummary';
 import { FinanceProvider } from '@/contexts/FinanceContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileText } from 'lucide-react';
+import SalaryCalculator from './SalaryCalculator';
 
 interface DashboardContentProps {
   // Core data
@@ -130,6 +131,22 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
 
         {dataInitialized && (
           <>
+            {/* Salary Calculator - Prominent position at top */}
+            <SalaryCalculator
+              key={calculatorKey}
+              zohoIncome={regularIncome}
+              stripeIncome={stripeIncome}
+              opexAmount={opexAmount}
+              itbmAmount={itbmAmount}
+              profitPercentage={profitPercentage}
+              taxReservePercentage={taxReservePercentage}
+              includeZohoFiftyPercent={includeZohoFiftyPercent}
+              startingBalance={startingBalance}
+              totalZohoExpenses={totalZohoExpenses}
+            />
+
+            <Separator />
+
             {/* Log financial data before providing to context */}
             {(() => {
               console.log("💰 DashboardContent: Providing financial data to FinanceProvider:", {
