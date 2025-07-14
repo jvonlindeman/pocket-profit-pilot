@@ -40,47 +40,11 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
 
-  // Fetch current configuration
+  // NO AUTO-LOADING - Only load config when user manually requests it
   useEffect(() => {
-    const fetchConfig = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        console.log('Fetching Zoho config from edge function...');
-        const { data, error } = await supabase.functions.invoke('zoho-config', {
-          method: 'GET'
-        });
-        
-        console.log('Zoho config response received');
-        
-        if (error) {
-          console.error('Error fetching Zoho config:', error);
-          setError('Failed to fetch existing Zoho configuration');
-          toast({
-            title: 'Error',
-            description: 'Failed to fetch existing Zoho configuration',
-            variant: 'destructive'
-          });
-          return;
-        }
-        
-        if (data.configured && data.config) {
-          setConfigured(true);
-          setExistingConfig(data.config);
-          setClientId(data.config.clientId || '');
-          setOrganizationId(data.config.organizationId || '');
-        }
-      } catch (err) {
-        console.error('Error in fetchConfig:', err);
-        setError('Failed to connect to Zoho configuration service');
-      } finally {
-        setLoading(false);
-      }
-    };
+    console.log('ZohoConfig: PASSIVE MODE - No auto-loading of configuration');
     
-    fetchConfig();
-    
-    // Check if refresh token is provided in URL
+    // Only check for token from URL parameters
     const tokenFromUrl = searchParams.get('refreshToken');
     if (tokenFromUrl) {
       setRefreshToken(tokenFromUrl);
@@ -89,7 +53,47 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
         description: 'Refresh token has been pre-filled from OAuth flow'
       });
     }
+    
+    // Set loading to false since we're not auto-loading
+    setLoading(false);
   }, [toast, searchParams]);
+
+  // Manual function to fetch configuration when user clicks a button
+  const fetchConfig = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      console.log('MANUAL: Fetching Zoho config from edge function...');
+      const { data, error } = await supabase.functions.invoke('zoho-config', {
+        method: 'GET'
+      });
+      
+      console.log('Zoho config response received');
+      
+      if (error) {
+        console.error('Error fetching Zoho config:', error);
+        setError('Failed to fetch existing Zoho configuration');
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch existing Zoho configuration',
+          variant: 'destructive'
+        });
+        return;
+      }
+      
+      if (data.configured && data.config) {
+        setConfigured(true);
+        setExistingConfig(data.config);
+        setClientId(data.config.clientId || '');
+        setOrganizationId(data.config.organizationId || '');
+      }
+    } catch (err) {
+      console.error('Error in fetchConfig:', err);
+      setError('Failed to connect to Zoho configuration service');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -207,6 +211,13 @@ const ZohoConfig: React.FC<ZohoConfigProps> = ({ onConfigSaved }) => {
             ? `Zoho Books is configured with client ID: ${existingConfig?.clientId}. Last updated: ${new Date(existingConfig?.updatedAt || '').toLocaleString()}`
             : 'Enter your Zoho Books API credentials below to connect.'}
         </CardDescription>
+        {!configured && !loading && (
+          <div className="mt-4">
+            <Button onClick={fetchConfig} variant="outline" size="sm">
+              Cargar Configuración Existente
+            </Button>
+          </div>
+        )}
       </CardHeader>
       <form onSubmit={handleSubmit}>
         {error && (

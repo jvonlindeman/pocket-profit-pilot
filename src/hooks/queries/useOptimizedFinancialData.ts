@@ -38,85 +38,19 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
     isRefreshing: false
   });
 
-  // PASSIVE CACHE CHECK - Only check if cache exists, don't load data automatically
+  // COMPLETELY PASSIVE - No automatic cache checks or API calls
   useEffect(() => {
-    let isMounted = true;
+    console.log("🔍 useOptimizedFinancialData: COMPLETELY PASSIVE MODE - No auto-checks", {
+      dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
+      note: "All operations must be user-initiated via 'Llamar API' button"
+    });
 
-    const checkCacheExistence = async () => {
-      console.log("🔍 useOptimizedFinancialData: PASSIVE cache existence check only", {
-        dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`
-      });
-
-      try {
-        // Run monthly cache sync in background
-        console.log("🔄 useOptimizedFinancialData: Running background monthly cache sync...");
-        MonthlyCacheSync.syncAllMissingEntries().catch(error => {
-          console.warn("Background sync failed:", error);
-        });
-
-        // Check cache existence WITHOUT loading data
-        const [zohoCacheCheck, stripeCacheCheck] = await Promise.all([
-          CacheService.checkCache('Zoho', startDate, endDate),
-          CacheService.checkCache('Stripe', startDate, endDate)
-        ]);
-
-        if (!isMounted) return;
-
-        const hasZohoCache = zohoCacheCheck.cached && zohoCacheCheck.data && zohoCacheCheck.data.length > 0;
-        const hasStripeCache = stripeCacheCheck.cached && stripeCacheCheck.data && stripeCacheCheck.data.length > 0;
-        const hasCachedData = hasZohoCache || hasStripeCache;
-
-        console.log("🔍 useOptimizedFinancialData: PASSIVE cache check results", {
-          zoho: { 
-            exists: hasZohoCache, 
-            count: zohoCacheCheck.data?.length || 0,
-            status: zohoCacheCheck.status,
-            isStale: zohoCacheCheck.isStale
-          },
-          stripe: { 
-            exists: hasStripeCache, 
-            count: stripeCacheCheck.data?.length || 0,
-            status: stripeCacheCheck.status,
-            isStale: stripeCacheCheck.isStale
-          },
-          hasCachedData,
-          autoLoadingPrevented: true
-        });
-
-        // ONLY update cache status - DO NOT load data automatically
-        setData(prev => ({
-          ...prev,
-          cacheChecked: true,
-          hasCachedData: hasCachedData,
-          cacheStatus: {
-            zoho: { hit: hasZohoCache, partial: zohoCacheCheck.partial || false },
-            stripe: { hit: hasStripeCache, partial: stripeCacheCheck.partial || false }
-          }
-        }));
-
-        if (hasCachedData) {
-          console.log("✅ useOptimizedFinancialData: Cache exists but NOT auto-loading - waiting for user action");
-        } else {
-          console.log("❌ useOptimizedFinancialData: No cache found - user interaction required");
-        }
-      } catch (error) {
-        console.error("❌ useOptimizedFinancialData: Error during passive cache check:", error);
-        if (isMounted) {
-          setData(prev => ({
-            ...prev,
-            cacheChecked: true,
-            hasCachedData: false,
-            error: error instanceof Error ? error.message : 'Error checking cache'
-          }));
-        }
-      }
-    };
-
-    checkCacheExistence();
-
-    return () => {
-      isMounted = false;
-    };
+    // Set basic state to indicate hook is ready but no auto-loading
+    setData(prev => ({
+      ...prev,
+      cacheChecked: true,
+      hasCachedData: false, // Don't check cache automatically
+    }));
   }, [startDate, endDate]);
 
   const fetchData = useCallback(async (forceRefresh = false) => {

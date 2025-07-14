@@ -1,31 +1,34 @@
 import React from 'react';
 import PeriodHeader from './PeriodHeader';
-import CacheMonitor from './CacheMonitor';
-import NoTransactionsWarning from './NoTransactionsWarning';
-import MonthlyBalanceEditor from './MonthlyBalanceEditor';
-import SalaryCalculator from './SalaryCalculator';
-import FinanceSummary from './FinanceSummary';
-import TransactionList from './TransactionList';
-import { FinancialSummary, Transaction, UnpaidInvoice } from '@/types/financial';
+import RefinedFinancialSummary from './FinancialCards/RefinedFinancialSummary';
+import TransactionTable from './TransactionTable';
+import TransactionFilters from './TransactionFilters';
+import LoadingSpinner from './LoadingSpinner';
+import ErrorDisplay from './ErrorDisplay';
+import InitialBalanceDialog from './InitialBalanceDialog';
+import NoDataLoadedState from './NoDataLoadedState';
+import { Separator } from '@/components/ui/separator';
+import CacheEfficiencyDashboard from './CacheEfficiencyDashboard';
+import TransactionCategorySummary from './TransactionCategorySummary';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { FileText } from 'lucide-react';
 
-// --- NEW TYPE DEFINITIONS ---
-interface CoreData {
+interface DashboardContentProps {
+  // Core data
   periodTitle: string;
-  dateRange: { startDate: Date; endDate: Date };
-  financialData: {
-    summary: FinancialSummary;
-    transactions: Transaction[];
-    expenseByCategory: any[];
+  financialData: any;
+  loading: boolean;
+  error: string | null;
+  dataInitialized: boolean;
+  hasCachedData: boolean;
+  usingCachedData: boolean;
+  isRefreshing: boolean;
+  cacheStatus: {
+    zoho: { hit: boolean; partial: boolean };
+    stripe: { hit: boolean; partial: boolean };
   };
-  currentMonthDate: Date;
-  monthlyBalance: any;
-  totalZohoExpenses: number;
-  unpaidInvoices?: UnpaidInvoice[];
-  startingBalance: number;
-  regularIncome: number;
-}
 
-interface StripeData {
+  // Financial data
   stripeIncome: number;
   stripeFees: number;
   stripeTransactionFees: number;
@@ -33,155 +36,139 @@ interface StripeData {
   stripeAdditionalFees: number;
   stripeNet: number;
   stripeFeePercentage: number;
-}
+  regularIncome: number;
+  collaboratorExpenses: number;
+  unpaidInvoices: any[];
+  startingBalance: number;
+  totalZohoExpenses: number;
 
-interface ActionHandlers {
-  refreshData: (force: boolean) => void;
-  handleBalanceChange: (
-    balance: number,
-    opexAmount?: number,
-    itbmAmount?: number,
-    profitPercentage?: number,
-    taxReservePercentage?: number,
-    includeZohoFiftyPercent?: boolean
-  ) => void;
-  handleRefresh: () => void;
-}
+  // Calculator values
+  calculatorKey: string;
+  opexAmount: number;
+  itbmAmount: number;
+  profitPercentage: number;
+  taxReservePercentage: number;
+  includeZohoFiftyPercent: boolean;
 
-interface DashboardContentProps {
-  coreData: CoreData;
-  stripeData: StripeData;
-  actions: ActionHandlers;
-  loading: boolean;
+  // Functions
+  refreshData: (forceRefresh?: boolean) => void;
+  showBalanceDialog: boolean;
+  setShowBalanceDialog: (show: boolean) => void;
 }
 
 const DashboardContent: React.FC<DashboardContentProps> = ({
-  coreData,
-  stripeData,
-  actions,
+  periodTitle,
+  financialData,
   loading,
+  error,
+  dataInitialized,
+  hasCachedData,
+  usingCachedData,
+  isRefreshing,
+  cacheStatus,
+  stripeIncome,
+  stripeFees,
+  stripeTransactionFees,
+  stripePayoutFees,
+  stripeAdditionalFees,
+  stripeNet,
+  stripeFeePercentage,
+  regularIncome,
+  collaboratorExpenses,
+  unpaidInvoices,
+  startingBalance,
+  totalZohoExpenses,
+  calculatorKey,
+  opexAmount,
+  itbmAmount,
+  profitPercentage,
+  taxReservePercentage,
+  includeZohoFiftyPercent,
+  refreshData,
+  showBalanceDialog,
+  setShowBalanceDialog
 }) => {
-  const {
-    periodTitle,
-    dateRange,
-    financialData,
-    currentMonthDate,
-    monthlyBalance,
-    totalZohoExpenses,
-    unpaidInvoices = [],
-    startingBalance,
-    regularIncome,
-  } = coreData;
-
-  const {
-    stripeIncome,
-    stripeFees,
-    stripeTransactionFees,
-    stripePayoutFees,
-    stripeAdditionalFees,
-    stripeNet,
-    stripeFeePercentage,
-  } = stripeData;
-  
-  const { refreshData, handleBalanceChange, handleRefresh } = actions;
-
-  // Enhanced debugging and improved value extraction logic
-  console.log("💼 DashboardContent: Monthly balance data received:", monthlyBalance);
-  
-  // IMMEDIATE VALUES: Use the most current values with better defaults - FIXED: Added include_zoho_fifty_percent tracking
-  const opexAmount = monthlyBalance?.opex_amount ?? 35;
-  const itbmAmount = monthlyBalance?.itbm_amount ?? 0;
-  const profitPercentage = monthlyBalance?.profit_percentage ?? 1;
-  const taxReservePercentage = monthlyBalance?.tax_reserve_percentage ?? 5;
-  const includeZohoFiftyPercent = monthlyBalance?.include_zoho_fifty_percent ?? true;
-  
-  console.log("💼 DashboardContent: IMMEDIATE VALUES for calculator (FIXED WITH TRACKING):", { 
-    opexAmount, 
-    itbmAmount, 
-    profitPercentage, 
-    taxReservePercentage,
-    includeZohoFiftyPercent, // NOW PROPERLY TRACKED
-    startingBalance,
-    monthlyBalanceId: monthlyBalance?.id,
-    monthlyBalanceTimestamp: monthlyBalance?.updated_at,
-    timestamp: new Date().toISOString()
-  });
-  
-  // REACTIVE KEY: Forces complete re-render when ANY value changes - FIXED: Added includeZohoFiftyPercent
-  const calculatorKey = `calculator-${monthlyBalance?.id || 'default'}-${monthlyBalance?.updated_at || Date.now()}-${startingBalance}-${opexAmount}-${itbmAmount}-${profitPercentage}-${taxReservePercentage}-${includeZohoFiftyPercent}`;
-  
-  console.log("💼 DashboardContent: Calculator key (forces re-render - FIXED):", calculatorKey);
-  console.log("💼 DashboardContent: Transaction count:", financialData.transactions.length);
-  console.log("💼 DashboardContent: Zoho income transactions:", 
-    financialData.transactions.filter(tx => tx.type === 'income' && tx.source === 'Zoho').length
-  );
-  console.log("💼 DashboardContent: Unpaid invoices:", unpaidInvoices?.length || 0);
-  console.log("💼 DashboardContent: PASSING includeZohoFiftyPercent to SalaryCalculator:", includeZohoFiftyPercent);
-
   return (
-    <>
-      {/* Period and refresh button */}
-      <PeriodHeader periodTitle={periodTitle} onRefresh={handleRefresh} />
-      
-      {/* Use our new CacheMonitor component */}
-      <CacheMonitor 
-        dateRange={dateRange}
-        onRefresh={() => refreshData(true)}
+    <div className="min-h-screen bg-gray-50">
+      {/* Initial Balance Dialog */}
+      <InitialBalanceDialog 
+        open={showBalanceDialog} 
+        onOpenChange={setShowBalanceDialog}
+        currentDate={new Date()}
+        onBalanceSaved={() => {}}
       />
 
-      {/* Warning message when no transactions exist */}
-      {financialData.transactions.length === 0 && <NoTransactionsWarning />}
-
-      {/* Monthly Balance Editor moved up to be above FinanceSummary */}
-      <div className="mb-6">
-        <MonthlyBalanceEditor 
-          currentDate={currentMonthDate}
-          onBalanceChange={handleBalanceChange}
+      {/* Main content area */}
+      <div className="space-y-6">
+        <PeriodHeader 
+          periodTitle={periodTitle}
+          onRefresh={refreshData}
+          hasCachedData={hasCachedData}
+          usingCachedData={usingCachedData}
+          isRefreshing={isRefreshing}
+          cacheStatus={cacheStatus}
         />
-      </div>
 
-      {/* Salary Calculator with IMMEDIATE REACTIVE UPDATES - FIXED: Now properly passing includeZohoFiftyPercent */}
-      <div className="mb-6">
-        <SalaryCalculator 
-          key={calculatorKey}
-          zohoIncome={regularIncome}
-          stripeIncome={stripeNet}
-          opexAmount={opexAmount}
-          itbmAmount={itbmAmount}
-          profitPercentage={profitPercentage}
-          taxReservePercentage={taxReservePercentage}
-          includeZohoFiftyPercent={includeZohoFiftyPercent}
-          startingBalance={startingBalance}
-          totalZohoExpenses={totalZohoExpenses}
-        />
-      </div>
+        {error && (
+          <ErrorDisplay 
+            error={error} 
+            onRetry={() => refreshData(true)} 
+          />
+        )}
 
-      {/* Financial Summary with improved organization */}
-      <FinanceSummary 
-        summary={financialData.summary} 
-        expenseCategories={financialData.expenseByCategory}
-        stripeIncome={stripeIncome}
-        stripeFees={stripeFees}
-        stripeTransactionFees={stripeTransactionFees}
-        stripePayoutFees={stripePayoutFees}
-        stripeAdditionalFees={stripeAdditionalFees}
-        stripeNet={stripeNet}
-        stripeFeePercentage={stripeFeePercentage}
-        regularIncome={regularIncome}
-        dateRange={dateRange}
-        transactions={financialData.transactions}
-        unpaidInvoices={unpaidInvoices}
-      />
+        {loading && <LoadingSpinner />}
 
-      {/* Listado de transacciones */}
-      <div className="mt-6">
-        <TransactionList 
-          transactions={financialData.transactions} 
-          onRefresh={handleRefresh}
-          isLoading={loading}
-        />
+        {!dataInitialized && !loading && !error && (
+          <NoDataLoadedState
+            onLoadCache={() => refreshData(false)}
+            onLoadFresh={() => refreshData(true)}
+            hasCachedData={hasCachedData}
+            isLoading={loading}
+          />
+        )}
+
+        {dataInitialized && (
+          <>
+            <RefinedFinancialSummary />
+
+            <Separator />
+
+            <TransactionCategorySummary transactions={financialData.transactions} />
+
+            <Separator />
+
+            <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+              <div className="xl:col-span-3">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Transacciones
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <TransactionFilters 
+                      transactions={financialData.transactions}
+                      onFilterChange={() => {}}
+                    />
+                    <TransactionTable 
+                      transactions={financialData.transactions}
+                      isLoading={loading}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="xl:col-span-1">
+                <CacheEfficiencyDashboard 
+                  dateRange={{ startDate: new Date(), endDate: new Date() }}
+                />
+              </div>
+            </div>
+          </>
+        )}
       </div>
-    </>
+    </div>
   );
 };
 

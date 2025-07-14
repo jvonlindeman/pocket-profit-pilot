@@ -114,12 +114,38 @@ const DashboardPageWrapper: React.FC = () => {
         )}
         
         {/* Dashboard content - only shows when data is explicitly loaded */}
-        {dashboardState.dataInitialized && !dashboardState.error && (
+        {(dashboardState.dataInitialized || !dashboardState.dataInitialized) && !dashboardState.error && (
           <DashboardContent 
-            coreData={coreData}
-            stripeData={stripeData}
-            actions={actions}
+            periodTitle={dashboardState.periodTitle}
+            financialData={dashboardState.financialData}
             loading={dashboardState.loading}
+            error={dashboardState.error}
+            dataInitialized={dashboardState.dataInitialized}
+            hasCachedData={dashboardState.hasCachedData}
+            usingCachedData={dashboardState.usingCachedData}
+            isRefreshing={dashboardState.isRefreshing}
+            cacheStatus={dashboardState.cacheStatus}
+            stripeIncome={dashboardState.stripeIncome}
+            stripeFees={dashboardState.stripeFees}
+            stripeTransactionFees={dashboardState.stripeTransactionFees}
+            stripePayoutFees={dashboardState.stripePayoutFees}
+            stripeAdditionalFees={dashboardState.stripeAdditionalFees}
+            stripeNet={dashboardState.stripeNet}
+            stripeFeePercentage={dashboardState.stripeFeePercentage}
+            regularIncome={dashboardState.regularIncome}
+            collaboratorExpenses={typeof dashboardState.collaboratorExpenses === 'number' ? dashboardState.collaboratorExpenses : 0}
+            unpaidInvoices={dashboardState.unpaidInvoices}
+            startingBalance={dashboardState.startingBalance}
+            totalZohoExpenses={dashboardState.totalZohoExpenses}
+            calculatorKey={dashboardState.calculatorKey}
+            opexAmount={dashboardState.opexAmount}
+            itbmAmount={dashboardState.itbmAmount}
+            profitPercentage={dashboardState.profitPercentage}
+            taxReservePercentage={dashboardState.taxReservePercentage}
+            includeZohoFiftyPercent={dashboardState.includeZohoFiftyPercent}
+            refreshData={dashboardState.refreshData}
+            showBalanceDialog={dashboardState.showBalanceDialog}
+            setShowBalanceDialog={dashboardState.setShowBalanceDialog}
           />
         )}
 
