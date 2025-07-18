@@ -19,8 +19,17 @@ export const useIncomeProcessor = () => {
   const processIncomeTypes = useCallback((transactions: Transaction[], stripeData: any) => {
     console.log("🔄 useIncomeProcessor: Processing income data", {
       transactionCount: transactions.length,
-      stripeData: stripeData ? 'present' : 'null',
-      stripeDataKeys: stripeData ? Object.keys(stripeData) : 'none'
+      stripeDataPresent: !!stripeData,
+      stripeDataType: typeof stripeData,
+      stripeDataKeys: stripeData ? Object.keys(stripeData) : 'none',
+      stripeDataStructure: stripeData ? {
+        hasGross: 'gross' in stripeData,
+        hasFees: 'fees' in stripeData,
+        hasNet: 'net' in stripeData,
+        hasSummary: 'summary' in stripeData,
+        hasData: 'data' in stripeData,
+        rawKeys: Object.keys(stripeData)
+      } : 'no stripe data'
     });
 
     let regularAmount = 0;
@@ -29,27 +38,98 @@ export const useIncomeProcessor = () => {
     transactions.forEach(transaction => {
       if (transaction.type === 'income' && transaction.source !== 'Stripe') {
         regularAmount += transaction.amount;
+        console.log("💰 Regular income transaction:", {
+          id: transaction.id,
+          amount: transaction.amount,
+          source: transaction.source,
+          description: transaction.description
+        });
       }
     });
     
-    console.log("💰 useIncomeProcessor: Regular income calculated", { regularAmount });
+    console.log("💰 useIncomeProcessor: Regular income calculated", { 
+      regularAmount,
+      regularIncomeTransactions: transactions.filter(tx => 
+        tx.type === 'income' && tx.source !== 'Stripe'
+      ).length
+    });
     
-    // Process Stripe data with null checks and proper structure handling
+    // Process Stripe data with comprehensive structure handling
     if (stripeData && typeof stripeData === 'object') {
-      // Handle both direct values and nested data structure
-      const gross = stripeData.gross || stripeData.data?.gross || 0;
-      const fees = stripeData.fees || stripeData.data?.fees || 0;
-      const transactionFees = stripeData.transactionFees || stripeData.data?.transactionFees || 0;
-      const payoutFees = stripeData.payoutFees || stripeData.data?.payoutFees || 0;
-      const additionalFees = stripeData.stripeFees || stripeData.additionalFees || stripeData.data?.stripeFees || 0;
-      const advances = stripeData.advances || stripeData.data?.advances || 0;
-      const advanceFunding = stripeData.advanceFunding || stripeData.data?.advanceFunding || 0;
-      const net = stripeData.net || stripeData.data?.net || 0;
-      const feePercentage = stripeData.feePercentage || stripeData.data?.feePercentage || 0;
-
-      console.log("💳 useIncomeProcessor: Stripe data processed", {
-        gross, fees, transactionFees, payoutFees, additionalFees, net, feePercentage
+      console.log("🔍 Processing Stripe data structure:", {
+        directKeys: Object.keys(stripeData),
+        hasDirectGross: 'gross' in stripeData,
+        hasDirectFees: 'fees' in stripeData,
+        hasDirectNet: 'net' in stripeData,
+        hasSummaryObject: 'summary' in stripeData,
+        hasDataObject: 'data' in stripeData,
+        summaryKeys: stripeData.summary ? Object.keys(stripeData.summary) : 'no summary',
+        dataKeys: stripeData.data ? Object.keys(stripeData.data) : 'no data'
       });
+
+      // Try multiple data extraction paths
+      let gross = 0, fees = 0, transactionFees = 0, payoutFees = 0, additionalFees = 0;
+      let advances = 0, advanceFunding = 0, net = 0, feePercentage = 0;
+
+      // Path 1: Direct properties
+      if (stripeData.gross !== undefined) {
+        gross = stripeData.gross || 0;
+        fees = stripeData.fees || 0;
+        transactionFees = stripeData.transactionFees || 0;
+        payoutFees = stripeData.payoutFees || 0;
+        additionalFees = stripeData.stripeFees || stripeData.additionalFees || 0;
+        advances = stripeData.advances || 0;
+        advanceFunding = stripeData.advanceFunding || 0;
+        net = stripeData.net || 0;
+        feePercentage = stripeData.feePercentage || 0;
+        console.log("✅ Using direct Stripe properties");
+      }
+      // Path 2: Summary object
+      else if (stripeData.summary) {
+        gross = stripeData.summary.gross || 0;
+        fees = stripeData.summary.fees || 0;
+        transactionFees = stripeData.summary.transactionFees || 0;
+        payoutFees = stripeData.summary.payoutFees || 0;
+        additionalFees = stripeData.summary.stripeFees || stripeData.summary.additionalFees || 0;
+        advances = stripeData.summary.advances || 0;
+        advanceFunding = stripeData.summary.advanceFunding || 0;
+        net = stripeData.summary.net || 0;
+        feePercentage = stripeData.summary.feePercentage || 0;
+        console.log("✅ Using Stripe summary object");
+      }
+      // Path 3: Data object
+      else if (stripeData.data) {
+        gross = stripeData.data.gross || 0;
+        fees = stripeData.data.fees || 0;
+        transactionFees = stripeData.data.transactionFees || 0;
+        payoutFees = stripeData.data.payoutFees || 0;
+        additionalFees = stripeData.data.stripeFees || stripeData.data.additionalFees || 0;
+        advances = stripeData.data.advances || 0;
+        advanceFunding = stripeData.data.advanceFunding || 0;
+        net = stripeData.data.net || 0;
+        feePercentage = stripeData.data.feePercentage || 0;
+        console.log("✅ Using Stripe data object");
+      }
+
+      console.log("💳 useIncomeProcessor: Extracted Stripe values", {
+        gross, fees, transactionFees, payoutFees, additionalFees, 
+        advances, advanceFunding, net, feePercentage,
+        extractionMethod: stripeData.gross !== undefined ? 'direct' : 
+                         stripeData.summary ? 'summary' : 
+                         stripeData.data ? 'data' : 'unknown'
+      });
+
+      // Verify values make sense
+      if (gross > 0) {
+        console.log("✅ Stripe income values look correct:", {
+          gross: `$${gross.toLocaleString()}`,
+          fees: `$${fees.toLocaleString()}`,
+          net: `$${net.toLocaleString()}`,
+          feePercentage: `${feePercentage.toFixed(2)}%`
+        });
+      } else {
+        console.warn("⚠️ Stripe gross income is 0 or missing, this might be incorrect");
+      }
 
       setStripeIncome(gross);
       setStripeFees(fees);
@@ -76,17 +156,20 @@ export const useIncomeProcessor = () => {
     
     setRegularIncome(regularAmount);
     
-    return { 
-      stripeGross: stripeData?.gross || stripeData?.data?.gross || 0, 
-      stripeFees: stripeData?.fees || stripeData?.data?.fees || 0,
-      stripeTransactionFees: stripeData?.transactionFees || stripeData?.data?.transactionFees || 0,
-      stripePayoutFees: stripeData?.payoutFees || stripeData?.data?.payoutFees || 0,
-      stripeAdditionalFees: stripeData?.stripeFees || stripeData?.additionalFees || stripeData?.data?.stripeFees || 0,
-      stripeAdvances: stripeData?.advances || stripeData?.data?.advances || 0,
-      stripeAdvanceFunding: stripeData?.advanceFunding || stripeData?.data?.advanceFunding || 0,
-      stripeNet: stripeData?.net || stripeData?.data?.net || 0,
+    const result = { 
+      stripeGross: stripeData?.gross || stripeData?.summary?.gross || stripeData?.data?.gross || 0, 
+      stripeFees: stripeData?.fees || stripeData?.summary?.fees || stripeData?.data?.fees || 0,
+      stripeTransactionFees: stripeData?.transactionFees || stripeData?.summary?.transactionFees || stripeData?.data?.transactionFees || 0,
+      stripePayoutFees: stripeData?.payoutFees || stripeData?.summary?.payoutFees || stripeData?.data?.payoutFees || 0,
+      stripeAdditionalFees: stripeData?.stripeFees || stripeData?.additionalFees || stripeData?.summary?.stripeFees || stripeData?.data?.stripeFees || 0,
+      stripeAdvances: stripeData?.advances || stripeData?.summary?.advances || stripeData?.data?.advances || 0,
+      stripeAdvanceFunding: stripeData?.advanceFunding || stripeData?.summary?.advanceFunding || stripeData?.data?.advanceFunding || 0,
+      stripeNet: stripeData?.net || stripeData?.summary?.net || stripeData?.data?.net || 0,
       regularAmount 
     };
+
+    console.log("📊 useIncomeProcessor: Final processed result", result);
+    return result;
   }, []);
 
   return {

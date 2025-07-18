@@ -6,6 +6,7 @@ import { ZohoReceivablesSection } from './ZohoReceivablesSection';
 import { StripeReceivablesSection } from './StripeReceivablesSection';
 import { ReceivablesSummary } from './ReceivablesSummary';
 import { useReceivablesData } from '@/hooks/useReceivablesData';
+import { zohoRepository } from '@/repositories/zohoRepository';
 import LoadingSpinner from '../LoadingSpinner';
 
 interface ReceivablesManagerProps {
@@ -17,7 +18,7 @@ interface ReceivablesManagerProps {
 }
 
 export const ReceivablesManager: React.FC<ReceivablesManagerProps> = ({
-  unpaidInvoices = []
+  unpaidInvoices: propUnpaidInvoices = []
 }) => {
   const {
     stripePendingInvoices,
@@ -32,14 +33,23 @@ export const ReceivablesManager: React.FC<ReceivablesManagerProps> = ({
     retryStripeFunction,
   } = useReceivablesData();
 
+  // Get Zoho unpaid invoices directly from repository
+  const zohoUnpaidInvoices = zohoRepository.getUnpaidInvoices();
+  
+  // Use Zoho data from repository, fallback to props if needed
+  const unpaidInvoices = zohoUnpaidInvoices.length > 0 ? zohoUnpaidInvoices : propUnpaidInvoices;
+
   console.log('🏠 ReceivablesManager: Render state', {
-    unpaidInvoicesCount: unpaidInvoices.length,
+    propUnpaidInvoicesCount: propUnpaidInvoices.length,
+    zohoUnpaidInvoicesCount: zohoUnpaidInvoices.length,
+    finalUnpaidInvoicesCount: unpaidInvoices.length,
     stripePendingInvoicesCount: stripePendingInvoices.length,
     stripeUpcomingPaymentsCount: stripeUpcomingPayments.length,
     stripePendingActivationsCount: stripePendingActivations.length,
     isLoading,
     error,
-    stripeErrors
+    stripeErrors,
+    zohoTotal: unpaidInvoices.reduce((sum, inv) => sum + inv.balance, 0)
   });
 
   if (isLoading) {

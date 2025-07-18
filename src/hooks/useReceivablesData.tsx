@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from 'sonner';
+import { zohoRepository } from '@/repositories/zohoRepository';
 import { 
   PendingStripeInvoice, 
   UpcomingSubscriptionPayment, 
@@ -37,6 +38,30 @@ export const useReceivablesData = () => {
       pendingActivations: null,
     },
   });
+
+  const fetchZohoUnpaidInvoices = async () => {
+    try {
+      console.log('🔄 Fetching Zoho unpaid invoices directly...');
+      
+      // Get unpaid invoices directly from Zoho repository
+      const unpaidInvoices = zohoRepository.getUnpaidInvoices();
+      
+      console.log('✅ Zoho unpaid invoices loaded:', {
+        count: unpaidInvoices.length,
+        totalAmount: unpaidInvoices.reduce((sum, inv) => sum + inv.balance, 0),
+        invoices: unpaidInvoices.map(inv => ({
+          customer: inv.customer_name,
+          company: inv.company_name,
+          amount: inv.balance
+        }))
+      });
+      
+      return unpaidInvoices;
+    } catch (error) {
+      console.error('❌ Error fetching Zoho unpaid invoices:', error);
+      throw error;
+    }
+  };
 
   const fetchStripeReceivables = async () => {
     try {
@@ -211,13 +236,21 @@ export const useReceivablesData = () => {
 
   const refreshData = async () => {
     try {
-      console.log('🚀 Starting full data refresh...');
+      console.log('🚀 Starting full receivables data refresh...');
       setData(prev => ({ ...prev, isLoading: true, error: null }));
       
+      // Fetch Zoho and Stripe data independently
       const [stripeData, selections] = await Promise.all([
         fetchStripeReceivables(),
         fetchSelections(),
       ]);
+
+      // Fetch Zoho unpaid invoices independently
+      const zohoUnpaidInvoices = await fetchZohoUnpaidInvoices();
+      console.log('📋 Zoho unpaid invoices in receivables data:', {
+        count: zohoUnpaidInvoices.length,
+        total: zohoUnpaidInvoices.reduce((sum, inv) => sum + inv.balance, 0)
+      });
 
       setData({
         ...stripeData,
@@ -226,7 +259,7 @@ export const useReceivablesData = () => {
         error: null,
       });
 
-      console.log('🎉 Data refresh completed successfully');
+      console.log('🎉 Receivables data refresh completed successfully');
     } catch (error) {
       console.error('❌ Error refreshing receivables data:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
