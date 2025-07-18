@@ -107,8 +107,8 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
       next30DaysGross,
       next30DaysNet,
       totalFeesCommissions,
-      stripePendingActivationsTotal,
-      totalItems: unpaidInvoices.length + stripePendingInvoices.length + 
+      pendingActivationsTotal,
+      totalItems: unpaidInvoices.length + stripePendingInvoices.length +
                   stripeCurrentMonthPayments.length + stripeNextMonthPayments.length + stripePendingActivations.length,
     };
   }, [unpaidInvoices, stripePendingInvoices, stripeCurrentMonthPayments, stripeNextMonthPayments, stripePendingActivations, selections]);

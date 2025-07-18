@@ -47,7 +47,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       
       const { data, error } = await supabase
         .from('monthly_balances')
-        .select('*')
+        .select('*, business_commission_rate')
         .eq('month_year', currentMonthYear)
         .maybeSingle();
 
@@ -150,6 +150,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       include_zoho_fifty_percent: includeZohoFiftyPercent,
       notes: notes || null,
       stripe_override: monthlyBalance?.stripe_override || null, // Include stripe_override
+      business_commission_rate: monthlyBalance?.business_commission_rate || null, // Include business_commission_rate
       created_at: monthlyBalance?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
