@@ -42,10 +42,23 @@ serve(async (req) => {
       );
     }
 
-    console.log(`🔍 ZOHO-TRANSACTIONS: ENHANCED processing request from ${startDate} to ${endDate}`, {
+    // Enhanced date validation and logging
+    const parsedStartDate = new Date(startDate);
+    const parsedEndDate = new Date(endDate);
+    
+    console.log(`🔍 ZOHO-TRANSACTIONS: ENHANCED DATE VALIDATION processing request from ${startDate} to ${endDate}`, {
       rawResponse: !!rawResponse,
       forceRefresh: !!forceRefresh,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      dateValidation: {
+        startDateString: startDate,
+        endDateString: endDate,
+        startDateParsed: parsedStartDate.toISOString(),
+        endDateParsed: parsedEndDate.toISOString(),
+        startDateUTC: parsedStartDate.toUTCString(),
+        endDateUTC: parsedEndDate.toUTCString(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      }
     });
 
     // Get the webhook URL from environment variables
@@ -127,20 +140,66 @@ serve(async (req) => {
         duration: webhookDuration
       });
 
-      // Enhanced validation for expense data
+      // Enhanced validation for expense data with detailed DATE TRACKING
       if (data?.expenses && Array.isArray(data.expenses)) {
-        console.log(`💰 ZOHO-TRANSACTIONS: EXPENSE DATA VALIDATION:`, {
-          expenseCount: data.expenses.length,
-          expenseAmounts: data.expenses.map((exp: any) => ({
+        // Log first few expenses with full date details
+        const sampleExpenses = data.expenses.slice(0, 5).map((exp: any) => {
+          const expenseDate = exp.date ? new Date(exp.date) : null;
+          return {
             id: exp.id || exp.external_id,
             amount: exp.amount,
             category: exp.category,
             description: exp.description?.substring(0, 50),
-            type: exp.type
-          })),
+            type: exp.type,
+            dateRAW: exp.date,
+            dateParsed: expenseDate ? expenseDate.toISOString() : null,
+            dateUTC: expenseDate ? expenseDate.toUTCString() : null,
+            dateLocal: expenseDate ? expenseDate.toLocaleDateString() : null,
+            isInRange: expenseDate ? (expenseDate >= parsedStartDate && expenseDate <= parsedEndDate) : null
+          };
+        });
+
+        console.log(`💰 ZOHO-TRANSACTIONS: EXPENSE DATA WITH DATE VALIDATION:`, {
+          expenseCount: data.expenses.length,
+          requestedRange: `${startDate} to ${endDate}`,
+          sampleExpenses,
+          dateAnalysis: {
+            outOfRangeCount: data.expenses.filter((exp: any) => {
+              if (!exp.date) return false;
+              const expDate = new Date(exp.date);
+              return expDate < parsedStartDate || expDate > parsedEndDate;
+            }).length,
+            inRangeCount: data.expenses.filter((exp: any) => {
+              if (!exp.date) return false;
+              const expDate = new Date(exp.date);
+              return expDate >= parsedStartDate && expDate <= parsedEndDate;
+            }).length
+          },
           totalExpenseAmount: data.expenses.reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0),
           requestId
         });
+
+        // Log specific out-of-range transactions
+        const outOfRange = data.expenses.filter((exp: any) => {
+          if (!exp.date) return false;
+          const expDate = new Date(exp.date);
+          return expDate < parsedStartDate || expDate > parsedEndDate;
+        });
+
+        if (outOfRange.length > 0) {
+          console.warn(`⚠️ ZOHO-TRANSACTIONS: OUT-OF-RANGE EXPENSES DETECTED:`, {
+            count: outOfRange.length,
+            requestedRange: `${startDate} to ${endDate}`,
+            outOfRangeExpenses: outOfRange.map((exp: any) => ({
+              description: exp.description?.substring(0, 50),
+              amount: exp.amount,
+              dateRAW: exp.date,
+              dateParsed: new Date(exp.date).toISOString(),
+              daysDifference: Math.floor((new Date(exp.date) - parsedStartDate) / (1000 * 60 * 60 * 24))
+            })),
+            requestId
+          });
+        }
       } else {
         console.warn(`⚠️ ZOHO-TRANSACTIONS: No expense data found in response`, {
           dataStructure: data ? Object.keys(data) : 'null',
