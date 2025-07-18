@@ -47,7 +47,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       
       const { data, error } = await supabase
         .from('monthly_balances')
-        .select('*, business_commission_rate')
+        .select('*')
         .eq('month_year', currentMonthYear)
         .maybeSingle();
 

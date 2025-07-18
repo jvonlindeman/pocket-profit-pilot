@@ -211,6 +211,7 @@ export type Database = {
       monthly_balances: {
         Row: {
           balance: number
+          business_commission_rate: number | null
           created_at: string
           id: number
           include_zoho_fifty_percent: boolean | null
@@ -225,6 +226,7 @@ export type Database = {
         }
         Insert: {
           balance: number
+          business_commission_rate?: number | null
           created_at?: string
           id?: number
           include_zoho_fifty_percent?: boolean | null
@@ -239,6 +241,7 @@ export type Database = {
         }
         Update: {
           balance?: number
+          business_commission_rate?: number | null
           created_at?: string
           id?: number
           include_zoho_fifty_percent?: boolean | null
