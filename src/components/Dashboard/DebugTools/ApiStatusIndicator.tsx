@@ -16,8 +16,7 @@ export function ApiStatusIndicator({ className }: ApiStatusIndicatorProps) {
   const stripeStatus = connectivity?.stripe;
   
   return (
-    <TooltipProvider>
-      <Tooltip>
+    <Tooltip>
         <TooltipTrigger asChild>
           <div className={`flex items-center gap-2 ${className}`}>
             {isLoading ? (
@@ -63,6 +62,5 @@ export function ApiStatusIndicator({ className }: ApiStatusIndicatorProps) {
           <p>Estado de conexión con APIs externas</p>
         </TooltipContent>
       </Tooltip>
-    </TooltipProvider>
   );
 }

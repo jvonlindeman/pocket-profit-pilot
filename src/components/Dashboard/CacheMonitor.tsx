@@ -75,8 +75,7 @@ const CacheMonitor = ({ dateRange, onRefresh }: CacheMonitorProps) => {
           </div>
           
           <div className="flex space-x-2">
-            <TooltipProvider>
-              <Tooltip>
+            <Tooltip>
                 <TooltipTrigger asChild>
                   <Button 
                     variant="outline" 
@@ -102,7 +101,6 @@ const CacheMonitor = ({ dateRange, onRefresh }: CacheMonitorProps) => {
                     : "Activa la caché para mejorar el rendimiento"}</p>
                 </TooltipContent>
               </Tooltip>
-            </TooltipProvider>
             
             <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading}>
               <RefreshCw className={`h-4 w-4 mr-1 ${isLoading ? 'animate-spin' : ''}`} />

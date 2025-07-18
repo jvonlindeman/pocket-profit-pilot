@@ -19,7 +19,6 @@ const ApiCallsTracker: React.FC<ApiCallsTrackerProps> = ({ className = "" }) => 
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="bg-gray-100 rounded-md px-2 py-1 flex items-center gap-1 text-sm">
@@ -46,7 +45,6 @@ const ApiCallsTracker: React.FC<ApiCallsTrackerProps> = ({ className = "" }) => 
             </div>
           </TooltipContent>
         </Tooltip>
-      </TooltipProvider>
     </div>
   );
 };

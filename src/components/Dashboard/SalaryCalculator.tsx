@@ -90,7 +90,6 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
   };
 
   return (
-    <TooltipProvider>
       <Card className="overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 shadow-md">
         <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 pb-4">
           <CardTitle className="flex items-center text-white">
@@ -452,7 +451,6 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
           </div>
         </CardContent>
       </Card>
-    </TooltipProvider>
   );
 };
 
