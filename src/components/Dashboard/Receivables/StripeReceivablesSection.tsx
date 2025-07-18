@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -250,12 +249,8 @@ export const StripeReceivablesSection: React.FC<StripeReceivablesSectionProps> =
                       </div>
                     )}
                     <div className="flex justify-between text-orange-600">
-                      <span>- Comisión Stripe (~4.43%):</span>
+                      <span>- Comisión Stripe (4.43%):</span>
                       <span>-{formatCurrency(payment.stripe_processing_fee)}</span>
-                    </div>
-                    <div className="flex justify-between text-red-600">
-                      <span>- Comisión negocio ({payment.business_commission_rate}%):</span>
-                      <span>-{formatCurrency(payment.business_commission_amount)}</span>
                     </div>
                     <div className="border-t pt-1 flex justify-between font-semibold text-green-600">
                       <span>Neto a recibir:</span>
