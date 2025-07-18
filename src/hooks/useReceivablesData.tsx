@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from 'sonner';
@@ -13,6 +12,8 @@ import {
 interface ReceivablesData {
   stripePendingInvoices: PendingStripeInvoice[];
   stripeUpcomingPayments: UpcomingSubscriptionPayment[];
+  stripeCurrentMonthPayments: UpcomingSubscriptionPayment[];
+  stripeNextMonthPayments: UpcomingSubscriptionPayment[];
   stripePendingActivations: PendingActivationSubscription[];
   selections: ReceivablesSelection[];
   isLoading: boolean;
@@ -28,6 +29,8 @@ export const useReceivablesData = () => {
   const [data, setData] = useState<ReceivablesData>({
     stripePendingInvoices: [],
     stripeUpcomingPayments: [],
+    stripeCurrentMonthPayments: [],
+    stripeNextMonthPayments: [],
     stripePendingActivations: [],
     selections: [],
     isLoading: true,
@@ -102,8 +105,10 @@ export const useReceivablesData = () => {
         console.error('❌ Stripe pending invoices function failed:', results[0].reason);
       }
 
-      // Process upcoming payments
+      // Process upcoming payments with new structure
       let stripeUpcomingPayments: UpcomingSubscriptionPayment[] = [];
+      let stripeCurrentMonthPayments: UpcomingSubscriptionPayment[] = [];
+      let stripeNextMonthPayments: UpcomingSubscriptionPayment[] = [];
       let upcomingPaymentsError: string | null = null;
       
       if (results[1].status === 'fulfilled') {
@@ -114,8 +119,16 @@ export const useReceivablesData = () => {
           upcomingPaymentsError = `Upcoming payments error: ${upcomingPaymentsRes.error}`;
           console.error('❌ Stripe upcoming payments error:', upcomingPaymentsRes.error);
         } else if (upcomingPaymentsRes.data?.success) {
-          stripeUpcomingPayments = upcomingPaymentsRes.data.data?.upcoming_payments || [];
-          console.log('✅ Upcoming payments loaded:', stripeUpcomingPayments.length);
+          const responseData = upcomingPaymentsRes.data.data;
+          stripeUpcomingPayments = responseData?.upcoming_payments || [];
+          stripeCurrentMonthPayments = responseData?.current_month_payments || [];
+          stripeNextMonthPayments = responseData?.next_month_payments || [];
+          
+          console.log('✅ Upcoming payments loaded:', {
+            total: stripeUpcomingPayments.length,
+            currentMonth: stripeCurrentMonthPayments.length,
+            nextMonth: stripeNextMonthPayments.length
+          });
         } else {
           upcomingPaymentsError = `Unexpected response format for upcoming payments`;
           console.error('❌ Unexpected upcoming payments response:', upcomingPaymentsRes);
@@ -151,6 +164,8 @@ export const useReceivablesData = () => {
       console.log('📈 Final Stripe data summary:', {
         pendingInvoices: stripePendingInvoices.length,
         upcomingPayments: stripeUpcomingPayments.length,
+        currentMonthPayments: stripeCurrentMonthPayments.length,
+        nextMonthPayments: stripeNextMonthPayments.length,
         pendingActivations: stripePendingActivations.length,
         errors: {
           pendingInvoices: pendingInvoicesError,
@@ -162,6 +177,8 @@ export const useReceivablesData = () => {
       return {
         stripePendingInvoices,
         stripeUpcomingPayments,
+        stripeCurrentMonthPayments,
+        stripeNextMonthPayments,
         stripePendingActivations,
         stripeErrors: {
           pendingInvoices: pendingInvoicesError,
@@ -310,7 +327,10 @@ export const useReceivablesData = () => {
             newErrors.pendingInvoices = null;
             break;
           case 'upcomingPayments':
-            newData.stripeUpcomingPayments = result.data.data?.upcoming_payments || [];
+            const responseData = result.data.data;
+            newData.stripeUpcomingPayments = responseData?.upcoming_payments || [];
+            newData.stripeCurrentMonthPayments = responseData?.current_month_payments || [];
+            newData.stripeNextMonthPayments = responseData?.next_month_payments || [];
             newErrors.upcomingPayments = null;
             break;
           case 'pendingActivations':
