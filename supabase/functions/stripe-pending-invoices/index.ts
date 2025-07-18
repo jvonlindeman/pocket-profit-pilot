@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 
@@ -20,29 +21,33 @@ serve(async (req) => {
     logStep("Function started");
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
+    if (!stripeKey) {
+      logStep("ERROR: STRIPE_SECRET_KEY not found");
+      throw new Error("STRIPE_SECRET_KEY is not set");
+    }
 
+    logStep("STRIPE_SECRET_KEY found, initializing client");
     const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
-    logStep("Stripe client initialized");
 
     // Get pending invoices (draft, open, uncollectible)
-    const invoices = await stripe.invoices.list({
+    logStep("Fetching open invoices");
+    const openInvoices = await stripe.invoices.list({
       status: 'open',
       limit: 100,
     });
     
-    // Also get draft invoices
+    logStep("Fetching draft invoices");
     const draftInvoices = await stripe.invoices.list({
       status: 'draft',
       limit: 100,
     });
 
     logStep("Retrieved invoices", { 
-      openCount: invoices.data.length, 
+      openCount: openInvoices.data.length, 
       draftCount: draftInvoices.data.length 
     });
 
-    const allInvoices = [...invoices.data, ...draftInvoices.data];
+    const allInvoices = [...openInvoices.data, ...draftInvoices.data];
 
     // Transform to our format
     const pendingInvoices = await Promise.all(
@@ -76,12 +81,14 @@ serve(async (req) => {
       })
     );
 
-    logStep("Transformed invoices", { count: pendingInvoices.length });
+    logStep("Transformed invoices successfully", { count: pendingInvoices.length });
 
     return new Response(JSON.stringify({ 
       success: true, 
-      invoices: pendingInvoices,
-      total_count: pendingInvoices.length
+      data: {
+        invoices: pendingInvoices,
+        total_count: pendingInvoices.length
+      }
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
@@ -89,12 +96,14 @@ serve(async (req) => {
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR", { message: errorMessage });
+    logStep("ERROR", { message: errorMessage, stack: error.stack });
     
     return new Response(JSON.stringify({ 
       success: false, 
       error: errorMessage,
-      invoices: []
+      data: {
+        invoices: []
+      }
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,

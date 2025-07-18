@@ -17,6 +17,18 @@ name = "stripe-balance"
 verify_jwt = true
 
 [[functions]]
+name = "stripe-pending-invoices"
+verify_jwt = true
+
+[[functions]]
+name = "stripe-upcoming-payments"
+verify_jwt = true
+
+[[functions]]
+name = "stripe-pending-activations"
+verify_jwt = true
+
+[[functions]]
 name = "cache-manager"
 verify_jwt = true
 

@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 
@@ -20,22 +21,28 @@ serve(async (req) => {
     logStep("Function started");
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
+    if (!stripeKey) {
+      logStep("ERROR: STRIPE_SECRET_KEY not found");
+      throw new Error("STRIPE_SECRET_KEY is not set");
+    }
 
+    logStep("STRIPE_SECRET_KEY found, initializing client");
     const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
-    logStep("Stripe client initialized");
 
     // Get subscriptions that need activation (incomplete, incomplete_expired, past_due)
+    logStep("Fetching incomplete subscriptions");
     const incompleteSubscriptions = await stripe.subscriptions.list({
       status: 'incomplete',
       limit: 100,
     });
 
+    logStep("Fetching incomplete_expired subscriptions");
     const incompleteExpiredSubscriptions = await stripe.subscriptions.list({
       status: 'incomplete_expired',
       limit: 100,
     });
 
+    logStep("Fetching past_due subscriptions");
     const pastDueSubscriptions = await stripe.subscriptions.list({
       status: 'past_due',
       limit: 100,
@@ -120,12 +127,14 @@ serve(async (req) => {
       })
     );
 
-    logStep("Transformed pending activations", { count: pendingActivations.length });
+    logStep("Transformed pending activations successfully", { count: pendingActivations.length });
 
     return new Response(JSON.stringify({ 
       success: true, 
-      pending_activations: pendingActivations,
-      total_count: pendingActivations.length
+      data: {
+        pending_activations: pendingActivations,
+        total_count: pendingActivations.length
+      }
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
@@ -133,12 +142,14 @@ serve(async (req) => {
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR", { message: errorMessage });
+    logStep("ERROR", { message: errorMessage, stack: error.stack });
     
     return new Response(JSON.stringify({ 
       success: false, 
       error: errorMessage,
-      pending_activations: []
+      data: {
+        pending_activations: []
+      }
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,

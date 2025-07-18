@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 
@@ -20,12 +21,16 @@ serve(async (req) => {
     logStep("Function started");
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
+    if (!stripeKey) {
+      logStep("ERROR: STRIPE_SECRET_KEY not found");
+      throw new Error("STRIPE_SECRET_KEY is not set");
+    }
 
+    logStep("STRIPE_SECRET_KEY found, initializing client");
     const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
-    logStep("Stripe client initialized");
 
-    // Get active subscriptions
+    // Get active subscriptions using the endpoint recommended by user
+    logStep("Fetching active subscriptions");
     const subscriptions = await stripe.subscriptions.list({
       status: 'active',
       limit: 100,
@@ -53,7 +58,7 @@ serve(async (req) => {
           }
         }
 
-        // Get plan info from the first item (most subscriptions have one item)
+        // Get plan info from the first item
         if (subscription.items.data.length > 0) {
           const item = subscription.items.data[0];
           const price = item.price;
@@ -67,7 +72,7 @@ serve(async (req) => {
           };
         }
 
-        // Calculate next payment date
+        // Calculate next payment date (próxima factura)
         const nextPaymentDate = new Date(subscription.current_period_end * 1000);
 
         return {
@@ -95,15 +100,17 @@ serve(async (req) => {
       return paymentDate >= now && paymentDate <= sixtyDaysFromNow;
     });
 
-    logStep("Filtered upcoming payments", { 
+    logStep("Filtered upcoming payments successfully", { 
       total: upcomingPayments.length, 
       next60Days: filteredPayments.length 
     });
 
     return new Response(JSON.stringify({ 
       success: true, 
-      upcoming_payments: filteredPayments,
-      total_count: filteredPayments.length
+      data: {
+        upcoming_payments: filteredPayments,
+        total_count: filteredPayments.length
+      }
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
@@ -111,12 +118,14 @@ serve(async (req) => {
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR", { message: errorMessage });
+    logStep("ERROR", { message: errorMessage, stack: error.stack });
     
     return new Response(JSON.stringify({ 
       success: false, 
       error: errorMessage,
-      upcoming_payments: []
+      data: {
+        upcoming_payments: []
+      }
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,

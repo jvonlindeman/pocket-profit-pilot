@@ -60,11 +60,13 @@ export const useReceivablesData = () => {
       
       if (results[0].status === 'fulfilled') {
         const pendingInvoicesRes = results[0].value;
-        if (pendingInvoicesRes.error) {
-          pendingInvoicesError = `Pending invoices error: ${pendingInvoicesRes.error}`;
+        console.log('📧 Pending invoices response:', pendingInvoicesRes);
+        
+        if (pendingInvoicesRes.error || !pendingInvoicesRes.data?.success) {
+          pendingInvoicesError = `Pending invoices error: ${pendingInvoicesRes.error || 'Unknown error'}`;
           console.error('❌ Stripe pending invoices error:', pendingInvoicesRes.error);
-        } else {
-          stripePendingInvoices = pendingInvoicesRes.data?.invoices || [];
+        } else if (pendingInvoicesRes.data) {
+          stripePendingInvoices = pendingInvoicesRes.data.data?.invoices || [];
           console.log('✅ Pending invoices loaded:', stripePendingInvoices.length);
         }
       } else {
@@ -78,11 +80,13 @@ export const useReceivablesData = () => {
       
       if (results[1].status === 'fulfilled') {
         const upcomingPaymentsRes = results[1].value;
-        if (upcomingPaymentsRes.error) {
-          upcomingPaymentsError = `Upcoming payments error: ${upcomingPaymentsRes.error}`;
+        console.log('💰 Upcoming payments response:', upcomingPaymentsRes);
+        
+        if (upcomingPaymentsRes.error || !upcomingPaymentsRes.data?.success) {
+          upcomingPaymentsError = `Upcoming payments error: ${upcomingPaymentsRes.error || 'Unknown error'}`;
           console.error('❌ Stripe upcoming payments error:', upcomingPaymentsRes.error);
-        } else {
-          stripeUpcomingPayments = upcomingPaymentsRes.data?.upcoming_payments || [];
+        } else if (upcomingPaymentsRes.data) {
+          stripeUpcomingPayments = upcomingPaymentsRes.data.data?.upcoming_payments || [];
           console.log('✅ Upcoming payments loaded:', stripeUpcomingPayments.length);
         }
       } else {
@@ -96,11 +100,13 @@ export const useReceivablesData = () => {
       
       if (results[2].status === 'fulfilled') {
         const pendingActivationsRes = results[2].value;
-        if (pendingActivationsRes.error) {
-          pendingActivationsError = `Pending activations error: ${pendingActivationsRes.error}`;
+        console.log('⚠️ Pending activations response:', pendingActivationsRes);
+        
+        if (pendingActivationsRes.error || !pendingActivationsRes.data?.success) {
+          pendingActivationsError = `Pending activations error: ${pendingActivationsRes.error || 'Unknown error'}`;
           console.error('❌ Stripe pending activations error:', pendingActivationsRes.error);
-        } else {
-          stripePendingActivations = pendingActivationsRes.data?.pending_activations || [];
+        } else if (pendingActivationsRes.data) {
+          stripePendingActivations = pendingActivationsRes.data.data?.pending_activations || [];
           console.log('✅ Pending activations loaded:', stripePendingActivations.length);
         }
       } else {
@@ -235,8 +241,9 @@ export const useReceivablesData = () => {
       };
 
       const result = await supabase.functions.invoke(functionMap[functionName]);
+      console.log(`📊 Retry result for ${functionName}:`, result);
       
-      if (result.error) {
+      if (result.error || !result.data?.success) {
         console.error(`❌ Retry failed for ${functionName}:`, result.error);
         toast.error(`Failed to retry ${functionName}`);
         return false;
@@ -251,15 +258,15 @@ export const useReceivablesData = () => {
         
         switch (functionName) {
           case 'pendingInvoices':
-            newData.stripePendingInvoices = result.data?.invoices || [];
+            newData.stripePendingInvoices = result.data.data?.invoices || [];
             newErrors.pendingInvoices = null;
             break;
           case 'upcomingPayments':
-            newData.stripeUpcomingPayments = result.data?.upcoming_payments || [];
+            newData.stripeUpcomingPayments = result.data.data?.upcoming_payments || [];
             newErrors.upcomingPayments = null;
             break;
           case 'pendingActivations':
-            newData.stripePendingActivations = result.data?.pending_activations || [];
+            newData.stripePendingActivations = result.data.data?.pending_activations || [];
             newErrors.pendingActivations = null;
             break;
         }
