@@ -38,7 +38,7 @@ export const useDashboardStateManager = () => {
     cacheStatus,
     cacheChecked,
     hasCachedData,
-    isRefreshing // Add isRefreshing state from useFinanceData
+    isRefreshing
   } = useFinanceData();
   
   const [showBalanceDialog, setShowBalanceDialog] = useState(false);
@@ -64,31 +64,49 @@ export const useDashboardStateManager = () => {
     [createPeriodTitle, dateRange.startDate, dateRange.endDate]
   );
 
-  // Calculate total Zoho expenses - all expenses except those from Stripe
-  const totalZohoExpenses = useMemo(() => 
-    financialData.transactions
-      .filter(tx => tx.type === 'expense' && tx.source !== 'Stripe')
-      .reduce((sum, tx) => sum + tx.amount, 0),
-    [financialData.transactions]
-  );
+  // ENHANCED Calculate total Zoho expenses - with detailed logging
+  const totalZohoExpenses = useMemo(() => {
+    const zohoExpenses = financialData.transactions
+      .filter(tx => tx.type === 'expense' && tx.source === 'Zoho');
+    
+    const total = zohoExpenses.reduce((sum, tx) => sum + tx.amount, 0);
+    
+    console.log("💰 DashboardStateManager: ENHANCED Total Zoho Expenses Calculation", {
+      allTransactions: financialData.transactions.length,
+      zohoTransactions: financialData.transactions.filter(tx => tx.source === 'Zoho').length,
+      zohoExpenses: zohoExpenses.length,
+      totalZohoExpenseAmount: total,
+      zohoExpenseBreakdown: zohoExpenses.map(tx => ({
+        id: tx.id,
+        amount: tx.amount,
+        category: tx.category,
+        description: tx.description?.substring(0, 50),
+        date: tx.date
+      })),
+      expectedResult: 'Should be > 0 if Zoho has expense data'
+    });
+    
+    return total;
+  }, [financialData.transactions]);
 
   // Enhanced debugging and improved value extraction logic
   console.log("💼 DashboardStateManager: Monthly balance data received:", monthlyBalance);
   
-  // IMMEDIATE VALUES: Use the most current values with better defaults - FIXED: Added include_zoho_fifty_percent
+  // IMMEDIATE VALUES: Use the most current values with better defaults
   const opexAmount = monthlyBalance?.opex_amount ?? 35;
   const itbmAmount = monthlyBalance?.itbm_amount ?? 0;
   const profitPercentage = monthlyBalance?.profit_percentage ?? 1;
   const taxReservePercentage = monthlyBalance?.tax_reserve_percentage ?? 5;
   const includeZohoFiftyPercent = monthlyBalance?.include_zoho_fifty_percent ?? true;
   
-  console.log("💼 DashboardStateManager: IMMEDIATE VALUES for calculator (FIXED):", { 
+  console.log("💼 DashboardStateManager: ENHANCED VALUES for calculator:", { 
     opexAmount, 
     itbmAmount, 
     profitPercentage, 
     taxReservePercentage,
-    includeZohoFiftyPercent, // NOW INCLUDED
+    includeZohoFiftyPercent,
     startingBalance,
+    totalZohoExpenses, // ENHANCED: Now tracked separately
     monthlyBalanceId: monthlyBalance?.id,
     monthlyBalanceTimestamp: monthlyBalance?.updated_at,
     isRefreshing,
@@ -96,19 +114,24 @@ export const useDashboardStateManager = () => {
   });
   
   // ENHANCED REACTIVE KEY: More granular with timestamp for better synchronization
-  const calculatorKey = `calculator-${monthlyBalance?.id || 'default'}-${monthlyBalance?.updated_at || Date.now()}-${startingBalance}-${opexAmount}-${itbmAmount}-${profitPercentage}-${taxReservePercentage}-${includeZohoFiftyPercent}-${Date.now()}`;
+  const calculatorKey = `calculator-${monthlyBalance?.id || 'default'}-${monthlyBalance?.updated_at || Date.now()}-${startingBalance}-${opexAmount}-${itbmAmount}-${profitPercentage}-${taxReservePercentage}-${includeZohoFiftyPercent}-${totalZohoExpenses}-${Date.now()}`;
   
   console.log("💼 DashboardStateManager: Enhanced calculator key (forces re-render):", calculatorKey);
-  console.log("💼 DashboardStateManager: Immediate calculator values:", {
-    opexAmount, itbmAmount, profitPercentage, taxReservePercentage, includeZohoFiftyPercent, startingBalance
+  console.log("💼 DashboardStateManager: ENHANCED immediate calculator values:", {
+    opexAmount, itbmAmount, profitPercentage, taxReservePercentage, includeZohoFiftyPercent, startingBalance, totalZohoExpenses
   });
-  console.log("💼 DashboardStateManager: Transaction count:", financialData.transactions.length);
-  console.log("💼 DashboardStateManager: Zoho income transactions:", 
-    financialData.transactions.filter(tx => tx.type === 'income' && tx.source === 'Zoho').length
-  );
-  console.log("💼 DashboardStateManager: Unpaid invoices:", unpaidInvoices?.length || 0);
-  console.log("💼 DashboardStateManager: Is refreshing:", isRefreshing);
-  console.log("💼 DashboardStateManager: Include Zoho 50% (TRACKING):", includeZohoFiftyPercent);
+  
+  // ENHANCED TRANSACTION LOGGING
+  console.log("💼 DashboardStateManager: ENHANCED Transaction analysis:", {
+    totalTransactions: financialData.transactions.length,
+    zohoIncomeTransactions: financialData.transactions.filter(tx => tx.type === 'income' && tx.source === 'Zoho').length,
+    zohoExpenseTransactions: financialData.transactions.filter(tx => tx.type === 'expense' && tx.source === 'Zoho').length,
+    stripeTransactions: financialData.transactions.filter(tx => tx.source === 'Stripe').length,
+    unpaidInvoices: unpaidInvoices?.length || 0,
+    isRefreshing,
+    includeZohoFiftyPercent,
+    totalZohoExpensesCalculated: totalZohoExpenses
+  });
 
   // Enhanced refresh function with global state management
   const enhancedRefreshData = async (force?: boolean) => {
@@ -130,14 +153,14 @@ export const useDashboardStateManager = () => {
     
     try {
       setGlobalRefreshInProgress(true);
-      console.log(`🔄 DashboardStateManager: Starting refresh operation [${requestId}] - Force: ${force}`);
+      console.log(`🔄 DashboardStateManager: Starting ENHANCED refresh operation [${requestId}] - Force: ${force}`);
       
       const result = await refreshData(force);
       
-      console.log(`✅ DashboardStateManager: Refresh completed [${requestId}] - Success: ${result}`);
+      console.log(`✅ DashboardStateManager: ENHANCED refresh completed [${requestId}] - Success: ${result}`);
       return result;
     } catch (error) {
-      console.error(`❌ DashboardStateManager: Refresh failed [${requestId}]:`, error);
+      console.error(`❌ DashboardStateManager: ENHANCED refresh failed [${requestId}]:`, error);
       return false;
     } finally {
       setGlobalRefreshInProgress(false);
@@ -171,7 +194,7 @@ export const useDashboardStateManager = () => {
     collaboratorExpenses,
     unpaidInvoices,
     startingBalance,
-    totalZohoExpenses,
+    totalZohoExpenses, // ENHANCED: Now properly calculated and tracked
     
     // Derived values
     periodTitle,
@@ -181,7 +204,7 @@ export const useDashboardStateManager = () => {
     itbmAmount,
     profitPercentage,
     taxReservePercentage,
-    includeZohoFiftyPercent, // NOW EXPORTED
+    includeZohoFiftyPercent,
     
     // Monthly balance
     monthlyBalance,
