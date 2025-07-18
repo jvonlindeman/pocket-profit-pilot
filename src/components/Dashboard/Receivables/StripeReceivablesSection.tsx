@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CheckSquare, Square, ExternalLink, Calendar, AlertTriangle } from 'lucide-react';
+import { CheckSquare, Square, ExternalLink, Calendar, AlertTriangle, RefreshCw, AlertCircle } from 'lucide-react';
 import { 
   PendingStripeInvoice, 
   UpcomingSubscriptionPayment, 
@@ -18,6 +18,7 @@ interface StripeReceivablesSectionProps {
   title: string;
   items: PendingStripeInvoice[] | UpcomingSubscriptionPayment[] | PendingActivationSubscription[];
   selections: ReceivablesSelection[];
+  error?: string | null;
   onUpdateSelection: (
     type: ReceivablesSelection['selection_type'],
     itemId: string,
@@ -25,6 +26,7 @@ interface StripeReceivablesSectionProps {
     amount: number,
     metadata?: any
   ) => Promise<boolean>;
+  onRetry?: (functionName: 'pendingInvoices' | 'upcomingPayments' | 'pendingActivations') => Promise<boolean>;
 }
 
 export const StripeReceivablesSection: React.FC<StripeReceivablesSectionProps> = ({
@@ -32,13 +34,23 @@ export const StripeReceivablesSection: React.FC<StripeReceivablesSectionProps> =
   title,
   items,
   selections,
+  error,
   onUpdateSelection,
+  onRetry,
 }) => {
   const selectionType = useMemo(() => {
     switch (type) {
       case 'pending_invoices': return 'stripe_pending_invoices' as const;
       case 'upcoming_payments': return 'stripe_upcoming_payments' as const;
       case 'pending_activations': return 'stripe_pending_activations' as const;
+    }
+  }, [type]);
+
+  const retryFunctionName = useMemo(() => {
+    switch (type) {
+      case 'pending_invoices': return 'pendingInvoices' as const;
+      case 'upcoming_payments': return 'upcomingPayments' as const;
+      case 'pending_activations': return 'pendingActivations' as const;
     }
   }, [type]);
 
@@ -124,6 +136,12 @@ export const StripeReceivablesSection: React.FC<StripeReceivablesSectionProps> =
       getItemAmount(item),
       item
     );
+  };
+
+  const handleRetry = async () => {
+    if (onRetry) {
+      await onRetry(retryFunctionName);
+    }
   };
 
   const renderItemContent = (item: any) => {
@@ -242,12 +260,56 @@ export const StripeReceivablesSection: React.FC<StripeReceivablesSectionProps> =
     }
   };
 
+  // Show error state with retry option
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>{title}</span>
+            <AlertCircle className="h-5 w-5 text-red-500" />
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
+          <div className="text-center space-y-4">
+            <div className="text-red-600 bg-red-50 p-4 rounded-lg">
+              <p className="font-medium">Error loading {title.toLowerCase()}</p>
+              <p className="text-sm mt-1">{error}</p>
+            </div>
+            {onRetry && (
+              <Button 
+                variant="outline" 
+                onClick={handleRetry}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Retry
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show empty state
   if (items.length === 0) {
     return (
       <Card>
         <CardContent className="p-6">
-          <div className="text-center text-muted-foreground">
-            No {title.toLowerCase()} found
+          <div className="text-center text-muted-foreground space-y-2">
+            <p>No {title.toLowerCase()} found</p>
+            {onRetry && (
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={handleRetry}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Refresh
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -270,6 +332,17 @@ export const StripeReceivablesSection: React.FC<StripeReceivablesSectionProps> =
           <span className="text-sm text-muted-foreground">
             {items.length} items
           </span>
+          {onRetry && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={handleRetry}
+              className="flex items-center gap-1"
+            >
+              <RefreshCw className="h-3 w-3" />
+              Refresh
+            </Button>
+          )}
         </div>
         <div className="text-right">
           <div className="text-sm text-muted-foreground">Selected Total</div>

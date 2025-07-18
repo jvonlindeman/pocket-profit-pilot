@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -25,8 +26,10 @@ export const ReceivablesManager: React.FC<ReceivablesManagerProps> = ({
     selections,
     isLoading,
     error,
+    stripeErrors,
     updateSelection,
     refreshData,
+    retryStripeFunction,
   } = useReceivablesData();
 
   if (isLoading) {
@@ -76,14 +79,17 @@ export const ReceivablesManager: React.FC<ReceivablesManagerProps> = ({
               <TabsTrigger value="zoho">
                 Zoho Books ({unpaidInvoices.length})
               </TabsTrigger>
-              <TabsTrigger value="stripe-invoices">
+              <TabsTrigger value="stripe-invoices" className={stripeErrors.pendingInvoices ? 'text-red-600' : ''}>
                 Stripe Invoices ({stripePendingInvoices.length})
+                {stripeErrors.pendingInvoices && <span className="ml-1">⚠️</span>}
               </TabsTrigger>
-              <TabsTrigger value="stripe-subscriptions">
+              <TabsTrigger value="stripe-subscriptions" className={stripeErrors.upcomingPayments ? 'text-red-600' : ''}>
                 Upcoming Payments ({stripeUpcomingPayments.length})
+                {stripeErrors.upcomingPayments && <span className="ml-1">⚠️</span>}
               </TabsTrigger>
-              <TabsTrigger value="stripe-activations">
+              <TabsTrigger value="stripe-activations" className={stripeErrors.pendingActivations ? 'text-red-600' : ''}>
                 Pending Activations ({stripePendingActivations.length})
+                {stripeErrors.pendingActivations && <span className="ml-1">⚠️</span>}
               </TabsTrigger>
             </TabsList>
 
@@ -101,7 +107,9 @@ export const ReceivablesManager: React.FC<ReceivablesManagerProps> = ({
                 title="Pending Stripe Invoices"
                 items={stripePendingInvoices}
                 selections={selections}
+                error={stripeErrors.pendingInvoices}
                 onUpdateSelection={updateSelection}
+                onRetry={retryStripeFunction}
               />
             </TabsContent>
 
@@ -111,7 +119,9 @@ export const ReceivablesManager: React.FC<ReceivablesManagerProps> = ({
                 title="Upcoming Subscription Payments"
                 items={stripeUpcomingPayments}
                 selections={selections}
+                error={stripeErrors.upcomingPayments}
                 onUpdateSelection={updateSelection}
+                onRetry={retryStripeFunction}
               />
             </TabsContent>
 
@@ -121,7 +131,9 @@ export const ReceivablesManager: React.FC<ReceivablesManagerProps> = ({
                 title="Subscriptions Pending Activation"
                 items={stripePendingActivations}
                 selections={selections}
+                error={stripeErrors.pendingActivations}
                 onUpdateSelection={updateSelection}
+                onRetry={retryStripeFunction}
               />
             </TabsContent>
           </Tabs>
