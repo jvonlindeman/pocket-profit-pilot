@@ -4,8 +4,10 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 interface ApiCallsContextType {
   zohoApiCalls: number;
   stripeApiCalls: number;
+  webhookCallsCount: number;
   incrementZohoApiCalls: () => void;
   incrementStripeApiCalls: () => void;
+  updateWebhookCallsCount: (count: number) => void;
   resetApiCalls: () => void;
   getTotalApiCalls: () => number;
 }
@@ -15,6 +17,7 @@ const ApiCallsContext = createContext<ApiCallsContextType | undefined>(undefined
 export const ApiCallsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [zohoApiCalls, setZohoApiCalls] = useState(0);
   const [stripeApiCalls, setStripeApiCalls] = useState(0);
+  const [webhookCallsCount, setWebhookCallsCount] = useState(0);
 
   const incrementZohoApiCalls = useCallback(() => {
     setZohoApiCalls(prev => prev + 1);
@@ -24,9 +27,15 @@ export const ApiCallsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setStripeApiCalls(prev => prev + 1);
   }, []);
 
+  const updateWebhookCallsCount = useCallback((count: number) => {
+    console.log(`🔢 ApiCallsContext: Updating webhook calls count to ${count}`);
+    setWebhookCallsCount(count);
+  }, []);
+
   const resetApiCalls = useCallback(() => {
     setZohoApiCalls(0);
     setStripeApiCalls(0);
+    setWebhookCallsCount(0);
   }, []);
 
   const getTotalApiCalls = useCallback(() => {
@@ -37,8 +46,10 @@ export const ApiCallsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     <ApiCallsContext.Provider value={{
       zohoApiCalls,
       stripeApiCalls,
+      webhookCallsCount,
       incrementZohoApiCalls,
       incrementStripeApiCalls,
+      updateWebhookCallsCount,
       resetApiCalls,
       getTotalApiCalls
     }}>

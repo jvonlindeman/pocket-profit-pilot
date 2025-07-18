@@ -1,4 +1,3 @@
-
 import { Transaction, UnpaidInvoice } from "../types/financial";
 import * as zohoApiClient from "../services/zoho/apiClient";
 import { formatDateYYYYMMDD } from "../utils/dateUtils";
@@ -32,6 +31,21 @@ export class ZohoRepository {
   private trackApiCall() {
     if (this.apiCallsContext) {
       this.apiCallsContext.incrementZohoApiCalls();
+    }
+  }
+
+  /**
+   * Extract and track webhook calls count from response
+   */
+  private trackWebhookCalls(response: any) {
+    if (this.apiCallsContext && response && typeof response.llamados === 'number') {
+      console.log(`📞 ZohoRepository: Webhook called ${response.llamados} times in this load`);
+      this.apiCallsContext.updateWebhookCallsCount(response.llamados);
+      
+      // Alert if multiple calls detected
+      if (response.llamados > 1) {
+        console.warn(`⚠️ ZohoRepository: DUPLICATE WEBHOOK CALLS DETECTED - ${response.llamados} calls in single load!`);
+      }
     }
   }
   
@@ -128,6 +142,9 @@ export class ZohoRepository {
     // Store the raw response for debugging
     this.lastRawResponse = response;
     
+    // Track webhook calls count from response
+    this.trackWebhookCalls(response);
+    
     let transactions: Transaction[] = [];
     
     if (Array.isArray(response)) {
@@ -147,7 +164,6 @@ export class ZohoRepository {
         const processed = zohoApiClient.processTransactionResponse(response);
         transactions = processed;
         
-        // Also process unpaid invoices if available
         this.unpaidInvoices = zohoApiClient.processUnpaidInvoicesResponse(response);
         
         // Process collaborator data if available
@@ -246,12 +262,14 @@ export class ZohoRepository {
   ): Promise<any> {
     console.log(`🚀 ZohoRepository: RAW WEBHOOK CALL - Making raw API request for ${cacheKey}`);
     
-    // Track the API call
     this.trackApiCall();
     
-    // Fetch raw data
     const rawData = await zohoApiClient.fetchZohoData(startDate, endDate, forceRefresh, true);
     this.lastRawResponse = rawData;
+    
+    // Track webhook calls from raw response too
+    this.trackWebhookCalls(rawData);
+    
     return rawData;
   }
 
