@@ -1,4 +1,3 @@
-
 import { Transaction, UnpaidInvoice } from "../../../types/financial";
 import { parseToPanamaTime, formatDateYYYYMMDD_Panama } from "@/utils/timezoneUtils";
 import { ZohoTransactionResponse } from "./types";
@@ -26,6 +25,31 @@ const isCollaboratorTransaction = (vendorName: string, accountName: string, desc
   return COLLABORATOR_KEYWORDS.some(keyword => 
     searchText.includes(keyword)
   );
+};
+
+// Helper function to process date without timezone conversion for YYYY-MM-DD format
+const processDateSafely = (dateInput: string): string => {
+  if (!dateInput) {
+    console.log('ZohoProcessor: No date provided, using current date');
+    return formatDateYYYYMMDD_Panama(new Date());
+  }
+  
+  // FIX: Check if date is already in YYYY-MM-DD format
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+    console.log(`ZohoProcessor: Date already in YYYY-MM-DD format: ${dateInput} (keeping as-is)`);
+    return dateInput; // Keep the date as-is since it's already properly formatted
+  } else {
+    console.log(`ZohoProcessor: Converting timestamp date: ${dateInput}`);
+    try {
+      const parsedDate = parseToPanamaTime(dateInput);
+      const formattedDate = formatDateYYYYMMDD_Panama(parsedDate);
+      console.log(`ZohoProcessor: Converted timestamp to Panama timezone: ${dateInput} -> ${formattedDate}`);
+      return formattedDate;
+    } catch (err) {
+      console.error(`ZohoProcessor: Error parsing date: ${dateInput}`, err);
+      return formatDateYYYYMMDD_Panama(new Date());
+    }
+  }
 };
 
 // Helper function to process raw transaction data from the API into the Transaction type
@@ -87,24 +111,8 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
         
         const amount = Number(item.total);
         if (amount > 0) {
-          // Enhanced date handling for collaborator transactions
-          let collaboratorDate: string;
-          
-          if (item.date) {
-            console.log(`📅 ZohoProcessor: Raw collaborator date for ${item.vendor_name}:`, item.date);
-            
-            try {
-              const parsedDate = parseToPanamaTime(item.date);
-              collaboratorDate = formatDateYYYYMMDD_Panama(parsedDate);
-              console.log(`📅 ZohoProcessor: Processed collaborator date for ${item.vendor_name} in Panama timezone:`, collaboratorDate);
-            } catch (err) {
-              console.error(`❌ ZohoProcessor: Error parsing collaborator date for ${item.vendor_name}:`, err);
-              collaboratorDate = formatDateYYYYMMDD_Panama(new Date());
-            }
-          } else {
-            console.log(`📅 ZohoProcessor: No date provided for collaborator ${item.vendor_name}, using current date`);
-            collaboratorDate = formatDateYYYYMMDD_Panama(new Date());
-          }
+          // Enhanced date handling for collaborator transactions with timezone fix
+          const collaboratorDate = processDateSafely(item.date);
           
           const externalId = `colaborador-${item.vendor_name.replace(/\s/g, '-')}-${collaboratorDate}-${amount}`;
           
@@ -119,7 +127,7 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
             type: 'expense'
           });
           
-          console.log(`✅ ZohoProcessor: Added collaborator transaction: ${item.vendor_name} - $${amount}`);
+          console.log(`✅ ZohoProcessor: Added collaborator transaction: ${item.vendor_name} - $${amount} on ${collaboratorDate}`);
         }
       }
     });
@@ -139,7 +147,8 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
 
         const amount = Number(item.total);
         if (amount > 0) {
-          const expenseDate = item.date || formatDateYYYYMMDD_Panama(new Date());
+          // Enhanced date handling for regular expenses with timezone fix
+          const expenseDate = processDateSafely(item.date);
           const vendorName = item.vendor_name || '';
           const accountName = item.account_name || 'Gastos generales';
           
@@ -152,7 +161,7 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
           if (isCollaboratorTransaction(vendorName, accountName, item.description)) {
             category = 'Pagos a colaboradores';
             description = `Pago a colaborador: ${vendorName || accountName}`;
-            console.log(`👥 ZohoProcessor: Detected collaborator expense: ${vendorName || accountName} - $${amount}`);
+            console.log(`👥 ZohoProcessor: Detected collaborator expense: ${vendorName || accountName} - $${amount} on ${expenseDate}`);
           }
           
           const externalId = `expense-${(vendorName || accountName || '').replace(/\s/g, '-')}-${expenseDate}-${amount}-${index}`;
@@ -167,6 +176,8 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
             source: 'Zoho',
             type: 'expense'
           });
+          
+          console.log(`💰 ZohoProcessor: Added expense: ${vendorName || accountName} - $${amount} on ${expenseDate}`);
         }
       }
     });
@@ -180,7 +191,8 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
       if (item && typeof item.amount !== 'undefined') {
         const amount = Number(item.amount);
         if (amount > 0) {
-          const paymentDate = item.date || formatDateYYYYMMDD_Panama(new Date());
+          // Enhanced date handling for payments with timezone fix
+          const paymentDate = processDateSafely(item.date);
           const customerName = item.customer_name || 'Cliente';
           const invoiceId = item.invoice_id || '';
           
@@ -197,7 +209,7 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
             type: 'income'
           });
           
-          console.log(`💵 ZohoProcessor: Added payment transaction: ${customerName} - $${amount}`);
+          console.log(`💵 ZohoProcessor: Added payment transaction: ${customerName} - $${amount} on ${paymentDate}`);
         }
       }
     });
