@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileText } from 'lucide-react';
 import SalaryCalculator from './SalaryCalculator';
 import { ReceivablesManager } from './Receivables/ReceivablesManager';
+import FinancialHistorySummary from './FinancialHistory/FinancialHistorySummary';
 
 interface DashboardContentProps {
   // Core data
