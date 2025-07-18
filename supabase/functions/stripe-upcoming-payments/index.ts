@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -15,9 +14,11 @@ const logStep = (step: string, details?: any) => {
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Calculate Stripe processing fee (2.9% + $0.30 for US cards)
+// Calculate REAL Stripe processing fee (4.43% based on actual charges)
 const calculateStripeProcessingFee = (amount: number): number => {
-  return (amount * 0.029) + 0.30;
+  // Using actual Stripe rate observed: 4.43% (from $44.17 on $997)
+  // This accounts for international cards, currency conversion, and actual fees
+  return amount * 0.0443;
 };
 
 // Get business commission rate from monthly balance configuration
@@ -96,6 +97,7 @@ serve(async (req) => {
       nextMonth: nextMonth + 1, // +1 because getMonth() is 0-based
       nextMonthYear,
       businessCommissionRate: businessCommissionRate,
+      actualStripeRate: "4.43% (real observed rate)",
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
     });
 
@@ -190,19 +192,19 @@ serve(async (req) => {
         }
       }
 
-      // Calculate fees and net amount
+      // Calculate fees and net amount using REAL Stripe rates
       const amountAfterDiscount = grossAmount - discountAmount;
       const stripeProcessingFee = calculateStripeProcessingFee(amountAfterDiscount);
       const businessCommissionAmount = amountAfterDiscount * (businessCommissionRate / 100);
       const netAmount = amountAfterDiscount - stripeProcessingFee - businessCommissionAmount;
 
-      // DETAILED LOGGING FOR EACH SUBSCRIPTION WITH FEE BREAKDOWN
+      // DETAILED LOGGING FOR EACH SUBSCRIPTION WITH REAL FEE BREAKDOWN
       const paymentMonth = nextPaymentDate.getMonth();
       const paymentYear = nextPaymentDate.getFullYear();
       const isCurrentMonth = paymentMonth === currentMonth && paymentYear === currentYear;
       const isNextMonth = paymentMonth === nextMonth && paymentYear === nextMonthYear;
 
-      logStep("SUBSCRIPTION ANALYSIS WITH FEE BREAKDOWN", {
+      logStep("SUBSCRIPTION ANALYSIS WITH REAL FEE BREAKDOWN", {
         subscriptionId: subscription.id.slice(-6),
         customerName: customerInfo?.name?.substring(0, 20) || 'Unknown',
         nextPaymentDate: nextPaymentDate.toISOString(),
@@ -216,6 +218,7 @@ serve(async (req) => {
         discountAmount,
         amountAfterDiscount,
         stripeProcessingFee,
+        stripeRateUsed: "4.43% (real)",
         businessCommissionRate,
         businessCommissionAmount,
         netAmount,
@@ -235,7 +238,7 @@ serve(async (req) => {
         current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
         created_date: new Date(subscription.created * 1000).toISOString(),
         trial_end: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
-        // Enhanced fee breakdown
+        // Enhanced fee breakdown with REAL rates
         stripe_processing_fee: stripeProcessingFee,
         business_commission_rate: businessCommissionRate,
         business_commission_amount: businessCommissionAmount,
@@ -263,19 +266,20 @@ serve(async (req) => {
       return isMatch;
     });
 
-    // LOG SUMMARY WITH FEE ANALYSIS
+    // LOG SUMMARY WITH REAL FEE ANALYSIS
     const totalGrossAmount = nextMonthPayments.reduce((sum, p) => sum + p.gross_amount, 0);
     const totalDiscountAmount = nextMonthPayments.reduce((sum, p) => sum + p.discount_amount, 0);
     const totalStripeFeesAmount = nextMonthPayments.reduce((sum, p) => sum + p.stripe_processing_fee, 0);
     const totalBusinessCommissionAmount = nextMonthPayments.reduce((sum, p) => sum + p.business_commission_amount, 0);
     const totalNetAmount = nextMonthPayments.reduce((sum, p) => sum + p.net_amount, 0);
 
-    logStep("NEXT MONTH FINANCIAL BREAKDOWN", {
+    logStep("NEXT MONTH FINANCIAL BREAKDOWN WITH REAL RATES", {
       nextMonthExpected: `${nextMonth + 1}/${nextMonthYear}`, // +1 because getMonth() is 0-based
       nextMonthPaymentsFound: nextMonthPayments.length,
       totalGrossAmount,
       totalDiscountAmount,
       totalStripeFeesAmount,
+      realStripeRate: "4.43%",
       totalBusinessCommissionAmount,
       totalNetAmount,
       effectiveCommissionRate: totalGrossAmount > 0 ? ((totalStripeFeesAmount + totalBusinessCommissionAmount) / totalGrossAmount * 100).toFixed(2) + '%' : '0%'
@@ -296,12 +300,13 @@ serve(async (req) => {
       nextMonthPayments: nextMonthPayments.length
     });
 
-    logStep("Processed upcoming payments successfully", { 
+    logStep("Processed upcoming payments successfully with REAL rates", { 
       total: upcomingPayments.length,
       next60Days: filteredPayments.length,
       currentMonth: currentMonthPayments.length,
       nextMonth: nextMonthPayments.length,
       businessCommissionRate: businessCommissionRate,
+      realStripeRate: "4.43%",
       customersFound: Array.from(customerCache.values()).filter(c => c.name !== 'Customer Information Unavailable').length
     });
 
