@@ -16,11 +16,13 @@ interface ReceivablesManagerProps {
     balance: number;
   }>;
   stripeNet: number;
+  adjustedZohoIncome: number;
 }
 
 export const ReceivablesManager: React.FC<ReceivablesManagerProps> = ({
   unpaidInvoices: propUnpaidInvoices = [],
-  stripeNet
+  stripeNet,
+  adjustedZohoIncome
 }) => {
   const {
     stripeUpcomingPayments,
@@ -60,7 +62,8 @@ export const ReceivablesManager: React.FC<ReceivablesManagerProps> = ({
     error,
     stripeErrors,
     zohoTotal: unpaidInvoices.reduce((sum, inv) => sum + inv.balance, 0),
-    stripeNetProp: stripeNet
+    stripeNetProp: stripeNet,
+    adjustedZohoIncome
   });
 
   if (isLoading) {
@@ -99,6 +102,7 @@ export const ReceivablesManager: React.FC<ReceivablesManagerProps> = ({
         stripePendingActivations={stripePendingActivations}
         selections={selections}
         stripeNet={stripeNet}
+        adjustedZohoIncome={adjustedZohoIncome}
         onRefresh={refreshData}
       />
 

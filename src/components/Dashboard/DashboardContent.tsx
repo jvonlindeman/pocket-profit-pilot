@@ -99,6 +99,9 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   currentDate,
   onBalanceSaved
 }) => {
+  // Calculate adjustedZohoIncome using the same formula as the salary calculator
+  const adjustedZohoIncome = startingBalance + regularIncome - totalZohoExpenses;
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Initial Balance Dialog */}
@@ -169,7 +172,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
                 stripeFees,
                 regularIncome,
                 collaboratorExpensesCount: Array.isArray(collaboratorExpenses) ? collaboratorExpenses.length : 0,
-                unpaidInvoicesCount: unpaidInvoices?.length
+                unpaidInvoicesCount: unpaidInvoices?.length,
+                adjustedZohoIncome
               });
               return null;
             })()}
@@ -193,10 +197,11 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
 
             <Separator />
 
-            {/* Receivables Management - Now with stripeNet prop */}
+            {/* Receivables Management - Now with stripeNet and adjustedZohoIncome props */}
             <ReceivablesManager 
               unpaidInvoices={unpaidInvoices || []}
               stripeNet={stripeNet}
+              adjustedZohoIncome={adjustedZohoIncome}
             />
 
             <Separator />

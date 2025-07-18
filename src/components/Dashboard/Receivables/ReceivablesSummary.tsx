@@ -20,6 +20,7 @@ interface ReceivablesSummaryProps {
   stripePendingActivations: PendingActivationSubscription[];
   selections: ReceivablesSelection[];
   stripeNet: number;
+  adjustedZohoIncome: number;
   onRefresh: () => void;
 }
 
@@ -31,12 +32,14 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
   stripePendingActivations,
   selections,
   stripeNet,
+  adjustedZohoIncome,
   onRefresh,
 }) => {
   
   const summary = useMemo(() => {
-    console.log('🧮 RECEIVABLES SUMMARY CALCULATION (SIMPLIFIED):', {
+    console.log('🧮 RECEIVABLES SUMMARY CALCULATION (WITH ZOHO BANK):', {
       stripeNetProp: stripeNet,
+      adjustedZohoIncome,
       selectionsCount: selections.length,
       currentMonthPayments: stripeCurrentMonthPayments.length,
       nextMonthPayments: stripeNextMonthPayments.length,
@@ -81,7 +84,10 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
     };
 
     // Separate totals for each channel (selected amounts)
-    const zohoTotal = getSelectedAmount('zoho_invoices', unpaidInvoices);
+    const zohoSelectedInvoices = getSelectedAmount('zoho_invoices', unpaidInvoices);
+    
+    // UPDATED: Total Zoho includes selected invoices + adjusted Zoho income (dinero real en banco)
+    const zohoTotal = zohoSelectedInvoices + adjustedZohoIncome;
     
     const currentMonthAmounts = getStripeAmounts(stripeCurrentMonthPayments, 'stripe_upcoming_payments');
     const nextMonthAmounts = getStripeAmounts(stripeNextMonthPayments, 'stripe_upcoming_payments');
@@ -105,15 +111,17 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
     // CORRECT CALCULATION: Stripe Bruto (receivables) + Stripe Neto (ya cobrado)
     const totalStripeProjection = stripeGrossTotal + stripeNet;
 
-    console.log('🧮 SIMPLIFIED CALCULATION BREAKDOWN:', {
+    console.log('🧮 UPDATED CALCULATION BREAKDOWN:', {
+      zohoSelectedInvoices: `$${zohoSelectedInvoices.toFixed(2)} (facturas seleccionadas)`,
+      adjustedZohoIncome: `$${adjustedZohoIncome.toFixed(2)} (dinero real en banco Zoho)`,
+      zohoTotal: `$${zohoTotal.toFixed(2)} (Total Zoho = facturas + banco)`,
       stripeGrossTotal: `$${stripeGrossTotal.toFixed(2)} (receivables seleccionados bruto)`,
       stripeNetProp: `$${stripeNet.toFixed(2)} (ya cobrado este mes, neto)`,
       totalStripeProjection: `$${totalStripeProjection.toFixed(2)} (Total Stripe Neto + Bruto)`,
-      expectedTotal: '$23,092.34',
-      matches: Math.abs(totalStripeProjection - 23092.34) < 1
     });
 
     return {
+      zohoSelectedInvoices,
       zohoTotal,
       stripeGrossTotal,
       stripeNetTotal,
@@ -127,7 +135,7 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
       totalItems: unpaidInvoices.length + 
                   stripeCurrentMonthPayments.length + stripeNextMonthPayments.length + stripePendingActivations.length,
     };
-  }, [unpaidInvoices, stripeCurrentMonthPayments, stripeNextMonthPayments, stripePendingActivations, selections, stripeNet]);
+  }, [unpaidInvoices, stripeCurrentMonthPayments, stripeNextMonthPayments, stripePendingActivations, selections, stripeNet, adjustedZohoIncome]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -148,8 +156,12 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
             {formatCurrency(summary.zohoTotal)}
           </div>
           <p className="text-xs text-muted-foreground">
-            From {unpaidInvoices.length} invoices
+            Facturas + Dinero en banco
           </p>
+          <div className="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-600">
+            <div>Facturas: {formatCurrency(summary.zohoSelectedInvoices)}</div>
+            <div>Banco: {formatCurrency(adjustedZohoIncome)}</div>
+          </div>
         </CardContent>
       </Card>
 
