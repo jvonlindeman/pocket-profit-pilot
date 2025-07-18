@@ -85,20 +85,16 @@ export const useReceivablesData = () => {
     metadata: any = {}
   ) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
       const { error } = await supabase
         .from('receivables_selections')
         .upsert({
-          user_id: user.id,
           selection_type: selectionType,
           item_id: itemId,
           selected,
           amount,
           metadata,
         }, {
-          onConflict: 'user_id,selection_type,item_id'
+          onConflict: 'selection_type,item_id'
         });
 
       if (error) throw error;
