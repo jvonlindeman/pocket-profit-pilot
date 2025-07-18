@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 import PeriodHeader from './PeriodHeader';
 import RefinedFinancialSummary from './FinancialCards/RefinedFinancialSummary';
@@ -198,15 +196,24 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
             <Separator />
 
             {/* === RECEIVABLES MANAGEMENT SECTION START === */}
-            {/* This should appear immediately after Financial Summary */}
-            <div style={{ order: 1 }}>
-              <ReceivablesManager 
-                key={`receivables-${Date.now()}`}
-                stripeNet={stripeNet}
-                adjustedZohoIncome={adjustedZohoIncome}
+            {/* This appears between Financial Summary and Financial History */}
+            <ReceivablesManager 
+              key={`receivables-${calculatorKey}`}
+              stripeNet={stripeNet}
+              adjustedZohoIncome={adjustedZohoIncome}
+            />
+            {/* === RECEIVABLES MANAGEMENT SECTION END === */}
+
+            <Separator />
+
+            {/* === FINANCIAL HISTORY SECTION START === */}
+            <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+              <FinancialHistorySummary 
+                startDate={null}
+                endDate={null}
               />
             </div>
-            {/* === RECEIVABLES MANAGEMENT SECTION END === */}
+            {/* === FINANCIAL HISTORY SECTION END === */}
 
             <Separator />
 
@@ -250,4 +257,3 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
 };
 
 export default DashboardContent;
-
