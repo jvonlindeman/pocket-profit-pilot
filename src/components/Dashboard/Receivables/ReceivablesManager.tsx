@@ -32,6 +32,16 @@ export const ReceivablesManager: React.FC<ReceivablesManagerProps> = ({
     retryStripeFunction,
   } = useReceivablesData();
 
+  console.log('🏠 ReceivablesManager: Render state', {
+    unpaidInvoicesCount: unpaidInvoices.length,
+    stripePendingInvoicesCount: stripePendingInvoices.length,
+    stripeUpcomingPaymentsCount: stripeUpcomingPayments.length,
+    stripePendingActivationsCount: stripePendingActivations.length,
+    isLoading,
+    error,
+    stripeErrors
+  });
+
   if (isLoading) {
     return (
       <Card>
@@ -128,7 +138,7 @@ export const ReceivablesManager: React.FC<ReceivablesManagerProps> = ({
             <TabsContent value="stripe-activations" className="mt-4">
               <StripeReceivablesSection
                 type="pending_activations"
-                title="Subscriptions Pending Activation"
+                title="Pending Activations"
                 items={stripePendingActivations}
                 selections={selections}
                 error={stripeErrors.pendingActivations}

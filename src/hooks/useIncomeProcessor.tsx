@@ -17,6 +17,12 @@ export const useIncomeProcessor = () => {
 
   // Function to process and separate income types
   const processIncomeTypes = useCallback((transactions: Transaction[], stripeData: any) => {
+    console.log("🔄 useIncomeProcessor: Processing income data", {
+      transactionCount: transactions.length,
+      stripeData: stripeData ? 'present' : 'null',
+      stripeDataKeys: stripeData ? Object.keys(stripeData) : 'none'
+    });
+
     let regularAmount = 0;
     
     // Calculate regular income (excluding Stripe transactions)
@@ -26,18 +32,36 @@ export const useIncomeProcessor = () => {
       }
     });
     
-    // Add null check for stripeData before accessing its properties
+    console.log("💰 useIncomeProcessor: Regular income calculated", { regularAmount });
+    
+    // Process Stripe data with null checks and proper structure handling
     if (stripeData && typeof stripeData === 'object') {
-      setStripeIncome(stripeData.gross || 0);
-      setStripeFees(stripeData.fees || 0);
-      setStripeTransactionFees(stripeData.transactionFees || 0);
-      setStripePayoutFees(stripeData.payoutFees || 0);
-      setStripeAdditionalFees(stripeData.stripeFees || 0);
-      setStripeAdvances(stripeData.advances || 0);
-      setStripeAdvanceFunding(stripeData.advanceFunding || 0);
-      setStripeNet(stripeData.net || 0);
-      setStripeFeePercentage(stripeData.feePercentage || 0);
+      // Handle both direct values and nested data structure
+      const gross = stripeData.gross || stripeData.data?.gross || 0;
+      const fees = stripeData.fees || stripeData.data?.fees || 0;
+      const transactionFees = stripeData.transactionFees || stripeData.data?.transactionFees || 0;
+      const payoutFees = stripeData.payoutFees || stripeData.data?.payoutFees || 0;
+      const additionalFees = stripeData.stripeFees || stripeData.additionalFees || stripeData.data?.stripeFees || 0;
+      const advances = stripeData.advances || stripeData.data?.advances || 0;
+      const advanceFunding = stripeData.advanceFunding || stripeData.data?.advanceFunding || 0;
+      const net = stripeData.net || stripeData.data?.net || 0;
+      const feePercentage = stripeData.feePercentage || stripeData.data?.feePercentage || 0;
+
+      console.log("💳 useIncomeProcessor: Stripe data processed", {
+        gross, fees, transactionFees, payoutFees, additionalFees, net, feePercentage
+      });
+
+      setStripeIncome(gross);
+      setStripeFees(fees);
+      setStripeTransactionFees(transactionFees);
+      setStripePayoutFees(payoutFees);
+      setStripeAdditionalFees(additionalFees);
+      setStripeAdvances(advances);
+      setStripeAdvanceFunding(advanceFunding);
+      setStripeNet(net);
+      setStripeFeePercentage(feePercentage);
     } else {
+      console.log("⚠️ useIncomeProcessor: No valid Stripe data, resetting to 0");
       // Reset all Stripe values to 0 when stripeData is null
       setStripeIncome(0);
       setStripeFees(0);
@@ -53,14 +77,14 @@ export const useIncomeProcessor = () => {
     setRegularIncome(regularAmount);
     
     return { 
-      stripeGross: stripeData?.gross || 0, 
-      stripeFees: stripeData?.fees || 0,
-      stripeTransactionFees: stripeData?.transactionFees || 0,
-      stripePayoutFees: stripeData?.payoutFees || 0,
-      stripeAdditionalFees: stripeData?.stripeFees || 0,
-      stripeAdvances: stripeData?.advances || 0,
-      stripeAdvanceFunding: stripeData?.advanceFunding || 0,
-      stripeNet: stripeData?.net || 0,
+      stripeGross: stripeData?.gross || stripeData?.data?.gross || 0, 
+      stripeFees: stripeData?.fees || stripeData?.data?.fees || 0,
+      stripeTransactionFees: stripeData?.transactionFees || stripeData?.data?.transactionFees || 0,
+      stripePayoutFees: stripeData?.payoutFees || stripeData?.data?.payoutFees || 0,
+      stripeAdditionalFees: stripeData?.stripeFees || stripeData?.additionalFees || stripeData?.data?.stripeFees || 0,
+      stripeAdvances: stripeData?.advances || stripeData?.data?.advances || 0,
+      stripeAdvanceFunding: stripeData?.advanceFunding || stripeData?.data?.advanceFunding || 0,
+      stripeNet: stripeData?.net || stripeData?.data?.net || 0,
       regularAmount 
     };
   }, []);

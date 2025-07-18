@@ -62,12 +62,15 @@ export const useReceivablesData = () => {
         const pendingInvoicesRes = results[0].value;
         console.log('📧 Pending invoices response:', pendingInvoicesRes);
         
-        if (pendingInvoicesRes.error || !pendingInvoicesRes.data?.success) {
-          pendingInvoicesError = `Pending invoices error: ${pendingInvoicesRes.error || 'Unknown error'}`;
+        if (pendingInvoicesRes.error) {
+          pendingInvoicesError = `Pending invoices error: ${pendingInvoicesRes.error}`;
           console.error('❌ Stripe pending invoices error:', pendingInvoicesRes.error);
-        } else if (pendingInvoicesRes.data) {
+        } else if (pendingInvoicesRes.data?.success) {
           stripePendingInvoices = pendingInvoicesRes.data.data?.invoices || [];
           console.log('✅ Pending invoices loaded:', stripePendingInvoices.length);
+        } else {
+          pendingInvoicesError = `Unexpected response format for pending invoices`;
+          console.error('❌ Unexpected pending invoices response:', pendingInvoicesRes);
         }
       } else {
         pendingInvoicesError = `Function call failed: ${results[0].reason}`;
@@ -82,12 +85,15 @@ export const useReceivablesData = () => {
         const upcomingPaymentsRes = results[1].value;
         console.log('💰 Upcoming payments response:', upcomingPaymentsRes);
         
-        if (upcomingPaymentsRes.error || !upcomingPaymentsRes.data?.success) {
-          upcomingPaymentsError = `Upcoming payments error: ${upcomingPaymentsRes.error || 'Unknown error'}`;
+        if (upcomingPaymentsRes.error) {
+          upcomingPaymentsError = `Upcoming payments error: ${upcomingPaymentsRes.error}`;
           console.error('❌ Stripe upcoming payments error:', upcomingPaymentsRes.error);
-        } else if (upcomingPaymentsRes.data) {
+        } else if (upcomingPaymentsRes.data?.success) {
           stripeUpcomingPayments = upcomingPaymentsRes.data.data?.upcoming_payments || [];
           console.log('✅ Upcoming payments loaded:', stripeUpcomingPayments.length);
+        } else {
+          upcomingPaymentsError = `Unexpected response format for upcoming payments`;
+          console.error('❌ Unexpected upcoming payments response:', upcomingPaymentsRes);
         }
       } else {
         upcomingPaymentsError = `Function call failed: ${results[1].reason}`;
@@ -102,12 +108,15 @@ export const useReceivablesData = () => {
         const pendingActivationsRes = results[2].value;
         console.log('⚠️ Pending activations response:', pendingActivationsRes);
         
-        if (pendingActivationsRes.error || !pendingActivationsRes.data?.success) {
-          pendingActivationsError = `Pending activations error: ${pendingActivationsRes.error || 'Unknown error'}`;
+        if (pendingActivationsRes.error) {
+          pendingActivationsError = `Pending activations error: ${pendingActivationsRes.error}`;
           console.error('❌ Stripe pending activations error:', pendingActivationsRes.error);
-        } else if (pendingActivationsRes.data) {
+        } else if (pendingActivationsRes.data?.success) {
           stripePendingActivations = pendingActivationsRes.data.data?.pending_activations || [];
           console.log('✅ Pending activations loaded:', stripePendingActivations.length);
+        } else {
+          pendingActivationsError = `Unexpected response format for pending activations`;
+          console.error('❌ Unexpected pending activations response:', pendingActivationsRes);
         }
       } else {
         pendingActivationsError = `Function call failed: ${results[2].reason}`;
@@ -243,8 +252,14 @@ export const useReceivablesData = () => {
       const result = await supabase.functions.invoke(functionMap[functionName]);
       console.log(`📊 Retry result for ${functionName}:`, result);
       
-      if (result.error || !result.data?.success) {
+      if (result.error) {
         console.error(`❌ Retry failed for ${functionName}:`, result.error);
+        toast.error(`Failed to retry ${functionName}`);
+        return false;
+      }
+
+      if (!result.data?.success) {
+        console.error(`❌ Retry failed for ${functionName}: Invalid response format`);
         toast.error(`Failed to retry ${functionName}`);
         return false;
       }
