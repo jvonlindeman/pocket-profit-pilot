@@ -33,6 +33,11 @@ const StripeIncomeTab: React.FC = () => {
     formatCurrency
   ]);
 
+  // Calculate total Stripe income (Net + Gross)
+  const totalStripeIncome = useMemo(() => {
+    return stripeNet + stripeIncome;
+  }, [stripeNet, stripeIncome]);
+
   return (
     <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -52,6 +57,17 @@ const StripeIncomeTab: React.FC = () => {
           icon={BadgeDollarSign}
           iconColor="text-green-700"
           iconBgColor="bg-green-50"
+          additionalContent={
+            <div className="mt-3 pt-2 border-t border-gray-200">
+              <div className="flex justify-between text-sm text-blue-600 font-medium">
+                <span>Total Stripe (Neto + Bruto):</span>
+                <span>{formatCurrency(totalStripeIncome)}</span>
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Proyección total de ingresos
+              </div>
+            </div>
+          }
         />
 
         {/* Fees */}
