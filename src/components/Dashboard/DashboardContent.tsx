@@ -161,6 +161,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
 
             <Separator />
 
+            {/* === FINANCIAL SUMMARY SECTION START === */}
             {/* Log financial data before providing to context */}
             {(() => {
               console.log("💰 DashboardContent: Providing financial data to FinanceProvider:", {
@@ -192,14 +193,20 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
             >
               <RefinedFinancialSummary />
             </FinanceProvider>
+            {/* === FINANCIAL SUMMARY SECTION END === */}
 
             <Separator />
 
-            {/* Receivables Management - Moved here after Financial Summary */}
-            <ReceivablesManager 
-              stripeNet={stripeNet}
-              adjustedZohoIncome={adjustedZohoIncome}
-            />
+            {/* === RECEIVABLES MANAGEMENT SECTION START === */}
+            {/* This should appear immediately after Financial Summary */}
+            <div style={{ order: 1 }}>
+              <ReceivablesManager 
+                key={`receivables-${Date.now()}`}
+                stripeNet={stripeNet}
+                adjustedZohoIncome={adjustedZohoIncome}
+              />
+            </div>
+            {/* === RECEIVABLES MANAGEMENT SECTION END === */}
 
             <Separator />
 
