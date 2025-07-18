@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -21,7 +22,7 @@ const calculateStripeProcessingFee = (amount: number): number => {
   return amount * 0.0443;
 };
 
-// Get business commission rate from monthly balance configuration
+// Get business commission rate from monthly balance configuration (for display only)
 const getBusinessCommissionRate = async (supabase: any): Promise<number> => {
   try {
     const currentDate = new Date();
@@ -69,7 +70,7 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Get configurable business commission rate
+    // Get configurable business commission rate (for display only, not deducted)
     const businessCommissionRate = await getBusinessCommissionRate(supabase);
 
     // Get active subscriptions using expand to reduce API calls
@@ -192,11 +193,11 @@ serve(async (req) => {
         }
       }
 
-      // Calculate fees and net amount using REAL Stripe rates
+      // Calculate fees and net amount - ONLY deduct Stripe fee, not business commission
       const amountAfterDiscount = grossAmount - discountAmount;
       const stripeProcessingFee = calculateStripeProcessingFee(amountAfterDiscount);
-      const businessCommissionAmount = amountAfterDiscount * (businessCommissionRate / 100);
-      const netAmount = amountAfterDiscount - stripeProcessingFee - businessCommissionAmount;
+      const businessCommissionAmount = amountAfterDiscount * (businessCommissionRate / 100); // For display only
+      const netAmount = amountAfterDiscount - stripeProcessingFee; // Only deduct Stripe fee
 
       // DETAILED LOGGING FOR EACH SUBSCRIPTION WITH REAL FEE BREAKDOWN
       const paymentMonth = nextPaymentDate.getMonth();
@@ -204,7 +205,7 @@ serve(async (req) => {
       const isCurrentMonth = paymentMonth === currentMonth && paymentYear === currentYear;
       const isNextMonth = paymentMonth === nextMonth && paymentYear === nextMonthYear;
 
-      logStep("SUBSCRIPTION ANALYSIS WITH REAL FEE BREAKDOWN", {
+      logStep("SUBSCRIPTION ANALYSIS WITH STRIPE FEE ONLY", {
         subscriptionId: subscription.id.slice(-6),
         customerName: customerInfo?.name?.substring(0, 20) || 'Unknown',
         nextPaymentDate: nextPaymentDate.toISOString(),
@@ -219,9 +220,9 @@ serve(async (req) => {
         amountAfterDiscount,
         stripeProcessingFee,
         stripeRateUsed: "4.43% (real)",
-        businessCommissionRate,
-        businessCommissionAmount,
-        netAmount,
+        businessCommissionRate: businessCommissionRate + "% (display only)",
+        businessCommissionAmount: businessCommissionAmount + " (not deducted)",
+        netAmount: netAmount + " (after Stripe fee only)",
         discountDetails
       });
 
@@ -229,7 +230,7 @@ serve(async (req) => {
         subscription_id: subscription.id,
         customer: customerInfo,
         plan_name: planInfo?.nickname || `${planInfo?.interval || 'monthly'} plan`,
-        amount: netAmount, // Net amount after all deductions
+        amount: netAmount, // Net amount after Stripe fee only
         gross_amount: grossAmount, // Original subscription amount
         currency: planInfo?.currency || 'usd',
         next_payment_date: nextPaymentDate.toISOString(),
@@ -240,10 +241,10 @@ serve(async (req) => {
         trial_end: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
         // Enhanced fee breakdown with REAL rates
         stripe_processing_fee: stripeProcessingFee,
-        business_commission_rate: businessCommissionRate,
-        business_commission_amount: businessCommissionAmount,
+        business_commission_rate: businessCommissionRate, // For display only
+        business_commission_amount: businessCommissionAmount, // For display only
         discount_amount: discountAmount,
-        net_amount: netAmount,
+        net_amount: netAmount, // After Stripe fee only
         discount_details: discountDetails,
       });
     }
@@ -266,23 +267,21 @@ serve(async (req) => {
       return isMatch;
     });
 
-    // LOG SUMMARY WITH REAL FEE ANALYSIS
+    // LOG SUMMARY WITH STRIPE FEE ONLY
     const totalGrossAmount = nextMonthPayments.reduce((sum, p) => sum + p.gross_amount, 0);
     const totalDiscountAmount = nextMonthPayments.reduce((sum, p) => sum + p.discount_amount, 0);
     const totalStripeFeesAmount = nextMonthPayments.reduce((sum, p) => sum + p.stripe_processing_fee, 0);
-    const totalBusinessCommissionAmount = nextMonthPayments.reduce((sum, p) => sum + p.business_commission_amount, 0);
     const totalNetAmount = nextMonthPayments.reduce((sum, p) => sum + p.net_amount, 0);
 
-    logStep("NEXT MONTH FINANCIAL BREAKDOWN WITH REAL RATES", {
+    logStep("NEXT MONTH FINANCIAL BREAKDOWN - STRIPE FEE ONLY", {
       nextMonthExpected: `${nextMonth + 1}/${nextMonthYear}`, // +1 because getMonth() is 0-based
       nextMonthPaymentsFound: nextMonthPayments.length,
       totalGrossAmount,
       totalDiscountAmount,
       totalStripeFeesAmount,
       realStripeRate: "4.43%",
-      totalBusinessCommissionAmount,
-      totalNetAmount,
-      effectiveCommissionRate: totalGrossAmount > 0 ? ((totalStripeFeesAmount + totalBusinessCommissionAmount) / totalGrossAmount * 100).toFixed(2) + '%' : '0%'
+      totalNetAmount: totalNetAmount + " (after Stripe fee only)",
+      note: "Business commission not deducted from net amount"
     });
 
     // Filter to only include payments in the next 60 days for backward compatibility
@@ -300,14 +299,15 @@ serve(async (req) => {
       nextMonthPayments: nextMonthPayments.length
     });
 
-    logStep("Processed upcoming payments successfully with REAL rates", { 
+    logStep("Processed upcoming payments successfully - STRIPE FEE ONLY", { 
       total: upcomingPayments.length,
       next60Days: filteredPayments.length,
       currentMonth: currentMonthPayments.length,
       nextMonth: nextMonthPayments.length,
-      businessCommissionRate: businessCommissionRate,
+      businessCommissionRate: businessCommissionRate + "% (display only)",
       realStripeRate: "4.43%",
-      customersFound: Array.from(customerCache.values()).filter(c => c.name !== 'Customer Information Unavailable').length
+      customersFound: Array.from(customerCache.values()).filter(c => c.name !== 'Customer Information Unavailable').length,
+      note: "Net amounts calculated with Stripe fee only"
     });
 
     return new Response(JSON.stringify({ 
