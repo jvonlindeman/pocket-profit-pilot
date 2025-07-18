@@ -34,7 +34,15 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
   onRefresh,
 }) => {
   const { stripeNet } = useFinance();
+  
   const summary = useMemo(() => {
+    console.log('🧮 RECEIVABLES SUMMARY CALCULATION DEBUG:', {
+      stripeNetFromContext: stripeNet,
+      selectionsCount: selections.length,
+      currentMonthPayments: stripeCurrentMonthPayments.length,
+      nextMonthPayments: stripeNextMonthPayments.length,
+    });
+
     const getSelectedAmount = (type: string, items: any[], useNetAmount = false) => {
       return items.reduce((total, item) => {
         const itemId = type === 'zoho_invoices' 
@@ -95,6 +103,17 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
     // Calculate total fees/commissions
     const totalFeesCommissions = grandGrossTotal - grandNetTotal;
 
+    // CORRECT CALCULATION: Stripe Bruto (receivables) + Stripe Neto (ya cobrado)
+    const totalStripeProjection = stripeGrossTotal + stripeNet;
+
+    console.log('🧮 CALCULATION BREAKDOWN:', {
+      stripeGrossTotal: `$${stripeGrossTotal.toFixed(2)} (receivables seleccionados bruto)`,
+      stripeNetFromContext: `$${stripeNet.toFixed(2)} (ya cobrado este mes, neto)`,
+      totalStripeProjection: `$${totalStripeProjection.toFixed(2)} (Total Stripe Neto + Bruto)`,
+      expectedTotal: '$23,092.34',
+      matches: Math.abs(totalStripeProjection - 23092.34) < 1
+    });
+
     return {
       zohoTotal,
       stripeGrossTotal,
@@ -105,10 +124,11 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
       next30DaysNet,
       totalFeesCommissions,
       pendingActivationsTotal,
+      totalStripeProjection,
       totalItems: unpaidInvoices.length + 
                   stripeCurrentMonthPayments.length + stripeNextMonthPayments.length + stripePendingActivations.length,
     };
-  }, [unpaidInvoices, stripeCurrentMonthPayments, stripeNextMonthPayments, stripePendingActivations, selections]);
+  }, [unpaidInvoices, stripeCurrentMonthPayments, stripeNextMonthPayments, stripePendingActivations, selections, stripeNet]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -144,15 +164,15 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
             {formatCurrency(summary.stripeGrossTotal)}
           </div>
           <p className="text-xs text-muted-foreground">
-            Antes de comisiones
+            Receivables seleccionados (bruto)
           </p>
           <div className="mt-3 pt-2 border-t border-gray-200">
             <div className="flex justify-between text-sm text-blue-600 font-medium">
               <span>Total Stripe (Neto + Bruto):</span>
-              <span>{formatCurrency(summary.stripeGrossTotal + stripeNet)}</span>
+              <span>{formatCurrency(summary.totalStripeProjection)}</span>
             </div>
             <div className="text-xs text-gray-500 mt-1">
-              Proyección total de ingresos
+              Receivables bruto + Neto ya cobrado
             </div>
           </div>
         </CardContent>
@@ -168,7 +188,7 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
             {formatCurrency(summary.stripeNetTotal)}
           </div>
           <p className="text-xs text-muted-foreground">
-            Después de comisiones
+            Receivables después de comisiones
           </p>
           {summary.totalFeesCommissions > 0 && (
             <p className="text-xs text-red-500 mt-1">
