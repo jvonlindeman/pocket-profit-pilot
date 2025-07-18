@@ -36,8 +36,12 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
   const { stripeNet } = useFinance();
   
   const summary = useMemo(() => {
+    // Forzar el valor correcto temporalmente para debug
+    const correctStripeNet = 14003.16; // El valor real de los edge function logs
     console.log('🧮 RECEIVABLES SUMMARY CALCULATION DEBUG:', {
       stripeNetFromContext: stripeNet,
+      stripeNetIsZero: stripeNet === 0,
+      correctStripeNet: correctStripeNet,
       selectionsCount: selections.length,
       currentMonthPayments: stripeCurrentMonthPayments.length,
       nextMonthPayments: stripeNextMonthPayments.length,
