@@ -6,6 +6,7 @@ import { useCacheStatus } from './useCacheStatus';
 import { useApiConnectivity } from './useApiConnectivity';
 import { queryClient } from '@/lib/react-query/queryClient';
 import { Transaction } from '@/types/financial';
+import { processUnpaidInvoices } from '@/services/zoho/api/processor';
 
 export function useFinancialData(startDate: Date, endDate: Date) {
   // Fetch Zoho transactions
@@ -44,14 +45,31 @@ export function useFinancialData(startDate: Date, endDate: Date) {
     [...zohoTransactions, ...stripeTransactions], 
     [zohoTransactions, stripeTransactions]);
 
-  // Get unpaid invoices from Zoho repository through queryClient
+  // Process unpaid invoices from Zoho data stored in queryClient
   const unpaidInvoices = useMemo(() => {
-    // This is a workaround since we are still transitioning to React Query
-    // and don't have a dedicated query for unpaid invoices yet
-    return queryClient.getQueryData<any>(
-      ["zoho-unpaid-invoices"]
-    ) || [];
-  }, [zohoTransactions.length]);
+    // Get the raw Zoho response from queryClient
+    const zohoRawData = queryClient.getQueryData<any>(
+      ["zoho-transactions", startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]
+    );
+    
+    console.log('🔍 useFinancialData: Processing unpaid invoices from Zoho data', {
+      hasZohoRawData: !!zohoRawData,
+      zohoDataKeys: zohoRawData ? Object.keys(zohoRawData) : [],
+      hasFacturasSinPagar: !!(zohoRawData?.facturas_sin_pagar),
+      facturasSinPagarCount: Array.isArray(zohoRawData?.facturas_sin_pagar) ? zohoRawData.facturas_sin_pagar.length : 0
+    });
+
+    if (zohoRawData && zohoRawData.facturas_sin_pagar) {
+      const processed = processUnpaidInvoices(zohoRawData);
+      console.log('✅ useFinancialData: Processed unpaid invoices:', {
+        count: processed.length,
+        totalAmount: processed.reduce((sum, inv) => sum + inv.balance, 0)
+      });
+      return processed;
+    }
+    
+    return [];
+  }, [startDate, endDate, zohoTransactions.length]);
 
   // Force refresh function
   const refreshData = async (forceRefresh = false) => {

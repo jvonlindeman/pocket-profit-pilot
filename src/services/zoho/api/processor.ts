@@ -312,9 +312,68 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
   return result;
 };
 
-// Process unpaid invoices from Zoho response - DEPRECATED
-export const processUnpaidInvoices = (data: ZohoTransactionResponse): any[] => {
-  // Functionality removed - return empty array
+// RESTORED: Process unpaid invoices from Zoho response  
+export const processUnpaidInvoices = (data: ZohoTransactionResponse): UnpaidInvoice[] => {
+  console.log("🔄 ZohoProcessor: Processing unpaid invoices", {
+    hasFacturasSinPagar: !!(data.facturas_sin_pagar),
+    facturasSinPagarCount: Array.isArray(data.facturas_sin_pagar) ? data.facturas_sin_pagar.length : 0,
+    dataKeys: Object.keys(data || {})
+  });
+
+  if (!data) {
+    console.error("❌ ZohoProcessor: No data received for unpaid invoices");
+    return [];
+  }
+
+  // Process facturas_sin_pagar from webhook
+  if (Array.isArray(data.facturas_sin_pagar)) {
+    console.log(`📋 ZohoProcessor: Processing ${data.facturas_sin_pagar.length} unpaid invoices`);
+    
+    const unpaidInvoices = data.facturas_sin_pagar
+      .map((invoice: any, index: number) => {
+        try {
+          console.log(`📄 ZohoProcessor: Processing unpaid invoice [${index}]:`, {
+            invoice_id: invoice.invoice_id,
+            customer_name: invoice.customer_name,
+            company_name: invoice.company_name,
+            balance: invoice.balance,
+            due_date: invoice.due_date,
+            status: invoice.status
+          });
+
+          // Map the invoice data to our UnpaidInvoice type
+          const unpaidInvoice: UnpaidInvoice = {
+            invoice_id: invoice.invoice_id || `invoice-${index}`,
+            customer_name: invoice.customer_name || 'Cliente desconocido',
+            company_name: invoice.company_name || invoice.customer_name || 'Empresa desconocida',
+            balance: Number(invoice.balance) || 0,
+            due_date: invoice.due_date || null,
+            status: invoice.status || 'unpaid',
+            currency_code: invoice.currency_code || 'USD',
+            invoice_number: invoice.invoice_number || invoice.invoice_id
+          };
+
+          console.log(`✅ ZohoProcessor: Mapped unpaid invoice: ${unpaidInvoice.customer_name} - $${unpaidInvoice.balance}`);
+          return unpaidInvoice;
+        } catch (error) {
+          console.error(`❌ ZohoProcessor: Error processing unpaid invoice [${index}]:`, error, invoice);
+          return null;
+        }
+      })
+      .filter((invoice): invoice is UnpaidInvoice => invoice !== null);
+
+    console.log(`📊 ZohoProcessor: Successfully processed ${unpaidInvoices.length} unpaid invoices:`, {
+      totalBalance: unpaidInvoices.reduce((sum, inv) => sum + inv.balance, 0),
+      sampleInvoices: unpaidInvoices.slice(0, 3).map(inv => ({
+        customer: inv.customer_name,
+        balance: inv.balance
+      }))
+    });
+
+    return unpaidInvoices;
+  }
+
+  console.warn("⚠️ ZohoProcessor: No facturas_sin_pagar found in webhook data");
   return [];
 };
 
