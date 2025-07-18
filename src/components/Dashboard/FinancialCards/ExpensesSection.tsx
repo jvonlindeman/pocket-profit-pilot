@@ -18,24 +18,30 @@ const ExpensesSection: React.FC = () => {
   // Calculate total collaborator expense using the metrics hook
   const totalCollaboratorExpense = calculateCollaboratorExpense(collaboratorExpenses);
   
-  // FIXED: Calculate total expenses as collaborator + other expenses for consistency
-  const calculatedTotalExpense = totalCollaboratorExpense + summary.otherExpense;
+  // FIXED: Use summary.totalExpense as the source of truth for total expenses
+  // Calculate "Otros Gastos" as the difference, but ensure it's not negative
+  const otherExpense = Math.max(0, summary.totalExpense - totalCollaboratorExpense);
+  
+  // Total expenses should always be the summary total expense
+  const totalExpense = summary.totalExpense;
   
   // Get expense breakdown for validation
-  const expenseBreakdown = calculateExpenseBreakdown(totalCollaboratorExpense, summary.otherExpense);
+  const expenseBreakdown = calculateExpenseBreakdown(totalCollaboratorExpense, otherExpense);
   
   // Add logging to debug the values and validate the calculation
   useEffect(() => {
     console.log("💰 ExpensesSection - EXPENSE BREAKDOWN VALIDATION:", {
       collaboratorExpense: totalCollaboratorExpense,
-      otherExpense: summary.otherExpense,
-      calculatedTotal: calculatedTotalExpense,
-      summaryTotal: summary.totalExpense,
+      calculatedOtherExpense: otherExpense,
+      summaryOtherExpense: summary.otherExpense,
+      totalExpense: totalExpense,
+      summaryTotalExpense: summary.totalExpense,
       expenseBreakdown,
-      calculation: `${totalCollaboratorExpense} + ${summary.otherExpense} = ${calculatedTotalExpense}`,
-      isConsistent: Math.abs(calculatedTotalExpense - summary.totalExpense) < 0.01
+      calculation: `${totalCollaboratorExpense} + ${otherExpense} = ${totalCollaboratorExpense + otherExpense}`,
+      isConsistent: Math.abs((totalCollaboratorExpense + otherExpense) - summary.totalExpense) < 0.01,
+      possibleIssue: totalCollaboratorExpense > summary.totalExpense ? "Collaborator expense exceeds total expense!" : "Normal"
     });
-  }, [totalCollaboratorExpense, summary.otherExpense, calculatedTotalExpense, summary.totalExpense, expenseBreakdown]);
+  }, [totalCollaboratorExpense, otherExpense, summary, totalExpense, expenseBreakdown]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -51,16 +57,16 @@ const ExpensesSection: React.FC = () => {
       {/* Other Expenses */}
       <SummaryCard
         title="Otros Gastos"
-        value={formatCurrency(summary.otherExpense)}
+        value={formatCurrency(otherExpense)}
         icon={ArrowDownIcon}
         iconColor="text-red-500"
         iconBgColor="bg-red-50"
       />
 
-      {/* Total Expenses - FIXED: Now shows the sum of the other two cards */}
+      {/* Total Expenses - FIXED: Always shows the summary total expense */}
       <SummaryCard
         title="Gastos Totales"
-        value={formatCurrency(calculatedTotalExpense)}
+        value={formatCurrency(totalExpense)}
         icon={ArrowDownIcon}
         iconColor="text-red-500"
         iconBgColor="bg-red-50"
