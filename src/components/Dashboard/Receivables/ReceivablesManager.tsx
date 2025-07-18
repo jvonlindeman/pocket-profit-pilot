@@ -93,7 +93,9 @@ export const ReceivablesManager: React.FC<ReceivablesManagerProps> = ({
       <ReceivablesSummary
         unpaidInvoices={unpaidInvoices}
         stripePendingInvoices={stripePendingInvoices}
-        stripeUpcomingPayments={stripeCurrentMonthPayments} // Use current month for summary
+        stripeUpcomingPayments={stripeUpcomingPayments}
+        stripeCurrentMonthPayments={stripeCurrentMonthPayments}
+        stripeNextMonthPayments={stripeNextMonthPayments}
         stripePendingActivations={stripePendingActivations}
         selections={selections}
         onRefresh={refreshData}

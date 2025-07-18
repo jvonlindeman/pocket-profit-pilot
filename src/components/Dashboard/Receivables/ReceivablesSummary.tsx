@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,8 @@ interface ReceivablesSummaryProps {
   }>;
   stripePendingInvoices: PendingStripeInvoice[];
   stripeUpcomingPayments: UpcomingSubscriptionPayment[];
+  stripeCurrentMonthPayments: UpcomingSubscriptionPayment[];
+  stripeNextMonthPayments: UpcomingSubscriptionPayment[];
   stripePendingActivations: PendingActivationSubscription[];
   selections: ReceivablesSelection[];
   onRefresh: () => void;
@@ -26,6 +29,8 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
   unpaidInvoices,
   stripePendingInvoices,
   stripeUpcomingPayments,
+  stripeCurrentMonthPayments,
+  stripeNextMonthPayments,
   stripePendingActivations,
   selections,
   onRefresh,
@@ -50,12 +55,17 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
 
     const zohoTotal = getSelectedAmount('zoho_invoices', unpaidInvoices);
     const stripePendingInvoicesTotal = getSelectedAmount('stripe_pending_invoices', stripePendingInvoices);
-    const stripeUpcomingTotal = getSelectedAmount('stripe_upcoming_payments', stripeUpcomingPayments);
+    
+    // Calculate current month and next month payments separately
+    const stripeCurrentMonthTotal = getSelectedAmount('stripe_upcoming_payments', stripeCurrentMonthPayments);
+    const stripeNextMonthTotal = getSelectedAmount('stripe_upcoming_payments', stripeNextMonthPayments);
+    
     const stripePendingActivationsTotal = getSelectedAmount('stripe_pending_activations', stripePendingActivations);
 
-    const grandTotal = zohoTotal + stripePendingInvoicesTotal + stripeUpcomingTotal + stripePendingActivationsTotal;
+    // Grand total now includes current month and next month separately
+    const grandTotal = zohoTotal + stripePendingInvoicesTotal + stripeCurrentMonthTotal + stripeNextMonthTotal + stripePendingActivationsTotal;
 
-    // Calculate upcoming amounts by time periods
+    // Calculate upcoming amounts by time periods using all upcoming payments
     const now = new Date();
     const next30Days = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000));
     const next60Days = new Date(now.getTime() + (60 * 24 * 60 * 60 * 1000));
@@ -83,15 +93,16 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
     return {
       zohoTotal,
       stripePendingInvoicesTotal,
-      stripeUpcomingTotal,
+      stripeCurrentMonthTotal,
+      stripeNextMonthTotal,
       stripePendingActivationsTotal,
       grandTotal,
       upcomingNext30Days,
       upcomingNext60Days,
       totalItems: unpaidInvoices.length + stripePendingInvoices.length + 
-                  stripeUpcomingPayments.length + stripePendingActivations.length,
+                  stripeCurrentMonthPayments.length + stripeNextMonthPayments.length + stripePendingActivations.length,
     };
-  }, [unpaidInvoices, stripePendingInvoices, stripeUpcomingPayments, stripePendingActivations, selections]);
+  }, [unpaidInvoices, stripePendingInvoices, stripeUpcomingPayments, stripeCurrentMonthPayments, stripeNextMonthPayments, stripePendingActivations, selections]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {

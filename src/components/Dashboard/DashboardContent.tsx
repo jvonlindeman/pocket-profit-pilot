@@ -194,7 +194,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
 
             <Separator />
 
-            {/* Receivables Management - Now positioned after Financial Summary */}
+            {/* Receivables Management - Positioned immediately after Financial Summary */}
             <ReceivablesManager 
               unpaidInvoices={unpaidInvoices || []}
             />
