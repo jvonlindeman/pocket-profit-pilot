@@ -149,6 +149,15 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
           <p className="text-xs text-muted-foreground">
             Antes de comisiones
           </p>
+          <div className="mt-3 pt-2 border-t border-gray-200">
+            <div className="flex justify-between text-sm text-blue-600 font-medium">
+              <span>Total Stripe (Neto + Bruto):</span>
+              <span>{formatCurrency(summary.stripeGrossTotal + summary.stripeNetTotal)}</span>
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              Proyección total de ingresos
+            </div>
+          </div>
         </CardContent>
       </Card>
 
