@@ -1,4 +1,5 @@
 
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -73,18 +74,19 @@ serve(async (req) => {
     // Get configurable business commission rate (for display only, not deducted)
     const businessCommissionRate = await getBusinessCommissionRate(supabase);
 
-    // Get active subscriptions using expand to reduce API calls
-    logStep("Fetching active subscriptions");
+    // Get ALL active subscriptions using expand to reduce API calls
+    logStep("Fetching ALL active subscriptions");
     const subscriptions = await stripe.subscriptions.list({
       status: 'active',
       limit: 100,
       expand: ['data.customer', 'data.discount'], // Also expand discount information
     });
 
-    logStep("Retrieved active subscriptions", { count: subscriptions.data.length });
+    logStep("Retrieved ALL active subscriptions", { count: subscriptions.data.length });
 
     // DETAILED DATE ANALYSIS - Current time and month calculations
     const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Start of today
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
     const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
@@ -92,6 +94,7 @@ serve(async (req) => {
 
     logStep("DATE CALCULATION ANALYSIS", {
       now: now.toISOString(),
+      today: today.toISOString(),
       nowLocal: now.toLocaleDateString(),
       currentMonth: currentMonth + 1, // +1 because getMonth() is 0-based
       currentYear,
@@ -104,7 +107,7 @@ serve(async (req) => {
 
     // Process subscriptions with customer cache for missing data
     const customerCache = new Map();
-    const upcomingPayments = [];
+    const allUpcomingPayments = [];
 
     // DETAILED SUBSCRIPTION ANALYSIS
     logStep("ANALYZING ALL SUBSCRIPTIONS", {
@@ -202,8 +205,7 @@ serve(async (req) => {
       // DETAILED LOGGING FOR EACH SUBSCRIPTION WITH REAL FEE BREAKDOWN
       const paymentMonth = nextPaymentDate.getMonth();
       const paymentYear = nextPaymentDate.getFullYear();
-      const isCurrentMonth = paymentMonth === currentMonth && paymentYear === currentYear;
-      const isNextMonth = paymentMonth === nextMonth && paymentYear === nextMonthYear;
+      const paymentDay = nextPaymentDate.getDate();
 
       logStep("SUBSCRIPTION ANALYSIS WITH STRIPE FEE ONLY", {
         subscriptionId: subscription.id.slice(-6),
@@ -212,8 +214,7 @@ serve(async (req) => {
         nextPaymentDateLocal: nextPaymentDate.toLocaleDateString(),
         paymentMonth: paymentMonth + 1, // +1 because getMonth() is 0-based
         paymentYear,
-        isCurrentMonth,
-        isNextMonth,
+        paymentDay,
         status: subscription.status,
         grossAmount,
         discountAmount,
@@ -226,7 +227,7 @@ serve(async (req) => {
         discountDetails
       });
 
-      upcomingPayments.push({
+      allUpcomingPayments.push({
         subscription_id: subscription.id,
         customer: customerInfo,
         plan_name: planInfo?.nickname || `${planInfo?.interval || 'monthly'} plan`,
@@ -250,28 +251,35 @@ serve(async (req) => {
     }
 
     // Sort by next payment date (earliest first)
-    upcomingPayments.sort((a, b) => 
+    allUpcomingPayments.sort((a, b) => 
       new Date(a.next_payment_date).getTime() - new Date(b.next_payment_date).getTime()
     );
 
-    // DETAILED FILTERING ANALYSIS
-    const currentMonthPayments = upcomingPayments.filter(payment => {
+    // NEW LOGIC: Separate filtering for current and next month
+    // Current month: ALL subscriptions from the current month (will be filtered in frontend by next_payment_date > today)
+    const currentMonthPayments = allUpcomingPayments.filter(payment => {
       const paymentDate = new Date(payment.next_payment_date);
-      const isMatch = paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear;
-      return isMatch;
+      return paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear;
     });
 
-    const nextMonthPayments = upcomingPayments.filter(payment => {
+    // Next month: ALL subscriptions from the next month (no date filtering, all subscriptions)
+    const nextMonthPayments = allUpcomingPayments.filter(payment => {
       const paymentDate = new Date(payment.next_payment_date);
-      const isMatch = paymentDate.getMonth() === nextMonth && paymentDate.getFullYear() === nextMonthYear;
-      return isMatch;
+      return paymentDate.getMonth() === nextMonth && paymentDate.getFullYear() === nextMonthYear;
     });
 
-    // LOG SUMMARY WITH STRIPE FEE ONLY
+    // LOG SUMMARY WITH NEW LOGIC
     const totalGrossAmount = nextMonthPayments.reduce((sum, p) => sum + p.gross_amount, 0);
     const totalDiscountAmount = nextMonthPayments.reduce((sum, p) => sum + p.discount_amount, 0);
     const totalStripeFeesAmount = nextMonthPayments.reduce((sum, p) => sum + p.stripe_processing_fee, 0);
     const totalNetAmount = nextMonthPayments.reduce((sum, p) => sum + p.net_amount, 0);
+
+    logStep("NEW LOGIC - ALL SUBSCRIPTIONS ANALYSIS", {
+      totalSubscriptions: allUpcomingPayments.length,
+      currentMonthAll: currentMonthPayments.length,
+      nextMonthAll: nextMonthPayments.length,
+      note: "Frontend will filter current month by next_payment_date > today"
+    });
 
     logStep("NEXT MONTH FINANCIAL BREAKDOWN - STRIPE FEE ONLY", {
       nextMonthExpected: `${nextMonth + 1}/${nextMonthYear}`, // +1 because getMonth() is 0-based
@@ -286,38 +294,41 @@ serve(async (req) => {
 
     // Filter to only include payments in the next 60 days for backward compatibility
     const sixtyDaysFromNow = new Date(now.getTime() + (60 * 24 * 60 * 60 * 1000));
-    const filteredPayments = upcomingPayments.filter(payment => {
+    const filteredPayments = allUpcomingPayments.filter(payment => {
       const paymentDate = new Date(payment.next_payment_date);
       return paymentDate >= now && paymentDate <= sixtyDaysFromNow;
     });
 
     logStep("FINAL FILTERING ANALYSIS", {
       sixtyDaysFromNow: sixtyDaysFromNow.toISOString(),
-      totalPayments: upcomingPayments.length,
+      totalPayments: allUpcomingPayments.length,
       filteredPayments: filteredPayments.length,
       currentMonthPayments: currentMonthPayments.length,
-      nextMonthPayments: nextMonthPayments.length
+      nextMonthPayments: nextMonthPayments.length,
+      todayForFrontendFiltering: today.toISOString()
     });
 
-    logStep("Processed upcoming payments successfully - STRIPE FEE ONLY", { 
-      total: upcomingPayments.length,
+    logStep("Processed upcoming payments successfully - ALL SUBSCRIPTIONS RETRIEVED", { 
+      total: allUpcomingPayments.length,
       next60Days: filteredPayments.length,
       currentMonth: currentMonthPayments.length,
       nextMonth: nextMonthPayments.length,
       businessCommissionRate: businessCommissionRate + "% (display only)",
       realStripeRate: "4.43%",
       customersFound: Array.from(customerCache.values()).filter(c => c.name !== 'Customer Information Unavailable').length,
-      note: "Net amounts calculated with Stripe fee only"
+      note: "Net amounts calculated with Stripe fee only. Frontend will filter current month by today."
     });
 
     return new Response(JSON.stringify({ 
       success: true, 
       data: {
         upcoming_payments: filteredPayments, // For backward compatibility with 60-day filter
-        current_month_payments: currentMonthPayments,
-        next_month_payments: nextMonthPayments, // FULL NEXT MONTH - NO TIME LIMIT
+        current_month_payments: currentMonthPayments, // ALL current month (will be filtered in frontend)
+        next_month_payments: nextMonthPayments, // ALL next month - complete projection
         total_count: filteredPayments.length,
-        business_commission_rate: businessCommissionRate
+        business_commission_rate: businessCommissionRate,
+        today: today.toISOString(), // For frontend filtering
+        all_subscriptions_count: allUpcomingPayments.length
       }
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -334,7 +345,8 @@ serve(async (req) => {
       data: {
         upcoming_payments: [],
         current_month_payments: [],
-        next_month_payments: []
+        next_month_payments: [],
+        today: new Date().toISOString()
       }
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -342,3 +354,4 @@ serve(async (req) => {
     });
   }
 });
+

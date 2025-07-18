@@ -61,6 +61,27 @@ const generateNextMonthFromCurrent = (currentMonthPayments: UpcomingSubscription
   return nextMonthPayments;
 };
 
+/**
+ * NEW LOGIC: Filter current month payments by next_payment_date > today
+ * This shows only subscriptions pending collection in the current month
+ */
+const filterCurrentMonthPendingPayments = (payments: UpcomingSubscriptionPayment[], today: Date): UpcomingSubscriptionPayment[] => {
+  console.log('🔍 Filtering current month payments by next_payment_date > today...');
+  console.log(`📅 Today: ${today.toISOString()}`);
+  console.log(`📊 Input payments: ${payments.length}`);
+  
+  const filtered = payments.filter(payment => {
+    const nextPaymentDate = new Date(payment.next_payment_date);
+    const isPending = nextPaymentDate > today;
+    
+    console.log(`💳 ${payment.customer?.email || 'unknown'}: ${nextPaymentDate.toISOString()} > ${today.toISOString()} = ${isPending}`);
+    return isPending;
+  });
+  
+  console.log(`✅ Filtered to ${filtered.length} pending payments for current month`);
+  return filtered;
+};
+
 export const useReceivablesData = () => {
   const [data, setData] = useState<ReceivablesData>({
     stripePendingInvoices: [],
@@ -141,7 +162,7 @@ export const useReceivablesData = () => {
         console.error('❌ Stripe pending invoices function failed:', results[0].reason);
       }
 
-      // Process upcoming payments with enhanced logic
+      // Process upcoming payments with NEW ENHANCED LOGIC
       let stripeUpcomingPayments: UpcomingSubscriptionPayment[] = [];
       let stripeCurrentMonthPayments: UpcomingSubscriptionPayment[] = [];
       let stripeNextMonthPayments: UpcomingSubscriptionPayment[] = [];
@@ -157,34 +178,35 @@ export const useReceivablesData = () => {
         } else if (upcomingPaymentsRes.data?.success) {
           const responseData = upcomingPaymentsRes.data.data;
           stripeUpcomingPayments = responseData?.upcoming_payments || [];
-          stripeCurrentMonthPayments = responseData?.current_month_payments || [];
           
-          // ENHANCED: Generate next month from current month data
-          const apiNextMonthPayments = responseData?.next_month_payments || [];
-          console.log(`🚀 ENHANCED LOGIC: API returned ${apiNextMonthPayments.length} next month payments`);
-          console.log(`🚀 ENHANCED LOGIC: Current month has ${stripeCurrentMonthPayments.length} payments`);
+          // NEW LOGIC: Apply filtering with today's date
+          const rawCurrentMonthPayments = responseData?.current_month_payments || [];
+          const rawNextMonthPayments = responseData?.next_month_payments || [];
+          const todayStr = responseData?.today || new Date().toISOString();
+          const today = new Date(todayStr);
           
-          if (stripeCurrentMonthPayments.length > 0) {
-            // Generate next month from current month data for complete projection
-            const generatedNextMonthPayments = generateNextMonthFromCurrent(stripeCurrentMonthPayments);
-            
-            console.log('🎯 ENHANCED PROJECTION STRATEGY:');
-            console.log(`  - API next month payments: ${apiNextMonthPayments.length}`);
-            console.log(`  - Generated from current: ${generatedNextMonthPayments.length}`);
-            console.log(`  - Using: Generated data for complete projection`);
-            
-            stripeNextMonthPayments = generatedNextMonthPayments;
-          } else {
-            // Fallback to API data if no current month data
-            console.log('⚠️ No current month data, using API next month data as fallback');
-            stripeNextMonthPayments = apiNextMonthPayments;
+          console.log(`🚀 NEW LOGIC IMPLEMENTATION:`);
+          console.log(`  - Raw current month payments: ${rawCurrentMonthPayments.length}`);
+          console.log(`  - Raw next month payments: ${rawNextMonthPayments.length}`);
+          console.log(`  - Today for filtering: ${today.toISOString()}`);
+          
+          // Current month: Filter by next_payment_date > today (only pending collections)
+          stripeCurrentMonthPayments = filterCurrentMonthPendingPayments(rawCurrentMonthPayments, today);
+          
+          // Next month: Use ALL subscriptions from API (complete month view)
+          stripeNextMonthPayments = rawNextMonthPayments;
+          
+          // Fallback: If no next month data from API, generate from current month
+          if (stripeNextMonthPayments.length === 0 && rawCurrentMonthPayments.length > 0) {
+            console.log('⚠️ No next month data from API, generating from current month as fallback');
+            stripeNextMonthPayments = generateNextMonthFromCurrent(rawCurrentMonthPayments);
           }
           
-          console.log('✅ Upcoming payments loaded:', {
+          console.log('✅ NEW LOGIC - Processed payments:', {
             total: stripeUpcomingPayments.length,
-            currentMonth: stripeCurrentMonthPayments.length,
-            nextMonth: stripeNextMonthPayments.length,
-            nextMonthSource: stripeCurrentMonthPayments.length > 0 ? 'generated-from-current' : 'api-fallback'
+            currentMonthPending: stripeCurrentMonthPayments.length,
+            nextMonthAll: stripeNextMonthPayments.length,
+            logic: 'Current = pending only, Next = all subscriptions'
           });
         } else {
           upcomingPaymentsError = `Unexpected response format for upcoming payments`;
@@ -218,13 +240,13 @@ export const useReceivablesData = () => {
         console.error('❌ Stripe pending activations function failed:', results[2].reason);
       }
 
-      console.log('📈 ENHANCED Stripe data summary:', {
+      console.log('📈 NEW LOGIC - Final Stripe data summary:', {
         pendingInvoices: stripePendingInvoices.length,
         upcomingPayments: stripeUpcomingPayments.length,
-        currentMonthPayments: stripeCurrentMonthPayments.length,
-        nextMonthPayments: stripeNextMonthPayments.length,
-        nextMonthDataSource: stripeCurrentMonthPayments.length > 0 ? 'GENERATED_FROM_CURRENT' : 'API_FALLBACK',
+        currentMonthPendingOnly: stripeCurrentMonthPayments.length,
+        nextMonthAllSubscriptions: stripeNextMonthPayments.length,
         pendingActivations: stripePendingActivations.length,
+        newLogic: 'CURRENT=pending, NEXT=all',
         errors: {
           pendingInvoices: pendingInvoicesError,
           upcomingPayments: upcomingPaymentsError,
@@ -311,7 +333,7 @@ export const useReceivablesData = () => {
 
   const refreshData = async () => {
     try {
-      console.log('🚀 Starting ENHANCED receivables data refresh...');
+      console.log('🚀 Starting NEW LOGIC receivables data refresh...');
       setData(prev => ({ ...prev, isLoading: true, error: null }));
       
       // Fetch Zoho and Stripe data independently
@@ -334,7 +356,7 @@ export const useReceivablesData = () => {
         error: null,
       });
 
-      console.log('🎉 ENHANCED receivables data refresh completed successfully');
+      console.log('🎉 NEW LOGIC receivables data refresh completed successfully');
     } catch (error) {
       console.error('❌ Error refreshing receivables data:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -387,14 +409,23 @@ export const useReceivablesData = () => {
           case 'upcomingPayments':
             const responseData = result.data.data;
             newData.stripeUpcomingPayments = responseData?.upcoming_payments || [];
-            newData.stripeCurrentMonthPayments = responseData?.current_month_payments || [];
             
-            // ENHANCED: Re-generate next month from updated current month data
-            if (newData.stripeCurrentMonthPayments.length > 0) {
-              newData.stripeNextMonthPayments = generateNextMonthFromCurrent(newData.stripeCurrentMonthPayments);
+            // Apply NEW LOGIC for retry as well
+            const rawCurrentMonthPayments = responseData?.current_month_payments || [];
+            const rawNextMonthPayments = responseData?.next_month_payments || [];
+            const todayStr = responseData?.today || new Date().toISOString();
+            const today = new Date(todayStr);
+            
+            // Current month: Filter by next_payment_date > today (only pending collections)
+            newData.stripeCurrentMonthPayments = filterCurrentMonthPendingPayments(rawCurrentMonthPayments, today);
+            
+            // Next month: Use ALL subscriptions from API
+            newData.stripeNextMonthPayments = rawNextMonthPayments;
+            
+            // Fallback generation if needed
+            if (newData.stripeNextMonthPayments.length === 0 && rawCurrentMonthPayments.length > 0) {
+              newData.stripeNextMonthPayments = generateNextMonthFromCurrent(rawCurrentMonthPayments);
               console.log(`🔄 Re-generated ${newData.stripeNextMonthPayments.length} next month payments after retry`);
-            } else {
-              newData.stripeNextMonthPayments = responseData?.next_month_payments || [];
             }
             
             newErrors.upcomingPayments = null;
