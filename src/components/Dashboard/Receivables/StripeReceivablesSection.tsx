@@ -38,6 +38,15 @@ export const StripeReceivablesSection: React.FC<StripeReceivablesSectionProps> =
   onUpdateSelection,
   onRetry,
 }) => {
+  // Helper functions defined first to avoid initialization errors
+  const getItemId = (item: any) => {
+    return item.invoice_id || item.subscription_id;
+  };
+
+  const getItemAmount = (item: any) => {
+    return item.amount_due || item.amount;
+  };
+
   const selectionType = useMemo(() => {
     switch (type) {
       case 'pending_invoices': return 'stripe_pending_invoices' as const;
@@ -76,14 +85,6 @@ export const StripeReceivablesSection: React.FC<StripeReceivablesSectionProps> =
 
     return { selectedItems, totalSelected, allSelected };
   }, [items, selections, selectionType]);
-
-  const getItemId = (item: any) => {
-    return item.invoice_id || item.subscription_id;
-  };
-
-  const getItemAmount = (item: any) => {
-    return item.amount_due || item.amount;
-  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
