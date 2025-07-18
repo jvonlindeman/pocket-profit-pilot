@@ -2,7 +2,7 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, DollarSign, Calendar, BookOpen, CreditCard } from 'lucide-react';
+import { RefreshCw, DollarSign, Calendar, BookOpen, CreditCard, TrendingDown } from 'lucide-react';
 import { 
   PendingStripeInvoice, 
   UpcomingSubscriptionPayment, 
@@ -36,7 +36,7 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
   onRefresh,
 }) => {
   const summary = useMemo(() => {
-    const getSelectedAmount = (type: string, items: any[]) => {
+    const getSelectedAmount = (type: string, items: any[], useNetAmount = false) => {
       return items.reduce((total, item) => {
         const itemId = type === 'zoho_invoices' 
           ? `${item.customer_name}-${item.balance}` 
@@ -47,40 +47,66 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
         );
         
         if (selection?.selected) {
-          return total + (item.balance || item.amount_due || item.amount);
+          // For upcoming payments, use net_amount if available and requested
+          const amount = (useNetAmount && item.net_amount !== undefined) 
+            ? item.net_amount 
+            : (item.balance || item.amount_due || item.amount);
+          return total + amount;
         }
         return total;
       }, 0);
     };
 
     // Function for automatic calculation (without considering selections)
-    const getAutomaticTotal = (items: any[]) => {
+    const getAutomaticTotal = (items: any[], useNetAmount = false) => {
       return items.reduce((total, item) => {
-        return total + (item.balance || item.amount_due || item.amount);
+        const amount = (useNetAmount && item.net_amount !== undefined) 
+          ? item.net_amount 
+          : (item.balance || item.amount_due || item.amount);
+        return total + amount;
       }, 0);
+    };
+
+    // Calculate gross and net amounts for Stripe
+    const getStripeAmounts = (items: UpcomingSubscriptionPayment[], type: string) => {
+      const selectedGross = getSelectedAmount(type, items, false); // Use gross amount
+      const selectedNet = getSelectedAmount(type, items, true); // Use net amount
+      return { selectedGross, selectedNet };
     };
 
     // Separate totals for each channel (selected amounts)
     const zohoTotal = getSelectedAmount('zoho_invoices', unpaidInvoices);
     
     const stripePendingInvoicesTotal = getSelectedAmount('stripe_pending_invoices', stripePendingInvoices);
-    const stripeCurrentMonthTotal = getSelectedAmount('stripe_upcoming_payments', stripeCurrentMonthPayments);
-    const stripeNextMonthTotal = getSelectedAmount('stripe_upcoming_payments', stripeNextMonthPayments);
-    const stripePendingActivationsTotal = getSelectedAmount('stripe_pending_activations', stripePendingActivations);
     
-    const stripeTotal = stripePendingInvoicesTotal + stripeCurrentMonthTotal + stripeNextMonthTotal + stripePendingActivationsTotal;
+    const currentMonthAmounts = getStripeAmounts(stripeCurrentMonthPayments, 'stripe_upcoming_payments');
+    const nextMonthAmounts = getStripeAmounts(stripeNextMonthPayments, 'stripe_upcoming_payments');
+    const pendingActivationsTotal = getSelectedAmount('stripe_pending_activations', stripePendingActivations);
+    
+    // Total Stripe amounts (gross and net)
+    const stripeGrossTotal = stripePendingInvoicesTotal + currentMonthAmounts.selectedGross + nextMonthAmounts.selectedGross + pendingActivationsTotal;
+    const stripeNetTotal = stripePendingInvoicesTotal + currentMonthAmounts.selectedNet + nextMonthAmounts.selectedNet + pendingActivationsTotal;
+    
+    // Grand totals
+    const grandGrossTotal = zohoTotal + stripeGrossTotal;
+    const grandNetTotal = zohoTotal + stripeNetTotal;
 
-    // Grand total combines both channels
-    const grandTotal = zohoTotal + stripeTotal;
+    // Next 30 days calculation (automatic, regardless of selections) - use net amounts
+    const next30DaysGross = getAutomaticTotal(stripeNextMonthPayments, false);
+    const next30DaysNet = getAutomaticTotal(stripeNextMonthPayments, true);
 
-    // Next 30 days calculation (automatic, regardless of selections)
-    const next30Days = getAutomaticTotal(stripeNextMonthPayments);
+    // Calculate total fees/commissions
+    const totalFeesCommissions = grandGrossTotal - grandNetTotal;
 
     return {
       zohoTotal,
-      stripeTotal,
-      grandTotal,
-      next30Days,
+      stripeGrossTotal,
+      stripeNetTotal,
+      grandGrossTotal,
+      grandNetTotal,
+      next30DaysGross,
+      next30DaysNet,
+      totalFeesCommissions,
       stripePendingActivationsTotal,
       totalItems: unpaidInvoices.length + stripePendingInvoices.length + 
                   stripeCurrentMonthPayments.length + stripeNextMonthPayments.length + stripePendingActivations.length,
@@ -95,7 +121,7 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Total Zoho Books</CardTitle>
@@ -113,46 +139,76 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Stripe</CardTitle>
+          <CardTitle className="text-sm font-medium">Stripe Bruto</CardTitle>
           <CreditCard className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-purple-600">
-            {formatCurrency(summary.stripeTotal)}
+            {formatCurrency(summary.stripeGrossTotal)}
           </div>
           <p className="text-xs text-muted-foreground">
-            All Stripe receivables
+            Antes de comisiones
           </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Next 30 Days</CardTitle>
+          <CardTitle className="text-sm font-medium">Stripe Neto</CardTitle>
+          <TrendingDown className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-green-600">
+            {formatCurrency(summary.stripeNetTotal)}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Después de comisiones
+          </p>
+          {summary.totalFeesCommissions > 0 && (
+            <p className="text-xs text-red-500 mt-1">
+              -{formatCurrency(summary.totalFeesCommissions)} en comisiones
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Próximo Mes (Neto)</CardTitle>
           <Calendar className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-green-600">
-            {formatCurrency(summary.next30Days)}
+            {formatCurrency(summary.next30DaysNet)}
           </div>
           <p className="text-xs text-muted-foreground">
-            Next month payments (forecast)
+            Proyección neta
           </p>
+          {summary.next30DaysGross !== summary.next30DaysNet && (
+            <p className="text-xs text-gray-500 mt-1">
+              {formatCurrency(summary.next30DaysGross)} bruto
+            </p>
+          )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Grand Total</CardTitle>
+          <CardTitle className="text-sm font-medium">Total Neto</CardTitle>
           <DollarSign className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-primary">
-            {formatCurrency(summary.grandTotal)}
+            {formatCurrency(summary.grandNetTotal)}
           </div>
           <p className="text-xs text-muted-foreground">
-            From {summary.totalItems} selected items
+            De {summary.totalItems} items seleccionados
           </p>
+          {summary.grandGrossTotal !== summary.grandNetTotal && (
+            <p className="text-xs text-gray-500 mt-1">
+              {formatCurrency(summary.grandGrossTotal)} bruto
+            </p>
+          )}
           <Button 
             variant="outline" 
             size="sm" 

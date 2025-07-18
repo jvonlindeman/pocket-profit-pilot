@@ -45,6 +45,7 @@ export interface UpcomingSubscriptionPayment {
   } | null;
   plan_name: string;
   amount: number;
+  gross_amount: number; // Added: Original subscription amount
   currency: string;
   next_payment_date: string;
   status: string;
@@ -52,6 +53,18 @@ export interface UpcomingSubscriptionPayment {
   current_period_end: string;
   created_date: string;
   trial_end?: string | null;
+  // Enhanced commission and fee breakdown
+  stripe_processing_fee: number; // Calculated Stripe fee (2.9% + $0.30)
+  business_commission_rate: number; // Configurable business commission rate
+  business_commission_amount: number; // Calculated business commission
+  discount_amount: number; // Any active discounts/coupons
+  net_amount: number; // Final amount after all deductions
+  discount_details?: {
+    coupon_id?: string;
+    coupon_name?: string;
+    percent_off?: number;
+    amount_off?: number;
+  } | null;
 }
 
 export interface PendingActivationSubscription {
@@ -161,4 +174,5 @@ export interface MonthlyBalance {
   profit_percentage: number | null; // Added for Profit First percentage
   tax_reserve_percentage: number | null; // Added for configurable tax reserve percentage
   include_zoho_fifty_percent: boolean | null; // Added for controlling 50% Zoho inclusion in salary
+  business_commission_rate: number | null; // Added: Configurable business commission rate for receivables
 }

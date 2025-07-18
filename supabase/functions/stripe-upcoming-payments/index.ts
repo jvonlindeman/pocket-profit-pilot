@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,6 +14,36 @@ const logStep = (step: string, details?: any) => {
 };
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Calculate Stripe processing fee (2.9% + $0.30 for US cards)
+const calculateStripeProcessingFee = (amount: number): number => {
+  return (amount * 0.029) + 0.30;
+};
+
+// Get business commission rate from monthly balance configuration
+const getBusinessCommissionRate = async (supabase: any): Promise<number> => {
+  try {
+    const currentDate = new Date();
+    const monthYear = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+    
+    const { data, error } = await supabase
+      .from('monthly_balances')
+      .select('business_commission_rate')
+      .eq('month_year', monthYear)
+      .single();
+    
+    if (error || !data?.business_commission_rate) {
+      logStep("Using default business commission rate", { defaultRate: 8.0 });
+      return 8.0; // Default 8% business commission rate
+    }
+    
+    logStep("Retrieved business commission rate from config", { rate: data.business_commission_rate });
+    return data.business_commission_rate;
+  } catch (error) {
+    logStep("Error getting business commission rate, using default", { error: error.message });
+    return 8.0; // Default fallback
+  }
+};
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -31,12 +62,21 @@ serve(async (req) => {
     logStep("STRIPE_SECRET_KEY found, initializing client");
     const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
 
+    // Initialize Supabase client to get business commission rate
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    // Get configurable business commission rate
+    const businessCommissionRate = await getBusinessCommissionRate(supabase);
+
     // Get active subscriptions using expand to reduce API calls
     logStep("Fetching active subscriptions");
     const subscriptions = await stripe.subscriptions.list({
       status: 'active',
       limit: 100,
-      expand: ['data.customer'], // Expand customer data directly
+      expand: ['data.customer', 'data.discount'], // Also expand discount information
     });
 
     logStep("Retrieved active subscriptions", { count: subscriptions.data.length });
@@ -55,6 +95,7 @@ serve(async (req) => {
       currentYear,
       nextMonth: nextMonth + 1, // +1 because getMonth() is 0-based
       nextMonthYear,
+      businessCommissionRate: businessCommissionRate,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
     });
 
@@ -128,14 +169,40 @@ serve(async (req) => {
 
       // Calculate next payment date
       const nextPaymentDate = new Date(subscription.current_period_end * 1000);
+      const grossAmount = planInfo?.amount || 0;
 
-      // DETAILED LOGGING FOR EACH SUBSCRIPTION
+      // Calculate discount amount
+      let discountAmount = 0;
+      let discountDetails = null;
+      if (subscription.discount && subscription.discount.coupon) {
+        const coupon = subscription.discount.coupon;
+        discountDetails = {
+          coupon_id: coupon.id,
+          coupon_name: coupon.name || coupon.id,
+          percent_off: coupon.percent_off,
+          amount_off: coupon.amount_off ? coupon.amount_off / 100 : null,
+        };
+
+        if (coupon.percent_off) {
+          discountAmount = grossAmount * (coupon.percent_off / 100);
+        } else if (coupon.amount_off) {
+          discountAmount = coupon.amount_off / 100; // Convert from cents
+        }
+      }
+
+      // Calculate fees and net amount
+      const amountAfterDiscount = grossAmount - discountAmount;
+      const stripeProcessingFee = calculateStripeProcessingFee(amountAfterDiscount);
+      const businessCommissionAmount = amountAfterDiscount * (businessCommissionRate / 100);
+      const netAmount = amountAfterDiscount - stripeProcessingFee - businessCommissionAmount;
+
+      // DETAILED LOGGING FOR EACH SUBSCRIPTION WITH FEE BREAKDOWN
       const paymentMonth = nextPaymentDate.getMonth();
       const paymentYear = nextPaymentDate.getFullYear();
       const isCurrentMonth = paymentMonth === currentMonth && paymentYear === currentYear;
       const isNextMonth = paymentMonth === nextMonth && paymentYear === nextMonthYear;
 
-      logStep("SUBSCRIPTION ANALYSIS", {
+      logStep("SUBSCRIPTION ANALYSIS WITH FEE BREAKDOWN", {
         subscriptionId: subscription.id.slice(-6),
         customerName: customerInfo?.name?.substring(0, 20) || 'Unknown',
         nextPaymentDate: nextPaymentDate.toISOString(),
@@ -145,15 +212,22 @@ serve(async (req) => {
         isCurrentMonth,
         isNextMonth,
         status: subscription.status,
-        currentPeriodEnd: subscription.current_period_end,
-        currentPeriodEndDate: new Date(subscription.current_period_end * 1000).toISOString()
+        grossAmount,
+        discountAmount,
+        amountAfterDiscount,
+        stripeProcessingFee,
+        businessCommissionRate,
+        businessCommissionAmount,
+        netAmount,
+        discountDetails
       });
 
       upcomingPayments.push({
         subscription_id: subscription.id,
         customer: customerInfo,
         plan_name: planInfo?.nickname || `${planInfo?.interval || 'monthly'} plan`,
-        amount: planInfo?.amount || 0,
+        amount: netAmount, // Net amount after all deductions
+        gross_amount: grossAmount, // Original subscription amount
         currency: planInfo?.currency || 'usd',
         next_payment_date: nextPaymentDate.toISOString(),
         status: subscription.status,
@@ -161,6 +235,13 @@ serve(async (req) => {
         current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
         created_date: new Date(subscription.created * 1000).toISOString(),
         trial_end: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
+        // Enhanced fee breakdown
+        stripe_processing_fee: stripeProcessingFee,
+        business_commission_rate: businessCommissionRate,
+        business_commission_amount: businessCommissionAmount,
+        discount_amount: discountAmount,
+        net_amount: netAmount,
+        discount_details: discountDetails,
       });
     }
 
@@ -182,40 +263,22 @@ serve(async (req) => {
       return isMatch;
     });
 
-    // LOG ALL NEXT MONTH PAYMENTS IN DETAIL
-    logStep("NEXT MONTH PAYMENTS DETAILED ANALYSIS", {
+    // LOG SUMMARY WITH FEE ANALYSIS
+    const totalGrossAmount = nextMonthPayments.reduce((sum, p) => sum + p.gross_amount, 0);
+    const totalDiscountAmount = nextMonthPayments.reduce((sum, p) => sum + p.discount_amount, 0);
+    const totalStripeFeesAmount = nextMonthPayments.reduce((sum, p) => sum + p.stripe_processing_fee, 0);
+    const totalBusinessCommissionAmount = nextMonthPayments.reduce((sum, p) => sum + p.business_commission_amount, 0);
+    const totalNetAmount = nextMonthPayments.reduce((sum, p) => sum + p.net_amount, 0);
+
+    logStep("NEXT MONTH FINANCIAL BREAKDOWN", {
       nextMonthExpected: `${nextMonth + 1}/${nextMonthYear}`, // +1 because getMonth() is 0-based
       nextMonthPaymentsFound: nextMonthPayments.length,
-      nextMonthPaymentsDetails: nextMonthPayments.map(payment => ({
-        subscriptionId: payment.subscription_id.slice(-6),
-        customerName: payment.customer?.name?.substring(0, 20) || 'Unknown',
-        amount: payment.amount,
-        nextPaymentDate: payment.next_payment_date,
-        nextPaymentDateLocal: new Date(payment.next_payment_date).toLocaleDateString(),
-        dayOfMonth: new Date(payment.next_payment_date).getDate()
-      }))
-    });
-
-    // Check for payments that might be excluded
-    const allPaymentsNextMonth = upcomingPayments.filter(payment => {
-      const paymentDate = new Date(payment.next_payment_date);
-      return paymentDate.getMonth() === nextMonth && paymentDate.getFullYear() === nextMonthYear;
-    });
-
-    const paymentsAfter16th = nextMonthPayments.filter(payment => {
-      const paymentDate = new Date(payment.next_payment_date);
-      return paymentDate.getDate() > 16;
-    });
-
-    logStep("PAYMENTS AFTER 16TH ANALYSIS", {
-      totalNextMonthPayments: allPaymentsNextMonth.length,
-      paymentsAfter16th: paymentsAfter16th.length,
-      paymentsAfter16thDetails: paymentsAfter16th.map(payment => ({
-        subscriptionId: payment.subscription_id.slice(-6),
-        customerName: payment.customer?.name?.substring(0, 20) || 'Unknown',
-        nextPaymentDate: payment.next_payment_date,
-        dayOfMonth: new Date(payment.next_payment_date).getDate()
-      }))
+      totalGrossAmount,
+      totalDiscountAmount,
+      totalStripeFeesAmount,
+      totalBusinessCommissionAmount,
+      totalNetAmount,
+      effectiveCommissionRate: totalGrossAmount > 0 ? ((totalStripeFeesAmount + totalBusinessCommissionAmount) / totalGrossAmount * 100).toFixed(2) + '%' : '0%'
     });
 
     // Filter to only include payments in the next 60 days for backward compatibility
@@ -238,6 +301,7 @@ serve(async (req) => {
       next60Days: filteredPayments.length,
       currentMonth: currentMonthPayments.length,
       nextMonth: nextMonthPayments.length,
+      businessCommissionRate: businessCommissionRate,
       customersFound: Array.from(customerCache.values()).filter(c => c.name !== 'Customer Information Unavailable').length
     });
 
@@ -247,7 +311,8 @@ serve(async (req) => {
         upcoming_payments: filteredPayments, // For backward compatibility with 60-day filter
         current_month_payments: currentMonthPayments,
         next_month_payments: nextMonthPayments, // FULL NEXT MONTH - NO TIME LIMIT
-        total_count: filteredPayments.length
+        total_count: filteredPayments.length,
+        business_commission_rate: businessCommissionRate
       }
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

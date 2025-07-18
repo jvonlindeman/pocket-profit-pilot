@@ -1,15 +1,17 @@
+
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CheckSquare, Square, ExternalLink, Calendar, AlertTriangle, RefreshCw, AlertCircle } from 'lucide-react';
+import { CheckSquare, Square, ExternalLink, Calendar, AlertTriangle, RefreshCw, AlertCircle, ChevronDown, ChevronRight, Info } from 'lucide-react';
 import { 
   PendingStripeInvoice, 
   UpcomingSubscriptionPayment, 
   PendingActivationSubscription,
   ReceivablesSelection 
 } from '@/types/financial';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 type ReceivableType = 'pending_invoices' | 'upcoming_payments' | 'pending_activations';
 
@@ -44,6 +46,10 @@ export const StripeReceivablesSection: React.FC<StripeReceivablesSectionProps> =
   };
 
   const getItemAmount = (item: any) => {
+    // For upcoming payments, use net_amount if available, otherwise amount
+    if (type === 'upcoming_payments' && item.net_amount !== undefined) {
+      return item.net_amount;
+    }
     return item.amount_due || item.amount;
   };
 
@@ -192,18 +198,74 @@ export const StripeReceivablesSection: React.FC<StripeReceivablesSectionProps> =
 
       case 'upcoming_payments':
         const payment = item as UpcomingSubscriptionPayment;
+        const hasDetailedBreakdown = payment.gross_amount !== undefined;
+        
         return (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium">{commonProps.customer}</div>
                 <div className="text-sm text-muted-foreground">{payment.plan_name}</div>
+                {payment.discount_details && (
+                  <div className="flex items-center gap-1 mt-1">
+                    <Badge variant="secondary" className="text-xs">
+                      {payment.discount_details.percent_off 
+                        ? `${payment.discount_details.percent_off}% OFF` 
+                        : `$${payment.discount_details.amount_off} OFF`}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      {payment.discount_details.coupon_name}
+                    </span>
+                  </div>
+                )}
               </div>
               <div className="text-right">
-                <div className="font-semibold">{formatCurrency(commonProps.amount)}</div>
+                <div className="font-semibold text-green-600">{formatCurrency(commonProps.amount)}</div>
+                {hasDetailedBreakdown && (
+                  <div className="text-xs text-muted-foreground">
+                    Net de {formatCurrency(payment.gross_amount)}
+                  </div>
+                )}
                 <Badge className={getStatusColor(commonProps.status)}>{commonProps.status}</Badge>
               </div>
             </div>
+            
+            {hasDetailedBreakdown && (
+              <Collapsible>
+                <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary">
+                  <ChevronRight className="h-3 w-3" />
+                  <Info className="h-3 w-3" />
+                  <span>Ver desglose de comisiones</span>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="mt-2 p-3 bg-gray-50 rounded-lg text-xs space-y-1">
+                    <div className="flex justify-between font-medium">
+                      <span>Monto bruto:</span>
+                      <span>{formatCurrency(payment.gross_amount)}</span>
+                    </div>
+                    {payment.discount_amount > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>- Descuento:</span>
+                        <span>-{formatCurrency(payment.discount_amount)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-orange-600">
+                      <span>- Comisión Stripe (~2.9%):</span>
+                      <span>-{formatCurrency(payment.stripe_processing_fee)}</span>
+                    </div>
+                    <div className="flex justify-between text-red-600">
+                      <span>- Comisión negocio ({payment.business_commission_rate}%):</span>
+                      <span>-{formatCurrency(payment.business_commission_amount)}</span>
+                    </div>
+                    <div className="border-t pt-1 flex justify-between font-semibold text-green-600">
+                      <span>Neto a recibir:</span>
+                      <span>{formatCurrency(payment.net_amount)}</span>
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+            
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <div className="flex items-center space-x-1">
                 <Calendar className="h-3 w-3" />
