@@ -9,6 +9,7 @@ export interface ZohoTransactionResponse {
   stripe?: string | number;
   raw_response?: any;
   cached_transactions?: Transaction[];
+  facturas_sin_pagar?: any[];
 }
 
 export interface ZohoWebhookOptions {
