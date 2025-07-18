@@ -127,12 +127,20 @@ const StripeService = {
             tx.date = formatDateYYYYMMDD_Panama(new Date());
           } else {
             try {
-              // Convert existing date to Panama timezone format
               const originalDate = tx.date;
-              tx.date = formatDateYYYYMMDD_Panama(toPanamaTime(new Date(tx.date)));
-              console.log(`StripeService: Converted date for ${tx.id}: ${originalDate} -> ${tx.date}`);
+              
+              // FIX: Check if date is already in YYYY-MM-DD format
+              if (/^\d{4}-\d{2}-\d{2}$/.test(tx.date)) {
+                // Date is already in correct format, don't convert timezone
+                console.log(`StripeService: Date already in YYYY-MM-DD format for ${tx.id}: ${tx.date} (keeping as-is)`);
+                // Keep the date as-is since it's already properly formatted
+              } else {
+                // Only convert timezone for full timestamps
+                tx.date = formatDateYYYYMMDD_Panama(toPanamaTime(new Date(tx.date)));
+                console.log(`StripeService: Converted timestamp date for ${tx.id}: ${originalDate} -> ${tx.date}`);
+              }
             } catch (e) {
-              console.error(`StripeService: Error converting transaction date to Panama timezone: ${tx.date}`, e);
+              console.error(`StripeService: Error processing transaction date: ${tx.date}`, e);
               tx.date = formatDateYYYYMMDD_Panama(new Date());
             }
           }
