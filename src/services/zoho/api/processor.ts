@@ -1,3 +1,4 @@
+
 import { Transaction, UnpaidInvoice } from "../../../types/financial";
 import { parseToPanamaTime, formatDateYYYYMMDD_Panama } from "@/utils/timezoneUtils";
 import { ZohoTransactionResponse } from "./types";
@@ -27,26 +28,47 @@ const isCollaboratorTransaction = (vendorName: string, accountName: string, desc
   );
 };
 
+// Helper function to validate if a date is within the expected range
+const isDateInRange = (dateStr: string, startDate: Date, endDate: Date): boolean => {
+  try {
+    const transactionDate = new Date(dateStr + 'T00:00:00');
+    const start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+    
+    return transactionDate >= start && transactionDate <= end;
+  } catch (error) {
+    console.error(`❌ ZohoProcessor: Error validating date range for ${dateStr}:`, error);
+    return false;
+  }
+};
+
 // Helper function to process date without timezone conversion for YYYY-MM-DD format
-const processDateSafely = (dateInput: string): string => {
+const processDateSafely = (dateInput: string, context: string = ''): string => {
   if (!dateInput) {
-    console.log('ZohoProcessor: No date provided, using current date');
+    console.log(`🔍 ZohoProcessor: No date provided for ${context}, using current date`);
     return formatDateYYYYMMDD_Panama(new Date());
   }
   
+  // Enhanced logging for debugging
+  console.log(`🔍 ZohoProcessor: Processing date for ${context}:`, {
+    originalDate: dateInput,
+    dateType: typeof dateInput,
+    isYYYYMMDD: /^\d{4}-\d{2}-\d{2}$/.test(dateInput)
+  });
+  
   // FIX: Check if date is already in YYYY-MM-DD format
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
-    console.log(`ZohoProcessor: Date already in YYYY-MM-DD format: ${dateInput} (keeping as-is)`);
+    console.log(`✅ ZohoProcessor: Date already in YYYY-MM-DD format for ${context}: ${dateInput} (keeping as-is)`);
     return dateInput; // Keep the date as-is since it's already properly formatted
   } else {
-    console.log(`ZohoProcessor: Converting timestamp date: ${dateInput}`);
+    console.log(`🔄 ZohoProcessor: Converting timestamp date for ${context}: ${dateInput}`);
     try {
       const parsedDate = parseToPanamaTime(dateInput);
       const formattedDate = formatDateYYYYMMDD_Panama(parsedDate);
-      console.log(`ZohoProcessor: Converted timestamp to Panama timezone: ${dateInput} -> ${formattedDate}`);
+      console.log(`🔄 ZohoProcessor: Converted timestamp to Panama timezone for ${context}: ${dateInput} -> ${formattedDate}`);
       return formattedDate;
     } catch (err) {
-      console.error(`ZohoProcessor: Error parsing date: ${dateInput}`, err);
+      console.error(`❌ ZohoProcessor: Error parsing date for ${context}: ${dateInput}`, err);
       return formatDateYYYYMMDD_Panama(new Date());
     }
   }
@@ -67,7 +89,7 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
     return [];
   }
   
-  console.log("🔄 ZohoProcessor: Starting transaction processing", {
+  console.log("🔄 ZohoProcessor: Starting transaction processing with ENHANCED DATE DEBUGGING", {
     hasStripe: !!data.stripe,
     colaboradoresCount: data.colaboradores?.length || 0,
     expensesCount: data.expenses?.length || 0,
@@ -97,12 +119,21 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
     }
   }
   
-  // Process collaborator expenses with enhanced detection
+  // Process collaborator expenses with enhanced detection and date debugging
   if (Array.isArray(data.colaboradores)) {
-    console.log(`👥 ZohoProcessor: Processing ${data.colaboradores.length} collaborator entries`);
+    console.log(`👥 ZohoProcessor: Processing ${data.colaboradores.length} collaborator entries with ENHANCED DATE DEBUGGING`);
     
     data.colaboradores.forEach((item: any, index: number) => {
       if (item && typeof item.total !== 'undefined' && item.vendor_name) {
+        // Enhanced logging for collaborator dates
+        console.log(`🔍 ZohoProcessor: COLLABORATOR [${index}] RAW DATA:`, {
+          vendor_name: item.vendor_name,
+          total: item.total,
+          original_date: item.date,
+          date_type: typeof item.date,
+          all_item_keys: Object.keys(item)
+        });
+        
         // Skip excluded vendors
         if (excludedVendors.includes(item.vendor_name)) {
           console.log(`🚫 ZohoProcessor: Skipping excluded collaborator vendor: ${item.vendor_name}`);
@@ -112,7 +143,14 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
         const amount = Number(item.total);
         if (amount > 0) {
           // Enhanced date handling for collaborator transactions with timezone fix
-          const collaboratorDate = processDateSafely(item.date);
+          const collaboratorDate = processDateSafely(item.date, `collaborator-${item.vendor_name}`);
+          
+          console.log(`🔍 ZohoProcessor: COLLABORATOR DATE PROCESSING RESULT:`, {
+            vendor_name: item.vendor_name,
+            original_date: item.date,
+            processed_date: collaboratorDate,
+            amount: amount
+          });
           
           const externalId = `colaborador-${item.vendor_name.replace(/\s/g, '-')}-${collaboratorDate}-${amount}`;
           
@@ -133,12 +171,22 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
     });
   }
   
-  // Process regular expenses with enhanced collaborator detection
+  // Process regular expenses with enhanced collaborator detection and date debugging
   if (Array.isArray(data.expenses)) {
-    console.log(`💰 ZohoProcessor: Processing ${data.expenses.length} expense entries`);
+    console.log(`💰 ZohoProcessor: Processing ${data.expenses.length} expense entries with ENHANCED DATE DEBUGGING`);
     
     data.expenses.forEach((item: any, index: number) => {
       if (item && typeof item.total !== 'undefined' && item.account_name !== "Impuestos") {
+        // Enhanced logging for expense dates
+        console.log(`🔍 ZohoProcessor: EXPENSE [${index}] RAW DATA:`, {
+          vendor_name: item.vendor_name,
+          account_name: item.account_name,
+          total: item.total,
+          original_date: item.date,
+          date_type: typeof item.date,
+          all_item_keys: Object.keys(item)
+        });
+        
         // Skip expenses from excluded vendors
         if (item.vendor_name && excludedVendors.includes(item.vendor_name)) {
           console.log(`🚫 ZohoProcessor: Skipping expense from excluded vendor: ${item.vendor_name}`);
@@ -148,9 +196,17 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
         const amount = Number(item.total);
         if (amount > 0) {
           // Enhanced date handling for regular expenses with timezone fix
-          const expenseDate = processDateSafely(item.date);
+          const expenseDate = processDateSafely(item.date, `expense-${item.vendor_name || item.account_name}`);
           const vendorName = item.vendor_name || '';
           const accountName = item.account_name || 'Gastos generales';
+          
+          console.log(`🔍 ZohoProcessor: EXPENSE DATE PROCESSING RESULT:`, {
+            vendor_name: vendorName,
+            account_name: accountName,
+            original_date: item.date,
+            processed_date: expenseDate,
+            amount: amount
+          });
           
           // Enhanced collaborator detection for regular expenses
           let category = accountName;
@@ -183,18 +239,34 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
     });
   }
   
-  // Process payments (income)
+  // Process payments (income) with date debugging
   if (Array.isArray(data.payments)) {
-    console.log(`💵 ZohoProcessor: Processing ${data.payments.length} payment entries`);
+    console.log(`💵 ZohoProcessor: Processing ${data.payments.length} payment entries with ENHANCED DATE DEBUGGING`);
     
     data.payments.forEach((item: any, index: number) => {
       if (item && typeof item.amount !== 'undefined') {
+        // Enhanced logging for payment dates
+        console.log(`🔍 ZohoProcessor: PAYMENT [${index}] RAW DATA:`, {
+          customer_name: item.customer_name,
+          amount: item.amount,
+          original_date: item.date,
+          date_type: typeof item.date,
+          all_item_keys: Object.keys(item)
+        });
+        
         const amount = Number(item.amount);
         if (amount > 0) {
           // Enhanced date handling for payments with timezone fix
-          const paymentDate = processDateSafely(item.date);
+          const paymentDate = processDateSafely(item.date, `payment-${item.customer_name || 'unknown'}`);
           const customerName = item.customer_name || 'Cliente';
           const invoiceId = item.invoice_id || '';
+          
+          console.log(`🔍 ZohoProcessor: PAYMENT DATE PROCESSING RESULT:`, {
+            customer_name: customerName,
+            original_date: item.date,
+            processed_date: paymentDate,
+            amount: amount
+          });
           
           const externalId = `income-${customerName.replace(/\s/g, '-')}-${paymentDate}-${invoiceId || index}`;
           
@@ -221,6 +293,22 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
     collaboratorExpenses: result.filter(tx => tx.category === 'Pagos a colaboradores').length
   });
   
+  // Final validation: log any suspicious dates
+  result.forEach(transaction => {
+    const transactionDate = new Date(transaction.date);
+    const today = new Date();
+    const daysDiff = Math.abs((today.getTime() - transactionDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysDiff > 365) {
+      console.warn(`⚠️ ZohoProcessor: Suspicious date detected - transaction more than 1 year old:`, {
+        description: transaction.description,
+        date: transaction.date,
+        amount: transaction.amount,
+        daysDifference: daysDiff
+      });
+    }
+  });
+  
   return result;
 };
 
@@ -245,12 +333,10 @@ export const processUnpaidInvoices = (data: ZohoTransactionResponse): UnpaidInvo
   }
 };
 
-// Calculate total amount of unpaid invoices
 export const calculateTotalUnpaidAmount = (invoices: UnpaidInvoice[]): number => {
   return invoices.reduce((sum, invoice) => sum + invoice.balance, 0);
 };
 
-// Function to filter excluded vendors from any transaction array
 export const filterExcludedVendors = (transactions: Transaction[]): Transaction[] => {
   if (!Array.isArray(transactions)) {
     console.warn("filterExcludedVendors received non-array input:", transactions);
