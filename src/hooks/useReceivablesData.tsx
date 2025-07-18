@@ -27,14 +27,14 @@ interface ReceivablesData {
 }
 
 /**
- * Generate next month's payments from current month's subscription data
- * This ensures we always have complete projections regardless of Stripe API limitations
+ * Generate next month's payments from ALL active subscription data
+ * This ensures we always have complete projections for ALL active subscriptions
  */
-const generateNextMonthFromCurrent = (currentMonthPayments: UpcomingSubscriptionPayment[]): UpcomingSubscriptionPayment[] => {
-  console.log('🔄 Generating next month payments from current month data...');
-  console.log(`📊 Input: ${currentMonthPayments.length} current month payments`);
+const generateNextMonthFromAllSubscriptions = (allUpcomingPayments: UpcomingSubscriptionPayment[]): UpcomingSubscriptionPayment[] => {
+  console.log('🔄 Generating next month payments from ALL active subscriptions...');
+  console.log(`📊 Input: ${allUpcomingPayments.length} total active subscriptions`);
   
-  const nextMonthPayments = currentMonthPayments.map(payment => {
+  const nextMonthPayments = allUpcomingPayments.map(payment => {
     try {
       // Add exactly 1 month to all relevant dates
       const nextPaymentDate = addMonths(new Date(payment.next_payment_date), 1);
@@ -57,7 +57,7 @@ const generateNextMonthFromCurrent = (currentMonthPayments: UpcomingSubscription
     }
   }).filter((payment): payment is UpcomingSubscriptionPayment => payment !== null);
   
-  console.log(`🎉 Successfully generated ${nextMonthPayments.length} next month payments`);
+  console.log(`🎉 Successfully generated ${nextMonthPayments.length} next month payments from ALL active subscriptions`);
   return nextMonthPayments;
 };
 
@@ -162,7 +162,7 @@ export const useReceivablesData = () => {
         console.error('❌ Stripe pending invoices function failed:', results[0].reason);
       }
 
-      // Process upcoming payments with ALWAYS GENERATE NEXT MONTH LOGIC
+      // Process upcoming payments with FIXED LOGIC - ALWAYS generate next month from ALL subscriptions
       let stripeUpcomingPayments: UpcomingSubscriptionPayment[] = [];
       let stripeCurrentMonthPayments: UpcomingSubscriptionPayment[] = [];
       let stripeNextMonthPayments: UpcomingSubscriptionPayment[] = [];
@@ -179,27 +179,29 @@ export const useReceivablesData = () => {
           const responseData = upcomingPaymentsRes.data.data;
           stripeUpcomingPayments = responseData?.upcoming_payments || [];
           
-          // IMPLEMENTACIÓN DEL PLAN: SIEMPRE generar próximo mes desde mes actual
+          // PLAN IMPLEMENTADO FIJO: SIEMPRE generar próximo mes desde TODAS las suscripciones activas
           const rawCurrentMonthPayments = responseData?.current_month_payments || [];
           const todayStr = responseData?.today || new Date().toISOString();
           const today = new Date(todayStr);
           
-          console.log(`🚀 PLAN IMPLEMENTADO - SIEMPRE GENERAR PRÓXIMO MES:`);
+          console.log(`🚀 PLAN FIJO IMPLEMENTADO - CORRIGIENDO PRÓXIMO MES:`);
+          console.log(`  - Total active subscriptions: ${stripeUpcomingPayments.length}`);
           console.log(`  - Raw current month payments: ${rawCurrentMonthPayments.length}`);
           console.log(`  - Today for filtering: ${today.toISOString()}`);
-          console.log(`  - IGNORANDO rawNextMonthPayments del API (limitado hasta día 16)`);
+          console.log(`  - FIXED: Generar próximo mes desde TODAS las suscripciones activas`);
           
           // Current month: Filter by next_payment_date > today (only pending collections)
           stripeCurrentMonthPayments = filterCurrentMonthPendingPayments(rawCurrentMonthPayments, today);
           
-          // Next month: SIEMPRE generar desde current month (PLAN IMPLEMENTADO)
-          stripeNextMonthPayments = generateNextMonthFromCurrent(rawCurrentMonthPayments);
+          // Next month: FIXED - SIEMPRE generar desde TODAS las suscripciones activas
+          stripeNextMonthPayments = generateNextMonthFromAllSubscriptions(stripeUpcomingPayments);
           
-          console.log('✅ PLAN IMPLEMENTADO - Processed payments:', {
+          console.log('✅ PLAN FIJO IMPLEMENTADO - Processed payments:', {
             total: stripeUpcomingPayments.length,
             currentMonthPending: stripeCurrentMonthPayments.length,
             nextMonthGenerated: stripeNextMonthPayments.length,
-            logic: 'Current = pending only, Next = ALWAYS generated from current (ALL subscriptions)'
+            logic: 'Current = pending only, Next = TODAS las suscripciones activas (FIJO)',
+            fixed: 'Next month now shows ALL active subscriptions'
           });
         } else {
           upcomingPaymentsError = `Unexpected response format for upcoming payments`;
@@ -233,13 +235,12 @@ export const useReceivablesData = () => {
         console.error('❌ Stripe pending activations function failed:', results[2].reason);
       }
 
-      console.log('📈 PLAN IMPLEMENTADO - Final Stripe data summary:', {
+      console.log('📈 PLAN FIJO IMPLEMENTADO - Final Stripe data summary:', {
         pendingInvoices: stripePendingInvoices.length,
         upcomingPayments: stripeUpcomingPayments.length,
         currentMonthPendingOnly: stripeCurrentMonthPayments.length,
-        nextMonthAllSubscriptions: stripeNextMonthPayments.length,
-        pendingActivations: stripePendingActivations.length,
-        planImplemented: 'PRÓXIMO MES = SIEMPRE generado desde ACTUAL (todas las suscripciones)',
+        nextMonthAllActiveSubscriptions: stripeNextMonthPayments.length,
+        planFixed: 'PRÓXIMO MES = SIEMPRE desde TODAS las suscripciones activas',
         errors: {
           pendingInvoices: pendingInvoicesError,
           upcomingPayments: upcomingPaymentsError,
@@ -403,7 +404,7 @@ export const useReceivablesData = () => {
             const responseData = result.data.data;
             newData.stripeUpcomingPayments = responseData?.upcoming_payments || [];
             
-            // Apply PLAN IMPLEMENTADO for retry as well
+            // Apply FIXED PLAN for retry as well
             const rawCurrentMonthPayments = responseData?.current_month_payments || [];
             const todayStr = responseData?.today || new Date().toISOString();
             const today = new Date(todayStr);
@@ -411,10 +412,10 @@ export const useReceivablesData = () => {
             // Current month: Filter by next_payment_date > today (only pending collections)
             newData.stripeCurrentMonthPayments = filterCurrentMonthPendingPayments(rawCurrentMonthPayments, today);
             
-            // Next month: SIEMPRE generar desde current month (PLAN IMPLEMENTADO)
-            newData.stripeNextMonthPayments = generateNextMonthFromCurrent(rawCurrentMonthPayments);
+            // Next month: FIXED - SIEMPRE generar desde TODAS las suscripciones activas
+            newData.stripeNextMonthPayments = generateNextMonthFromAllSubscriptions(newData.stripeUpcomingPayments);
             
-            console.log(`🔄 PLAN IMPLEMENTADO applied during retry - Generated ${newData.stripeNextMonthPayments.length} next month payments`);
+            console.log(`🔄 PLAN FIJO applied during retry - Generated ${newData.stripeNextMonthPayments.length} next month payments from ALL active subscriptions`);
             
             newErrors.upcomingPayments = null;
             break;
