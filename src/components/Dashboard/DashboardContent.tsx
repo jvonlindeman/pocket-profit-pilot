@@ -1,3 +1,4 @@
+
 import React from 'react';
 import PeriodHeader from './PeriodHeader';
 import RefinedFinancialSummary from './FinancialCards/RefinedFinancialSummary';
@@ -101,6 +102,21 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   // Calculate adjustedZohoIncome using the same formula as the salary calculator
   const adjustedZohoIncome = startingBalance + regularIncome - totalZohoExpenses;
 
+  // Extract unpaid invoices from financial data
+  const unpaidInvoices = financialData?.unpaidInvoices || [];
+  
+  // Debug logging to verify data flow
+  console.log('📋 DashboardContent: Extracting unpaid invoices for ReceivablesManager', {
+    financialDataKeys: Object.keys(financialData || {}),
+    unpaidInvoicesCount: unpaidInvoices.length,
+    unpaidInvoicesTotal: unpaidInvoices.reduce((sum: number, inv: any) => sum + (inv.balance || 0), 0),
+    sampleInvoices: unpaidInvoices.slice(0, 3).map((inv: any) => ({
+      customer: inv.customer_name,
+      company: inv.company_name,
+      balance: inv.balance
+    }))
+  });
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Initial Balance Dialog */}
@@ -200,6 +216,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
             {/* This appears between Financial Summary and Financial History */}
             <ReceivablesManager 
               key={`receivables-${calculatorKey}`}
+              unpaidInvoices={unpaidInvoices}
               stripeNet={stripeNet}
               adjustedZohoIncome={adjustedZohoIncome}
             />
