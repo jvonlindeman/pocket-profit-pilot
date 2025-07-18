@@ -13,18 +13,29 @@ const ExpensesSection: React.FC = () => {
   } = useFinance();
   
   const { formatCurrency } = useFinanceFormatter();
-  const { calculateCollaboratorExpense } = useFinanceMetrics();
+  const { calculateCollaboratorExpense, calculateExpenseBreakdown } = useFinanceMetrics();
 
   // Calculate total collaborator expense using the metrics hook
   const totalCollaboratorExpense = calculateCollaboratorExpense(collaboratorExpenses);
   
-  // Add logging to debug the values
+  // FIXED: Calculate total expenses as collaborator + other expenses for consistency
+  const calculatedTotalExpense = totalCollaboratorExpense + summary.otherExpense;
+  
+  // Get expense breakdown for validation
+  const expenseBreakdown = calculateExpenseBreakdown(totalCollaboratorExpense, summary.otherExpense);
+  
+  // Add logging to debug the values and validate the calculation
   useEffect(() => {
-    console.log("ExpensesSection - Collaborator expenses:", collaboratorExpenses);
-    console.log("ExpensesSection - Total collaborator expense:", totalCollaboratorExpense);
-    console.log("ExpensesSection - Summary other expense:", summary.otherExpense);
-    console.log("ExpensesSection - Summary total expense:", summary.totalExpense);
-  }, [collaboratorExpenses, totalCollaboratorExpense, summary]);
+    console.log("💰 ExpensesSection - EXPENSE BREAKDOWN VALIDATION:", {
+      collaboratorExpense: totalCollaboratorExpense,
+      otherExpense: summary.otherExpense,
+      calculatedTotal: calculatedTotalExpense,
+      summaryTotal: summary.totalExpense,
+      expenseBreakdown,
+      calculation: `${totalCollaboratorExpense} + ${summary.otherExpense} = ${calculatedTotalExpense}`,
+      isConsistent: Math.abs(calculatedTotalExpense - summary.totalExpense) < 0.01
+    });
+  }, [totalCollaboratorExpense, summary.otherExpense, calculatedTotalExpense, summary.totalExpense, expenseBreakdown]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -46,10 +57,10 @@ const ExpensesSection: React.FC = () => {
         iconBgColor="bg-red-50"
       />
 
-      {/* Total Expenses */}
+      {/* Total Expenses - FIXED: Now shows the sum of the other two cards */}
       <SummaryCard
         title="Gastos Totales"
-        value={formatCurrency(summary.totalExpense)}
+        value={formatCurrency(calculatedTotalExpense)}
         icon={ArrowDownIcon}
         iconColor="text-red-500"
         iconBgColor="bg-red-50"
