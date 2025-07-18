@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import PeriodHeader from './PeriodHeader';
 import RefinedFinancialSummary from './FinancialCards/RefinedFinancialSummary';
@@ -194,7 +195,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
 
             <Separator />
 
-            {/* Receivables Management - Now with stripeNet and adjustedZohoIncome props */}
+            {/* Receivables Management - Moved here after Financial Summary */}
             <ReceivablesManager 
               stripeNet={stripeNet}
               adjustedZohoIncome={adjustedZohoIncome}
@@ -242,3 +243,4 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
 };
 
 export default DashboardContent;
+
