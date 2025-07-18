@@ -2,7 +2,7 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, DollarSign, TrendingUp, Calendar, AlertTriangle, BookOpen, CreditCard } from 'lucide-react';
+import { RefreshCw, DollarSign, Calendar, BookOpen, CreditCard } from 'lucide-react';
 import { 
   PendingStripeInvoice, 
   UpcomingSubscriptionPayment, 
@@ -66,16 +66,14 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
     // Grand total combines both channels
     const grandTotal = zohoTotal + stripeTotal;
 
-    // Automated calculations for next 30 and 60 days
-    const next30Days = stripeCurrentMonthTotal; // Current month payments
-    const next60Days = stripeCurrentMonthTotal + stripeNextMonthTotal; // Current + next month
+    // Next 30 days should show only next month payments (the 21 items)
+    const next30Days = stripeNextMonthTotal;
 
     return {
       zohoTotal,
       stripeTotal,
       grandTotal,
       next30Days,
-      next60Days,
       stripePendingActivationsTotal,
       totalItems: unpaidInvoices.length + stripePendingInvoices.length + 
                   stripeCurrentMonthPayments.length + stripeNextMonthPayments.length + stripePendingActivations.length,
@@ -90,7 +88,7 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Total Zoho Books</CardTitle>
@@ -131,22 +129,7 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
             {formatCurrency(summary.next30Days)}
           </div>
           <p className="text-xs text-muted-foreground">
-            Current month payments
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Next 60 Days</CardTitle>
-          <TrendingUp className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-blue-600">
-            {formatCurrency(summary.next60Days)}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Current + next month
+            Next month payments
           </p>
         </CardContent>
       </Card>
