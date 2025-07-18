@@ -187,17 +187,12 @@ const RefinedExpensesSection: React.FC = () => {
                     </span>
                   </div>
                   <div className="space-y-1">
-                    {txs.slice(0, 3).map(tx => (
+                    {txs.map(tx => (
                       <div key={tx.id} className="flex justify-between text-xs">
                         <span className="truncate pr-2 text-gray-600">{tx.description}</span>
                         <span className="text-red-500">{formatCurrency(tx.amount)}</span>
                       </div>
                     ))}
-                    {txs.length > 3 && (
-                      <div className="text-xs text-gray-500 text-center pt-1">
-                        +{txs.length - 3} transacciones más
-                      </div>
-                    )}
                   </div>
                 </div>
               ))}
