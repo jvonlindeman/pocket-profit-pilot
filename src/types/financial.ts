@@ -54,7 +54,7 @@ export interface UpcomingSubscriptionPayment {
   created_date: string;
   trial_end?: string | null;
   // Enhanced commission and fee breakdown
-  stripe_processing_fee: number; // Calculated Stripe fee (2.9% + $0.30)
+  stripe_processing_fee: number; // Calculated Stripe fee (4.43% real rate)
   business_commission_rate: number; // Configurable business commission rate
   business_commission_amount: number; // Calculated business commission
   discount_amount: number; // Any active discounts/coupons

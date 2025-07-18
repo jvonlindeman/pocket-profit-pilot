@@ -250,7 +250,7 @@ export const StripeReceivablesSection: React.FC<StripeReceivablesSectionProps> =
                       </div>
                     )}
                     <div className="flex justify-between text-orange-600">
-                      <span>- Comisión Stripe (~2.9%):</span>
+                      <span>- Comisión Stripe (~4.43%):</span>
                       <span>-{formatCurrency(payment.stripe_processing_fee)}</span>
                     </div>
                     <div className="flex justify-between text-red-600">
