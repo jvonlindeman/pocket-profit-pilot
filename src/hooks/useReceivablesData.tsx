@@ -4,14 +4,12 @@ import { toast } from 'sonner';
 import { zohoRepository } from '@/repositories/zohoRepository';
 import { addMonths } from 'date-fns';
 import { 
-  PendingStripeInvoice, 
   UpcomingSubscriptionPayment, 
   PendingActivationSubscription,
   ReceivablesSelection 
 } from '@/types/financial';
 
 interface ReceivablesData {
-  stripePendingInvoices: PendingStripeInvoice[];
   stripeUpcomingPayments: UpcomingSubscriptionPayment[];
   stripeCurrentMonthPayments: UpcomingSubscriptionPayment[];
   stripeNextMonthPayments: UpcomingSubscriptionPayment[];
@@ -20,7 +18,6 @@ interface ReceivablesData {
   isLoading: boolean;
   error: string | null;
   stripeErrors: {
-    pendingInvoices: string | null;
     upcomingPayments: string | null;
     pendingActivations: string | null;
   };
@@ -84,7 +81,6 @@ const filterCurrentMonthPendingPayments = (payments: UpcomingSubscriptionPayment
 
 export const useReceivablesData = () => {
   const [data, setData] = useState<ReceivablesData>({
-    stripePendingInvoices: [],
     stripeUpcomingPayments: [],
     stripeCurrentMonthPayments: [],
     stripeNextMonthPayments: [],
@@ -93,7 +89,6 @@ export const useReceivablesData = () => {
     isLoading: true,
     error: null,
     stripeErrors: {
-      pendingInvoices: null,
       upcomingPayments: null,
       pendingActivations: null,
     },
@@ -128,39 +123,15 @@ export const useReceivablesData = () => {
       console.log('🔄 Starting Stripe receivables fetch...');
       
       const results = await Promise.allSettled([
-        supabase.functions.invoke('stripe-pending-invoices'),
         supabase.functions.invoke('stripe-upcoming-payments'),
         supabase.functions.invoke('stripe-pending-activations'),
       ]);
 
       console.log('📊 Stripe function results:', results.map((result, index) => ({
-        function: ['pending-invoices', 'upcoming-payments', 'pending-activations'][index],
+        function: ['upcoming-payments', 'pending-activations'][index],
         status: result.status,
         ...(result.status === 'fulfilled' ? { data: result.value } : { error: result.reason })
       })));
-
-      // Process pending invoices
-      let stripePendingInvoices: PendingStripeInvoice[] = [];
-      let pendingInvoicesError: string | null = null;
-      
-      if (results[0].status === 'fulfilled') {
-        const pendingInvoicesRes = results[0].value;
-        console.log('📧 Pending invoices response:', pendingInvoicesRes);
-        
-        if (pendingInvoicesRes.error) {
-          pendingInvoicesError = `Pending invoices error: ${pendingInvoicesRes.error}`;
-          console.error('❌ Stripe pending invoices error:', pendingInvoicesRes.error);
-        } else if (pendingInvoicesRes.data?.success) {
-          stripePendingInvoices = pendingInvoicesRes.data.data?.invoices || [];
-          console.log('✅ Pending invoices loaded:', stripePendingInvoices.length);
-        } else {
-          pendingInvoicesError = `Unexpected response format for pending invoices`;
-          console.error('❌ Unexpected pending invoices response:', pendingInvoicesRes);
-        }
-      } else {
-        pendingInvoicesError = `Function call failed: ${results[0].reason}`;
-        console.error('❌ Stripe pending invoices function failed:', results[0].reason);
-      }
 
       // Process upcoming payments with FIXED LOGIC - ALWAYS generate next month from ALL subscriptions
       let stripeUpcomingPayments: UpcomingSubscriptionPayment[] = [];
@@ -168,8 +139,8 @@ export const useReceivablesData = () => {
       let stripeNextMonthPayments: UpcomingSubscriptionPayment[] = [];
       let upcomingPaymentsError: string | null = null;
       
-      if (results[1].status === 'fulfilled') {
-        const upcomingPaymentsRes = results[1].value;
+      if (results[0].status === 'fulfilled') {
+        const upcomingPaymentsRes = results[0].value;
         console.log('💰 Upcoming payments response:', upcomingPaymentsRes);
         
         if (upcomingPaymentsRes.error) {
@@ -208,16 +179,16 @@ export const useReceivablesData = () => {
           console.error('❌ Unexpected upcoming payments response:', upcomingPaymentsRes);
         }
       } else {
-        upcomingPaymentsError = `Function call failed: ${results[1].reason}`;
-        console.error('❌ Stripe upcoming payments function failed:', results[1].reason);
+        upcomingPaymentsError = `Function call failed: ${results[0].reason}`;
+        console.error('❌ Stripe upcoming payments function failed:', results[0].reason);
       }
 
       // Process pending activations
       let stripePendingActivations: PendingActivationSubscription[] = [];
       let pendingActivationsError: string | null = null;
       
-      if (results[2].status === 'fulfilled') {
-        const pendingActivationsRes = results[2].value;
+      if (results[1].status === 'fulfilled') {
+        const pendingActivationsRes = results[1].value;
         console.log('⚠️ Pending activations response:', pendingActivationsRes);
         
         if (pendingActivationsRes.error) {
@@ -231,31 +202,27 @@ export const useReceivablesData = () => {
           console.error('❌ Unexpected pending activations response:', pendingActivationsRes);
         }
       } else {
-        pendingActivationsError = `Function call failed: ${results[2].reason}`;
-        console.error('❌ Stripe pending activations function failed:', results[2].reason);
+        pendingActivationsError = `Function call failed: ${results[1].reason}`;
+        console.error('❌ Stripe pending activations function failed:', results[1].reason);
       }
 
       console.log('📈 PLAN FIJO IMPLEMENTADO - Final Stripe data summary:', {
-        pendingInvoices: stripePendingInvoices.length,
         upcomingPayments: stripeUpcomingPayments.length,
         currentMonthPendingOnly: stripeCurrentMonthPayments.length,
         nextMonthAllActiveSubscriptions: stripeNextMonthPayments.length,
         planFixed: 'PRÓXIMO MES = SIEMPRE desde TODAS las suscripciones activas',
         errors: {
-          pendingInvoices: pendingInvoicesError,
           upcomingPayments: upcomingPaymentsError,
           pendingActivations: pendingActivationsError,
         }
       });
 
       return {
-        stripePendingInvoices,
         stripeUpcomingPayments,
         stripeCurrentMonthPayments,
         stripeNextMonthPayments,
         stripePendingActivations,
         stripeErrors: {
-          pendingInvoices: pendingInvoicesError,
           upcomingPayments: upcomingPaymentsError,
           pendingActivations: pendingActivationsError,
         }
@@ -330,7 +297,7 @@ export const useReceivablesData = () => {
       console.log('🚀 Starting PLAN IMPLEMENTADO receivables data refresh...');
       setData(prev => ({ ...prev, isLoading: true, error: null }));
       
-      // Fetch Zoho and Stripe data independently
+      // Fetch Stripe data
       const [stripeData, selections] = await Promise.all([
         fetchStripeReceivables(),
         fetchSelections(),
@@ -363,12 +330,11 @@ export const useReceivablesData = () => {
     }
   };
 
-  const retryStripeFunction = async (functionName: 'pendingInvoices' | 'upcomingPayments' | 'pendingActivations') => {
+  const retryStripeFunction = async (functionName: 'upcomingPayments' | 'pendingActivations') => {
     try {
       console.log(`🔄 Retrying Stripe function: ${functionName}`);
       
       const functionMap = {
-        pendingInvoices: 'stripe-pending-invoices',
         upcomingPayments: 'stripe-upcoming-payments',
         pendingActivations: 'stripe-pending-activations',
       };
@@ -396,10 +362,6 @@ export const useReceivablesData = () => {
         const newErrors = { ...prev.stripeErrors };
         
         switch (functionName) {
-          case 'pendingInvoices':
-            newData.stripePendingInvoices = result.data.data?.invoices || [];
-            newErrors.pendingInvoices = null;
-            break;
           case 'upcomingPayments':
             const responseData = result.data.data;
             newData.stripeUpcomingPayments = responseData?.upcoming_payments || [];

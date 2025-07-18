@@ -19,23 +19,6 @@ export interface UnpaidInvoice {
   balance: number;
 }
 
-export interface PendingStripeInvoice {
-  invoice_id: string;
-  customer: {
-    id: string;
-    email?: string | null;
-    name?: string | null;
-  } | null;
-  amount_due: number;
-  currency: string;
-  due_date: string | null;
-  status: string;
-  pdf_url?: string | null;
-  description: string;
-  created_date: string;
-  number?: string | null;
-}
-
 export interface UpcomingSubscriptionPayment {
   subscription_id: string;
   customer: {
@@ -95,7 +78,7 @@ export interface PendingActivationSubscription {
 export interface ReceivablesSelection {
   id: string;
   user_id: string;
-  selection_type: 'zoho_invoices' | 'stripe_pending_invoices' | 'stripe_upcoming_payments' | 'stripe_pending_activations';
+  selection_type: 'zoho_invoices' | 'stripe_upcoming_payments' | 'stripe_pending_activations';
   item_id: string;
   selected: boolean;
   amount: number;
@@ -140,7 +123,6 @@ export interface FinancialData {
   incomeBySource: CategorySummary[];
   expenseByCategory: CategorySummary[];
   unpaidInvoices?: UnpaidInvoice[]; // Added unpaid invoices
-  stripePendingInvoices?: PendingStripeInvoice[];
   stripeUpcomingPayments?: UpcomingSubscriptionPayment[];
   stripePendingActivations?: PendingActivationSubscription[];
   dailyData: {

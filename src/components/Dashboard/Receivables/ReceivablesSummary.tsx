@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, DollarSign, Calendar, BookOpen, CreditCard, TrendingDown } from 'lucide-react';
 import { 
-  PendingStripeInvoice, 
   UpcomingSubscriptionPayment, 
   PendingActivationSubscription,
   ReceivablesSelection 
@@ -16,7 +15,6 @@ interface ReceivablesSummaryProps {
     company_name?: string;
     balance: number;
   }>;
-  stripePendingInvoices: PendingStripeInvoice[];
   stripeUpcomingPayments: UpcomingSubscriptionPayment[];
   stripeCurrentMonthPayments: UpcomingSubscriptionPayment[];
   stripeNextMonthPayments: UpcomingSubscriptionPayment[];
@@ -27,7 +25,6 @@ interface ReceivablesSummaryProps {
 
 export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
   unpaidInvoices,
-  stripePendingInvoices,
   stripeUpcomingPayments,
   stripeCurrentMonthPayments,
   stripeNextMonthPayments,
@@ -40,7 +37,7 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
       return items.reduce((total, item) => {
         const itemId = type === 'zoho_invoices' 
           ? `${item.customer_name}-${item.balance}` 
-          : item.invoice_id || item.subscription_id;
+          : item.subscription_id;
         
         const selection = selections.find(s => 
           s.selection_type === type && s.item_id === itemId
@@ -50,7 +47,7 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
           // For upcoming payments, use net_amount if available and requested
           const amount = (useNetAmount && item.net_amount !== undefined) 
             ? item.net_amount 
-            : (item.balance || item.amount_due || item.amount);
+            : (item.balance || item.amount);
           return total + amount;
         }
         return total;
@@ -62,7 +59,7 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
       return items.reduce((total, item) => {
         const amount = (useNetAmount && item.net_amount !== undefined) 
           ? item.net_amount 
-          : (item.balance || item.amount_due || item.amount);
+          : (item.balance || item.amount);
         return total + amount;
       }, 0);
     };
@@ -77,15 +74,13 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
     // Separate totals for each channel (selected amounts)
     const zohoTotal = getSelectedAmount('zoho_invoices', unpaidInvoices);
     
-    const stripePendingInvoicesTotal = getSelectedAmount('stripe_pending_invoices', stripePendingInvoices);
-    
     const currentMonthAmounts = getStripeAmounts(stripeCurrentMonthPayments, 'stripe_upcoming_payments');
     const nextMonthAmounts = getStripeAmounts(stripeNextMonthPayments, 'stripe_upcoming_payments');
     const pendingActivationsTotal = getSelectedAmount('stripe_pending_activations', stripePendingActivations);
     
     // Total Stripe amounts (gross and net)
-    const stripeGrossTotal = stripePendingInvoicesTotal + currentMonthAmounts.selectedGross + nextMonthAmounts.selectedGross + pendingActivationsTotal;
-    const stripeNetTotal = stripePendingInvoicesTotal + currentMonthAmounts.selectedNet + nextMonthAmounts.selectedNet + pendingActivationsTotal;
+    const stripeGrossTotal = currentMonthAmounts.selectedGross + nextMonthAmounts.selectedGross + pendingActivationsTotal;
+    const stripeNetTotal = currentMonthAmounts.selectedNet + nextMonthAmounts.selectedNet + pendingActivationsTotal;
     
     // Grand totals
     const grandGrossTotal = zohoTotal + stripeGrossTotal;
@@ -108,10 +103,10 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
       next30DaysNet,
       totalFeesCommissions,
       pendingActivationsTotal,
-      totalItems: unpaidInvoices.length + stripePendingInvoices.length +
+      totalItems: unpaidInvoices.length + 
                   stripeCurrentMonthPayments.length + stripeNextMonthPayments.length + stripePendingActivations.length,
     };
-  }, [unpaidInvoices, stripePendingInvoices, stripeCurrentMonthPayments, stripeNextMonthPayments, stripePendingActivations, selections]);
+  }, [unpaidInvoices, stripeCurrentMonthPayments, stripeNextMonthPayments, stripePendingActivations, selections]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {

@@ -21,7 +21,6 @@ export const ReceivablesManager: React.FC<ReceivablesManagerProps> = ({
   unpaidInvoices: propUnpaidInvoices = []
 }) => {
   const {
-    stripePendingInvoices,
     stripeUpcomingPayments,
     stripeCurrentMonthPayments,
     stripeNextMonthPayments,
@@ -51,7 +50,6 @@ export const ReceivablesManager: React.FC<ReceivablesManagerProps> = ({
     propUnpaidInvoicesCount: propUnpaidInvoices.length,
     zohoUnpaidInvoicesCount: zohoUnpaidInvoices.length,
     finalUnpaidInvoicesCount: unpaidInvoices.length,
-    stripePendingInvoicesCount: stripePendingInvoices.length,
     stripeUpcomingPaymentsCount: stripeUpcomingPayments.length,
     stripeCurrentMonthPaymentsCount: stripeCurrentMonthPayments.length,
     stripeNextMonthPaymentsCount: stripeNextMonthPayments.length,
@@ -92,7 +90,6 @@ export const ReceivablesManager: React.FC<ReceivablesManagerProps> = ({
     <div className="space-y-6">
       <ReceivablesSummary
         unpaidInvoices={unpaidInvoices}
-        stripePendingInvoices={stripePendingInvoices}
         stripeUpcomingPayments={stripeUpcomingPayments}
         stripeCurrentMonthPayments={stripeCurrentMonthPayments}
         stripeNextMonthPayments={stripeNextMonthPayments}
@@ -107,13 +104,9 @@ export const ReceivablesManager: React.FC<ReceivablesManagerProps> = ({
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="current-month-payments" className="w-full">
-            <TabsList className="grid w-full grid-cols-6">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="zoho">
                 Zoho Books ({unpaidInvoices.length})
-              </TabsTrigger>
-              <TabsTrigger value="stripe-invoices" className={stripeErrors.pendingInvoices ? 'text-red-600' : ''}>
-                Stripe Invoices ({stripePendingInvoices.length})
-                {stripeErrors.pendingInvoices && <span className="ml-1">⚠️</span>}
               </TabsTrigger>
               <TabsTrigger value="current-month-payments" className={stripeErrors.upcomingPayments ? 'text-red-600' : ''}>
                 Mes Actual ({stripeCurrentMonthPayments.length})
@@ -138,18 +131,6 @@ export const ReceivablesManager: React.FC<ReceivablesManagerProps> = ({
                 unpaidInvoices={unpaidInvoices}
                 selections={selections}
                 onUpdateSelection={updateSelection}
-              />
-            </TabsContent>
-
-            <TabsContent value="stripe-invoices" className="mt-4">
-              <StripeReceivablesSection
-                type="pending_invoices"
-                title="Facturas Pendientes de Stripe"
-                items={stripePendingInvoices}
-                selections={selections}
-                error={stripeErrors.pendingInvoices}
-                onUpdateSelection={updateSelection}
-                onRetry={retryStripeFunction}
               />
             </TabsContent>
 

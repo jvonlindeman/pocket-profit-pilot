@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -5,19 +6,18 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CheckSquare, Square, ExternalLink, Calendar, AlertTriangle, RefreshCw, AlertCircle, ChevronDown, ChevronRight, Info } from 'lucide-react';
 import { 
-  PendingStripeInvoice, 
   UpcomingSubscriptionPayment, 
   PendingActivationSubscription,
   ReceivablesSelection 
 } from '@/types/financial';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
-type ReceivableType = 'pending_invoices' | 'upcoming_payments' | 'pending_activations';
+type ReceivableType = 'upcoming_payments' | 'pending_activations';
 
 interface StripeReceivablesSectionProps {
   type: ReceivableType;
   title: string;
-  items: PendingStripeInvoice[] | UpcomingSubscriptionPayment[] | PendingActivationSubscription[];
+  items: UpcomingSubscriptionPayment[] | PendingActivationSubscription[];
   selections: ReceivablesSelection[];
   error?: string | null;
   onUpdateSelection: (
@@ -27,7 +27,7 @@ interface StripeReceivablesSectionProps {
     amount: number,
     metadata?: any
   ) => Promise<boolean>;
-  onRetry?: (functionName: 'pendingInvoices' | 'upcomingPayments' | 'pendingActivations') => Promise<boolean>;
+  onRetry?: (functionName: 'upcomingPayments' | 'pendingActivations') => Promise<boolean>;
 }
 
 export const StripeReceivablesSection: React.FC<StripeReceivablesSectionProps> = ({
@@ -41,7 +41,7 @@ export const StripeReceivablesSection: React.FC<StripeReceivablesSectionProps> =
 }) => {
   // Helper functions defined first to avoid initialization errors
   const getItemId = (item: any) => {
-    return item.invoice_id || item.subscription_id;
+    return item.subscription_id;
   };
 
   const getItemAmount = (item: any) => {
@@ -49,12 +49,11 @@ export const StripeReceivablesSection: React.FC<StripeReceivablesSectionProps> =
     if (type === 'upcoming_payments' && item.net_amount !== undefined) {
       return item.net_amount;
     }
-    return item.amount_due || item.amount;
+    return item.amount;
   };
 
   const selectionType = useMemo(() => {
     switch (type) {
-      case 'pending_invoices': return 'stripe_pending_invoices' as const;
       case 'upcoming_payments': return 'stripe_upcoming_payments' as const;
       case 'pending_activations': return 'stripe_pending_activations' as const;
     }
@@ -62,7 +61,6 @@ export const StripeReceivablesSection: React.FC<StripeReceivablesSectionProps> =
 
   const retryFunctionName = useMemo(() => {
     switch (type) {
-      case 'pending_invoices': return 'pendingInvoices' as const;
       case 'upcoming_payments': return 'upcomingPayments' as const;
       case 'pending_activations': return 'pendingActivations' as const;
     }
@@ -108,8 +106,6 @@ export const StripeReceivablesSection: React.FC<StripeReceivablesSectionProps> =
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'open': return 'bg-orange-100 text-orange-800';
-      case 'draft': return 'bg-gray-100 text-gray-800';
       case 'active': return 'bg-green-100 text-green-800';
       case 'incomplete': return 'bg-red-100 text-red-800';
       case 'past_due': return 'bg-red-100 text-red-800';
@@ -158,43 +154,6 @@ export const StripeReceivablesSection: React.FC<StripeReceivablesSectionProps> =
     };
 
     switch (type) {
-      case 'pending_invoices':
-        const invoice = item as PendingStripeInvoice;
-        return (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium">{commonProps.customer}</div>
-                <div className="text-sm text-muted-foreground">{invoice.description}</div>
-                {invoice.number && (
-                  <div className="text-xs text-muted-foreground">#{invoice.number}</div>
-                )}
-              </div>
-              <div className="text-right">
-                <div className="font-semibold">{formatCurrency(commonProps.amount)}</div>
-                <Badge className={getStatusColor(commonProps.status)}>{commonProps.status}</Badge>
-              </div>
-            </div>
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <div className="flex items-center space-x-1">
-                <Calendar className="h-3 w-3" />
-                <span>Due: {invoice.due_date ? formatDate(invoice.due_date) : 'No due date'}</span>
-              </div>
-              {invoice.pdf_url && (
-                <a
-                  href={invoice.pdf_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center space-x-1 hover:text-primary"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  <span>View PDF</span>
-                </a>
-              )}
-            </div>
-          </div>
-        );
-
       case 'upcoming_payments':
         const payment = item as UpcomingSubscriptionPayment;
         const hasDetailedBreakdown = payment.gross_amount !== undefined;
