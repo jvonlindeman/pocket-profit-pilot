@@ -367,6 +367,42 @@ export type Database = {
         }
         Relationships: []
       }
+      receivables_selections: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          item_id: string
+          metadata: Json | null
+          selected: boolean
+          selection_type: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          id?: string
+          item_id: string
+          metadata?: Json | null
+          selected?: boolean
+          selection_type: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          item_id?: string
+          metadata?: Json | null
+          selected?: boolean
+          selection_type?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       zoho_integration: {
         Row: {
           access_token: string | null

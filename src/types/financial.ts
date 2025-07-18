@@ -19,6 +19,78 @@ export interface UnpaidInvoice {
   balance: number;
 }
 
+export interface PendingStripeInvoice {
+  invoice_id: string;
+  customer: {
+    id: string;
+    email?: string | null;
+    name?: string | null;
+  } | null;
+  amount_due: number;
+  currency: string;
+  due_date: string | null;
+  status: string;
+  pdf_url?: string | null;
+  description: string;
+  created_date: string;
+  number?: string | null;
+}
+
+export interface UpcomingSubscriptionPayment {
+  subscription_id: string;
+  customer: {
+    id: string;
+    email?: string | null;
+    name?: string | null;
+  } | null;
+  plan_name: string;
+  amount: number;
+  currency: string;
+  next_payment_date: string;
+  status: string;
+  current_period_start: string;
+  current_period_end: string;
+  created_date: string;
+  trial_end?: string | null;
+}
+
+export interface PendingActivationSubscription {
+  subscription_id: string;
+  customer: {
+    id: string;
+    email?: string | null;
+    name?: string | null;
+  } | null;
+  plan_name: string;
+  amount: number;
+  currency: string;
+  status: string;
+  created_date: string;
+  current_period_start: string;
+  current_period_end: string;
+  trial_end?: string | null;
+  latest_invoice?: {
+    id: string;
+    amount_due: number;
+    status: string;
+    hosted_invoice_url?: string | null;
+  } | null;
+  cancel_at_period_end: boolean;
+  days_until_due?: number | null;
+}
+
+export interface ReceivablesSelection {
+  id: string;
+  user_id: string;
+  selection_type: 'zoho_invoices' | 'stripe_pending_invoices' | 'stripe_upcoming_payments' | 'stripe_pending_activations';
+  item_id: string;
+  selected: boolean;
+  amount: number;
+  metadata: any;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface FinancialSummary {
   totalIncome: number;
   totalExpense: number;
@@ -55,6 +127,9 @@ export interface FinancialData {
   incomeBySource: CategorySummary[];
   expenseByCategory: CategorySummary[];
   unpaidInvoices?: UnpaidInvoice[]; // Added unpaid invoices
+  stripePendingInvoices?: PendingStripeInvoice[];
+  stripeUpcomingPayments?: UpcomingSubscriptionPayment[];
+  stripePendingActivations?: PendingActivationSubscription[];
   dailyData: {
     income: ChartData;
     expense: ChartData;

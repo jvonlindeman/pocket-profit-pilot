@@ -14,6 +14,7 @@ import { FinanceProvider } from '@/contexts/FinanceContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileText } from 'lucide-react';
 import SalaryCalculator from './SalaryCalculator';
+import { ReceivablesManager } from './Receivables/ReceivablesManager';
 
 interface DashboardContentProps {
   // Core data
@@ -189,6 +190,13 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
             >
               <RefinedFinancialSummary />
             </FinanceProvider>
+
+            <Separator />
+
+            {/* Receivables Management */}
+            <ReceivablesManager 
+              unpaidInvoices={unpaidInvoices || []}
+            />
 
             <Separator />
 
