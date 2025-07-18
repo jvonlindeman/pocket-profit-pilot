@@ -53,7 +53,14 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
       }, 0);
     };
 
-    // Separate totals for each channel
+    // Function for automatic calculation (without considering selections)
+    const getAutomaticTotal = (items: any[]) => {
+      return items.reduce((total, item) => {
+        return total + (item.balance || item.amount_due || item.amount);
+      }, 0);
+    };
+
+    // Separate totals for each channel (selected amounts)
     const zohoTotal = getSelectedAmount('zoho_invoices', unpaidInvoices);
     
     const stripePendingInvoicesTotal = getSelectedAmount('stripe_pending_invoices', stripePendingInvoices);
@@ -66,8 +73,8 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
     // Grand total combines both channels
     const grandTotal = zohoTotal + stripeTotal;
 
-    // Next 30 days should show only next month payments (the 21 items)
-    const next30Days = stripeNextMonthTotal;
+    // Next 30 days calculation (automatic, regardless of selections)
+    const next30Days = getAutomaticTotal(stripeNextMonthPayments);
 
     return {
       zohoTotal,
@@ -129,7 +136,7 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
             {formatCurrency(summary.next30Days)}
           </div>
           <p className="text-xs text-muted-foreground">
-            Next month payments
+            Next month payments (forecast)
           </p>
         </CardContent>
       </Card>
