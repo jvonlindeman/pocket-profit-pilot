@@ -1,4 +1,5 @@
-import { Transaction, UnpaidInvoice } from "../types/financial";
+
+import { Transaction } from "../types/financial";
 import * as zohoApiClient from "../services/zoho/apiClient";
 import { formatDateYYYYMMDD } from "../utils/dateUtils";
 import { useApiCalls } from "@/contexts/ApiCallsContext";
@@ -13,7 +14,6 @@ import { cacheStorage } from "@/services/cache/storage";
 export class ZohoRepository {
   private lastRawResponse: any = null;
   private apiCallsContext?: ReturnType<typeof useApiCalls>;
-  private unpaidInvoices: UnpaidInvoice[] = [];
   private lastRequestKey: string = '';
   private inProgressRequestsMap: Map<string, Promise<any>> = new Map();
   private collaboratorExpenses: any[] = [];
@@ -164,15 +164,11 @@ export class ZohoRepository {
         const processed = zohoApiClient.processTransactionResponse(response);
         transactions = processed;
         
-        this.unpaidInvoices = zohoApiClient.processUnpaidInvoicesResponse(response);
-        
         // Process collaborator data if available
         if (response.colaboradores && Array.isArray(response.colaboradores)) {
           this.collaboratorExpenses = response.colaboradores;
           console.log(`👥 ZohoRepository: Processed ${this.collaboratorExpenses.length} collaborator expenses`);
         }
-        
-        console.log(`📋 ZohoRepository: Processed ${this.unpaidInvoices.length} unpaid invoices`);
       }
     }
     
@@ -189,13 +185,6 @@ export class ZohoRepository {
     
     console.log(`✅ ZohoRepository: Final transaction count: ${transactions.length}`);
     return transactions;
-  }
-  
-  /**
-   * Get unpaid invoices
-   */
-  getUnpaidInvoices(): UnpaidInvoice[] {
-    return this.unpaidInvoices;
   }
 
   /**

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import PeriodHeader from './PeriodHeader';
 import RefinedFinancialSummary from './FinancialCards/RefinedFinancialSummary';
@@ -41,7 +42,6 @@ interface DashboardContentProps {
   stripeFeePercentage: number;
   regularIncome: number;
   collaboratorExpenses: any[];
-  unpaidInvoices: any[];
   startingBalance: number;
   totalZohoExpenses: number;
 
@@ -83,7 +83,6 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   stripeFeePercentage,
   regularIncome,
   collaboratorExpenses,
-  unpaidInvoices,
   startingBalance,
   totalZohoExpenses,
   calculatorKey,
@@ -172,7 +171,6 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
                 stripeFees,
                 regularIncome,
                 collaboratorExpensesCount: Array.isArray(collaboratorExpenses) ? collaboratorExpenses.length : 0,
-                unpaidInvoicesCount: unpaidInvoices?.length,
                 adjustedZohoIncome
               });
               return null;
@@ -190,7 +188,6 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
               stripeFeePercentage={stripeFeePercentage}
               regularIncome={regularIncome}
               collaboratorExpenses={Array.isArray(collaboratorExpenses) ? collaboratorExpenses : []}
-              unpaidInvoices={unpaidInvoices}
             >
               <RefinedFinancialSummary />
             </FinanceProvider>
@@ -199,7 +196,6 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
 
             {/* Receivables Management - Now with stripeNet and adjustedZohoIncome props */}
             <ReceivablesManager 
-              unpaidInvoices={unpaidInvoices || []}
               stripeNet={stripeNet}
               adjustedZohoIncome={adjustedZohoIncome}
             />

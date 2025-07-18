@@ -122,7 +122,6 @@ export interface FinancialData {
   transactions: Transaction[];
   incomeBySource: CategorySummary[];
   expenseByCategory: CategorySummary[];
-  unpaidInvoices?: UnpaidInvoice[]; // Added unpaid invoices
   stripeUpcomingPayments?: UpcomingSubscriptionPayment[];
   stripePendingActivations?: PendingActivationSubscription[];
   dailyData: {

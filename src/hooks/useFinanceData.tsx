@@ -8,8 +8,6 @@ import { useUrlParamCleaner } from '@/hooks/useUrlParamCleaner';
 import { useStoredFinancialData } from '@/hooks/useStoredFinancialData';
 import { processTransactionData } from '@/services/financialService';
 import { getCurrentMonthRange } from '@/utils/dateUtils';
-import { zohoRepository } from '@/repositories/zohoRepository';
-import { UnpaidInvoice } from '@/types/financial';
 
 export const useFinanceData = () => {
   // Keep track of the last time refreshData was called
@@ -84,11 +82,6 @@ export const useFinanceData = () => {
     }
   }, [transactions, stripeData, processCollaboratorData, processIncomeTypes]);
 
-  // Get unpaid invoices from zoho repository
-  const unpaidInvoices = useMemo<UnpaidInvoice[]>(() => {
-    return zohoRepository.getUnpaidInvoices();
-  }, [transactions]);
-
   // Financial data processing
   const financialData = useMemo(() => {
     // Pass collaboratorExpenses to ensure they're included in the summary
@@ -105,7 +98,6 @@ export const useFinanceData = () => {
         stripeData,
         summary: financialData,
         collaboratorExpenses,
-        unpaidInvoices,
         startingBalance,
         regularIncome,
         stripeIncome,
@@ -137,7 +129,6 @@ export const useFinanceData = () => {
     dateRange,
     financialData,
     collaboratorExpenses,
-    unpaidInvoices,
     startingBalance,
     regularIncome,
     stripeIncome,
@@ -240,7 +231,6 @@ export const useFinanceData = () => {
     stripeFeePercentage,
     regularIncome,
     collaboratorExpenses,
-    unpaidInvoices,
     startingBalance,
     notes,
     updateStartingBalance,
