@@ -30,7 +30,6 @@ export const useDashboardStateManager = () => {
     stripeFeePercentage,
     regularIncome,
     collaboratorExpenses,
-    unpaidInvoices,
     startingBalance,
     updateStartingBalance,
     setStartingBalance,
@@ -127,7 +126,6 @@ export const useDashboardStateManager = () => {
     zohoIncomeTransactions: financialData.transactions.filter(tx => tx.type === 'income' && tx.source === 'Zoho').length,
     zohoExpenseTransactions: financialData.transactions.filter(tx => tx.type === 'expense' && tx.source === 'Zoho').length,
     stripeTransactions: financialData.transactions.filter(tx => tx.source === 'Stripe').length,
-    unpaidInvoices: unpaidInvoices?.length || 0,
     isRefreshing,
     includeZohoFiftyPercent,
     totalZohoExpensesCalculated: totalZohoExpenses
@@ -192,7 +190,6 @@ export const useDashboardStateManager = () => {
     stripeFeePercentage,
     regularIncome,
     collaboratorExpenses,
-    unpaidInvoices,
     startingBalance,
     totalZohoExpenses, // ENHANCED: Now properly calculated and tracked
     

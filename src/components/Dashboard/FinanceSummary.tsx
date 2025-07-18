@@ -87,7 +87,6 @@ const FinanceSummary: React.FC<FinanceSummaryProps> = ({
       stripeFeePercentage={stripeFeePercentage}
       regularIncome={regularIncome}
       collaboratorExpenses={collaboratorExpenses}
-      unpaidInvoices={unpaidInvoices}
     >
       <div className="space-y-8 animate-fade-in">
         {/* Initial Balance Section */}

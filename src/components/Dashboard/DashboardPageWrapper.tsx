@@ -50,7 +50,6 @@ const DashboardPageWrapper: React.FC = () => {
     currentMonthDate: dashboardState.currentMonthDate,
     monthlyBalance: dashboardState.monthlyBalance,
     totalZohoExpenses: dashboardState.totalZohoExpenses,
-    unpaidInvoices: dashboardState.unpaidInvoices,
     startingBalance: dashboardState.startingBalance,
     regularIncome: dashboardState.regularIncome,
   };
@@ -137,7 +136,6 @@ const DashboardPageWrapper: React.FC = () => {
             stripeFeePercentage={dashboardState.stripeFeePercentage}
             regularIncome={dashboardState.regularIncome}
             collaboratorExpenses={dashboardState.collaboratorExpenses}
-            unpaidInvoices={dashboardState.unpaidInvoices}
             startingBalance={dashboardState.startingBalance}
             totalZohoExpenses={dashboardState.totalZohoExpenses}
             calculatorKey={dashboardState.calculatorKey}

@@ -38,11 +38,8 @@ export const ReceivablesManager: React.FC<ReceivablesManagerProps> = ({
     retryStripeFunction,
   } = useReceivablesData();
 
-  // Get Zoho unpaid invoices directly from repository
-  const zohoUnpaidInvoices = zohoRepository.getUnpaidInvoices();
-  
-  // Use Zoho data from repository, fallback to props if needed
-  const unpaidInvoices = zohoUnpaidInvoices.length > 0 ? zohoUnpaidInvoices : propUnpaidInvoices;
+  // Use the unpaid invoices passed as props (if any)
+  const unpaidInvoices = propUnpaidInvoices;
 
   // Get current month for default tab
   const currentMonth = new Date().getMonth();
@@ -52,7 +49,6 @@ export const ReceivablesManager: React.FC<ReceivablesManagerProps> = ({
 
   console.log('🏠 ReceivablesManager: Render state', {
     propUnpaidInvoicesCount: propUnpaidInvoices.length,
-    zohoUnpaidInvoicesCount: zohoUnpaidInvoices.length,
     finalUnpaidInvoicesCount: unpaidInvoices.length,
     stripeUpcomingPaymentsCount: stripeUpcomingPayments.length,
     stripeCurrentMonthPaymentsCount: stripeCurrentMonthPayments.length,

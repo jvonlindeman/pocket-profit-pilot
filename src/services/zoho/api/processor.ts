@@ -312,25 +312,10 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
   return result;
 };
 
-// Process unpaid invoices from Zoho response
-export const processUnpaidInvoices = (data: ZohoTransactionResponse): UnpaidInvoice[] => {
-  if (!data || !data.facturas_sin_pagar) {
-    return [];
-  }
-  
-  try {
-    const invoices: UnpaidInvoice[] = data.facturas_sin_pagar.map(invoice => ({
-      customer_name: invoice.customer_name || 'Cliente sin nombre',
-      company_name: invoice.company_name || '',
-      balance: typeof invoice.balance === 'number' ? invoice.balance : parseFloat(invoice.balance)
-    }));
-    
-    console.log(`Processed ${invoices.length} unpaid invoices from Zoho data`);
-    return invoices;
-  } catch (error) {
-    console.error("Error processing unpaid invoices:", error);
-    return [];
-  }
+// Process unpaid invoices from Zoho response - DEPRECATED
+export const processUnpaidInvoices = (data: ZohoTransactionResponse): any[] => {
+  // Functionality removed - return empty array
+  return [];
 };
 
 export const calculateTotalUnpaidAmount = (invoices: UnpaidInvoice[]): number => {

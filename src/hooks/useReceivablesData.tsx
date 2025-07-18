@@ -102,10 +102,10 @@ export const useReceivablesData = () => {
 
   const fetchZohoUnpaidInvoices = async () => {
     try {
-      console.log('🔄 Fetching Zoho unpaid invoices directly...');
+      console.log('🔄 Zoho unpaid invoices functionality removed - returning empty array');
       
-      // Get unpaid invoices directly from Zoho repository
-      const unpaidInvoices = zohoRepository.getUnpaidInvoices();
+      // Functionality removed - return empty array
+      const unpaidInvoices: any[] = [];
       
       console.log('✅ Zoho unpaid invoices loaded:', {
         count: unpaidInvoices.length,
