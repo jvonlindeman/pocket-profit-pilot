@@ -127,7 +127,7 @@ serve(async (req) => {
       new Date(a.next_payment_date).getTime() - new Date(b.next_payment_date).getTime()
     );
 
-    // Separate current month and next month payments
+    // Separate current month and next month payments (NO TIME RESTRICTIONS)
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
@@ -139,6 +139,7 @@ serve(async (req) => {
       return paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear;
     });
 
+    // CRITICAL FIX: Include ALL payments for the entire next month (no 60-day limit)
     const nextMonthPayments = upcomingPayments.filter(payment => {
       const paymentDate = new Date(payment.next_payment_date);
       return paymentDate.getMonth() === nextMonth && paymentDate.getFullYear() === nextMonthYear;
@@ -162,9 +163,9 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       success: true, 
       data: {
-        upcoming_payments: filteredPayments, // For backward compatibility
+        upcoming_payments: filteredPayments, // For backward compatibility with 60-day filter
         current_month_payments: currentMonthPayments,
-        next_month_payments: nextMonthPayments,
+        next_month_payments: nextMonthPayments, // FULL NEXT MONTH - NO TIME LIMIT
         total_count: filteredPayments.length
       }
     }), {
