@@ -8,6 +8,7 @@ import {
   PendingActivationSubscription,
   ReceivablesSelection 
 } from '@/types/financial';
+import { useFinance } from '@/contexts/FinanceContext';
 
 interface ReceivablesSummaryProps {
   unpaidInvoices: Array<{
@@ -32,6 +33,7 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
   selections,
   onRefresh,
 }) => {
+  const { stripeNet } = useFinance();
   const summary = useMemo(() => {
     const getSelectedAmount = (type: string, items: any[], useNetAmount = false) => {
       return items.reduce((total, item) => {
@@ -147,7 +149,7 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
           <div className="mt-3 pt-2 border-t border-gray-200">
             <div className="flex justify-between text-sm text-blue-600 font-medium">
               <span>Total Stripe (Neto + Bruto):</span>
-              <span>{formatCurrency(summary.stripeGrossTotal + summary.stripeNetTotal)}</span>
+              <span>{formatCurrency(summary.stripeGrossTotal + stripeNet)}</span>
             </div>
             <div className="text-xs text-gray-500 mt-1">
               Proyección total de ingresos
