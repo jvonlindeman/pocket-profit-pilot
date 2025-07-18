@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +7,6 @@ import {
   PendingActivationSubscription,
   ReceivablesSelection 
 } from '@/types/financial';
-import { useFinance } from '@/contexts/FinanceContext';
 
 interface ReceivablesSummaryProps {
   unpaidInvoices: Array<{
@@ -21,6 +19,7 @@ interface ReceivablesSummaryProps {
   stripeNextMonthPayments: UpcomingSubscriptionPayment[];
   stripePendingActivations: PendingActivationSubscription[];
   selections: ReceivablesSelection[];
+  stripeNet: number;
   onRefresh: () => void;
 }
 
@@ -31,17 +30,13 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
   stripeNextMonthPayments,
   stripePendingActivations,
   selections,
+  stripeNet,
   onRefresh,
 }) => {
-  const { stripeNet } = useFinance();
   
   const summary = useMemo(() => {
-    // Forzar el valor correcto temporalmente para debug
-    const correctStripeNet = 14003.16; // El valor real de los edge function logs
-    console.log('🧮 RECEIVABLES SUMMARY CALCULATION DEBUG:', {
-      stripeNetFromContext: stripeNet,
-      stripeNetIsZero: stripeNet === 0,
-      correctStripeNet: correctStripeNet,
+    console.log('🧮 RECEIVABLES SUMMARY CALCULATION (SIMPLIFIED):', {
+      stripeNetProp: stripeNet,
       selectionsCount: selections.length,
       currentMonthPayments: stripeCurrentMonthPayments.length,
       nextMonthPayments: stripeNextMonthPayments.length,
@@ -110,9 +105,9 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
     // CORRECT CALCULATION: Stripe Bruto (receivables) + Stripe Neto (ya cobrado)
     const totalStripeProjection = stripeGrossTotal + stripeNet;
 
-    console.log('🧮 CALCULATION BREAKDOWN:', {
+    console.log('🧮 SIMPLIFIED CALCULATION BREAKDOWN:', {
       stripeGrossTotal: `$${stripeGrossTotal.toFixed(2)} (receivables seleccionados bruto)`,
-      stripeNetFromContext: `$${stripeNet.toFixed(2)} (ya cobrado este mes, neto)`,
+      stripeNetProp: `$${stripeNet.toFixed(2)} (ya cobrado este mes, neto)`,
       totalStripeProjection: `$${totalStripeProjection.toFixed(2)} (Total Stripe Neto + Bruto)`,
       expectedTotal: '$23,092.34',
       matches: Math.abs(totalStripeProjection - 23092.34) < 1

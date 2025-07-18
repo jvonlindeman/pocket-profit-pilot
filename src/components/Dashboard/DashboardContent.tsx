@@ -1,4 +1,3 @@
-
 import React from 'react';
 import PeriodHeader from './PeriodHeader';
 import RefinedFinancialSummary from './FinancialCards/RefinedFinancialSummary';
@@ -194,9 +193,10 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
 
             <Separator />
 
-            {/* Receivables Management - Positioned immediately after Financial Summary */}
+            {/* Receivables Management - Now with stripeNet prop */}
             <ReceivablesManager 
               unpaidInvoices={unpaidInvoices || []}
+              stripeNet={stripeNet}
             />
 
             <Separator />
