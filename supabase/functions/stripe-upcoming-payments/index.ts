@@ -41,9 +41,31 @@ serve(async (req) => {
 
     logStep("Retrieved active subscriptions", { count: subscriptions.data.length });
 
+    // DETAILED DATE ANALYSIS - Current time and month calculations
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+    const nextMonthYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+
+    logStep("DATE CALCULATION ANALYSIS", {
+      now: now.toISOString(),
+      nowLocal: now.toLocaleDateString(),
+      currentMonth: currentMonth + 1, // +1 because getMonth() is 0-based
+      currentYear,
+      nextMonth: nextMonth + 1, // +1 because getMonth() is 0-based
+      nextMonthYear,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    });
+
     // Process subscriptions with customer cache for missing data
     const customerCache = new Map();
     const upcomingPayments = [];
+
+    // DETAILED SUBSCRIPTION ANALYSIS
+    logStep("ANALYZING ALL SUBSCRIPTIONS", {
+      totalSubscriptions: subscriptions.data.length
+    });
 
     for (const subscription of subscriptions.data) {
       let customerInfo = null;
@@ -107,6 +129,26 @@ serve(async (req) => {
       // Calculate next payment date
       const nextPaymentDate = new Date(subscription.current_period_end * 1000);
 
+      // DETAILED LOGGING FOR EACH SUBSCRIPTION
+      const paymentMonth = nextPaymentDate.getMonth();
+      const paymentYear = nextPaymentDate.getFullYear();
+      const isCurrentMonth = paymentMonth === currentMonth && paymentYear === currentYear;
+      const isNextMonth = paymentMonth === nextMonth && paymentYear === nextMonthYear;
+
+      logStep("SUBSCRIPTION ANALYSIS", {
+        subscriptionId: subscription.id.slice(-6),
+        customerName: customerInfo?.name?.substring(0, 20) || 'Unknown',
+        nextPaymentDate: nextPaymentDate.toISOString(),
+        nextPaymentDateLocal: nextPaymentDate.toLocaleDateString(),
+        paymentMonth: paymentMonth + 1, // +1 because getMonth() is 0-based
+        paymentYear,
+        isCurrentMonth,
+        isNextMonth,
+        status: subscription.status,
+        currentPeriodEnd: subscription.current_period_end,
+        currentPeriodEndDate: new Date(subscription.current_period_end * 1000).toISOString()
+      });
+
       upcomingPayments.push({
         subscription_id: subscription.id,
         customer: customerInfo,
@@ -127,22 +169,53 @@ serve(async (req) => {
       new Date(a.next_payment_date).getTime() - new Date(b.next_payment_date).getTime()
     );
 
-    // Separate current month and next month payments (NO TIME RESTRICTIONS)
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
-    const nextMonthYear = currentMonth === 11 ? currentYear + 1 : currentYear;
-
+    // DETAILED FILTERING ANALYSIS
     const currentMonthPayments = upcomingPayments.filter(payment => {
       const paymentDate = new Date(payment.next_payment_date);
-      return paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear;
+      const isMatch = paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear;
+      return isMatch;
     });
 
-    // CRITICAL FIX: Include ALL payments for the entire next month (no 60-day limit)
     const nextMonthPayments = upcomingPayments.filter(payment => {
       const paymentDate = new Date(payment.next_payment_date);
+      const isMatch = paymentDate.getMonth() === nextMonth && paymentDate.getFullYear() === nextMonthYear;
+      return isMatch;
+    });
+
+    // LOG ALL NEXT MONTH PAYMENTS IN DETAIL
+    logStep("NEXT MONTH PAYMENTS DETAILED ANALYSIS", {
+      nextMonthExpected: `${nextMonth + 1}/${nextMonthYear}`, // +1 because getMonth() is 0-based
+      nextMonthPaymentsFound: nextMonthPayments.length,
+      nextMonthPaymentsDetails: nextMonthPayments.map(payment => ({
+        subscriptionId: payment.subscription_id.slice(-6),
+        customerName: payment.customer?.name?.substring(0, 20) || 'Unknown',
+        amount: payment.amount,
+        nextPaymentDate: payment.next_payment_date,
+        nextPaymentDateLocal: new Date(payment.next_payment_date).toLocaleDateString(),
+        dayOfMonth: new Date(payment.next_payment_date).getDate()
+      }))
+    });
+
+    // Check for payments that might be excluded
+    const allPaymentsNextMonth = upcomingPayments.filter(payment => {
+      const paymentDate = new Date(payment.next_payment_date);
       return paymentDate.getMonth() === nextMonth && paymentDate.getFullYear() === nextMonthYear;
+    });
+
+    const paymentsAfter16th = nextMonthPayments.filter(payment => {
+      const paymentDate = new Date(payment.next_payment_date);
+      return paymentDate.getDate() > 16;
+    });
+
+    logStep("PAYMENTS AFTER 16TH ANALYSIS", {
+      totalNextMonthPayments: allPaymentsNextMonth.length,
+      paymentsAfter16th: paymentsAfter16th.length,
+      paymentsAfter16thDetails: paymentsAfter16th.map(payment => ({
+        subscriptionId: payment.subscription_id.slice(-6),
+        customerName: payment.customer?.name?.substring(0, 20) || 'Unknown',
+        nextPaymentDate: payment.next_payment_date,
+        dayOfMonth: new Date(payment.next_payment_date).getDate()
+      }))
     });
 
     // Filter to only include payments in the next 60 days for backward compatibility
@@ -150,6 +223,14 @@ serve(async (req) => {
     const filteredPayments = upcomingPayments.filter(payment => {
       const paymentDate = new Date(payment.next_payment_date);
       return paymentDate >= now && paymentDate <= sixtyDaysFromNow;
+    });
+
+    logStep("FINAL FILTERING ANALYSIS", {
+      sixtyDaysFromNow: sixtyDaysFromNow.toISOString(),
+      totalPayments: upcomingPayments.length,
+      filteredPayments: filteredPayments.length,
+      currentMonthPayments: currentMonthPayments.length,
+      nextMonthPayments: nextMonthPayments.length
     });
 
     logStep("Processed upcoming payments successfully", { 
