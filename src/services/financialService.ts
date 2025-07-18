@@ -96,7 +96,7 @@ export const financialService = new FinancialService();
 /**
  * ENHANCED Helper function to identify Stripe fee transactions with comprehensive detection
  */
-const isStripeFeeTransaction = (transaction: Transaction): boolean => {
+export const isStripeFeeTransaction = (transaction: Transaction): boolean => {
   // First check if it's from Stripe
   if (transaction.source !== 'Stripe') {
     return false;

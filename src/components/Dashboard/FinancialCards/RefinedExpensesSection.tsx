@@ -4,6 +4,7 @@ import SummaryCard from './SummaryCard';
 import { useFinance } from '@/contexts/FinanceContext';
 import { useFinanceFormatter } from '@/hooks/useFinanceFormatter';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { isStripeFeeTransaction } from '@/services/financialService';
 
 const RefinedExpensesSection: React.FC = () => {
   const { 
@@ -14,38 +15,49 @@ const RefinedExpensesSection: React.FC = () => {
   const { formatCurrency } = useFinanceFormatter();
   const isMobile = useIsMobile();
 
-  // FIXED: Calculate collaborator expenses directly from transactions with 'Pagos a colaboradores' category
-  // This uses the collaborators that come properly separated from the Zoho endpoint
-  const collaboratorTransactions = transactions?.filter(tx => 
+  // FIXED: Calculate expenses excluding Stripe fees (consistent with processTransactionData)
+  const operationalExpenseTransactions = transactions?.filter(tx => 
     tx.type === 'expense' && 
-    tx.category === 'Pagos a colaboradores'
+    !isStripeFeeTransaction(tx)
   ) || [];
+
+  // Calculate collaborator expenses from operational expenses only
+  const collaboratorTransactions = operationalExpenseTransactions.filter(tx => 
+    tx.category === 'Pagos a colaboradores'
+  );
   
   const totalCollaboratorExpense = collaboratorTransactions.reduce((sum, tx) => sum + tx.amount, 0);
 
-  // Calculate "Otros Gastos" as all other expenses (excluding collaborators)
-  const otherExpenseTransactions = transactions?.filter(tx => 
-    tx.type === 'expense' && 
+  // Calculate "Otros Gastos" as operational expenses excluding collaborators
+  const otherExpenseTransactions = operationalExpenseTransactions.filter(tx => 
     tx.category !== 'Pagos a colaboradores'
-  ) || [];
+  );
   
   const otherExpense = otherExpenseTransactions.reduce((sum, tx) => sum + tx.amount, 0);
   
-  // Total expenses should be the sum of collaborators + others
-  const calculatedTotalExpense = totalCollaboratorExpense + otherExpense;
+  // Use summary.totalExpense (which already excludes Stripe fees from processTransactionData)
+  const totalExpenseFromSummary = summary.totalExpense;
 
-  // Add detailed debugging for the fixed calculation
+  // Add detailed debugging for the STRIPE FEE EXCLUSION calculation
   useEffect(() => {
     const allExpenseTransactions = transactions?.filter(tx => tx.type === 'expense') || [];
+    const stripeFeesTransactions = allExpenseTransactions.filter(tx => isStripeFeeTransaction(tx));
     const totalFromAllExpenses = allExpenseTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+    const totalStripeFees = stripeFeesTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+    const calculatedTotalOperational = totalCollaboratorExpense + otherExpense;
     
-    console.log("🔍 RefinedExpensesSection - FIXED EXPENSE CALCULATION:", {
+    console.log("🔍 RefinedExpensesSection - STRIPE FEE EXCLUSION CALCULATION:", {
       // Raw transaction data
       totalTransactions: transactions?.length || 0,
       allExpenseTransactions: allExpenseTransactions.length,
       totalFromAllExpenses,
       
-      // Collaborator calculation (from endpoint)
+      // Stripe fees separation
+      stripeFeesCount: stripeFeesTransactions.length,
+      totalStripeFees,
+      operationalExpenseCount: operationalExpenseTransactions.length,
+      
+      // Collaborator calculation (operational only)
       collaboratorTransactions: collaboratorTransactions.length,
       collaboratorTransactionDetails: collaboratorTransactions.map(tx => ({
         id: tx.id,
@@ -55,23 +67,24 @@ const RefinedExpensesSection: React.FC = () => {
       })),
       totalCollaboratorExpense,
       
-      // Other expenses calculation
+      // Other expenses calculation (operational only)
       otherExpenseTransactions: otherExpenseTransactions.length,
       otherExpenseCategories: [...new Set(otherExpenseTransactions.map(tx => tx.category))],
       otherExpense,
       
       // Mathematical validation
-      calculatedTotalExpense,
+      calculatedTotalOperational,
       summaryTotalExpense: summary.totalExpense,
-      difference: calculatedTotalExpense - summary.totalExpense,
-      isConsistent: Math.abs(calculatedTotalExpense - summary.totalExpense) < 0.01,
+      difference: calculatedTotalOperational - summary.totalExpense,
+      isConsistent: Math.abs(calculatedTotalOperational - summary.totalExpense) < 0.01,
       
-      // Verification
+      // Verification against processTransactionData logic
       verification: {
-        collaboratorsFromEndpoint: totalCollaboratorExpense,
-        otherExpensesCalculated: otherExpense,
-        sum: totalCollaboratorExpense + otherExpense,
-        matchesTotalExpenses: Math.abs((totalCollaboratorExpense + otherExpense) - totalFromAllExpenses) < 0.01
+        totalExpensesIncludingFees: totalFromAllExpenses,
+        stripeFeesExcluded: totalStripeFees,
+        operationalExpensesCalculated: calculatedTotalOperational,
+        summaryTotalExpenseFromProcessor: summary.totalExpense,
+        matchesSummary: Math.abs(calculatedTotalOperational - summary.totalExpense) < 0.01
       }
     });
 
@@ -97,7 +110,7 @@ const RefinedExpensesSection: React.FC = () => {
       });
     }
 
-  }, [transactions, collaboratorTransactions, otherExpenseTransactions, totalCollaboratorExpense, otherExpense, calculatedTotalExpense, summary]);
+  }, [transactions, operationalExpenseTransactions, collaboratorTransactions, otherExpenseTransactions, totalCollaboratorExpense, otherExpense, summary]);
 
   return (
     <div className={`grid ${isMobile ? 'grid-cols-1 gap-3' : 'grid-cols-1 md:grid-cols-3 gap-6'}`}>
@@ -121,14 +134,14 @@ const RefinedExpensesSection: React.FC = () => {
         tooltip="Todos los gastos excepto colaboradores"
       />
 
-      {/* Total Expenses - Sum of collaborators + others */}
+      {/* Total Expenses - Using summary.totalExpense (excludes Stripe fees) */}
       <SummaryCard
         title="Gastos Totales"
-        value={formatCurrency(calculatedTotalExpense)}
+        value={formatCurrency(totalExpenseFromSummary)}
         icon={ArrowDownIcon}
         iconColor="text-red-500"
         iconBgColor="bg-red-50"
-        tooltip="Suma de Gastos Colaboradores + Otros Gastos"
+        tooltip="Total de gastos operacionales (excluyendo comisiones de Stripe)"
       />
     </div>
   );
