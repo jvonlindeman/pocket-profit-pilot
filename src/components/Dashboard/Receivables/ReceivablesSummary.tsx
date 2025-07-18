@@ -2,7 +2,7 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, DollarSign, TrendingUp, Calendar, AlertTriangle } from 'lucide-react';
+import { RefreshCw, DollarSign, TrendingUp, Calendar, AlertTriangle, BookOpen, CreditCard } from 'lucide-react';
 import { 
   PendingStripeInvoice, 
   UpcomingSubscriptionPayment, 
@@ -53,56 +53,34 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
       }, 0);
     };
 
+    // Separate totals for each channel
     const zohoTotal = getSelectedAmount('zoho_invoices', unpaidInvoices);
-    const stripePendingInvoicesTotal = getSelectedAmount('stripe_pending_invoices', stripePendingInvoices);
     
-    // Calculate current month and next month payments separately
+    const stripePendingInvoicesTotal = getSelectedAmount('stripe_pending_invoices', stripePendingInvoices);
     const stripeCurrentMonthTotal = getSelectedAmount('stripe_upcoming_payments', stripeCurrentMonthPayments);
     const stripeNextMonthTotal = getSelectedAmount('stripe_upcoming_payments', stripeNextMonthPayments);
-    
     const stripePendingActivationsTotal = getSelectedAmount('stripe_pending_activations', stripePendingActivations);
+    
+    const stripeTotal = stripePendingInvoicesTotal + stripeCurrentMonthTotal + stripeNextMonthTotal + stripePendingActivationsTotal;
 
-    // Grand total now includes current month and next month separately
-    const grandTotal = zohoTotal + stripePendingInvoicesTotal + stripeCurrentMonthTotal + stripeNextMonthTotal + stripePendingActivationsTotal;
+    // Grand total combines both channels
+    const grandTotal = zohoTotal + stripeTotal;
 
-    // Calculate upcoming amounts by time periods using all upcoming payments
-    const now = new Date();
-    const next30Days = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000));
-    const next60Days = new Date(now.getTime() + (60 * 24 * 60 * 60 * 1000));
-
-    const upcomingNext30Days = stripeUpcomingPayments
-      .filter(payment => {
-        const paymentDate = new Date(payment.next_payment_date);
-        const selection = selections.find(s => 
-          s.selection_type === 'stripe_upcoming_payments' && s.item_id === payment.subscription_id
-        );
-        return paymentDate <= next30Days && selection?.selected;
-      })
-      .reduce((total, payment) => total + payment.amount, 0);
-
-    const upcomingNext60Days = stripeUpcomingPayments
-      .filter(payment => {
-        const paymentDate = new Date(payment.next_payment_date);
-        const selection = selections.find(s => 
-          s.selection_type === 'stripe_upcoming_payments' && s.item_id === payment.subscription_id
-        );
-        return paymentDate <= next60Days && selection?.selected;
-      })
-      .reduce((total, payment) => total + payment.amount, 0);
+    // Automated calculations for next 30 and 60 days
+    const next30Days = stripeCurrentMonthTotal; // Current month payments
+    const next60Days = stripeCurrentMonthTotal + stripeNextMonthTotal; // Current + next month
 
     return {
       zohoTotal,
-      stripePendingInvoicesTotal,
-      stripeCurrentMonthTotal,
-      stripeNextMonthTotal,
-      stripePendingActivationsTotal,
+      stripeTotal,
       grandTotal,
-      upcomingNext30Days,
-      upcomingNext60Days,
+      next30Days,
+      next60Days,
+      stripePendingActivationsTotal,
       totalItems: unpaidInvoices.length + stripePendingInvoices.length + 
                   stripeCurrentMonthPayments.length + stripeNextMonthPayments.length + stripePendingActivations.length,
     };
-  }, [unpaidInvoices, stripePendingInvoices, stripeUpcomingPayments, stripeCurrentMonthPayments, stripeNextMonthPayments, stripePendingActivations, selections]);
+  }, [unpaidInvoices, stripePendingInvoices, stripeCurrentMonthPayments, stripeNextMonthPayments, stripePendingActivations, selections]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -112,10 +90,70 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Receivables</CardTitle>
+          <CardTitle className="text-sm font-medium">Total Zoho Books</CardTitle>
+          <BookOpen className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-blue-600">
+            {formatCurrency(summary.zohoTotal)}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            From {unpaidInvoices.length} invoices
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Total Stripe</CardTitle>
+          <CreditCard className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-purple-600">
+            {formatCurrency(summary.stripeTotal)}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            All Stripe receivables
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Next 30 Days</CardTitle>
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-green-600">
+            {formatCurrency(summary.next30Days)}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Current month payments
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Next 60 Days</CardTitle>
+          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-blue-600">
+            {formatCurrency(summary.next60Days)}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Current + next month
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Grand Total</CardTitle>
           <DollarSign className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
@@ -134,51 +172,6 @@ export const ReceivablesSummary: React.FC<ReceivablesSummaryProps> = ({
             <RefreshCw className="h-3 w-3 mr-1" />
             Refresh
           </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Next 30 Days</CardTitle>
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-green-600">
-            {formatCurrency(summary.upcomingNext30Days)}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Expected subscription payments
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Next 60 Days</CardTitle>
-          <TrendingUp className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-blue-600">
-            {formatCurrency(summary.upcomingNext60Days)}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Total upcoming payments
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Pending Activations</CardTitle>
-          <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold text-orange-600">
-            {formatCurrency(summary.stripePendingActivationsTotal)}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Requires immediate attention
-          </p>
         </CardContent>
       </Card>
     </div>
