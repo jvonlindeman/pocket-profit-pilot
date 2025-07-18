@@ -26,6 +26,7 @@ interface ReceivablesData {
 /**
  * Generate next month's payments from ALL active subscription data
  * This ensures we always have complete projections for ALL active subscriptions
+ * FIXED: Add unique identifier for next month to prevent duplication
  */
 const generateNextMonthFromAllSubscriptions = (allUpcomingPayments: UpcomingSubscriptionPayment[]): UpcomingSubscriptionPayment[] => {
   console.log('🔄 Generating next month payments from ALL active subscriptions...');
@@ -40,6 +41,7 @@ const generateNextMonthFromAllSubscriptions = (allUpcomingPayments: UpcomingSubs
       
       const nextMonthPayment: UpcomingSubscriptionPayment = {
         ...payment, // Copy all existing data
+        subscription_id: `${payment.subscription_id}_next_month`, // FIXED: Unique ID for next month
         next_payment_date: nextPaymentDate.toISOString(),
         current_period_start: nextPeriodStart.toISOString(),
         current_period_end: nextPeriodEnd.toISOString(),
@@ -54,13 +56,14 @@ const generateNextMonthFromAllSubscriptions = (allUpcomingPayments: UpcomingSubs
     }
   }).filter((payment): payment is UpcomingSubscriptionPayment => payment !== null);
   
-  console.log(`🎉 Successfully generated ${nextMonthPayments.length} next month payments from ALL active subscriptions`);
+  console.log(`🎉 Successfully generated ${nextMonthPayments.length} next month payments from ALL active subscriptions with unique IDs`);
   return nextMonthPayments;
 };
 
 /**
  * Filter current month payments by next_payment_date > today
  * This shows only subscriptions pending collection in the current month
+ * FIXED: Add unique identifier for current month to prevent duplication
  */
 const filterCurrentMonthPendingPayments = (payments: UpcomingSubscriptionPayment[], today: Date): UpcomingSubscriptionPayment[] => {
   console.log('🔍 Filtering current month payments by next_payment_date > today...');
@@ -73,9 +76,12 @@ const filterCurrentMonthPendingPayments = (payments: UpcomingSubscriptionPayment
     
     console.log(`💳 ${payment.customer?.email || 'unknown'}: ${nextPaymentDate.toISOString()} > ${today.toISOString()} = ${isPending}`);
     return isPending;
-  });
+  }).map(payment => ({
+    ...payment,
+    subscription_id: `${payment.subscription_id}_current_month`, // FIXED: Unique ID for current month
+  }));
   
-  console.log(`✅ Filtered to ${filtered.length} pending payments for current month`);
+  console.log(`✅ Filtered to ${filtered.length} pending payments for current month with unique IDs`);
   return filtered;
 };
 
@@ -159,20 +165,20 @@ export const useReceivablesData = () => {
           console.log(`  - Total active subscriptions: ${stripeUpcomingPayments.length}`);
           console.log(`  - Raw current month payments: ${rawCurrentMonthPayments.length}`);
           console.log(`  - Today for filtering: ${today.toISOString()}`);
-          console.log(`  - FIXED: Generar próximo mes desde TODAS las suscripciones activas`);
+          console.log(`  - FIXED: Generar próximo mes desde TODAS las suscripciones activas con IDs únicos`);
           
-          // Current month: Filter by next_payment_date > today (only pending collections)
+          // Current month: Filter by next_payment_date > today (only pending collections) with unique IDs
           stripeCurrentMonthPayments = filterCurrentMonthPendingPayments(rawCurrentMonthPayments, today);
           
-          // Next month: FIXED - SIEMPRE generar desde TODAS las suscripciones activas
+          // Next month: FIXED - SIEMPRE generar desde TODAS las suscripciones activas con IDs únicos
           stripeNextMonthPayments = generateNextMonthFromAllSubscriptions(stripeUpcomingPayments);
           
-          console.log('✅ PLAN FIJO IMPLEMENTADO - Processed payments:', {
+          console.log('✅ PLAN FIJO IMPLEMENTADO - Processed payments with UNIQUE IDs:', {
             total: stripeUpcomingPayments.length,
             currentMonthPending: stripeCurrentMonthPayments.length,
             nextMonthGenerated: stripeNextMonthPayments.length,
-            logic: 'Current = pending only, Next = TODAS las suscripciones activas (FIJO)',
-            fixed: 'Next month now shows ALL active subscriptions'
+            logic: 'Current = pending only (unique IDs), Next = TODAS las suscripciones activas (unique IDs)',
+            fixed: 'Next month now shows ALL active subscriptions with unique identifiers'
           });
         } else {
           upcomingPaymentsError = `Unexpected response format for upcoming payments`;
@@ -206,11 +212,12 @@ export const useReceivablesData = () => {
         console.error('❌ Stripe pending activations function failed:', results[1].reason);
       }
 
-      console.log('📈 PLAN FIJO IMPLEMENTADO - Final Stripe data summary:', {
+      console.log('📈 PLAN FIJO IMPLEMENTADO - Final Stripe data summary with UNIQUE IDs:', {
         upcomingPayments: stripeUpcomingPayments.length,
         currentMonthPendingOnly: stripeCurrentMonthPayments.length,
         nextMonthAllActiveSubscriptions: stripeNextMonthPayments.length,
-        planFixed: 'PRÓXIMO MES = SIEMPRE desde TODAS las suscripciones activas',
+        planFixed: 'PRÓXIMO MES = SIEMPRE desde TODAS las suscripciones activas con IDs únicos',
+        duplicatesFixed: 'Current and next month now have separate unique identifiers',
         errors: {
           upcomingPayments: upcomingPaymentsError,
           pendingActivations: pendingActivationsError,
@@ -294,7 +301,7 @@ export const useReceivablesData = () => {
 
   const refreshData = async () => {
     try {
-      console.log('🚀 Starting PLAN IMPLEMENTADO receivables data refresh...');
+      console.log('🚀 Starting PLAN IMPLEMENTADO receivables data refresh with UNIQUE IDs...');
       setData(prev => ({ ...prev, isLoading: true, error: null }));
       
       // Fetch Stripe data
@@ -317,7 +324,7 @@ export const useReceivablesData = () => {
         error: null,
       });
 
-      console.log('🎉 PLAN IMPLEMENTADO receivables data refresh completed successfully');
+      console.log('🎉 PLAN IMPLEMENTADO receivables data refresh completed successfully with UNIQUE IDs');
     } catch (error) {
       console.error('❌ Error refreshing receivables data:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -366,18 +373,18 @@ export const useReceivablesData = () => {
             const responseData = result.data.data;
             newData.stripeUpcomingPayments = responseData?.upcoming_payments || [];
             
-            // Apply FIXED PLAN for retry as well
+            // Apply FIXED PLAN for retry as well with unique IDs
             const rawCurrentMonthPayments = responseData?.current_month_payments || [];
             const todayStr = responseData?.today || new Date().toISOString();
             const today = new Date(todayStr);
             
-            // Current month: Filter by next_payment_date > today (only pending collections)
+            // Current month: Filter by next_payment_date > today (only pending collections) with unique IDs
             newData.stripeCurrentMonthPayments = filterCurrentMonthPendingPayments(rawCurrentMonthPayments, today);
             
-            // Next month: FIXED - SIEMPRE generar desde TODAS las suscripciones activas
+            // Next month: FIXED - SIEMPRE generar desde TODAS las suscripciones activas with unique IDs
             newData.stripeNextMonthPayments = generateNextMonthFromAllSubscriptions(newData.stripeUpcomingPayments);
             
-            console.log(`🔄 PLAN FIJO applied during retry - Generated ${newData.stripeNextMonthPayments.length} next month payments from ALL active subscriptions`);
+            console.log(`🔄 PLAN FIJO applied during retry with UNIQUE IDs - Generated ${newData.stripeNextMonthPayments.length} next month payments from ALL active subscriptions`);
             
             newErrors.upcomingPayments = null;
             break;
