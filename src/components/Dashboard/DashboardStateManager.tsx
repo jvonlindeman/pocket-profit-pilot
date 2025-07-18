@@ -4,7 +4,7 @@ import { useFinanceData } from '@/hooks/useFinanceData';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 import { useDateRangeManager } from '@/hooks/useDateRangeManager';
 import { useDateFormatter } from '@/hooks/useDateFormatter';
-import { UnpaidInvoice } from '@/types/financial';
+
 
 export const useDashboardStateManager = () => {
   const [globalRefreshInProgress, setGlobalRefreshInProgress] = useState(false);
