@@ -45,29 +45,38 @@ export function useFinancialData(startDate: Date, endDate: Date) {
     [...zohoTransactions, ...stripeTransactions], 
     [zohoTransactions, stripeTransactions]);
 
-  // Process unpaid invoices from Zoho data stored in queryClient
+  // FIXED: Process unpaid invoices from Zoho data stored in queryClient
   const unpaidInvoices = useMemo(() => {
     // Get the raw Zoho response from queryClient
     const zohoRawData = queryClient.getQueryData<any>(
       ["zoho-transactions", startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]
     );
     
-    console.log('🔍 useFinancialData: Processing unpaid invoices from Zoho data', {
+    console.log('🔍 useFinancialData: ENHANCED Processing unpaid invoices from Zoho data', {
       hasZohoRawData: !!zohoRawData,
       zohoDataKeys: zohoRawData ? Object.keys(zohoRawData) : [],
       hasFacturasSinPagar: !!(zohoRawData?.facturas_sin_pagar),
-      facturasSinPagarCount: Array.isArray(zohoRawData?.facturas_sin_pagar) ? zohoRawData.facturas_sin_pagar.length : 0
+      facturasSinPagarCount: Array.isArray(zohoRawData?.facturas_sin_pagar) ? zohoRawData.facturas_sin_pagar.length : 0,
+      dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
+      zohoTransactionsCount: zohoTransactions.length
     });
 
     if (zohoRawData && zohoRawData.facturas_sin_pagar) {
       const processed = processUnpaidInvoices(zohoRawData);
-      console.log('✅ useFinancialData: Processed unpaid invoices:', {
+      console.log('✅ useFinancialData: SUCCESSFULLY processed unpaid invoices:', {
         count: processed.length,
-        totalAmount: processed.reduce((sum, inv) => sum + inv.balance, 0)
+        totalAmount: processed.reduce((sum, inv) => sum + inv.balance, 0),
+        sampleInvoices: processed.slice(0, 3).map(inv => ({
+          customer: inv.customer_name,
+          company: inv.company_name,
+          balance: inv.balance,
+          invoice_id: inv.invoice_id
+        }))
       });
       return processed;
     }
     
+    console.warn('⚠️ useFinancialData: No facturas_sin_pagar found in Zoho raw data');
     return [];
   }, [startDate, endDate, zohoTransactions.length]);
 
@@ -105,12 +114,20 @@ export function useFinancialData(startDate: Date, endDate: Date) {
     );
   }, [cacheStatus]);
 
+  console.log('🏠 useFinancialData: FINAL RESULT with enhanced unpaid invoices tracking:', {
+    transactionCount: allTransactions.length,
+    unpaidInvoicesCount: unpaidInvoices.length,
+    unpaidInvoicesTotal: unpaidInvoices.reduce((sum, inv) => sum + inv.balance, 0),
+    usingCachedData,
+    dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`
+  });
+
   return {
     transactions: allTransactions,
     zohoTransactions,
     stripeTransactions,
     stripeData,
-    unpaidInvoices,
+    unpaidInvoices, // CRITICAL: Ensure unpaid invoices are returned
     loading: zohoLoading || stripeLoading,
     error: zohoError || stripeError,
     errorDetails: zohoError ? zohoErrorDetails : stripeErrorDetails,
