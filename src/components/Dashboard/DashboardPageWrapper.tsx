@@ -32,6 +32,7 @@ const DashboardPageWrapper: React.FC = () => {
     loading: dashboardState.loading,
     isRefreshing: dashboardState.isRefreshing,
     error: !!dashboardState.error,
+    errorMessage: dashboardState.error,
     cacheChecked: dashboardState.cacheChecked,
     hasCachedData: dashboardState.hasCachedData,
     usingCachedData: dashboardState.usingCachedData,
@@ -40,7 +41,7 @@ const DashboardPageWrapper: React.FC = () => {
     smartRefreshEnabled: true,
     monthlyBalanceId: dashboardState.monthlyBalance?.id,
     monthlyBalanceTimestamp: dashboardState.monthlyBalance?.updated_at,
-    includeZohoFiftyPercent: dashboardState.includeZohoFiftyPercent // TRACKING THE NEW VALUE
+    includeZohoFiftyPercent: dashboardState.includeZohoFiftyPercent
   });
 
   const coreData = {
@@ -93,10 +94,10 @@ const DashboardPageWrapper: React.FC = () => {
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Loading and error state handling */}
+        {/* Loading and error state handling - FIXED: error is now string or null */}
         <LoadingErrorState 
           loading={dashboardState.loading} 
-          error={dashboardState.error?.toString() || ''}
+          error={dashboardState.error || ''}
           onRetry={handleRefresh}
         />
         
@@ -122,7 +123,7 @@ const DashboardPageWrapper: React.FC = () => {
             financialData={dashboardState.financialData}
             unpaidInvoices={dashboardState.unpaidInvoices || []}
             loading={dashboardState.loading}
-            error={dashboardState.error?.toString() || ''}
+            error={dashboardState.error || ''}
             dataInitialized={dashboardState.dataInitialized}
             hasCachedData={dashboardState.hasCachedData}
             usingCachedData={dashboardState.usingCachedData}

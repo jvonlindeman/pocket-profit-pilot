@@ -65,7 +65,8 @@ const Index = () => {
       balance: inv.balance,
       invoice_id: inv.invoice_id
     })) || [],
-    dataFlowComplete: true
+    dataFlowComplete: true,
+    errorMessage: error
   });
 
   const handleBalanceSaved = async (
@@ -100,7 +101,7 @@ const Index = () => {
       financialData={financialData}
       unpaidInvoices={unpaidInvoices || []} // CRITICAL: Pass unpaid invoices as direct prop
       loading={loading}
-      error={error?.toString() || ''}
+      error={error || ''} // FIXED: error is now string or null
       dataInitialized={dataInitialized}
       hasCachedData={hasCachedData}
       usingCachedData={usingCachedData}

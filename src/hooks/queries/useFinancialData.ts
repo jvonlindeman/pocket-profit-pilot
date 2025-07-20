@@ -80,6 +80,17 @@ export function useFinancialData(startDate: Date, endDate: Date) {
     return [];
   }, [startDate, endDate, zohoTransactions.length]);
 
+  // FIXED: Proper error handling - return actual error messages or null
+  const errorMessage = useMemo(() => {
+    if (zohoError && zohoErrorDetails) {
+      return `Error en Zoho: ${zohoErrorDetails.message || 'Error desconocido'}`;
+    }
+    if (stripeError && stripeErrorDetails) {
+      return `Error en Stripe: ${stripeErrorDetails.message || 'Error desconocido'}`;
+    }
+    return null;
+  }, [zohoError, zohoErrorDetails, stripeError, stripeErrorDetails]);
+
   // Force refresh function
   const refreshData = async (forceRefresh = false) => {
     if (forceRefresh) {
@@ -119,6 +130,7 @@ export function useFinancialData(startDate: Date, endDate: Date) {
     unpaidInvoicesCount: unpaidInvoices.length,
     unpaidInvoicesTotal: unpaidInvoices.reduce((sum, inv) => sum + inv.balance, 0),
     usingCachedData,
+    errorMessage,
     dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`
   });
 
@@ -129,7 +141,7 @@ export function useFinancialData(startDate: Date, endDate: Date) {
     stripeData,
     unpaidInvoices, // CRITICAL: Ensure unpaid invoices are returned
     loading: zohoLoading || stripeLoading,
-    error: zohoError || stripeError,
+    error: errorMessage, // FIXED: Return proper error message or null
     errorDetails: zohoError ? zohoErrorDetails : stripeErrorDetails,
     cacheStatus,
     cacheStatusLoading,
