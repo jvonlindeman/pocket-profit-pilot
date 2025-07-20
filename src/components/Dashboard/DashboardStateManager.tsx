@@ -4,18 +4,17 @@ import { useFinanceData } from '@/hooks/useFinanceData';
 import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 import { useDateRangeManager } from '@/hooks/useDateRangeManager';
 import { useDateFormatter } from '@/hooks/useDateFormatter';
-
+import { UnpaidInvoice } from '@/types/financial';
 
 export const useDashboardStateManager = () => {
   const [globalRefreshInProgress, setGlobalRefreshInProgress] = useState(false);
   const refreshCancelRef = useRef<AbortController | null>(null);
 
-  // ENHANCED: Now using the corrected useFinanceData that includes unpaidInvoices
+  // PASSIVE MODE: useFinanceData no longer auto-loads data
   const {
     dateRange,
     updateDateRange,
     financialData,
-    unpaidInvoices, // CRITICAL: Now we get unpaid invoices from the corrected hook
     loading,
     error,
     getCurrentMonthRange,
@@ -31,6 +30,7 @@ export const useDashboardStateManager = () => {
     stripeFeePercentage,
     regularIncome,
     collaboratorExpenses,
+    unpaidInvoices,
     startingBalance,
     updateStartingBalance,
     setStartingBalance,
@@ -89,19 +89,6 @@ export const useDashboardStateManager = () => {
     return total;
   }, [financialData.transactions]);
 
-  // CRITICAL: Log unpaid invoices data flow
-  console.log("💼 DashboardStateManager: ENHANCED with unpaid invoices tracking:", {
-    unpaidInvoicesCount: unpaidInvoices?.length || 0,
-    unpaidInvoicesTotal: unpaidInvoices?.reduce((sum, inv) => sum + inv.balance, 0) || 0,
-    unpaidInvoicesSample: unpaidInvoices?.slice(0, 3).map(inv => ({
-      customer: inv.customer_name,
-      balance: inv.balance,
-      invoice_id: inv.invoice_id
-    })) || [],
-    dataSource: 'useFinanceData_corrected_hook',
-    timestamp: new Date().toISOString()
-  });
-
   // Enhanced debugging and improved value extraction logic
   console.log("💼 DashboardStateManager: Monthly balance data received:", monthlyBalance);
   
@@ -140,6 +127,7 @@ export const useDashboardStateManager = () => {
     zohoIncomeTransactions: financialData.transactions.filter(tx => tx.type === 'income' && tx.source === 'Zoho').length,
     zohoExpenseTransactions: financialData.transactions.filter(tx => tx.type === 'expense' && tx.source === 'Zoho').length,
     stripeTransactions: financialData.transactions.filter(tx => tx.source === 'Stripe').length,
+    unpaidInvoices: unpaidInvoices?.length || 0,
     isRefreshing,
     includeZohoFiftyPercent,
     totalZohoExpensesCalculated: totalZohoExpenses
@@ -184,7 +172,6 @@ export const useDashboardStateManager = () => {
     // Data state
     dateRange,
     financialData,
-    unpaidInvoices, // CRITICAL: Now properly included in return
     loading,
     error,
     dataInitialized,
@@ -205,6 +192,7 @@ export const useDashboardStateManager = () => {
     stripeFeePercentage,
     regularIncome,
     collaboratorExpenses,
+    unpaidInvoices,
     startingBalance,
     totalZohoExpenses, // ENHANCED: Now properly calculated and tracked
     

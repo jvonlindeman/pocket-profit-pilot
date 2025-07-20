@@ -389,7 +389,7 @@ export const processTransactionData = (
   };
 };
 
-// Unpaid invoices functionality removed - keeping function for compatibility
-export const getUnpaidInvoices = (): any[] => {
-  return [];
+// Add a new function to get unpaid invoices
+export const getUnpaidInvoices = (): UnpaidInvoice[] => {
+  return zohoRepository.getUnpaidInvoices();
 };

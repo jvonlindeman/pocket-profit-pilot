@@ -1,7 +1,9 @@
+
 import React, { useEffect } from 'react';
 import SummaryCardSection from './SummaryCardSection';
 import RefinedExpensesSection from './RefinedExpensesSection';
 import ProfitSection from './ProfitSection';
+import UnpaidInvoicesSection from './UnpaidInvoicesSection';
 import FinancialDebugHelper from '../DebugTools/FinancialDebugHelper';
 import FinancialHistorySummary from '../FinancialHistory/FinancialHistorySummary';
 import { FinancialAssistantPromo } from '../FinancialAssistant/FinancialAssistantPromo';
@@ -11,7 +13,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import IncomeTabs from './IncomeTabs';
 
 const RefinedFinancialSummary: React.FC = () => {
-  const { dateRange } = useFinance();
+  const { dateRange, unpaidInvoices } = useFinance();
   const isMobile = useIsMobile();
   
   // Register components as visible
@@ -35,9 +37,27 @@ const RefinedFinancialSummary: React.FC = () => {
         <ProfitSection />
       </SummaryCardSection>
       
-      {/* Financial assistant promo section - moved to single column */}
-      <div className="w-full">
-        <FinancialAssistantPromo />
+      {unpaidInvoices && unpaidInvoices.length > 0 && (
+        <SummaryCardSection title="Facturas por Cobrar" data-component="unpaid-invoices" className="unpaid-invoices-section">
+          <UnpaidInvoicesSection />
+        </SummaryCardSection>
+      )}
+      
+      <div className={`grid ${isMobile ? 'grid-cols-1 gap-4' : 'md:grid-cols-3 gap-4'}`}>
+        <div className={isMobile ? "" : "md:col-span-2"}>
+          {/* Financial history section */}
+          <SummaryCardSection title="Historial Financiero" data-component="financial-history" className="financial-history-summary">
+            <FinancialHistorySummary 
+              startDate={dateRange?.startDate}
+              endDate={dateRange?.endDate}
+            />
+          </SummaryCardSection>
+        </div>
+        
+        <div className={isMobile ? "mt-4" : "md:col-span-1"}>
+          {/* Financial assistant promo section */}
+          <FinancialAssistantPromo />
+        </div>
       </div>
       
       {/* Add the debug helper */}

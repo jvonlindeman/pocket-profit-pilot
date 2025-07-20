@@ -1,12 +1,10 @@
-
-import { Transaction } from "../types/financial";
+import { Transaction, UnpaidInvoice } from "../types/financial";
 import * as zohoApiClient from "../services/zoho/apiClient";
 import { formatDateYYYYMMDD } from "../utils/dateUtils";
 import { useApiCalls } from "@/contexts/ApiCallsContext";
 import { apiRequestManager } from "@/utils/ApiRequestManager";
 import CacheService from "@/services/cache";
 import { cacheStorage } from "@/services/cache/storage";
-import { processUnpaidInvoices } from "@/services/zoho/api/processor";
 
 /**
  * ZohoRepository handles all data access related to Zoho,
@@ -15,10 +13,10 @@ import { processUnpaidInvoices } from "@/services/zoho/api/processor";
 export class ZohoRepository {
   private lastRawResponse: any = null;
   private apiCallsContext?: ReturnType<typeof useApiCalls>;
+  private unpaidInvoices: UnpaidInvoice[] = [];
   private lastRequestKey: string = '';
   private inProgressRequestsMap: Map<string, Promise<any>> = new Map();
   private collaboratorExpenses: any[] = [];
-  private unpaidInvoices: any[] = [];
   
   /**
    * Set the API calls context for tracking
@@ -53,7 +51,6 @@ export class ZohoRepository {
   
   /**
    * Get transactions for a date range with cache-first approach
-   * Now also extracts and returns unpaid invoices
    */
   async getTransactions(
     startDate: Date,
@@ -89,8 +86,6 @@ export class ZohoRepository {
           
           if (cachedTransactions && cachedTransactions.length > 0) {
             console.log(`📋 ZohoRepository: Successfully loaded ${cachedTransactions.length} transactions from cache`);
-            // Clear unpaid invoices when using cache (they need fresh data)
-            this.unpaidInvoices = [];
             return cachedTransactions;
           }
         } else {
@@ -129,7 +124,6 @@ export class ZohoRepository {
   
   /**
    * Execute the actual transactions request with webhook call tracking
-   * Now also processes unpaid invoices
    */
   private async executeTransactionsRequest(
     cacheKey: string,
@@ -153,16 +147,6 @@ export class ZohoRepository {
     
     let transactions: Transaction[] = [];
     
-    // CRITICAL: Process unpaid invoices from the response
-    if (response && response.facturas_sin_pagar) {
-      console.log(`💰 ZohoRepository: Processing ${response.facturas_sin_pagar.length} unpaid invoices from webhook`);
-      this.unpaidInvoices = processUnpaidInvoices(response);
-      console.log(`✅ ZohoRepository: Processed ${this.unpaidInvoices.length} unpaid invoices`);
-    } else {
-      console.warn(`⚠️ ZohoRepository: No facturas_sin_pagar found in webhook response`);
-      this.unpaidInvoices = [];
-    }
-    
     if (Array.isArray(response)) {
       // If the response is already an array of Transaction objects
       console.log(`📊 ZohoRepository: Received ${response.length} already processed Zoho transactions`);
@@ -180,11 +164,15 @@ export class ZohoRepository {
         const processed = zohoApiClient.processTransactionResponse(response);
         transactions = processed;
         
+        this.unpaidInvoices = zohoApiClient.processUnpaidInvoicesResponse(response);
+        
         // Process collaborator data if available
         if (response.colaboradores && Array.isArray(response.colaboradores)) {
           this.collaboratorExpenses = response.colaboradores;
           console.log(`👥 ZohoRepository: Processed ${this.collaboratorExpenses.length} collaborator expenses`);
         }
+        
+        console.log(`📋 ZohoRepository: Processed ${this.unpaidInvoices.length} unpaid invoices`);
       }
     }
     
@@ -199,15 +187,14 @@ export class ZohoRepository {
       }
     }
     
-    console.log(`✅ ZohoRepository: Final results - ${transactions.length} transactions, ${this.unpaidInvoices.length} unpaid invoices`);
+    console.log(`✅ ZohoRepository: Final transaction count: ${transactions.length}`);
     return transactions;
   }
-
+  
   /**
-   * Get unpaid invoices (facturas sin pagar)
+   * Get unpaid invoices
    */
-  getUnpaidInvoices(): any[] {
-    console.log(`📋 ZohoRepository: Returning ${this.unpaidInvoices.length} unpaid invoices`);
+  getUnpaidInvoices(): UnpaidInvoice[] {
     return this.unpaidInvoices;
   }
 

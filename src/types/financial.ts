@@ -14,14 +14,9 @@ export interface Transaction {
 }
 
 export interface UnpaidInvoice {
-  invoice_id: string;
   customer_name: string;
   company_name?: string;
   balance: number;
-  due_date?: string;
-  status?: string;
-  currency_code?: string;
-  invoice_number?: string;
 }
 
 export interface UpcomingSubscriptionPayment {
@@ -127,6 +122,7 @@ export interface FinancialData {
   transactions: Transaction[];
   incomeBySource: CategorySummary[];
   expenseByCategory: CategorySummary[];
+  unpaidInvoices?: UnpaidInvoice[]; // Added unpaid invoices
   stripeUpcomingPayments?: UpcomingSubscriptionPayment[];
   stripePendingActivations?: PendingActivationSubscription[];
   dailyData: {

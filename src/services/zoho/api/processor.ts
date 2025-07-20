@@ -312,91 +312,25 @@ export const processRawTransactions = (data: ZohoTransactionResponse): Transacti
   return result;
 };
 
-// RESTORED AND ENHANCED: Process unpaid invoices from Zoho response  
+// Process unpaid invoices from Zoho response
 export const processUnpaidInvoices = (data: ZohoTransactionResponse): UnpaidInvoice[] => {
-  console.log("🔄 ZohoProcessor: ENHANCED Processing unpaid invoices", {
-    hasFacturasSinPagar: !!(data.facturas_sin_pagar),
-    facturasSinPagarCount: Array.isArray(data.facturas_sin_pagar) ? data.facturas_sin_pagar.length : 0,
-    dataKeys: Object.keys(data || {}),
-    rawDataStructure: data.facturas_sin_pagar ? typeof data.facturas_sin_pagar : 'undefined'
-  });
-
-  if (!data) {
-    console.error("❌ ZohoProcessor: No data received for unpaid invoices");
+  if (!data || !data.facturas_sin_pagar) {
     return [];
   }
-
-  // Process facturas_sin_pagar from webhook
-  if (Array.isArray(data.facturas_sin_pagar) && data.facturas_sin_pagar.length > 0) {
-    console.log(`📋 ZohoProcessor: PROCESSING ${data.facturas_sin_pagar.length} unpaid invoices from webhook`);
+  
+  try {
+    const invoices: UnpaidInvoice[] = data.facturas_sin_pagar.map(invoice => ({
+      customer_name: invoice.customer_name || 'Cliente sin nombre',
+      company_name: invoice.company_name || '',
+      balance: typeof invoice.balance === 'number' ? invoice.balance : parseFloat(invoice.balance)
+    }));
     
-    const unpaidInvoices = data.facturas_sin_pagar
-      .map((invoice: any, index: number) => {
-        try {
-          console.log(`📄 ZohoProcessor: Processing unpaid invoice [${index}] with ENHANCED LOGGING:`, {
-            invoice_id: invoice.invoice_id,
-            customer_name: invoice.customer_name,
-            company_name: invoice.company_name,
-            balance: invoice.balance,
-            due_date: invoice.due_date,
-            status: invoice.status,
-            invoice_number: invoice.invoice_number,
-            currency_code: invoice.currency_code,
-            allKeys: Object.keys(invoice || {})
-          });
-
-          // Ensure we have minimum required data
-          if (!invoice.customer_name && !invoice.company_name) {
-            console.warn(`⚠️ ZohoProcessor: Invoice [${index}] missing customer/company name, skipping`);
-            return null;
-          }
-
-          if (!invoice.balance || isNaN(Number(invoice.balance))) {
-            console.warn(`⚠️ ZohoProcessor: Invoice [${index}] has invalid balance: ${invoice.balance}, skipping`);
-            return null;
-          }
-
-          // Map the invoice data to our UnpaidInvoice type with enhanced validation
-          const unpaidInvoice: UnpaidInvoice = {
-            invoice_id: invoice.invoice_id || invoice.invoice_number || `invoice-${index}`,
-            customer_name: invoice.customer_name || invoice.company_name || 'Cliente desconocido',
-            company_name: invoice.company_name || invoice.customer_name || 'Empresa desconocida',
-            balance: Number(invoice.balance) || 0,
-            due_date: invoice.due_date || null,
-            status: invoice.status || 'unpaid',
-            currency_code: invoice.currency_code || 'USD',
-            invoice_number: invoice.invoice_number || invoice.invoice_id || `INV-${index}`
-          };
-
-          console.log(`✅ ZohoProcessor: SUCCESSFULLY mapped unpaid invoice:`, {
-            customer: unpaidInvoice.customer_name,
-            balance: unpaidInvoice.balance,
-            invoice_id: unpaidInvoice.invoice_id,
-            currency: unpaidInvoice.currency_code
-          });
-          return unpaidInvoice;
-        } catch (error) {
-          console.error(`❌ ZohoProcessor: Error processing unpaid invoice [${index}]:`, error, invoice);
-          return null;
-        }
-      })
-      .filter((invoice): invoice is UnpaidInvoice => invoice !== null);
-
-    console.log(`📊 ZohoProcessor: FINAL RESULT - Successfully processed ${unpaidInvoices.length} unpaid invoices:`, {
-      totalBalance: unpaidInvoices.reduce((sum, inv) => sum + inv.balance, 0),
-      averageBalance: unpaidInvoices.length > 0 ? unpaidInvoices.reduce((sum, inv) => sum + inv.balance, 0) / unpaidInvoices.length : 0,
-      sampleInvoices: unpaidInvoices.slice(0, 5).map(inv => ({
-        customer: inv.customer_name,
-        balance: inv.balance,
-        invoice_id: inv.invoice_id
-      }))
-    });
-
-    return unpaidInvoices;
+    console.log(`Processed ${invoices.length} unpaid invoices from Zoho data`);
+    return invoices;
+  } catch (error) {
+    console.error("Error processing unpaid invoices:", error);
+    return [];
   }
-
-  console.warn("⚠️ ZohoProcessor: No valid facturas_sin_pagar array found in webhook data");
-  return [];
 };
 
 export const calculateTotalUnpaidAmount = (invoices: UnpaidInvoice[]): number => {

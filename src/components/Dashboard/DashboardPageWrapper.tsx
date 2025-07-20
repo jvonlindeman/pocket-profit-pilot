@@ -32,7 +32,6 @@ const DashboardPageWrapper: React.FC = () => {
     loading: dashboardState.loading,
     isRefreshing: dashboardState.isRefreshing,
     error: !!dashboardState.error,
-    errorMessage: dashboardState.error,
     cacheChecked: dashboardState.cacheChecked,
     hasCachedData: dashboardState.hasCachedData,
     usingCachedData: dashboardState.usingCachedData,
@@ -41,7 +40,7 @@ const DashboardPageWrapper: React.FC = () => {
     smartRefreshEnabled: true,
     monthlyBalanceId: dashboardState.monthlyBalance?.id,
     monthlyBalanceTimestamp: dashboardState.monthlyBalance?.updated_at,
-    includeZohoFiftyPercent: dashboardState.includeZohoFiftyPercent
+    includeZohoFiftyPercent: dashboardState.includeZohoFiftyPercent // TRACKING THE NEW VALUE
   });
 
   const coreData = {
@@ -51,6 +50,7 @@ const DashboardPageWrapper: React.FC = () => {
     currentMonthDate: dashboardState.currentMonthDate,
     monthlyBalance: dashboardState.monthlyBalance,
     totalZohoExpenses: dashboardState.totalZohoExpenses,
+    unpaidInvoices: dashboardState.unpaidInvoices,
     startingBalance: dashboardState.startingBalance,
     regularIncome: dashboardState.regularIncome,
   };
@@ -94,10 +94,10 @@ const DashboardPageWrapper: React.FC = () => {
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Loading and error state handling - FIXED: error is now string or null */}
+        {/* Loading and error state handling */}
         <LoadingErrorState 
           loading={dashboardState.loading} 
-          error={dashboardState.error || ''}
+          error={dashboardState.error}
           onRetry={handleRefresh}
         />
         
@@ -121,23 +121,13 @@ const DashboardPageWrapper: React.FC = () => {
           <DashboardContent 
             periodTitle={dashboardState.periodTitle}
             financialData={dashboardState.financialData}
-            unpaidInvoices={dashboardState.unpaidInvoices || []}
             loading={dashboardState.loading}
-            error={dashboardState.error || ''}
+            error={dashboardState.error}
             dataInitialized={dashboardState.dataInitialized}
             hasCachedData={dashboardState.hasCachedData}
             usingCachedData={dashboardState.usingCachedData}
             isRefreshing={dashboardState.isRefreshing || dashboardState.globalRefreshInProgress}
-            cacheStatus={{
-              zoho: { 
-                hit: dashboardState.cacheStatus?.zoho?.cached || false, 
-                partial: dashboardState.cacheStatus?.zoho?.partial || false 
-              },
-              stripe: { 
-                hit: dashboardState.cacheStatus?.stripe?.cached || false, 
-                partial: dashboardState.cacheStatus?.stripe?.partial || false 
-              }
-            }}
+            cacheStatus={dashboardState.cacheStatus}
             stripeIncome={dashboardState.stripeIncome}
             stripeFees={dashboardState.stripeFees}
             stripeTransactionFees={dashboardState.stripeTransactionFees}
@@ -147,6 +137,7 @@ const DashboardPageWrapper: React.FC = () => {
             stripeFeePercentage={dashboardState.stripeFeePercentage}
             regularIncome={dashboardState.regularIncome}
             collaboratorExpenses={dashboardState.collaboratorExpenses}
+            unpaidInvoices={dashboardState.unpaidInvoices}
             startingBalance={dashboardState.startingBalance}
             totalZohoExpenses={dashboardState.totalZohoExpenses}
             calculatorKey={dashboardState.calculatorKey}

@@ -1,14 +1,15 @@
-
 import { useMemo, useCallback, useRef, useEffect } from 'react';
 import { useFinanceDateRange } from '@/hooks/useFinanceDateRange';
 import { useCollaboratorProcessor } from '@/hooks/useCollaboratorProcessor';
 import { useIncomeProcessor } from '@/hooks/useIncomeProcessor';
 import { useMonthlyBalanceManager } from '@/hooks/useMonthlyBalanceManager';
-import { useFinancialData } from '@/hooks/queries/useFinancialData';
+import { useOptimizedFinancialData } from '@/hooks/queries/useOptimizedFinancialData';
 import { useUrlParamCleaner } from '@/hooks/useUrlParamCleaner';
 import { useStoredFinancialData } from '@/hooks/useStoredFinancialData';
 import { processTransactionData } from '@/services/financialService';
 import { getCurrentMonthRange } from '@/utils/dateUtils';
+import { zohoRepository } from '@/repositories/zohoRepository';
+import { UnpaidInvoice } from '@/types/financial';
 
 export const useFinanceData = () => {
   // Keep track of the last time refreshData was called
@@ -34,30 +35,34 @@ export const useFinanceData = () => {
   // Use the date range hook
   const { dateRange, updateDateRange } = useFinanceDateRange(fetchMonthlyBalance);
   
-  // FIXED: Use useFinancialData which now includes unpaid invoices directly from repository
+  // Use PASSIVE financial data hook - no auto-loading
   const { 
     transactions, 
     stripeData,
-    unpaidInvoices, // CRITICAL: Now comes directly from repository, not queryClient
     loading, 
     error, 
     usingCachedData, 
     cacheStatus, 
-    refreshData: refetchData
-  } = useFinancialData(dateRange.startDate, dateRange.endDate);
+    refetch,
+    isDataRequested,
+    cacheChecked,
+    hasCachedData,
+    isRefreshing
+  } = useOptimizedFinancialData(dateRange.startDate, dateRange.endDate);
 
-  console.log("🏠 useFinanceData: Hook rendered with FIXED repository flow:", {
+  console.log("🏠 useFinanceData: Hook rendered with PASSIVE MODE", {
     dateRange: `${dateRange.startDate.toISOString().split('T')[0]} to ${dateRange.endDate.toISOString().split('T')[0]}`,
     transactionCount: transactions.length,
-    unpaidInvoicesCount: unpaidInvoices.length, // CRITICAL: Direct from repository!
-    unpaidInvoicesTotal: unpaidInvoices.reduce((sum, inv) => sum + (inv.balance || 0), 0),
+    isDataRequested,
+    cacheChecked,
+    hasCachedData,
     loading,
     usingCachedData,
     isLegitimateRefresh,
-    hookSource: 'useFinancialData_with_repository_unpaidInvoices',
+    autoLoadingPrevented: true,
     cacheStatus: {
-      zohoHit: cacheStatus?.zoho?.cached || false,
-      stripeHit: cacheStatus?.stripe?.cached || false
+      zohoHit: cacheStatus.zoho.hit,
+      stripeHit: cacheStatus.stripe.hit
     }
   });
 
@@ -79,29 +84,28 @@ export const useFinanceData = () => {
     }
   }, [transactions, stripeData, processCollaboratorData, processIncomeTypes]);
 
+  // Get unpaid invoices from zoho repository
+  const unpaidInvoices = useMemo<UnpaidInvoice[]>(() => {
+    return zohoRepository.getUnpaidInvoices();
+  }, [transactions]);
+
   // Financial data processing
   const financialData = useMemo(() => {
-    // ENHANCED: Include unpaid invoices in the financial data
-    const processedData = processTransactionData(transactions, startingBalance, collaboratorExpenses);
-    
-    // Add unpaid invoices to the processed data
-    return {
-      ...processedData,
-      unpaidInvoices // CRITICAL: Include unpaid invoices in financial data
-    };
-  }, [transactions, startingBalance, collaboratorExpenses, unpaidInvoices]);
+    // Pass collaboratorExpenses to ensure they're included in the summary
+    return processTransactionData(transactions, startingBalance, collaboratorExpenses);
+  }, [transactions, startingBalance, collaboratorExpenses]);
 
   // Auto-save financial data snapshot when data is successfully loaded
   useEffect(() => {
-    if (transactions.length > 0 && !loading) {
+    if (transactions.length > 0 && isDataRequested && !loading) {
       const snapshotData = {
         transactions,
         zohoTransactions: transactions.filter(tx => tx.source === 'Zoho'),
         stripeTransactions: transactions.filter(tx => tx.source === 'Stripe'),
         stripeData,
-        unpaidInvoices, // CRITICAL: Include unpaid invoices in snapshot
         summary: financialData,
         collaboratorExpenses,
+        unpaidInvoices,
         startingBalance,
         regularIncome,
         stripeIncome,
@@ -115,24 +119,25 @@ export const useFinanceData = () => {
         dateRange,
         snapshotData,
         {
-          dataSource: 'useFinanceData_with_repository_unpaidInvoices',
+          dataSource: 'useFinanceData',
           usingCachedData,
         }
       );
 
-      console.log('💾 Auto-saved financial data snapshot with repository unpaid invoices', {
+      console.log('💾 Auto-saved financial data snapshot', {
         dateRange,
         transactionCount: transactions.length,
-        unpaidInvoicesCount: unpaidInvoices.length,
         usingCachedData,
       });
     }
   }, [
     transactions.length,
+    isDataRequested,
     loading,
     dateRange,
     financialData,
     collaboratorExpenses,
+    unpaidInvoices,
     startingBalance,
     regularIncome,
     stripeIncome,
@@ -140,7 +145,6 @@ export const useFinanceData = () => {
     stripeNet,
     cacheStatus,
     usingCachedData,
-    unpaidInvoices,
     saveSnapshot
   ]);
 
@@ -157,23 +161,26 @@ export const useFinanceData = () => {
     }
   }, []);
 
-  // Data initialized flag - true when we have transactions or unpaid invoices
+  // Data initialized flag - FIXED: Only true when user explicitly loads data
   const dataInitialized = useMemo(() => {
-    const initialized = transactions.length > 0 || unpaidInvoices.length > 0;
+    // Data is only initialized when explicitly requested AND has transactions
+    const initialized = isDataRequested && transactions.length > 0;
     
-    console.log("🔍 useFinanceData: Data initialization check with REPOSITORY FLOW", {
+    console.log("🔍 useFinanceData: Data initialization check with PASSIVE MODE", {
       initialized,
+      isDataRequested,
       transactionCount: transactions.length,
-      unpaidInvoicesCount: unpaidInvoices.length,
+      cacheChecked,
+      hasCachedData,
       usingCachedData,
       reason: initialized ? 
-        'data_loaded_successfully' : 
-        'no_data_loaded'
+        'user_explicitly_loaded_data' : 
+        (isDataRequested ? 'no_transactions_loaded' : 'no_explicit_request')
     });
     return initialized;
-  }, [transactions.length, unpaidInvoices.length, usingCachedData]);
+  }, [isDataRequested, transactions.length, cacheChecked, hasCachedData, usingCachedData]);
 
-  // MANUAL DATA REFRESH FUNCTION
+  // MANUAL DATA REFRESH FUNCTION - only loads data when explicitly called
   const refreshData = useCallback((force = false) => {
     // If a refresh is already in progress, return early
     if (refreshInProgressRef.current) {
@@ -193,7 +200,7 @@ export const useFinanceData = () => {
     refreshInProgressRef.current = true;
     lastRefreshTimeRef.current = now;
     
-    console.log(`🚀 useFinanceData: Beginning MANUAL data load with REPOSITORY FLOW`, {
+    console.log(`🚀 useFinanceData: Beginning MANUAL data load by user action`, {
       force, 
       isLegitimateRefresh,
       actualForceNeeded: force || isLegitimateRefresh
@@ -202,23 +209,22 @@ export const useFinanceData = () => {
     // Only force refresh if explicitly requested OR if it's a legitimate user refresh
     const shouldForceRefresh = force || isLegitimateRefresh;
     
-    // Use the refetch function from useFinancialData
-    const promise = refetchData(shouldForceRefresh);
+    // Use the refetch function from useOptimizedFinancialData
+    const promise = refetch(shouldForceRefresh);
     
     promise.finally(() => {
       // Always clean up when done
-      console.log("✅ useFinanceData: Completed MANUAL data load with repository unpaid invoices");
+      console.log("✅ useFinanceData: Completed MANUAL data load");
       refreshInProgressRef.current = false;
     });
     
     return promise;
-  }, [refetchData, isLegitimateRefresh]);
+  }, [refetch, isLegitimateRefresh]);
 
   return {
     dateRange,
     updateDateRange,
-    financialData, // ENHANCED: Now includes unpaidInvoices
-    unpaidInvoices, // CRITICAL: Now directly from repository
+    financialData,
     loading,
     error,
     getCurrentMonthRange,
@@ -234,6 +240,7 @@ export const useFinanceData = () => {
     stripeFeePercentage,
     regularIncome,
     collaboratorExpenses,
+    unpaidInvoices,
     startingBalance,
     notes,
     updateStartingBalance,
@@ -243,8 +250,8 @@ export const useFinanceData = () => {
     cacheStatus,
     apiConnectivity: { zoho: true, stripe: true }, // Simplified
     checkApiConnectivity,
-    cacheChecked: true, // Always true with useFinancialData
-    hasCachedData: usingCachedData,
-    isRefreshing: loading
+    cacheChecked,
+    hasCachedData,
+    isRefreshing
   };
 };

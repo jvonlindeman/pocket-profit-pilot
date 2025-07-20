@@ -8,23 +8,14 @@ import { queryClient } from '@/lib/react-query/queryClient';
 import { Transaction } from '@/types/financial';
 
 export function useFinancialData(startDate: Date, endDate: Date) {
-  // Fetch Zoho transactions with unpaid invoices
+  // Fetch Zoho transactions
   const {
-    data: zohoData,
+    data: zohoTransactions = [],
     isLoading: zohoLoading,
     isError: zohoError,
     error: zohoErrorDetails,
     refetch: refetchZoho
   } = useZohoTransactions(startDate, endDate);
-
-  // Extract transactions and unpaid invoices from Zoho data
-  const zohoTransactions = useMemo(() => {
-    if (!zohoData) return [];
-    return Array.isArray(zohoData.transactions) ? zohoData.transactions : [];
-  }, [zohoData]);
-  
-  const unpaidInvoices = useMemo(() => 
-    zohoData?.unpaidInvoices || [], [zohoData]);
 
   // Fetch Stripe transactions
   const {
@@ -53,16 +44,14 @@ export function useFinancialData(startDate: Date, endDate: Date) {
     [...zohoTransactions, ...stripeTransactions], 
     [zohoTransactions, stripeTransactions]);
 
-  // FIXED: Proper error handling - return actual error messages or null
-  const errorMessage = useMemo(() => {
-    if (zohoError && zohoErrorDetails) {
-      return `Error en Zoho: ${zohoErrorDetails.message || 'Error desconocido'}`;
-    }
-    if (stripeError && stripeErrorDetails) {
-      return `Error en Stripe: ${stripeErrorDetails.message || 'Error desconocido'}`;
-    }
-    return null;
-  }, [zohoError, zohoErrorDetails, stripeError, stripeErrorDetails]);
+  // Get unpaid invoices from Zoho repository through queryClient
+  const unpaidInvoices = useMemo(() => {
+    // This is a workaround since we are still transitioning to React Query
+    // and don't have a dedicated query for unpaid invoices yet
+    return queryClient.getQueryData<any>(
+      ["zoho-unpaid-invoices"]
+    ) || [];
+  }, [zohoTransactions.length]);
 
   // Force refresh function
   const refreshData = async (forceRefresh = false) => {
@@ -98,26 +87,14 @@ export function useFinancialData(startDate: Date, endDate: Date) {
     );
   }, [cacheStatus]);
 
-  console.log('🏠 useFinancialData: UPDATED FINAL RESULT with direct unpaid invoices:', {
-    transactionCount: allTransactions.length,
-    zohoTransactionsCount: zohoTransactions.length,
-    stripeTransactionsCount: stripeTransactions.length,
-    unpaidInvoicesCount: unpaidInvoices.length,
-    unpaidInvoicesTotal: unpaidInvoices.reduce((sum, inv) => sum + (inv.balance || 0), 0),
-    usingCachedData,
-    errorMessage,
-    dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
-    dataSource: 'direct_from_zoho_repository'
-  });
-
   return {
     transactions: allTransactions,
     zohoTransactions,
     stripeTransactions,
     stripeData,
-    unpaidInvoices, // CRITICAL: Direct from repository, not from queryClient
+    unpaidInvoices,
     loading: zohoLoading || stripeLoading,
-    error: errorMessage, // FIXED: Return proper error message or null
+    error: zohoError || stripeError,
     errorDetails: zohoError ? zohoErrorDetails : stripeErrorDetails,
     cacheStatus,
     cacheStatusLoading,
