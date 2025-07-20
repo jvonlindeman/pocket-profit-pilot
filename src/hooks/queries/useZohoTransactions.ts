@@ -13,7 +13,7 @@ export const zohoTransactionsKeys = {
 
 interface UseZohoTransactionsOptions {
   enabled?: boolean;
-  onSuccess?: (data: Transaction[]) => void;
+  onSuccess?: (data: { transactions: Transaction[], unpaidInvoices: any[] }) => void;
   onError?: (error: unknown) => void;
 }
 
@@ -43,6 +43,9 @@ export function useZohoTransactions(
       
       const transactions = await zohoRepository.getTransactions(startDate, endDate);
       
+      // CRITICAL: Also get unpaid invoices from the repository
+      const unpaidInvoices = zohoRepository.getUnpaidInvoices();
+      
       // Enhanced validation: filter transactions that are outside the requested date range
       const filteredTransactions = transactions.filter(transaction => {
         const isInRange = isTransactionInDateRange(transaction, startDate, endDate);
@@ -68,9 +71,13 @@ export function useZohoTransactions(
         });
       }
       
-      console.log(`✅ useZohoTransactions: Returning ${filteredTransactions.length} validated transactions for range ${formatDateYYYYMMDD(startDate)} to ${formatDateYYYYMMDD(endDate)}`);
+      console.log(`✅ useZohoTransactions: Returning ${filteredTransactions.length} validated transactions and ${unpaidInvoices.length} unpaid invoices for range ${formatDateYYYYMMDD(startDate)} to ${formatDateYYYYMMDD(endDate)}`);
       
-      return filteredTransactions;
+      // CRITICAL: Return both transactions and unpaid invoices
+      return {
+        transactions: filteredTransactions,
+        unpaidInvoices: unpaidInvoices
+      };
     },
     enabled: options.enabled !== false,
     meta: {
