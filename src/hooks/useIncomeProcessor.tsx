@@ -22,7 +22,7 @@ export const useIncomeProcessor = () => {
       stripeDataPresent: !!stripeData,
       stripeDataType: typeof stripeData,
       stripeDataKeys: stripeData ? Object.keys(stripeData) : 'none',
-      stripeDataStructure: stripeData ? {
+      stripeDataStructure: stripeData && typeof stripeData === 'object' && stripeData !== null ? {
         hasGross: 'gross' in stripeData,
         hasFees: 'fees' in stripeData,
         hasNet: 'net' in stripeData,
