@@ -18,8 +18,10 @@ export function useFinancialData(startDate: Date, endDate: Date) {
   } = useZohoTransactions(startDate, endDate);
 
   // Extract transactions and unpaid invoices from Zoho data
-  const zohoTransactions = useMemo(() => 
-    zohoData?.transactions || [], [zohoData]);
+  const zohoTransactions = useMemo(() => {
+    if (!zohoData) return [];
+    return Array.isArray(zohoData.transactions) ? zohoData.transactions : [];
+  }, [zohoData]);
   
   const unpaidInvoices = useMemo(() => 
     zohoData?.unpaidInvoices || [], [zohoData]);
