@@ -100,12 +100,21 @@ const Index = () => {
       financialData={financialData}
       unpaidInvoices={unpaidInvoices || []} // CRITICAL: Pass unpaid invoices as direct prop
       loading={loading}
-      error={error}
+      error={error?.toString() || ''}
       dataInitialized={dataInitialized}
       hasCachedData={hasCachedData}
       usingCachedData={usingCachedData}
       isRefreshing={isRefreshing}
-      cacheStatus={cacheStatus}
+      cacheStatus={{
+        zoho: { 
+          hit: cacheStatus?.zoho?.cached || false, 
+          partial: cacheStatus?.zoho?.partial || false 
+        },
+        stripe: { 
+          hit: cacheStatus?.stripe?.cached || false, 
+          partial: cacheStatus?.stripe?.partial || false 
+        }
+      }}
       stripeIncome={stripeIncome}
       stripeFees={stripeFees}
       stripeTransactionFees={stripeTransactionFees}
