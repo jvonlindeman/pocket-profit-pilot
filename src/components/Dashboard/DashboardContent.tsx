@@ -22,6 +22,7 @@ interface DashboardContentProps {
   // Core data
   periodTitle: string;
   financialData: any;
+  unpaidInvoices: any[]; // CRITICAL: Now receiving unpaid invoices as direct prop
   loading: boolean;
   error: string | null;
   dataInitialized: boolean;
@@ -68,6 +69,7 @@ interface DashboardContentProps {
 const DashboardContent: React.FC<DashboardContentProps> = ({
   periodTitle,
   financialData,
+  unpaidInvoices, // CRITICAL: Now receiving as direct prop instead of extracting from financialData
   loading,
   error,
   dataInitialized,
@@ -102,19 +104,17 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   // Calculate adjustedZohoIncome using the same formula as the salary calculator
   const adjustedZohoIncome = startingBalance + regularIncome - totalZohoExpenses;
 
-  // Extract unpaid invoices from financial data
-  const unpaidInvoices = financialData?.unpaidInvoices || [];
-  
-  // Debug logging to verify data flow
-  console.log('📋 DashboardContent: Extracting unpaid invoices for ReceivablesManager', {
-    financialDataKeys: Object.keys(financialData || {}),
-    unpaidInvoicesCount: unpaidInvoices.length,
-    unpaidInvoicesTotal: unpaidInvoices.reduce((sum: number, inv: any) => sum + (inv.balance || 0), 0),
-    sampleInvoices: unpaidInvoices.slice(0, 3).map((inv: any) => ({
+  // CRITICAL: Use unpaid invoices directly from props instead of extracting from financialData
+  console.log('📋 DashboardContent: FIXED - Using unpaid invoices from direct props', {
+    unpaidInvoicesCount: unpaidInvoices?.length || 0,
+    unpaidInvoicesTotal: unpaidInvoices?.reduce((sum: number, inv: any) => sum + (inv.balance || 0), 0) || 0,
+    sampleInvoices: unpaidInvoices?.slice(0, 3).map((inv: any) => ({
       customer: inv.customer_name,
       company: inv.company_name,
-      balance: inv.balance
-    }))
+      balance: inv.balance,
+      invoice_id: inv.invoice_id
+    })) || [],
+    dataSource: 'direct_props_from_corrected_hook'
   });
 
   return (
@@ -213,10 +213,10 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
             <Separator />
 
             {/* === RECEIVABLES MANAGEMENT SECTION START === */}
-            {/* This appears between Financial Summary and Financial History */}
+            {/* CRITICAL: Pass unpaid invoices directly from props */}
             <ReceivablesManager 
               key={`receivables-${calculatorKey}`}
-              unpaidInvoices={unpaidInvoices}
+              unpaidInvoices={unpaidInvoices || []} // FIXED: Use direct prop with fallback
               stripeNet={stripeNet}
               adjustedZohoIncome={adjustedZohoIncome}
             />
