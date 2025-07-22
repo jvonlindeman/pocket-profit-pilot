@@ -1,6 +1,5 @@
-
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { ReceivablesSelection } from '@/types/financial';
 import { formatAsCurrency } from '@/utils/financialUtils';
 
@@ -52,63 +51,68 @@ export const copyInvoicesToClipboard = async (invoices: ExportableInvoice[]): Pr
  * Export selected invoices to PDF
  */
 export const exportInvoicesToPDF = (invoices: ExportableInvoice[]): void => {
-  const doc = new jsPDF();
-  const totalAmount = invoices.reduce((sum, invoice) => sum + invoice.amount, 0);
-  const currentDate = new Date().toLocaleDateString('es-PA', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+  try {
+    const doc = new jsPDF();
+    const totalAmount = invoices.reduce((sum, invoice) => sum + invoice.amount, 0);
+    const currentDate = new Date().toLocaleDateString('es-PA', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
 
-  // Header
-  doc.setFontSize(20);
-  doc.setTextColor(40, 40, 40);
-  doc.text('FACTURAS SELECCIONADAS', 20, 25);
-  doc.text('ZOHO BOOKS', 20, 35);
+    // Header
+    doc.setFontSize(20);
+    doc.setTextColor(40, 40, 40);
+    doc.text('FACTURAS SELECCIONADAS', 20, 25);
+    doc.text('ZOHO BOOKS', 20, 35);
 
-  // Date and summary
-  doc.setFontSize(12);
-  doc.setTextColor(100, 100, 100);
-  doc.text(`Fecha de Exportación: ${currentDate}`, 20, 50);
-  doc.text(`Total de Facturas: ${invoices.length}`, 20, 60);
-  doc.text(`Total Seleccionado: ${formatAsCurrency(totalAmount)}`, 20, 70);
+    // Date and summary
+    doc.setFontSize(12);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Fecha de Exportación: ${currentDate}`, 20, 50);
+    doc.text(`Total de Facturas: ${invoices.length}`, 20, 60);
+    doc.text(`Total Seleccionado: ${formatAsCurrency(totalAmount)}`, 20, 70);
 
-  // Table data
-  const tableData = invoices.map((invoice, index) => [
-    (index + 1).toString(),
-    invoice.customer_name,
-    invoice.company_name || 'N/A',
-    formatAsCurrency(invoice.amount),
-  ]);
+    // Table data
+    const tableData = invoices.map((invoice, index) => [
+      (index + 1).toString(),
+      invoice.customer_name,
+      invoice.company_name || 'N/A',
+      formatAsCurrency(invoice.amount),
+    ]);
 
-  // Add table
-  (doc as any).autoTable({
-    head: [['#', 'Cliente', 'Compañía', 'Monto']],
-    body: tableData,
-    startY: 85,
-    styles: {
-      fontSize: 10,
-      cellPadding: 5,
-    },
-    headStyles: {
-      fillColor: [66, 66, 66],
-      textColor: 255,
-      fontStyle: 'bold',
-    },
-    alternateRowStyles: {
-      fillColor: [245, 245, 245],
-    },
-    foot: [['', '', 'TOTAL:', formatAsCurrency(totalAmount)]],
-    footStyles: {
-      fillColor: [66, 66, 66],
-      textColor: 255,
-      fontStyle: 'bold',
-    },
-  });
+    // Add table using the correct autoTable syntax
+    autoTable(doc, {
+      head: [['#', 'Cliente', 'Compañía', 'Monto']],
+      body: tableData,
+      startY: 85,
+      styles: {
+        fontSize: 10,
+        cellPadding: 5,
+      },
+      headStyles: {
+        fillColor: [66, 66, 66],
+        textColor: 255,
+        fontStyle: 'bold',
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 245],
+      },
+      foot: [['', '', 'TOTAL:', formatAsCurrency(totalAmount)]],
+      footStyles: {
+        fillColor: [66, 66, 66],
+        textColor: 255,
+        fontStyle: 'bold',
+      },
+    });
 
-  // Save the PDF
-  const fileName = `facturas_zoho_${new Date().toISOString().split('T')[0]}.pdf`;
-  doc.save(fileName);
+    // Save the PDF
+    const fileName = `facturas_zoho_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    throw new Error('No se pudo generar el PDF');
+  }
 };
 
 /**
