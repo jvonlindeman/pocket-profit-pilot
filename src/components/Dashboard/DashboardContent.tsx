@@ -1,248 +1,162 @@
-import React from 'react';
-import PeriodHeader from './PeriodHeader';
-import RefinedFinancialSummary from './FinancialCards/RefinedFinancialSummary';
-import TransactionTable from './TransactionTable';
-import TransactionFilters from './TransactionFilters';
-import LoadingSpinner from './LoadingSpinner';
-import ErrorDisplay from './ErrorDisplay';
-import InitialBalanceDialog from './InitialBalanceDialog';
-import NoDataLoadedState from './NoDataLoadedState';
-import { Separator } from '@/components/ui/separator';
-import CacheEfficiencyDashboard from './CacheEfficiencyDashboard';
-import TransactionCategorySummary from './TransactionCategorySummary';
-import { FinanceProvider } from '@/contexts/FinanceContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText } from 'lucide-react';
-import SalaryCalculator from './SalaryCalculator';
+import React, { useState, useMemo } from 'react';
+import { Button } from "@/components/ui/button";
+import { RefreshCw, Settings } from 'lucide-react';
+import { toast } from 'sonner';
+import { LoadingSpinner } from './LoadingSpinner';
+import { ErrorDisplay } from './ErrorDisplay';
+import { NoDataLoadedState } from './NoDataLoadedState';
+import { FinanceSummary } from './FinanceSummary';
+import { TransactionTable } from './TransactionTable';
+import { FinancialCards } from './FinancialCards';
+import { SalaryCalculator } from './SalaryCalculator';
 import { ReceivablesManager } from './Receivables/ReceivablesManager';
+import { InitialBalanceDialog } from './InitialBalanceDialog';
+import { MonthlyBalanceEditor } from './MonthlyBalanceEditor';
+import { useFinanceData } from '@/hooks/useFinanceData';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface DashboardContentProps {
-  // Core data
-  periodTitle: string;
-  financialData: any;
-  loading: boolean;
-  error: string | null;
-  dataInitialized: boolean;
-  hasCachedData: boolean;
-  usingCachedData: boolean;
-  isRefreshing: boolean;
-  cacheStatus: {
-    zoho: { hit: boolean; partial: boolean };
-    stripe: { hit: boolean; partial: boolean };
-  };
-
-  // Financial data
-  stripeIncome: number;
-  stripeFees: number;
-  stripeTransactionFees: number;
-  stripePayoutFees: number;
-  stripeAdditionalFees: number;
-  stripeNet: number;
-  stripeFeePercentage: number;
-  regularIncome: number;
-  collaboratorExpenses: any[];
-  unpaidInvoices: any[];
-  startingBalance: number;
-  totalZohoExpenses: number;
-
-  // Calculator values
-  calculatorKey: string;
-  opexAmount: number;
-  itbmAmount: number;
-  profitPercentage: number;
-  taxReservePercentage: number;
-  includeZohoFiftyPercent: boolean;
-
-  // Monthly balance data
-  monthlyBalance: any;
-
-  // Functions
-  refreshData: (forceRefresh?: boolean) => void;
-  showBalanceDialog: boolean;
-  setShowBalanceDialog: (show: boolean) => void;
-  currentDate: Date;
-  onBalanceSaved: (balance: number, opexAmount?: number, itbmAmount?: number, profitPercentage?: number, taxReservePercentage?: number, includeZohoFiftyPercent?: boolean, notes?: string) => Promise<boolean>;
+  onRefresh?: () => void;
 }
 
-const DashboardContent: React.FC<DashboardContentProps> = ({
-  periodTitle,
-  financialData,
-  loading,
-  error,
-  dataInitialized,
-  hasCachedData,
-  usingCachedData,
-  isRefreshing,
-  cacheStatus,
-  stripeIncome,
-  stripeFees,
-  stripeTransactionFees,
-  stripePayoutFees,
-  stripeAdditionalFees,
-  stripeNet,
-  stripeFeePercentage,
-  regularIncome,
-  collaboratorExpenses,
-  unpaidInvoices,
-  startingBalance,
-  totalZohoExpenses,
-  calculatorKey,
-  opexAmount,
-  itbmAmount,
-  profitPercentage,
-  taxReservePercentage,
-  includeZohoFiftyPercent,
-  monthlyBalance,
-  refreshData,
-  showBalanceDialog,
-  setShowBalanceDialog,
-  currentDate,
-  onBalanceSaved
-}) => {
-  // Calculate adjustedZohoIncome using the same formula as the salary calculator
-  const adjustedZohoIncome = startingBalance + regularIncome - totalZohoExpenses;
+export const DashboardContent: React.FC<DashboardContentProps> = ({ onRefresh }) => {
+  const [showInitialBalanceDialog, setShowInitialBalanceDialog] = useState(false);
+  const [showMonthlyBalanceDialog, setShowMonthlyBalanceDialog] = useState(false);
+  
+  const {
+    financialData,
+    loading,
+    error,
+    refreshData,
+    dataInitialized,
+    stripeIncome,
+    stripeFees,
+    stripeNet,
+    regularIncome,
+    collaboratorExpenses,
+    unpaidInvoices,
+    startingBalance,
+    notes,
+    setNotes,
+    usingCachedData,
+    cacheStatus,
+    isRefreshing
+  } = useFinanceData();
+
+  // OPEX and ITBM configuration with defaults
+  const defaultOpexAmount = 2650;
+  const defaultItbmAmount = 1070; 
+  const defaultProfitPercentage = 25;
+  const defaultTaxReservePercentage = 20;
+  const defaultIncludeZohoFiftyPercent = true;
+
+  const handleRefresh = async () => {
+    try {
+      console.log("🔄 Dashboard: Manual refresh initiated by user");
+      const success = await refreshData(true);
+      
+      if (success) {
+        toast.success("Datos actualizados exitosamente");
+        onRefresh?.();
+      } else {
+        toast.warning("No se pudo actualizar - intenta de nuevo");
+      }
+    } catch (error) {
+      console.error("Dashboard refresh error:", error);
+      toast.error("Error al actualizar los datos");
+    }
+  };
+
+  const handleConfigureBalances = () => {
+    setShowMonthlyBalanceDialog(true);
+  };
+
+  // Calculate total Zoho expenses for the calculator
+  const totalZohoExpenses = useMemo(() => {
+    return financialData.totalExpenses - collaboratorExpenses;
+  }, [financialData.totalExpenses, collaboratorExpenses]);
+
+  if (error && !dataInitialized) {
+    return <ErrorDisplay error={error} onRetry={handleRefresh} />;
+  }
+
+  if (!dataInitialized) {
+    return <NoDataLoadedState onLoadData={handleRefresh} />;
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Initial Balance Dialog */}
-      <InitialBalanceDialog 
-        open={showBalanceDialog} 
-        onOpenChange={setShowBalanceDialog}
-        currentDate={currentDate}
-        onBalanceSaved={onBalanceSaved}
-        currentBalance={monthlyBalance}
+    <div className="space-y-6 p-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h1 className="text-2xl font-bold text-gray-900">Dashboard Financiero</h1>
+        <div className="flex gap-2">
+          <Button 
+            onClick={handleRefresh}
+            disabled={loading || isRefreshing}
+            variant="outline"
+            size="sm"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${(loading || isRefreshing) ? 'animate-spin' : ''}`} />
+            {(loading || isRefreshing) ? 'Actualizando...' : 'Actualizar'}
+          </Button>
+          <Button 
+            onClick={handleConfigureBalances}
+            variant="outline"
+            size="sm"
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Configurar
+          </Button>
+        </div>
+      </div>
+
+      {loading && <LoadingSpinner />}
+
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="overview">Resumen</TabsTrigger>
+          <TabsTrigger value="transactions">Transacciones</TabsTrigger>
+          <TabsTrigger value="salary">Salario</TabsTrigger>
+          <TabsTrigger value="receivables">Por Cobrar</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
+          <FinancialCards />
+          <FinanceSummary />
+        </TabsContent>
+
+        <TabsContent value="transactions" className="space-y-6">
+          <TransactionTable />
+        </TabsContent>
+
+        <TabsContent value="salary" className="space-y-6">
+          <SalaryCalculator
+            zohoIncome={regularIncome}
+            stripeIncome={stripeNet} // FIXED: Now using stripeNet instead of stripeIncome (gross)
+            opexAmount={defaultOpexAmount}
+            itbmAmount={defaultItbmAmount}
+            profitPercentage={defaultProfitPercentage}
+            taxReservePercentage={defaultTaxReservePercentage}
+            includeZohoFiftyPercent={defaultIncludeZohoFiftyPercent}
+            startingBalance={startingBalance}
+            totalZohoExpenses={totalZohoExpenses}
+            onConfigureClick={handleConfigureBalances}
+          />
+        </TabsContent>
+
+        <TabsContent value="receivables" className="space-y-6">
+          <ReceivablesManager />
+        </TabsContent>
+      </Tabs>
+
+      <InitialBalanceDialog
+        open={showInitialBalanceDialog}
+        onOpenChange={setShowInitialBalanceDialog}
       />
 
-      {/* Main content area */}
-      <div className="space-y-6">
-        <PeriodHeader 
-          periodTitle={periodTitle}
-          onRefresh={refreshData}
-          hasCachedData={hasCachedData}
-          usingCachedData={usingCachedData}
-          isRefreshing={isRefreshing}
-          cacheStatus={cacheStatus}
-        />
-
-        {error && (
-          <ErrorDisplay 
-            error={error} 
-            onRetry={() => refreshData(true)} 
-          />
-        )}
-
-        {loading && <LoadingSpinner />}
-
-        {!dataInitialized && !loading && !error && (
-          <NoDataLoadedState
-            onLoadCache={() => refreshData(false)}
-            onLoadFresh={() => refreshData(true)}
-            hasCachedData={hasCachedData}
-            isLoading={loading}
-          />
-        )}
-
-        {dataInitialized && (
-          <>
-            {/* Salary Calculator - Prominent position at top */}
-            <SalaryCalculator
-              key={calculatorKey}
-              zohoIncome={regularIncome}
-              stripeIncome={stripeIncome}
-              opexAmount={opexAmount}
-              itbmAmount={itbmAmount}
-              profitPercentage={profitPercentage}
-              taxReservePercentage={taxReservePercentage}
-              includeZohoFiftyPercent={includeZohoFiftyPercent}
-              startingBalance={startingBalance}
-              totalZohoExpenses={totalZohoExpenses}
-              onConfigureClick={() => setShowBalanceDialog(true)}
-            />
-
-            <Separator />
-
-            {/* Log financial data before providing to context */}
-            {(() => {
-              console.log("💰 DashboardContent: Providing financial data to FinanceProvider:", {
-                summaryTotalIncome: financialData.summary?.totalIncome,
-                summaryTotalExpense: financialData.summary?.totalExpense,
-                summaryProfit: financialData.summary?.profit,
-                transactionCount: financialData.transactions?.length,
-                stripeIncome,
-                stripeFees,
-                regularIncome,
-                collaboratorExpensesCount: Array.isArray(collaboratorExpenses) ? collaboratorExpenses.length : 0,
-                unpaidInvoicesCount: unpaidInvoices?.length,
-                adjustedZohoIncome
-              });
-              return null;
-            })()}
-            <FinanceProvider
-              summary={financialData.summary}
-              transactions={financialData.transactions}
-              dateRange={{ startDate: null, endDate: null }}
-              stripeIncome={stripeIncome}
-              stripeFees={stripeFees}
-              stripeTransactionFees={stripeTransactionFees}
-              stripePayoutFees={stripePayoutFees}
-              stripeAdditionalFees={stripeAdditionalFees}
-              stripeNet={stripeNet}
-              stripeFeePercentage={stripeFeePercentage}
-              regularIncome={regularIncome}
-              collaboratorExpenses={Array.isArray(collaboratorExpenses) ? collaboratorExpenses : []}
-              unpaidInvoices={unpaidInvoices}
-            >
-              <RefinedFinancialSummary />
-            </FinanceProvider>
-
-            <Separator />
-
-            {/* Receivables Management - Now with stripeNet and adjustedZohoIncome props */}
-            <ReceivablesManager 
-              unpaidInvoices={unpaidInvoices || []}
-              stripeNet={stripeNet}
-              adjustedZohoIncome={adjustedZohoIncome}
-            />
-
-            <Separator />
-
-            <TransactionCategorySummary transactions={financialData.transactions} />
-
-            <Separator />
-
-            <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-              <div className="xl:col-span-3">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
-                      Transacciones
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <TransactionFilters 
-                      transactions={financialData.transactions}
-                      onFilterChange={() => {}}
-                    />
-                    <TransactionTable 
-                      transactions={financialData.transactions}
-                      isLoading={loading}
-                    />
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="xl:col-span-1">
-                <CacheEfficiencyDashboard 
-                  dateRange={{ startDate: new Date(), endDate: new Date() }}
-                />
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+      <MonthlyBalanceEditor
+        open={showMonthlyBalanceDialog}
+        onOpenChange={setShowMonthlyBalanceDialog}
+      />
     </div>
   );
 };
-
-export default DashboardContent;

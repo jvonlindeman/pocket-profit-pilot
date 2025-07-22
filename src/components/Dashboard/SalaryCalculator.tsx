@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calculator, DollarSign, ArrowDown, ArrowUp, Percent, Info, ToggleLeft, ToggleRight, Settings } from 'lucide-react';
@@ -6,7 +7,7 @@ import { Button } from "@/components/ui/button";
 
 interface SalaryCalculatorProps {
   zohoIncome: number;
-  stripeIncome: number;
+  stripeIncome: number; // NOTE: This now receives NET Stripe income (after Stripe fees deducted)
   opexAmount: number;
   itbmAmount: number;
   profitPercentage: number;
@@ -19,7 +20,7 @@ interface SalaryCalculatorProps {
 
 const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({ 
   zohoIncome,
-  stripeIncome,
+  stripeIncome, // This is now NET Stripe income (after Stripe processing fees)
   opexAmount,
   itbmAmount,
   profitPercentage,
@@ -31,9 +32,9 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
 }) => {
   // Enhanced debugging to track value changes and detect updates
   useEffect(() => {
-    console.log("💰 SalaryCalculator: Props updated - IMMEDIATE CALCULATION:", {
+    console.log("💰 SalaryCalculator: Props updated - CALCULATION WITH NET STRIPE INCOME:", {
       zohoIncome,
-      stripeIncome,
+      stripeIncome: stripeIncome + " (NET after Stripe fees)", // Updated documentation
       opexAmount,
       itbmAmount,
       profitPercentage,
@@ -42,7 +43,7 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
       startingBalance,
       totalZohoExpenses,
       timestamp: new Date().toISOString(),
-      note: "Calculator re-rendered with new values"
+      note: "Calculator now uses NET Stripe income (after processing fees)"
     });
   }, [zohoIncome, stripeIncome, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, includeZohoFiftyPercent, startingBalance, totalZohoExpenses]);
 
@@ -53,31 +54,33 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
   const taxReserveAmount = (adjustedZohoIncome * taxReservePercentage) / 100;
   const totalZohoDeductions = opexAmount + itbmAmount + profitFirstAmount + taxReserveAmount;
   const remainingZohoIncome = adjustedZohoIncome - totalZohoDeductions;
-  const halfStripeIncome = stripeIncome / 2;
+  const halfStripeIncome = stripeIncome / 2; // Now using NET Stripe income
   const halfRemainingZoho = remainingZohoIncome / 2;
   
   // Calculate salary based on toggle
   const salary = includeZohoFiftyPercent 
     ? halfStripeIncome + halfRemainingZoho  // Include both
-    : halfStripeIncome;                     // Only Stripe
+    : halfStripeIncome;                     // Only Stripe (NET)
   
-  // Debug calculation results with CORRECTED formula
-  console.log("SalaryCalculator: CORRECTED Calculation results:", {
+  // Debug calculation results with CORRECTED formula using NET Stripe income
+  console.log("SalaryCalculator: CORRECTED Calculation with NET Stripe income:", {
     startingBalance,
     zohoIncome,
     totalZohoExpenses,
     adjustedZohoIncome_CORRECTED: adjustedZohoIncome,
     explanation: "startingBalance + zohoIncome - totalZohoExpenses = real bank balance",
+    stripeIncomeNET: stripeIncome + " (after Stripe processing fees)",
     profitFirstAmount,
     taxReserveAmount,
     totalZohoDeductions,
     remainingZohoIncome,
-    halfStripeIncome,
+    halfStripeIncome: halfStripeIncome + " (50% of NET Stripe)",
     halfRemainingZoho,
     includeZohoFiftyPercent,
     salary,
     profitPercentageUsed: profitPercentage,
-    taxReservePercentageUsed: taxReservePercentage
+    taxReservePercentageUsed: taxReservePercentage,
+    note: "Now using NET Stripe income for accurate salary calculation"
   });
   
   // Formato para valores monetarios
@@ -146,8 +149,8 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                   </div>
                   <p className="text-xs text-white/80 mt-1">
                     {includeZohoFiftyPercent 
-                      ? "50% Stripe + 50% Zoho Restante" 
-                      : "Solo 50% Stripe"}
+                      ? "50% Stripe (NET) + 50% Zoho Restante" 
+                      : "Solo 50% Stripe (NET)"}
                   </p>
                 </div>
               </div>
@@ -161,12 +164,12 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                 </h4>
                 
                 <div className="grid grid-cols-1 gap-3">
-                  {/* Ingresos de Stripe */}
+                  {/* Ingresos de Stripe - Updated tooltip to clarify NET amount */}
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="bg-white rounded-md p-3 shadow-sm border border-blue-100 flex justify-between items-center">
                         <div>
-                          <p className="text-xs text-gray-500">Stripe (Total)</p>
+                          <p className="text-xs text-gray-500">Stripe (NET después de comisiones)</p>
                           <p className="font-medium text-green-600">{formatCurrency(stripeIncome)}</p>
                         </div>
                         <div className="bg-green-100 p-2 rounded-full">
@@ -175,7 +178,7 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p className="text-xs">Ingresos totales de Stripe</p>
+                      <p className="text-xs">Ingresos netos de Stripe (después de deducir comisiones de procesamiento)</p>
                     </TooltipContent>
                   </Tooltip>
                   
@@ -363,13 +366,13 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                   </TooltipContent>
                 </Tooltip>
 
-                {/* 50% de Stripe */}
+                {/* 50% de Stripe - Updated to clarify NET amount */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className="bg-white p-3 rounded-md shadow-sm border border-blue-100">
                       <div className="flex justify-between items-center">
                         <div>
-                          <p className="text-xs text-gray-500">50% de Stripe</p>
+                          <p className="text-xs text-gray-500">50% de Stripe (NET)</p>
                           <p className="font-medium text-blue-600">{formatCurrency(halfStripeIncome)}</p>
                         </div>
                         <div className="bg-blue-100 p-2 rounded-full">
@@ -379,7 +382,7 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="text-xs">Mitad de los ingresos de Stripe</p>
+                    <p className="text-xs">Mitad de los ingresos netos de Stripe (después de comisiones de procesamiento)</p>
                   </TooltipContent>
                 </Tooltip>
 
@@ -438,8 +441,8 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                     <p className="text-xs text-white/80">Fórmula del cálculo:</p>
                     <p className="font-medium">
                       {includeZohoFiftyPercent 
-                        ? "50% de Stripe + 50% de Zoho Restante = Salario"
-                        : "50% de Stripe = Salario (Zoho excluido)"}
+                        ? "50% de Stripe (NET) + 50% de Zoho Restante = Salario"
+                        : "50% de Stripe (NET) = Salario (Zoho excluido)"}
                     </p>
                   </div>
                   <div className="text-xl font-bold">
