@@ -148,7 +148,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
             <SalaryCalculator
               key={calculatorKey}
               zohoIncome={regularIncome}
-              stripeIncome={stripeIncome}
+              stripeIncome={stripeNet}
               opexAmount={opexAmount}
               itbmAmount={itbmAmount}
               profitPercentage={profitPercentage}
