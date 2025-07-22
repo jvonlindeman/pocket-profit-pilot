@@ -119,7 +119,39 @@ const DashboardPageWrapper: React.FC = () => {
         {/* Dashboard content - only shows when data is explicitly loaded */}
         {(dashboardState.dataInitialized || !dashboardState.dataInitialized) && !dashboardState.error && (
           <DashboardContent 
-            onRefresh={actions.refreshData}
+            periodTitle={dashboardState.periodTitle}
+            financialData={dashboardState.financialData}
+            loading={dashboardState.loading}
+            error={dashboardState.error}
+            dataInitialized={dashboardState.dataInitialized}
+            hasCachedData={dashboardState.hasCachedData}
+            usingCachedData={dashboardState.usingCachedData}
+            isRefreshing={dashboardState.isRefreshing || dashboardState.globalRefreshInProgress}
+            cacheStatus={dashboardState.cacheStatus}
+            stripeIncome={dashboardState.stripeIncome}
+            stripeFees={dashboardState.stripeFees}
+            stripeTransactionFees={dashboardState.stripeTransactionFees}
+            stripePayoutFees={dashboardState.stripePayoutFees}
+            stripeAdditionalFees={dashboardState.stripeAdditionalFees}
+            stripeNet={dashboardState.stripeNet}
+            stripeFeePercentage={dashboardState.stripeFeePercentage}
+            regularIncome={dashboardState.regularIncome}
+            collaboratorExpenses={dashboardState.collaboratorExpenses}
+            unpaidInvoices={dashboardState.unpaidInvoices}
+            startingBalance={dashboardState.startingBalance}
+            totalZohoExpenses={dashboardState.totalZohoExpenses}
+            calculatorKey={dashboardState.calculatorKey}
+            opexAmount={dashboardState.opexAmount}
+            itbmAmount={dashboardState.itbmAmount}
+            profitPercentage={dashboardState.profitPercentage}
+            taxReservePercentage={dashboardState.taxReservePercentage}
+            includeZohoFiftyPercent={dashboardState.includeZohoFiftyPercent}
+            monthlyBalance={dashboardState.monthlyBalance}
+            refreshData={dashboardState.refreshData}
+            showBalanceDialog={dashboardState.showBalanceDialog}
+            setShowBalanceDialog={dashboardState.setShowBalanceDialog}
+            currentDate={dashboardState.dateRange.endDate || new Date()}
+            onBalanceSaved={handleBalanceSaved}
           />
         )}
 
