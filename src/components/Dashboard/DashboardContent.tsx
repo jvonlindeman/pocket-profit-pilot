@@ -2,16 +2,16 @@ import React, { useState, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Settings } from 'lucide-react';
 import { toast } from 'sonner';
-import { LoadingSpinner } from './LoadingSpinner';
-import { ErrorDisplay } from './ErrorDisplay';
-import { NoDataLoadedState } from './NoDataLoadedState';
-import { FinanceSummary } from './FinanceSummary';
-import { TransactionTable } from './TransactionTable';
-import { FinancialCards } from './FinancialCards';
-import { SalaryCalculator } from './SalaryCalculator';
+import LoadingSpinner from './LoadingSpinner';
+import ErrorDisplay from './ErrorDisplay';
+import NoDataLoadedState from './NoDataLoadedState';
+import FinanceSummary from './FinanceSummary';
+import TransactionTable from './TransactionTable';
+import FinancialCards from './FinancialCards';
+import SalaryCalculator from './SalaryCalculator';
 import { ReceivablesManager } from './Receivables/ReceivablesManager';
-import { InitialBalanceDialog } from './InitialBalanceDialog';
-import { MonthlyBalanceEditor } from './MonthlyBalanceEditor';
+import InitialBalanceDialog from './InitialBalanceDialog';
+import MonthlyBalanceEditor from './MonthlyBalanceEditor';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -19,7 +19,7 @@ interface DashboardContentProps {
   onRefresh?: () => void;
 }
 
-export const DashboardContent: React.FC<DashboardContentProps> = ({ onRefresh }) => {
+const DashboardContent: React.FC<DashboardContentProps> = ({ onRefresh }) => {
   const [showInitialBalanceDialog, setShowInitialBalanceDialog] = useState(false);
   const [showMonthlyBalanceDialog, setShowMonthlyBalanceDialog] = useState(false);
   
@@ -73,15 +73,24 @@ export const DashboardContent: React.FC<DashboardContentProps> = ({ onRefresh })
 
   // Calculate total Zoho expenses for the calculator
   const totalZohoExpenses = useMemo(() => {
-    return financialData.totalExpenses - collaboratorExpenses;
-  }, [financialData.totalExpenses, collaboratorExpenses]);
+    const totalExpense = financialData.summary.totalExpense || 0;
+    const collabExpense = typeof collaboratorExpenses === 'number' ? collaboratorExpenses : 0;
+    return totalExpense - collabExpense;
+  }, [financialData.summary.totalExpense, collaboratorExpenses]);
 
   if (error && !dataInitialized) {
     return <ErrorDisplay error={error} onRetry={handleRefresh} />;
   }
 
   if (!dataInitialized) {
-    return <NoDataLoadedState onLoadData={handleRefresh} />;
+    return (
+      <NoDataLoadedState 
+        onLoadCache={handleRefresh}
+        onLoadFresh={handleRefresh}
+        hasCachedData={!!usingCachedData}
+        isLoading={loading}
+      />
+    );
   }
 
   return (
@@ -121,11 +130,23 @@ export const DashboardContent: React.FC<DashboardContentProps> = ({ onRefresh })
 
         <TabsContent value="overview" className="space-y-6">
           <FinancialCards />
-          <FinanceSummary />
+          <FinanceSummary 
+            summary={financialData.summary}
+            expenseCategories={financialData.expenseByCategory}
+            stripeIncome={stripeNet}
+            stripeFees={stripeFees}
+            regularIncome={regularIncome}
+            dateRange={{ startDate: new Date(), endDate: new Date() }}
+            transactions={financialData.transactions}
+            unpaidInvoices={unpaidInvoices}
+          />
         </TabsContent>
 
         <TabsContent value="transactions" className="space-y-6">
-          <TransactionTable />
+          <TransactionTable 
+            transactions={financialData.transactions}
+            isLoading={loading}
+          />
         </TabsContent>
 
         <TabsContent value="salary" className="space-y-6">
@@ -144,19 +165,26 @@ export const DashboardContent: React.FC<DashboardContentProps> = ({ onRefresh })
         </TabsContent>
 
         <TabsContent value="receivables" className="space-y-6">
-          <ReceivablesManager />
+          <ReceivablesManager 
+            stripeNet={stripeNet}
+            adjustedZohoIncome={regularIncome}
+          />
         </TabsContent>
       </Tabs>
 
       <InitialBalanceDialog
         open={showInitialBalanceDialog}
         onOpenChange={setShowInitialBalanceDialog}
+        currentDate={new Date()}
+        onBalanceSaved={async () => true}
       />
 
       <MonthlyBalanceEditor
-        open={showMonthlyBalanceDialog}
-        onOpenChange={setShowMonthlyBalanceDialog}
+        currentDate={new Date()}
+        onBalanceChange={async () => true}
       />
     </div>
   );
 };
+
+export default DashboardContent;
