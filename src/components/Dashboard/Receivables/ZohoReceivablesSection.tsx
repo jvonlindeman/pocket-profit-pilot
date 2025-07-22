@@ -4,6 +4,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { CheckSquare, Square } from 'lucide-react';
 import { ReceivablesSelection } from '@/types/financial';
+import { ExportButtons } from './ExportButtons';
+import { ExportableInvoice } from '@/utils/exportUtils';
 
 interface ZohoReceivablesSectionProps {
   unpaidInvoices: Array<{
@@ -26,7 +28,7 @@ export const ZohoReceivablesSection: React.FC<ZohoReceivablesSectionProps> = ({
   selections,
   onUpdateSelection,
 }) => {
-  const { selectedInvoices, totalSelected, allSelected, someSelected } = useMemo(() => {
+  const { selectedInvoices, totalSelected, allSelected, someSelected, exportableInvoices } = useMemo(() => {
     const selectedInvoices = new Set(
       selections
         .filter(s => s.selection_type === 'zoho_invoices' && s.selected)
@@ -51,7 +53,19 @@ export const ZohoReceivablesSection: React.FC<ZohoReceivablesSectionProps> = ({
       return selectedInvoices.has(itemId);
     });
 
-    return { selectedInvoices, totalSelected, allSelected, someSelected };
+    // Create exportable invoices data
+    const exportableInvoices: ExportableInvoice[] = unpaidInvoices
+      .filter(invoice => {
+        const itemId = `${invoice.customer_name}-${invoice.balance}`;
+        return selectedInvoices.has(itemId);
+      })
+      .map(invoice => ({
+        customer_name: invoice.customer_name,
+        company_name: invoice.company_name,
+        amount: invoice.balance,
+      }));
+
+    return { selectedInvoices, totalSelected, allSelected, someSelected, exportableInvoices };
   }, [unpaidInvoices, selections]);
 
   const formatCurrency = (amount: number) => {
@@ -127,6 +141,13 @@ export const ZohoReceivablesSection: React.FC<ZohoReceivablesSectionProps> = ({
           <div className="font-semibold text-primary">{formatCurrency(totalSelected)}</div>
         </div>
       </div>
+
+      {/* Export buttons - only show when there are selected invoices */}
+      {exportableInvoices.length > 0 && (
+        <div className="flex justify-center py-2 border-b">
+          <ExportButtons selectedInvoices={exportableInvoices} />
+        </div>
+      )}
 
       <div className="grid gap-3">
         {unpaidInvoices.map((invoice, index) => {
