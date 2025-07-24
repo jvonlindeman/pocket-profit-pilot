@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StripeIncomeTab from './StripeTabs/StripeIncomeTab';
 import ZohoIncomeTab from './StripeTabs/ZohoIncomeTab';
 import CombinedFinanceTab from './StripeTabs/CombinedFinanceTab';
+import CurrentMonthExpectedIncome from './CurrentMonthExpectedIncome';
 
 const IncomeTabs: React.FC = () => {
   // Track active tab for possible performance optimizations
@@ -36,6 +37,7 @@ const IncomeTabs: React.FC = () => {
             <TabsTrigger value="stripe">Stripe</TabsTrigger>
             <TabsTrigger value="zoho">Zoho</TabsTrigger>
             <TabsTrigger value="combined">Combinado</TabsTrigger>
+            <TabsTrigger value="projection">Proyección</TabsTrigger>
           </TabsList>
         </div>
 
@@ -52,6 +54,11 @@ const IncomeTabs: React.FC = () => {
         {/* Combined Financial Overview */}
         <TabsContent value="combined" className="p-0">
           <CombinedFinanceTab />
+        </TabsContent>
+
+        {/* Current Month Expected Income */}
+        <TabsContent value="projection" className="p-0">
+          <CurrentMonthExpectedIncome />
         </TabsContent>
       </Tabs>
     </div>
