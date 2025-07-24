@@ -16,7 +16,26 @@ export const useCurrentMonthPrediction = (): CurrentMonthPrediction => {
   const { summary } = useFinance();
 
   const prediction = useMemo(() => {
-    const { selections } = receivablesData;
+    const { selections, isLoading } = receivablesData;
+    
+    // Guard clause: Don't process if data is still loading or arrays are empty
+    if (isLoading || 
+        !receivablesData.stripeUpcomingPayments?.length && 
+        !receivablesData.stripeCurrentMonthPayments?.length && 
+        !receivablesData.stripeNextMonthPayments?.length && 
+        !receivablesData.stripePendingActivations?.length &&
+        Object.keys(selections).length === 0) {
+      console.log('🧮 useCurrentMonthPrediction - Data not ready, returning defaults');
+      const alreadyReceived = summary.totalIncome;
+      return {
+        alreadyReceived,
+        pendingSelected: 0,
+        totalExpected: alreadyReceived,
+        progressPercentage: 100,
+        stripeSelected: 0,
+        zohoSelected: 0,
+      };
+    }
     
     console.log('🧮 useCurrentMonthPrediction - DETAILED ANALYSIS');
     console.log('📊 Selections count:', Object.keys(selections).length);
