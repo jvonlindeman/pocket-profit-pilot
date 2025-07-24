@@ -1,4 +1,3 @@
-
 export interface Transaction {
   id: string;
   external_id?: string; // Added external_id as optional field
@@ -157,4 +156,34 @@ export interface MonthlyBalance {
   tax_reserve_percentage: number | null; // Added for configurable tax reserve percentage
   include_zoho_fifty_percent: boolean | null; // Added for controlling 50% Zoho inclusion in salary
   business_commission_rate: number | null; // Added: Configurable business commission rate for receivables
+}
+
+// Short-term prediction types
+export interface ShortTermPrediction {
+  current_month: {
+    confirmed_income: number;
+    probable_income: number;
+    estimated_expenses: number;
+    predicted_profit: number;
+    confidence: number;
+  };
+  next_month: {
+    confirmed_income: number;
+    probable_income: number;
+    estimated_expenses: number;
+    predicted_profit: number;
+    confidence: number;
+  };
+  breakdown: {
+    stripe_confirmed: number;
+    stripe_probable: number;
+    zoho_confirmed: number;
+    collaborator_expenses: number;
+    operational_expenses: number;
+  };
+  scenarios: {
+    conservative: { profit: number; confidence: 95 };
+    realistic: { profit: number; confidence: 80 };
+    optimistic: { profit: number; confidence: 60 };
+  };
 }

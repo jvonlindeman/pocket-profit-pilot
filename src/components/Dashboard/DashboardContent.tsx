@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileText } from 'lucide-react';
 import SalaryCalculator from './SalaryCalculator';
 import { ReceivablesManager } from './Receivables/ReceivablesManager';
+import { FinancialPredictionCard } from './Prediction/FinancialPredictionCard';
 
 interface DashboardContentProps {
   // Core data
@@ -202,6 +203,15 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
               unpaidInvoices={unpaidInvoices || []}
               stripeNet={stripeNet}
               adjustedZohoIncome={adjustedZohoIncome}
+            />
+
+            <Separator />
+
+            {/* Financial Prediction - 30-60 day forecast */}
+            <FinancialPredictionCard
+              collaboratorExpenses={Array.isArray(collaboratorExpenses) ? collaboratorExpenses : []}
+              historicalMonthlyExpenses={totalZohoExpenses}
+              startingBalance={startingBalance}
             />
 
             <Separator />
