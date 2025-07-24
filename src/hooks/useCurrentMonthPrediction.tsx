@@ -18,13 +18,19 @@ export const useCurrentMonthPrediction = (): CurrentMonthPrediction => {
   const prediction = useMemo(() => {
     const { selections } = receivablesData;
     
-    console.log('useCurrentMonthPrediction - selections:', selections);
-    console.log('useCurrentMonthPrediction - receivablesData:', {
+    console.log('🧮 useCurrentMonthPrediction - DETAILED ANALYSIS');
+    console.log('📊 Selections count:', Object.keys(selections).length);
+    console.log('📊 Selected items:', Object.entries(selections).filter(([_, data]) => data.selected).length);
+    console.log('📊 Stripe data arrays:', {
       stripeUpcomingPayments: receivablesData.stripeUpcomingPayments?.length || 0,
       stripeCurrentMonthPayments: receivablesData.stripeCurrentMonthPayments?.length || 0,
       stripeNextMonthPayments: receivablesData.stripeNextMonthPayments?.length || 0,
       stripePendingActivations: receivablesData.stripePendingActivations?.length || 0
     });
+    console.log('📊 Sample Stripe IDs from each array:');
+    console.log('  - stripeUpcomingPayments:', receivablesData.stripeUpcomingPayments?.slice(0, 2).map(p => p.subscription_id));
+    console.log('  - stripeCurrentMonthPayments:', receivablesData.stripeCurrentMonthPayments?.slice(0, 2).map(p => p.subscription_id));
+    console.log('  - stripeNextMonthPayments:', receivablesData.stripeNextMonthPayments?.slice(0, 2).map(p => p.subscription_id));
     
     let stripeSelected = 0;
     let zohoSelected = 0;
