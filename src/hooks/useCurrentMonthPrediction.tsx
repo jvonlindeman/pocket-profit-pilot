@@ -35,36 +35,35 @@ export const useCurrentMonthPrediction = (): CurrentMonthPrediction => {
       
       if (selectionData.selected) {
         if (selectionData.selection_type === 'stripe_upcoming_payments') {
-          // Extract base subscription_id by removing suffixes
-          const baseSubscriptionId = itemId.replace(/_current_month|_next_month|_upcoming$/g, '');
-          console.log('Extracted base subscription_id:', baseSubscriptionId, 'from itemId:', itemId);
+          // Use the full item_id directly (no base extraction needed)
+          console.log('Looking for Stripe payment with subscription_id:', itemId);
           
-          // Search in all Stripe payment arrays using base subscription_id
+          // Search in all Stripe payment arrays using the full item_id
           const allStripePayments = [
             ...receivablesData.stripeUpcomingPayments,
             ...receivablesData.stripeCurrentMonthPayments,
             ...receivablesData.stripeNextMonthPayments
           ];
           
-          const matchingPayment = allStripePayments.find(p => p.subscription_id === baseSubscriptionId);
+          const matchingPayment = allStripePayments.find(p => p.subscription_id === itemId);
           if (matchingPayment) {
-            console.log('Found matching Stripe payment:', matchingPayment.net_amount, 'for base ID:', baseSubscriptionId);
+            console.log('Found matching Stripe payment:', matchingPayment.net_amount, 'for item_id:', itemId);
             stripeSelected += matchingPayment.net_amount;
           } else {
-            console.log('No matching Stripe payment found for base ID:', baseSubscriptionId);
+            console.log('No matching Stripe payment found for item_id:', itemId);
           }
         } else if (selectionData.selection_type === 'stripe_pending_activations') {
-          // Extract base subscription_id for activations too
-          const baseSubscriptionId = itemId.replace(/_current_month|_next_month|_upcoming$/g, '');
+          // Use the full item_id directly for activations too
+          console.log('Looking for pending activation with subscription_id:', itemId);
           
           const activation = receivablesData.stripePendingActivations.find(a => 
-            a.subscription_id === baseSubscriptionId
+            a.subscription_id === itemId
           );
           if (activation) {
-            console.log('Found pending activation:', activation.amount, 'for base ID:', baseSubscriptionId);
+            console.log('Found pending activation:', activation.amount, 'for item_id:', itemId);
             stripeSelected += activation.amount;
           } else {
-            console.log('No matching activation found for base ID:', baseSubscriptionId);
+            console.log('No matching activation found for item_id:', itemId);
           }
         } else if (selectionData.selection_type === 'zoho_invoices') {
           // For Zoho invoices, the itemId format is "{customer_name}-{balance}"
