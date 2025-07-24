@@ -35,48 +35,36 @@ export const useCurrentMonthPrediction = (): CurrentMonthPrediction => {
       
       if (selectionData.selected) {
         if (selectionData.selection_type === 'stripe_upcoming_payments') {
-          // Check in all Stripe payment arrays for matching subscription_id
-          // For upcoming payments
-          const upcomingPayment = receivablesData.stripeUpcomingPayments.find(p => 
-            p.subscription_id === itemId || `${p.subscription_id}_upcoming` === itemId
-          );
-          if (upcomingPayment) {
-            console.log('Found upcoming payment:', upcomingPayment.net_amount);
-            stripeSelected += upcomingPayment.net_amount;
-          }
-
-          // For current month payments  
-          const currentPayment = receivablesData.stripeCurrentMonthPayments.find(p => 
-            p.subscription_id === itemId || `${p.subscription_id}_current_month` === itemId
-          );
-          if (currentPayment) {
-            console.log('Found current month payment:', currentPayment.net_amount);
-            stripeSelected += currentPayment.net_amount;
-          }
-
-          // For next month payments
-          const nextPayment = receivablesData.stripeNextMonthPayments.find(p => 
-            p.subscription_id === itemId || `${p.subscription_id}_next_month` === itemId
-          );
-          if (nextPayment) {
-            console.log('Found next month payment:', nextPayment.net_amount);
-            stripeSelected += nextPayment.net_amount;
-          }
+          // Extract base subscription_id by removing suffixes
+          const baseSubscriptionId = itemId.replace(/_current_month|_next_month|_upcoming$/g, '');
+          console.log('Extracted base subscription_id:', baseSubscriptionId, 'from itemId:', itemId);
           
-          // If no match found
-          if (!upcomingPayment && !currentPayment && !nextPayment) {
-            console.log('No matching Stripe payment found for:', itemId);
+          // Search in all Stripe payment arrays using base subscription_id
+          const allStripePayments = [
+            ...receivablesData.stripeUpcomingPayments,
+            ...receivablesData.stripeCurrentMonthPayments,
+            ...receivablesData.stripeNextMonthPayments
+          ];
+          
+          const matchingPayment = allStripePayments.find(p => p.subscription_id === baseSubscriptionId);
+          if (matchingPayment) {
+            console.log('Found matching Stripe payment:', matchingPayment.net_amount, 'for base ID:', baseSubscriptionId);
+            stripeSelected += matchingPayment.net_amount;
+          } else {
+            console.log('No matching Stripe payment found for base ID:', baseSubscriptionId);
           }
         } else if (selectionData.selection_type === 'stripe_pending_activations') {
-          // Check in pending activations
+          // Extract base subscription_id for activations too
+          const baseSubscriptionId = itemId.replace(/_current_month|_next_month|_upcoming$/g, '');
+          
           const activation = receivablesData.stripePendingActivations.find(a => 
-            a.subscription_id === itemId
+            a.subscription_id === baseSubscriptionId
           );
           if (activation) {
-            console.log('Found pending activation:', activation.amount);
+            console.log('Found pending activation:', activation.amount, 'for base ID:', baseSubscriptionId);
             stripeSelected += activation.amount;
           } else {
-            console.log('No matching activation found for:', itemId);
+            console.log('No matching activation found for base ID:', baseSubscriptionId);
           }
         } else if (selectionData.selection_type === 'zoho_invoices') {
           // For Zoho invoices, the itemId format is "{customer_name}-{balance}"
