@@ -21,38 +21,49 @@ export const useCurrentMonthPrediction = (): CurrentMonthPrediction => {
     let stripeSelected = 0;
     let zohoSelected = 0;
 
-    // Sum all selected items
-    Object.entries(selections).forEach(([key, selected]) => {
-      if (selected) {
-        // Parse the key to determine source and find the amount
-        if (key.startsWith('stripe-upcoming-')) {
-          const paymentId = key.replace('stripe-upcoming-', '');
-          const payment = receivablesData.stripeUpcomingPayments.find(p => p.subscription_id === paymentId);
-          if (payment) {
-            stripeSelected += payment.net_amount; // Use net_amount from type definition
+    // Sum all selected items based on actual item_id from database
+    Object.entries(selections).forEach(([itemId, selectionData]) => {
+      if (selectionData.selected) {
+        if (selectionData.selection_type === 'stripe_upcoming_payments') {
+          // Check in all Stripe payment arrays for matching subscription_id
+          // For upcoming payments
+          const upcomingPayment = receivablesData.stripeUpcomingPayments.find(p => 
+            p.subscription_id === itemId || `${p.subscription_id}_upcoming` === itemId
+          );
+          if (upcomingPayment) {
+            stripeSelected += upcomingPayment.net_amount;
           }
-        } else if (key.startsWith('stripe-current-')) {
-          const paymentId = key.replace('stripe-current-', '');
-          const payment = receivablesData.stripeCurrentMonthPayments.find(p => p.subscription_id === paymentId);
-          if (payment) {
-            stripeSelected += payment.net_amount; // Use net_amount from type definition
+
+          // For current month payments
+          const currentPayment = receivablesData.stripeCurrentMonthPayments.find(p => 
+            p.subscription_id === itemId || `${p.subscription_id}_current_month` === itemId
+          );
+          if (currentPayment) {
+            stripeSelected += currentPayment.net_amount;
           }
-        } else if (key.startsWith('stripe-next-')) {
-          const paymentId = key.replace('stripe-next-', '');
-          const payment = receivablesData.stripeNextMonthPayments.find(p => p.subscription_id === paymentId);
-          if (payment) {
-            stripeSelected += payment.net_amount; // Use net_amount from type definition
+
+          // For next month payments
+          const nextPayment = receivablesData.stripeNextMonthPayments.find(p => 
+            p.subscription_id === itemId || `${p.subscription_id}_next_month` === itemId
+          );
+          if (nextPayment) {
+            stripeSelected += nextPayment.net_amount;
           }
-        } else if (key.startsWith('stripe-pending-')) {
-          const activationId = key.replace('stripe-pending-', '');
-          const activation = receivablesData.stripePendingActivations.find(a => a.subscription_id === activationId);
+        } else if (selectionData.selection_type === 'stripe_pending_activations') {
+          // Check in pending activations
+          const activation = receivablesData.stripePendingActivations.find(a => 
+            a.subscription_id === itemId
+          );
           if (activation) {
-            stripeSelected += activation.amount; // Use amount from type definition
+            stripeSelected += activation.amount;
           }
-        } else if (key.startsWith('zoho-')) {
-          const invoiceId = key.replace('zoho-', '');
-          // Note: zohoUnpaidInvoices might need to be added to the receivablesData interface
-          // For now, we'll access it through the useReceivablesData hook structure
+        } else if (selectionData.selection_type === 'zoho_invoices') {
+          // For Zoho invoices, the itemId format is "{customer_name}-{balance}"
+          const [customerName, balanceStr] = itemId.split('-');
+          const balance = parseFloat(balanceStr);
+          if (!isNaN(balance)) {
+            zohoSelected += balance;
+          }
         }
       }
     });
