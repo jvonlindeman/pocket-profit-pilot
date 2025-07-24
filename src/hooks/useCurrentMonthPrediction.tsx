@@ -35,17 +35,26 @@ export const useCurrentMonthPrediction = (): CurrentMonthPrediction => {
       
       if (selectionData.selected) {
         if (selectionData.selection_type === 'stripe_upcoming_payments') {
-          // Use the full item_id directly (no base extraction needed)
-          console.log('Looking for Stripe payment with subscription_id:', itemId);
+          console.log('Processing Stripe selection with item_id:', itemId);
           
-          // Search in all Stripe payment arrays using the full item_id
-          const allStripePayments = [
-            ...receivablesData.stripeUpcomingPayments,
-            ...receivablesData.stripeCurrentMonthPayments,
-            ...receivablesData.stripeNextMonthPayments
-          ];
+          let matchingPayment = null;
           
-          const matchingPayment = allStripePayments.find(p => p.subscription_id === itemId);
+          // Route to correct array based on suffix
+          if (itemId.endsWith('_current_month')) {
+            // Search in current month payments with the suffixed ID
+            matchingPayment = receivablesData.stripeCurrentMonthPayments.find(p => p.subscription_id === itemId);
+            console.log('Searching in stripeCurrentMonthPayments for:', itemId);
+          } else if (itemId.endsWith('_next_month')) {
+            // Search in next month payments with the suffixed ID
+            matchingPayment = receivablesData.stripeNextMonthPayments.find(p => p.subscription_id === itemId);
+            console.log('Searching in stripeNextMonthPayments for:', itemId);
+          } else {
+            // Search in upcoming payments (no suffix or _upcoming suffix)
+            const baseId = itemId.replace('_upcoming', '');
+            matchingPayment = receivablesData.stripeUpcomingPayments.find(p => p.subscription_id === baseId);
+            console.log('Searching in stripeUpcomingPayments for:', baseId);
+          }
+          
           if (matchingPayment) {
             console.log('Found matching Stripe payment:', matchingPayment.net_amount, 'for item_id:', itemId);
             stripeSelected += matchingPayment.net_amount;
