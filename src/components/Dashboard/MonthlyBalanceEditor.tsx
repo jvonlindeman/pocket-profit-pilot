@@ -89,6 +89,7 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
     itbmAmount: number = 0,
     profitPercentage: number = 1,
     taxReservePercentage: number = 5,
+    stripeSavingsPercentage: number = 0,
     includeZohoFiftyPercent: boolean = true,
     notes?: string
   ): Promise<boolean> => {
@@ -99,7 +100,7 @@ const MonthlyBalanceEditor: React.FC<MonthlyBalanceEditorProps> = ({
     
     try {
       // IMMEDIATE: Trigger the parent's immediate update handler
-      await onBalanceChange(balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, includeZohoFiftyPercent);
+      await onBalanceChange(balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, stripeSavingsPercentage, includeZohoFiftyPercent);
       
       // Close dialog only on success
       setShowBalanceDialog(false);

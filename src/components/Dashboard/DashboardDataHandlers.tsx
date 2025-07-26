@@ -12,6 +12,7 @@ interface DashboardDataHandlersProps {
     itbmAmount?: number,
     profitPercentage?: number,
     taxReservePercentage?: number,
+    stripeSavingsPercentage?: number,
     includeZohoFiftyPercent?: boolean,
     notes?: string
   ) => Promise<boolean>;
@@ -60,6 +61,7 @@ export const useDashboardDataHandlers = ({
     itbmAmount: number = 0,
     profitPercentage: number = 1,
     taxReservePercentage: number = 5,
+    stripeSavingsPercentage: number = 0,
     includeZohoFiftyPercent: boolean = true,
     notes?: string
   ) => {
@@ -79,6 +81,7 @@ export const useDashboardDataHandlers = ({
         itbmAmount,
         profitPercentage,
         taxReservePercentage,
+        stripeSavingsPercentage,
         includeZohoFiftyPercent,
         notes
       );
@@ -118,6 +121,7 @@ export const useDashboardDataHandlers = ({
     itbmAmount: number = 0, 
     profitPercentage: number = 1,
     taxReservePercentage: number = 5,
+    stripeSavingsPercentage: number = 0,
     includeZohoFiftyPercent: boolean = true
   ): Promise<boolean> => {
     console.log("💰 DashboardDataHandlers: handleBalanceChange CALLED WITH ENHANCED LOGGING:", {
@@ -147,6 +151,7 @@ export const useDashboardDataHandlers = ({
         itbmAmount,
         profitPercentage,
         taxReservePercentage,
+        stripeSavingsPercentage,
         includeZohoFiftyPercent
       );
 
