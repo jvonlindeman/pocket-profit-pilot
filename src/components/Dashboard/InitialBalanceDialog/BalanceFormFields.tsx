@@ -16,6 +16,8 @@ interface BalanceFormFieldsProps {
   setProfitPercentage: (value: string) => void;
   taxReservePercentage: string;
   setTaxReservePercentage: (value: string) => void;
+  stripeSavingsPercentage: string;
+  setStripeSavingsPercentage: (value: string) => void;
   includeZohoFiftyPercent: boolean;
   setIncludeZohoFiftyPercent: (value: boolean) => void;
   notes: string;
@@ -33,6 +35,8 @@ const BalanceFormFields: React.FC<BalanceFormFieldsProps> = ({
   setProfitPercentage,
   taxReservePercentage,
   setTaxReservePercentage,
+  stripeSavingsPercentage,
+  setStripeSavingsPercentage,
   includeZohoFiftyPercent,
   setIncludeZohoFiftyPercent,
   notes,
@@ -111,6 +115,21 @@ const BalanceFormFields: React.FC<BalanceFormFieldsProps> = ({
           placeholder="5.0"
           value={taxReservePercentage}
           onChange={(e) => setTaxReservePercentage(e.target.value)}
+          className="col-span-3"
+        />
+      </div>
+      
+      <div className="grid grid-cols-4 items-center gap-4">
+        <Label htmlFor="stripeSavings" className="text-right">
+          Stripe Savings (%)
+        </Label>
+        <Input
+          id="stripeSavings"
+          type="number"
+          step="0.1"
+          placeholder="0.0"
+          value={stripeSavingsPercentage}
+          onChange={(e) => setStripeSavingsPercentage(e.target.value)}
           className="col-span-3"
         />
       </div>

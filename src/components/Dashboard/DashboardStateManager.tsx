@@ -97,6 +97,7 @@ export const useDashboardStateManager = () => {
   const itbmAmount = monthlyBalance?.itbm_amount ?? 0;
   const profitPercentage = monthlyBalance?.profit_percentage ?? 1;
   const taxReservePercentage = monthlyBalance?.tax_reserve_percentage ?? 5;
+  const stripeSavingsPercentage = monthlyBalance?.stripe_savings_percentage ?? 0;
   const includeZohoFiftyPercent = monthlyBalance?.include_zoho_fifty_percent ?? true;
   
   console.log("💼 DashboardStateManager: ENHANCED VALUES for calculator:", { 
@@ -104,6 +105,7 @@ export const useDashboardStateManager = () => {
     itbmAmount, 
     profitPercentage, 
     taxReservePercentage,
+    stripeSavingsPercentage,
     includeZohoFiftyPercent,
     startingBalance,
     totalZohoExpenses, // ENHANCED: Now tracked separately
@@ -204,6 +206,7 @@ export const useDashboardStateManager = () => {
     itbmAmount,
     profitPercentage,
     taxReservePercentage,
+    stripeSavingsPercentage,
     includeZohoFiftyPercent,
     
     // Monthly balance

@@ -154,6 +154,7 @@ export interface MonthlyBalance {
   itbm_amount: number | null; // Added for ITBM amount
   profit_percentage: number | null; // Added for Profit First percentage
   tax_reserve_percentage: number | null; // Added for configurable tax reserve percentage
+  stripe_savings_percentage: number | null; // Added for Stripe savings percentage
   include_zoho_fifty_percent: boolean | null; // Added for controlling 50% Zoho inclusion in salary
   business_commission_rate: number | null; // Added: Configurable business commission rate for receivables
 }

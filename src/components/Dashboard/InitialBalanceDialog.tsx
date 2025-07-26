@@ -20,6 +20,7 @@ interface InitialBalanceDialogProps {
     itbmAmount?: number, 
     profitPercentage?: number,
     taxReservePercentage?: number,
+    stripeSavingsPercentage?: number,
     includeZohoFiftyPercent?: boolean,
     notes?: string
   ) => Promise<boolean>;
@@ -46,6 +47,8 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
     setProfitPercentage,
     taxReservePercentage,
     setTaxReservePercentage,
+    stripeSavingsPercentage,
+    setStripeSavingsPercentage,
     includeZohoFiftyPercent,
     setIncludeZohoFiftyPercent,
     notes,
@@ -63,6 +66,7 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
         itbmNum,
         profitNum,
         taxReserveNum,
+        stripeSavingsNum,
         includeZohoFiftyPercent: includeZoho,
         notes: formNotes
       } = getFormValues();
@@ -84,6 +88,7 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
         itbmNum, 
         profitNum, 
         taxReserveNum,
+        stripeSavingsNum,
         includeZoho,
         formNotes
       );
@@ -119,6 +124,8 @@ const InitialBalanceDialog: React.FC<InitialBalanceDialogProps> = ({
           setProfitPercentage={setProfitPercentage}
           taxReservePercentage={taxReservePercentage}
           setTaxReservePercentage={setTaxReservePercentage}
+          stripeSavingsPercentage={stripeSavingsPercentage}
+          setStripeSavingsPercentage={setStripeSavingsPercentage}
           includeZohoFiftyPercent={includeZohoFiftyPercent}
           setIncludeZohoFiftyPercent={setIncludeZohoFiftyPercent}
           notes={notes}

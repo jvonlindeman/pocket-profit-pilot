@@ -13,6 +13,7 @@ export const useBalanceForm = ({ open, currentBalance }: UseBalanceFormProps) =>
   const [itbmAmount, setItbmAmount] = useState('0');
   const [profitPercentage, setProfitPercentage] = useState('1');
   const [taxReservePercentage, setTaxReservePercentage] = useState('5');
+  const [stripeSavingsPercentage, setStripeSavingsPercentage] = useState('0');
   const [includeZohoFiftyPercent, setIncludeZohoFiftyPercent] = useState(true);
   const [notes, setNotes] = useState('');
 
@@ -27,6 +28,7 @@ export const useBalanceForm = ({ open, currentBalance }: UseBalanceFormProps) =>
         itbm_amount: currentBalance.itbm_amount,
         profit_percentage: currentBalance.profit_percentage,
         tax_reserve_percentage: currentBalance.tax_reserve_percentage,
+        stripe_savings_percentage: currentBalance.stripe_savings_percentage,
         include_zoho_fifty_percent: currentBalance.include_zoho_fifty_percent,
         notes: currentBalance.notes
       } : null
@@ -42,6 +44,7 @@ export const useBalanceForm = ({ open, currentBalance }: UseBalanceFormProps) =>
       // ENHANCED: Better percentage handling with explicit validation
       const profitValue = currentBalance.profit_percentage;
       const taxValue = currentBalance.tax_reserve_percentage;
+      const stripeSavingsValue = currentBalance.stripe_savings_percentage;
       
       console.log("🔧 useBalanceForm: DETAILED percentage analysis:", {
         profitValue: { 
@@ -65,6 +68,7 @@ export const useBalanceForm = ({ open, currentBalance }: UseBalanceFormProps) =>
       // CRITICAL FIX: Handle 0 values correctly - 0 is a valid percentage
       const profitStr = (profitValue !== null && profitValue !== undefined) ? profitValue.toString() : '1';
       const taxStr = (taxValue !== null && taxValue !== undefined) ? taxValue.toString() : '5';
+      const stripeSavingsStr = (stripeSavingsValue !== null && stripeSavingsValue !== undefined) ? stripeSavingsValue.toString() : '0';
       
       console.log("🔧 useBalanceForm: Setting percentage strings:", {
         profitStr,
@@ -75,6 +79,7 @@ export const useBalanceForm = ({ open, currentBalance }: UseBalanceFormProps) =>
       
       setProfitPercentage(profitStr);
       setTaxReservePercentage(taxStr);
+      setStripeSavingsPercentage(stripeSavingsStr);
       
       setIncludeZohoFiftyPercent(currentBalance.include_zoho_fifty_percent ?? true);
       setNotes(currentBalance.notes || '');
@@ -96,6 +101,7 @@ export const useBalanceForm = ({ open, currentBalance }: UseBalanceFormProps) =>
       setItbmAmount('0');
       setProfitPercentage('1');
       setTaxReservePercentage('5');
+      setStripeSavingsPercentage('0');
       setIncludeZohoFiftyPercent(true);
       setNotes('');
     }
@@ -121,6 +127,7 @@ export const useBalanceForm = ({ open, currentBalance }: UseBalanceFormProps) =>
     // CRITICAL: For percentages, if empty use 0, not defaults
     const profitNum = profitPercentage === '' ? 0 : parseFloat(profitPercentage) || 0;
     const taxReserveNum = taxReservePercentage === '' ? 0 : parseFloat(taxReservePercentage) || 0;
+    const stripeSavingsNum = stripeSavingsPercentage === '' ? 0 : parseFloat(stripeSavingsPercentage) || 0;
     
     const finalValues = {
       balanceNum,
@@ -128,6 +135,7 @@ export const useBalanceForm = ({ open, currentBalance }: UseBalanceFormProps) =>
       itbmNum,
       profitNum,
       taxReserveNum,
+      stripeSavingsNum,
       includeZohoFiftyPercent,
       notes: notes.trim() || undefined
     };
@@ -149,6 +157,8 @@ export const useBalanceForm = ({ open, currentBalance }: UseBalanceFormProps) =>
     setProfitPercentage,
     taxReservePercentage,
     setTaxReservePercentage,
+    stripeSavingsPercentage,
+    setStripeSavingsPercentage,
     includeZohoFiftyPercent,
     setIncludeZohoFiftyPercent,
     notes,

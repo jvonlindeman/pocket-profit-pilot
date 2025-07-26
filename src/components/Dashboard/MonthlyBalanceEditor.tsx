@@ -15,7 +15,8 @@ interface MonthlyBalanceEditorProps {
     opexAmount?: number, 
     itbmAmount?: number, 
     profitPercentage?: number, 
-    taxReservePercentage?: number,
+    taxReservePercentage?: number, 
+    stripeSavingsPercentage?: number,
     includeZohoFiftyPercent?: boolean
   ) => Promise<boolean>;
 }

@@ -121,6 +121,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
     itbmAmount: number = 0, 
     profitPercentage: number = 1,
     taxReservePercentage: number = 5,
+    stripeSavingsPercentage: number = 0,
     includeZohoFiftyPercent: boolean = true,
     notes?: string
   ) => {
@@ -147,6 +148,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
       itbm_amount: itbmAmount,
       profit_percentage: profitPercentage,
       tax_reserve_percentage: taxReservePercentage,
+      stripe_savings_percentage: stripeSavingsPercentage,
       include_zoho_fifty_percent: includeZohoFiftyPercent,
       notes: notes || null,
       stripe_override: monthlyBalance?.stripe_override || null, // Include stripe_override
@@ -177,6 +179,7 @@ export const useMonthlyBalance = ({ currentDate }: UseMonthlyBalanceProps) => {
         itbm_amount: Number(itbmAmount), // Ensure it's a number
         profit_percentage: Number(profitPercentage), // Explicitly convert to number, 0 is valid
         tax_reserve_percentage: Number(taxReservePercentage), // Explicitly convert to number, 0 is valid
+        stripe_savings_percentage: Number(stripeSavingsPercentage), // Explicitly convert to number, 0 is valid
         include_zoho_fifty_percent: Boolean(includeZohoFiftyPercent), // Ensure it's a boolean
         notes: notes || null,
       };

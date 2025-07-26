@@ -221,6 +221,7 @@ export type Database = {
           opex_amount: number | null
           profit_percentage: number | null
           stripe_override: number | null
+          stripe_savings_percentage: number | null
           tax_reserve_percentage: number | null
           updated_at: string
         }
@@ -236,6 +237,7 @@ export type Database = {
           opex_amount?: number | null
           profit_percentage?: number | null
           stripe_override?: number | null
+          stripe_savings_percentage?: number | null
           tax_reserve_percentage?: number | null
           updated_at?: string
         }
@@ -251,6 +253,7 @@ export type Database = {
           opex_amount?: number | null
           profit_percentage?: number | null
           stripe_override?: number | null
+          stripe_savings_percentage?: number | null
           tax_reserve_percentage?: number | null
           updated_at?: string
         }

@@ -11,6 +11,7 @@ interface SalaryCalculatorProps {
   itbmAmount: number;
   profitPercentage: number;
   taxReservePercentage: number;
+  stripeSavingsPercentage: number;
   includeZohoFiftyPercent: boolean;
   startingBalance?: number;
   totalZohoExpenses?: number;
@@ -24,6 +25,7 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
   itbmAmount,
   profitPercentage,
   taxReservePercentage,
+  stripeSavingsPercentage,
   includeZohoFiftyPercent,
   startingBalance = 0,
   totalZohoExpenses = 0,
@@ -53,7 +55,11 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
   const taxReserveAmount = (adjustedZohoIncome * taxReservePercentage) / 100;
   const totalZohoDeductions = opexAmount + itbmAmount + profitFirstAmount + taxReserveAmount;
   const remainingZohoIncome = adjustedZohoIncome - totalZohoDeductions;
-  const halfStripeIncome = stripeIncome / 2;
+  
+  // Calculate Stripe savings
+  const stripeSavingsAmount = (stripeIncome * stripeSavingsPercentage) / 100;
+  const stripeAfterSavings = stripeIncome - stripeSavingsAmount;
+  const halfStripeIncome = stripeAfterSavings / 2;
   const halfRemainingZoho = remainingZohoIncome / 2;
   
   // Calculate salary based on toggle
@@ -96,7 +102,7 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
             <Calculator className="h-6 w-6 mr-2" />
             Calculadora de Salario
             <span className="ml-2 text-xs opacity-75">
-              (Profit: {profitPercentage}% | Tax Reserve: {taxReservePercentage}%)
+              (Profit: {profitPercentage}% | Tax Reserve: {taxReservePercentage}% | Stripe Savings: {stripeSavingsPercentage}%)
             </span>
             <div className="ml-auto flex items-center space-x-3">
               <div className="flex items-center space-x-2">
@@ -168,6 +174,9 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                         <div>
                           <p className="text-xs text-gray-500">Stripe (Total)</p>
                           <p className="font-medium text-green-600">{formatCurrency(stripeIncome)}</p>
+                          {stripeSavingsPercentage > 0 && (
+                            <p className="text-xs text-amber-600">Ahorros: -{formatCurrency(stripeSavingsAmount)} ({stripeSavingsPercentage}%)</p>
+                          )}
                         </div>
                         <div className="bg-green-100 p-2 rounded-full">
                           <ArrowUp className="h-4 w-4 text-green-600" />
@@ -175,7 +184,12 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p className="text-xs">Ingresos totales de Stripe</p>
+                      <p className="text-xs">
+                        Ingresos totales de Stripe
+                        {stripeSavingsPercentage > 0 && (
+                          <><br />Ahorros ({stripeSavingsPercentage}%): {formatCurrency(stripeSavingsAmount)}</>
+                        )}
+                      </p>
                     </TooltipContent>
                   </Tooltip>
                   
@@ -363,14 +377,39 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                   </TooltipContent>
                 </Tooltip>
 
-                {/* 50% de Stripe */}
+                {/* Stripe Savings */}
+                {stripeSavingsPercentage > 0 && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="bg-amber-50 p-3 rounded-md shadow-sm border border-amber-200">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="text-xs text-amber-700">Ahorros Stripe ({stripeSavingsPercentage}%)</p>
+                            <p className="font-medium text-amber-600">- {formatCurrency(stripeSavingsAmount)}</p>
+                          </div>
+                          <div className="bg-amber-200 p-2 rounded-full">
+                            <ArrowDown className="h-4 w-4 text-amber-600" />
+                          </div>
+                        </div>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">Porcentaje de Stripe ahorrado ({stripeSavingsPercentage}%)</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+
+                {/* 50% de Stripe (después de ahorros) */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className="bg-white p-3 rounded-md shadow-sm border border-blue-100">
                       <div className="flex justify-between items-center">
                         <div>
-                          <p className="text-xs text-gray-500">50% de Stripe</p>
+                          <p className="text-xs text-gray-500">50% de Stripe{stripeSavingsPercentage > 0 ? ' (después de ahorros)' : ''}</p>
                           <p className="font-medium text-blue-600">{formatCurrency(halfStripeIncome)}</p>
+                          {stripeSavingsPercentage > 0 && (
+                            <p className="text-xs text-gray-500">De {formatCurrency(stripeAfterSavings)} disponible</p>
+                          )}
                         </div>
                         <div className="bg-blue-100 p-2 rounded-full">
                           <Percent className="h-4 w-4 text-blue-600" />
@@ -379,7 +418,12 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="text-xs">Mitad de los ingresos de Stripe</p>
+                    <p className="text-xs">
+                      Mitad de los ingresos de Stripe
+                      {stripeSavingsPercentage > 0 && (
+                        <><br />Después de deducir ahorros de {formatCurrency(stripeSavingsAmount)}</>
+                      )}
+                    </p>
                   </TooltipContent>
                 </Tooltip>
 

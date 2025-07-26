@@ -52,6 +52,7 @@ interface DashboardContentProps {
   itbmAmount: number;
   profitPercentage: number;
   taxReservePercentage: number;
+  stripeSavingsPercentage: number;
   includeZohoFiftyPercent: boolean;
 
   // Monthly balance data
@@ -62,7 +63,7 @@ interface DashboardContentProps {
   showBalanceDialog: boolean;
   setShowBalanceDialog: (show: boolean) => void;
   currentDate: Date;
-  onBalanceSaved: (balance: number, opexAmount?: number, itbmAmount?: number, profitPercentage?: number, taxReservePercentage?: number, includeZohoFiftyPercent?: boolean, notes?: string) => Promise<boolean>;
+  onBalanceSaved: (balance: number, opexAmount?: number, itbmAmount?: number, profitPercentage?: number, taxReservePercentage?: number, stripeSavingsPercentage?: number, includeZohoFiftyPercent?: boolean, notes?: string) => Promise<boolean>;
 }
 
 const DashboardContent: React.FC<DashboardContentProps> = ({
@@ -92,6 +93,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   itbmAmount,
   profitPercentage,
   taxReservePercentage,
+  stripeSavingsPercentage,
   includeZohoFiftyPercent,
   monthlyBalance,
   refreshData,
@@ -154,6 +156,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
               itbmAmount={itbmAmount}
               profitPercentage={profitPercentage}
               taxReservePercentage={taxReservePercentage}
+              stripeSavingsPercentage={stripeSavingsPercentage}
               includeZohoFiftyPercent={includeZohoFiftyPercent}
               startingBalance={startingBalance}
               totalZohoExpenses={totalZohoExpenses}
