@@ -108,45 +108,38 @@ export const usePersonalSalaryDistribution = (initialSalary: number = 0) => {
   ) => {
     const clampedAmount = Math.max(0, newAmount);
     
-    // Calculate what the other amounts currently are
-    const currentAmounts = {
-      owners: (estimatedSalary * distribution.owners) / 100,
-      savings: (estimatedSalary * distribution.savings) / 100,
-      investing: (estimatedSalary * distribution.investing) / 100,
-    };
+    // Calculate current amounts for the other categories
+    const currentAmounts = amounts;
+    const otherCategories = Object.keys(currentAmounts).filter(k => k !== category) as (keyof PersonalDistribution)[];
     
-    // Update the specific amount
-    currentAmounts[category] = clampedAmount;
+    // Sum of other amounts stays the same
+    const otherAmountsSum = otherCategories.reduce((sum, cat) => sum + currentAmounts[cat], 0);
     
     // Calculate new total salary
-    const newTotalSalary = currentAmounts.owners + currentAmounts.savings + currentAmounts.investing;
+    const newTotalSalary = clampedAmount + otherAmountsSum;
     
     if (newTotalSalary > 0) {
-      // Calculate new percentages based on amounts
+      // Calculate new percentages
       const newDistribution = {
-        owners: Math.round((currentAmounts.owners / newTotalSalary) * 100),
-        savings: Math.round((currentAmounts.savings / newTotalSalary) * 100),
-        investing: Math.round((currentAmounts.investing / newTotalSalary) * 100),
+        owners: newTotalSalary > 0 ? Math.round((category === 'owners' ? clampedAmount : currentAmounts.owners) / newTotalSalary * 100) : 0,
+        savings: newTotalSalary > 0 ? Math.round((category === 'savings' ? clampedAmount : currentAmounts.savings) / newTotalSalary * 100) : 0,
+        investing: newTotalSalary > 0 ? Math.round((category === 'investing' ? clampedAmount : currentAmounts.investing) / newTotalSalary * 100) : 0,
       };
       
-      // Ensure percentages add up to 100% (adjust the largest one if needed)
+      // Ensure percentages add up to 100%
       const total = newDistribution.owners + newDistribution.savings + newDistribution.investing;
-      if (total !== 100) {
+      if (total !== 100 && newTotalSalary > 0) {
         const diff = 100 - total;
-        const largest = Object.keys(newDistribution).reduce((a, b) => 
-          newDistribution[a as keyof PersonalDistribution] > newDistribution[b as keyof PersonalDistribution] ? a : b
-        ) as keyof PersonalDistribution;
-        newDistribution[largest] += diff;
+        newDistribution[category] += diff;
       }
       
       // Update both salary and distribution
       setEstimatedSalary(newTotalSalary);
       setDistribution(newDistribution);
     } else {
-      // If total is 0, just update the salary to the new amount
       setEstimatedSalary(clampedAmount);
     }
-  }, [estimatedSalary, distribution]);
+  }, [amounts]);
 
   // Auto-balance to ensure 100% total
   const balanceDistribution = useCallback(() => {

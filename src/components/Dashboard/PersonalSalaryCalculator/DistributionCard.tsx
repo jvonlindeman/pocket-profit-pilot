@@ -31,6 +31,11 @@ const DistributionCard: React.FC<DistributionCardProps> = ({
     onPercentageChange(Math.max(0, Math.min(100, value)));
   };
 
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseFloat(e.target.value) || 0;
+    onPercentageChange(Math.max(0, Math.min(100, value)));
+  };
+
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value) || 0;
     onAmountChange(Math.max(0, value));
@@ -67,7 +72,7 @@ const DistributionCard: React.FC<DistributionCardProps> = ({
               <input
                 type="range"
                 value={percentage}
-                onChange={handlePercentageChange}
+                onChange={handleSliderChange}
                 min="0"
                 max="100"
                 step="1"
@@ -85,7 +90,7 @@ const DistributionCard: React.FC<DistributionCardProps> = ({
             <span className="text-xs text-muted-foreground">$</span>
             <input
               type="number"
-              value={amount.toFixed(2)}
+              value={amount}
               onChange={handleAmountChange}
               min="0"
               step="0.01"
