@@ -25,6 +25,7 @@ const PersonalSalaryCalculator: React.FC<PersonalSalaryCalculatorProps> = ({
     totalPercentage,
     isValidDistribution,
     updatePercentage,
+    updateAmount,
     balanceDistribution,
     resetToDefaults,
   } = usePersonalSalaryDistribution(estimatedSalary);
@@ -148,6 +149,7 @@ const PersonalSalaryCalculator: React.FC<PersonalSalaryCalculatorProps> = ({
               color={item.color}
               description={item.description}
               onPercentageChange={(value) => updatePercentage(item.key, value)}
+              onAmountChange={(value) => updateAmount(item.key, value)}
             />
           ))}
         </div>

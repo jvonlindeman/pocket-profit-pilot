@@ -101,6 +101,53 @@ export const usePersonalSalaryDistribution = (initialSalary: number = 0) => {
     });
   }, []);
 
+  // Update individual amount with automatic recalculation
+  const updateAmount = useCallback((
+    category: keyof PersonalDistribution, 
+    newAmount: number
+  ) => {
+    const clampedAmount = Math.max(0, newAmount);
+    
+    // Calculate what the other amounts currently are
+    const currentAmounts = {
+      owners: (estimatedSalary * distribution.owners) / 100,
+      savings: (estimatedSalary * distribution.savings) / 100,
+      investing: (estimatedSalary * distribution.investing) / 100,
+    };
+    
+    // Update the specific amount
+    currentAmounts[category] = clampedAmount;
+    
+    // Calculate new total salary
+    const newTotalSalary = currentAmounts.owners + currentAmounts.savings + currentAmounts.investing;
+    
+    if (newTotalSalary > 0) {
+      // Calculate new percentages based on amounts
+      const newDistribution = {
+        owners: Math.round((currentAmounts.owners / newTotalSalary) * 100),
+        savings: Math.round((currentAmounts.savings / newTotalSalary) * 100),
+        investing: Math.round((currentAmounts.investing / newTotalSalary) * 100),
+      };
+      
+      // Ensure percentages add up to 100% (adjust the largest one if needed)
+      const total = newDistribution.owners + newDistribution.savings + newDistribution.investing;
+      if (total !== 100) {
+        const diff = 100 - total;
+        const largest = Object.keys(newDistribution).reduce((a, b) => 
+          newDistribution[a as keyof PersonalDistribution] > newDistribution[b as keyof PersonalDistribution] ? a : b
+        ) as keyof PersonalDistribution;
+        newDistribution[largest] += diff;
+      }
+      
+      // Update both salary and distribution
+      setEstimatedSalary(newTotalSalary);
+      setDistribution(newDistribution);
+    } else {
+      // If total is 0, just update the salary to the new amount
+      setEstimatedSalary(clampedAmount);
+    }
+  }, [estimatedSalary, distribution]);
+
   // Auto-balance to ensure 100% total
   const balanceDistribution = useCallback(() => {
     if (totalPercentage !== 100) {
@@ -125,6 +172,7 @@ export const usePersonalSalaryDistribution = (initialSalary: number = 0) => {
     totalPercentage,
     isValidDistribution,
     updatePercentage,
+    updateAmount,
     balanceDistribution,
     resetToDefaults,
   };

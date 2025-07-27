@@ -11,6 +11,7 @@ interface DistributionCardProps {
   color: string;
   description: string;
   onPercentageChange: (value: number) => void;
+  onAmountChange: (value: number) => void;
 }
 
 const DistributionCard: React.FC<DistributionCardProps> = ({
@@ -21,12 +22,18 @@ const DistributionCard: React.FC<DistributionCardProps> = ({
   color,
   description,
   onPercentageChange,
+  onAmountChange,
 }) => {
   const { formatCurrency } = useFinanceFormatter();
 
   const handlePercentageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value) || 0;
     onPercentageChange(Math.max(0, Math.min(100, value)));
+  };
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseFloat(e.target.value) || 0;
+    onAmountChange(Math.max(0, value));
   };
 
   return (
@@ -74,10 +81,16 @@ const DistributionCard: React.FC<DistributionCardProps> = ({
             </div>
           </div>
           
-          <div className="text-right">
-            <div className="text-lg font-bold text-primary">
-              {formatCurrency(amount)}
-            </div>
+          <div className="flex items-center justify-end space-x-2">
+            <span className="text-xs text-muted-foreground">$</span>
+            <input
+              type="number"
+              value={amount.toFixed(2)}
+              onChange={handleAmountChange}
+              min="0"
+              step="0.01"
+              className="w-24 px-2 py-1 text-sm border rounded text-right font-bold text-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
           </div>
         </div>
       </CardContent>
