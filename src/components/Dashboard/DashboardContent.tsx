@@ -14,6 +14,7 @@ import { FinanceProvider } from '@/contexts/FinanceContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileText } from 'lucide-react';
 import SalaryCalculator from './SalaryCalculator';
+import PersonalSalaryCalculator from './PersonalSalaryCalculator';
 import { ReceivablesManager } from './Receivables/ReceivablesManager';
 import { FinancialPredictionCard } from './Prediction/FinancialPredictionCard';
 
@@ -161,6 +162,23 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
               startingBalance={startingBalance}
               totalZohoExpenses={totalZohoExpenses}
               onConfigureClick={() => setShowBalanceDialog(true)}
+            />
+
+            {/* Personal Salary Calculator - Profit First Method */}
+            <PersonalSalaryCalculator
+              estimatedSalary={(() => {
+                const adjustedZohoIncome = startingBalance + regularIncome - totalZohoExpenses;
+                const profitFirstAmount = (adjustedZohoIncome * profitPercentage) / 100;
+                const taxReserveAmount = (adjustedZohoIncome * taxReservePercentage) / 100;
+                const remainingZohoIncome = adjustedZohoIncome - profitFirstAmount - taxReserveAmount;
+                const stripeSavingsAmount = (stripeNet * stripeSavingsPercentage) / 100;
+                const stripeAfterSavings = stripeNet - stripeSavingsAmount;
+                const halfStripeIncome = stripeAfterSavings / 2;
+                const halfRemainingZoho = remainingZohoIncome / 2;
+                return includeZohoFiftyPercent 
+                  ? halfStripeIncome + halfRemainingZoho
+                  : halfStripeIncome;
+              })()}
             />
 
             <Separator />
