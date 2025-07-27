@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { LucideIcon } from 'lucide-react';
 import { useFinanceFormatter } from '@/hooks/useFinanceFormatter';
@@ -25,6 +25,12 @@ const DistributionCard: React.FC<DistributionCardProps> = ({
   onAmountChange,
 }) => {
   const { formatCurrency } = useFinanceFormatter();
+  const [amountInput, setAmountInput] = useState(amount.toString());
+
+  // Update local input when prop changes
+  useEffect(() => {
+    setAmountInput(amount.toString());
+  }, [amount]);
 
   const handlePercentageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value) || 0;
@@ -36,9 +42,29 @@ const DistributionCard: React.FC<DistributionCardProps> = ({
     onPercentageChange(Math.max(0, Math.min(100, value)));
   };
 
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value) || 0;
-    onAmountChange(Math.max(0, value));
+  const handleAmountInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value;
+    setAmountInput(inputValue);
+    
+    // Only update parent if input is a valid number
+    const numValue = parseFloat(inputValue);
+    if (!isNaN(numValue) && isFinite(numValue)) {
+      onAmountChange(Math.max(0, numValue));
+    }
+  };
+
+  const handleAmountBlur = () => {
+    // On blur, ensure we have a valid number
+    const numValue = parseFloat(amountInput);
+    if (isNaN(numValue) || !isFinite(numValue)) {
+      // Reset to current amount if invalid
+      setAmountInput(amount.toString());
+    } else {
+      // Update with the valid value
+      const validValue = Math.max(0, numValue);
+      onAmountChange(validValue);
+      setAmountInput(validValue.toString());
+    }
   };
 
   return (
@@ -90,8 +116,9 @@ const DistributionCard: React.FC<DistributionCardProps> = ({
             <span className="text-xs text-muted-foreground">$</span>
             <input
               type="number"
-              value={amount}
-              onChange={handleAmountChange}
+              value={amountInput}
+              onChange={handleAmountInputChange}
+              onBlur={handleAmountBlur}
               min="0"
               step="0.01"
               className="w-24 px-2 py-1 text-sm border rounded text-right font-bold text-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
