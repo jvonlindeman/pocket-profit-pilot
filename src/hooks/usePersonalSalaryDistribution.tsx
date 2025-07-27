@@ -106,53 +106,68 @@ export const usePersonalSalaryDistribution = (initialSalary: number = 0) => {
     category: keyof PersonalDistribution, 
     newAmount: number
   ) => {
-    console.log('updateAmount called:', { category, newAmount, estimatedSalary, distribution });
-    
     const clampedAmount = Math.max(0, newAmount);
     
-    // Calculate current amounts directly from salary and distribution
+    // Get current displayed amounts (use the amounts calculated in useMemo)
+    // but access them directly to avoid circular dependency
     const currentAmounts = {
       owners: (estimatedSalary * distribution.owners) / 100,
       savings: (estimatedSalary * distribution.savings) / 100,
       investing: (estimatedSalary * distribution.investing) / 100,
     };
     
-    console.log('Current amounts calculated:', currentAmounts);
+    // Create new amounts object with the changed value
+    const newAmounts = {
+      ...currentAmounts,
+      [category]: clampedAmount
+    };
     
-    const otherCategories = Object.keys(currentAmounts).filter(k => k !== category) as (keyof PersonalDistribution)[];
-    
-    // Sum of other amounts stays the same
-    const otherAmountsSum = otherCategories.reduce((sum, cat) => sum + currentAmounts[cat], 0);
-    
-    // Calculate new total salary
-    const newTotalSalary = clampedAmount + otherAmountsSum;
-    
-    console.log('New total salary:', newTotalSalary, 'from:', clampedAmount, '+', otherAmountsSum);
+    // Calculate new total salary from all amounts
+    const newTotalSalary = newAmounts.owners + newAmounts.savings + newAmounts.investing;
     
     if (newTotalSalary > 0) {
-      // Calculate new percentages
+      // Calculate new percentages based on new amounts
       const newDistribution = {
-        owners: Math.round((category === 'owners' ? clampedAmount : currentAmounts.owners) / newTotalSalary * 100),
-        savings: Math.round((category === 'savings' ? clampedAmount : currentAmounts.savings) / newTotalSalary * 100),
-        investing: Math.round((category === 'investing' ? clampedAmount : currentAmounts.investing) / newTotalSalary * 100),
+        owners: Math.round((newAmounts.owners / newTotalSalary) * 100),
+        savings: Math.round((newAmounts.savings / newTotalSalary) * 100),
+        investing: Math.round((newAmounts.investing / newTotalSalary) * 100),
       };
       
-      // Ensure percentages add up to 100%
+      // Ensure percentages add up to 100% - adjust the category being changed
       const total = newDistribution.owners + newDistribution.savings + newDistribution.investing;
       if (total !== 100) {
         const diff = 100 - total;
         newDistribution[category] += diff;
       }
       
-      console.log('New distribution:', newDistribution);
-      
       // Update both salary and distribution
       setEstimatedSalary(newTotalSalary);
       setDistribution(newDistribution);
-    } else {
-      setEstimatedSalary(clampedAmount);
+    } else if (clampedAmount === 0) {
+      // If the amount is 0, just update that category to 0 and redistribute
+      const newDistribution = { ...distribution };
+      newDistribution[category] = 0;
+      
+      // Redistribute remaining percentage among other categories
+      const otherCategories = Object.keys(newDistribution).filter(k => k !== category) as (keyof PersonalDistribution)[];
+      const remainingPercentage = 100;
+      const currentOthersTotal = otherCategories.reduce((sum, key) => sum + distribution[key], 0);
+      
+      if (currentOthersTotal > 0) {
+        otherCategories.forEach(key => {
+          newDistribution[key] = Math.round((distribution[key] / currentOthersTotal) * remainingPercentage);
+        });
+        
+        // Ensure total is 100%
+        const total = newDistribution.owners + newDistribution.savings + newDistribution.investing;
+        if (total !== 100 && otherCategories.length > 0) {
+          newDistribution[otherCategories[0]] += (100 - total);
+        }
+      }
+      
+      setDistribution(newDistribution);
     }
-  }, [estimatedSalary, distribution]);
+  }, []);
 
   // Auto-balance to ensure 100% total
   const balanceDistribution = useCallback(() => {
