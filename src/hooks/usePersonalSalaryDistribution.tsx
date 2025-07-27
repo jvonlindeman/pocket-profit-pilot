@@ -106,10 +106,19 @@ export const usePersonalSalaryDistribution = (initialSalary: number = 0) => {
     category: keyof PersonalDistribution, 
     newAmount: number
   ) => {
+    console.log('updateAmount called:', { category, newAmount, estimatedSalary, distribution });
+    
     const clampedAmount = Math.max(0, newAmount);
     
-    // Calculate current amounts for the other categories
-    const currentAmounts = amounts;
+    // Calculate current amounts directly from salary and distribution
+    const currentAmounts = {
+      owners: (estimatedSalary * distribution.owners) / 100,
+      savings: (estimatedSalary * distribution.savings) / 100,
+      investing: (estimatedSalary * distribution.investing) / 100,
+    };
+    
+    console.log('Current amounts calculated:', currentAmounts);
+    
     const otherCategories = Object.keys(currentAmounts).filter(k => k !== category) as (keyof PersonalDistribution)[];
     
     // Sum of other amounts stays the same
@@ -118,20 +127,24 @@ export const usePersonalSalaryDistribution = (initialSalary: number = 0) => {
     // Calculate new total salary
     const newTotalSalary = clampedAmount + otherAmountsSum;
     
+    console.log('New total salary:', newTotalSalary, 'from:', clampedAmount, '+', otherAmountsSum);
+    
     if (newTotalSalary > 0) {
       // Calculate new percentages
       const newDistribution = {
-        owners: newTotalSalary > 0 ? Math.round((category === 'owners' ? clampedAmount : currentAmounts.owners) / newTotalSalary * 100) : 0,
-        savings: newTotalSalary > 0 ? Math.round((category === 'savings' ? clampedAmount : currentAmounts.savings) / newTotalSalary * 100) : 0,
-        investing: newTotalSalary > 0 ? Math.round((category === 'investing' ? clampedAmount : currentAmounts.investing) / newTotalSalary * 100) : 0,
+        owners: Math.round((category === 'owners' ? clampedAmount : currentAmounts.owners) / newTotalSalary * 100),
+        savings: Math.round((category === 'savings' ? clampedAmount : currentAmounts.savings) / newTotalSalary * 100),
+        investing: Math.round((category === 'investing' ? clampedAmount : currentAmounts.investing) / newTotalSalary * 100),
       };
       
       // Ensure percentages add up to 100%
       const total = newDistribution.owners + newDistribution.savings + newDistribution.investing;
-      if (total !== 100 && newTotalSalary > 0) {
+      if (total !== 100) {
         const diff = 100 - total;
         newDistribution[category] += diff;
       }
+      
+      console.log('New distribution:', newDistribution);
       
       // Update both salary and distribution
       setEstimatedSalary(newTotalSalary);
@@ -139,7 +152,7 @@ export const usePersonalSalaryDistribution = (initialSalary: number = 0) => {
     } else {
       setEstimatedSalary(clampedAmount);
     }
-  }, [amounts]);
+  }, [estimatedSalary, distribution]);
 
   // Auto-balance to ensure 100% total
   const balanceDistribution = useCallback(() => {
