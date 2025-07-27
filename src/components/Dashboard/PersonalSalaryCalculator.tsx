@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { User, PiggyBank, TrendingUp, RefreshCw, AlertTriangle } from 'lucide-react';
+import { User, PiggyBank, TrendingUp, RefreshCw, AlertTriangle, Calculator } from 'lucide-react';
 import { usePersonalSalaryDistribution } from '@/hooks/usePersonalSalaryDistribution';
 import { useFinanceFormatter } from '@/hooks/useFinanceFormatter';
 import DistributionCard from './PersonalSalaryCalculator/DistributionCard';
@@ -24,8 +24,18 @@ const PersonalSalaryCalculator: React.FC<PersonalSalaryCalculatorProps> = ({
     amounts,
     totalPercentage,
     isValidDistribution,
-    updatePercentage,
-    updateAmount,
+    // Draft states
+    draftSalary,
+    setDraftSalary,
+    draftDistribution,
+    draftAmounts,
+    draftTotalPercentage,
+    isDraftValidDistribution,
+    // Draft update functions
+    updateDraftPercentage,
+    updateDraftAmount,
+    // Recalculate function
+    recalculate,
     balanceDistribution,
     resetToDefaults,
   } = usePersonalSalaryDistribution(estimatedSalary);
@@ -47,7 +57,7 @@ const PersonalSalaryCalculator: React.FC<PersonalSalaryCalculatorProps> = ({
 
   const handleSalaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value) || 0;
-    setEstimatedSalary(value);
+    setDraftSalary(value);
   };
 
   const distributionData = [
@@ -57,8 +67,8 @@ const PersonalSalaryCalculator: React.FC<PersonalSalaryCalculatorProps> = ({
       icon: User,
       color: 'bg-blue-500',
       description: 'Salario personal final',
-      percentage: distribution.owners,
-      amount: amounts.owners,
+      percentage: draftDistribution.owners,
+      amount: draftAmounts.owners,
     },
     {
       key: 'savings' as const,
@@ -66,8 +76,8 @@ const PersonalSalaryCalculator: React.FC<PersonalSalaryCalculatorProps> = ({
       icon: PiggyBank,
       color: 'bg-green-500',
       description: 'Emergencias y objetivos',
-      percentage: distribution.savings,
-      amount: amounts.savings,
+      percentage: draftDistribution.savings,
+      amount: draftAmounts.savings,
     },
     {
       key: 'investing' as const,
@@ -75,8 +85,8 @@ const PersonalSalaryCalculator: React.FC<PersonalSalaryCalculatorProps> = ({
       icon: TrendingUp,
       color: 'bg-purple-500',
       description: 'Crecimiento a largo plazo',
-      percentage: distribution.investing,
-      amount: amounts.investing,
+      percentage: draftDistribution.investing,
+      amount: draftAmounts.investing,
     },
   ];
 
@@ -110,7 +120,7 @@ const PersonalSalaryCalculator: React.FC<PersonalSalaryCalculatorProps> = ({
             <Input
               id="personal-salary"
               type="number"
-              value={editableSalary}
+              value={draftSalary}
               onChange={handleSalaryChange}
               placeholder="0.00"
               className="text-lg font-semibold"
@@ -119,23 +129,27 @@ const PersonalSalaryCalculator: React.FC<PersonalSalaryCalculatorProps> = ({
           </div>
         </div>
 
-        {/* Validation Alert */}
-        {!isValidDistribution && (
+        {/* Draft Validation Alert */}
+        {!isDraftValidDistribution && (
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              La distribución debe sumar 100%. Total actual: {totalPercentage}%
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={balanceDistribution}
-                className="ml-2"
-              >
-                Ajustar automáticamente
-              </Button>
+              La distribución debe sumar 100%. Total actual: {draftTotalPercentage}%
             </AlertDescription>
           </Alert>
         )}
+
+        {/* Recalculate Button */}
+        <div className="flex justify-center">
+          <Button 
+            onClick={recalculate}
+            className="flex items-center space-x-2"
+            size="lg"
+          >
+            <Calculator className="h-4 w-4" />
+            <span>Recalcular</span>
+          </Button>
+        </div>
 
         {/* Distribution Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -148,25 +162,32 @@ const PersonalSalaryCalculator: React.FC<PersonalSalaryCalculatorProps> = ({
               amount={item.amount}
               color={item.color}
               description={item.description}
-              onPercentageChange={(value) => updatePercentage(item.key, value)}
-              onAmountChange={(value) => updateAmount(item.key, value)}
+              onPercentageChange={(value) => updateDraftPercentage(item.key, value)}
+              onAmountChange={(value) => updateDraftAmount(item.key, value)}
             />
           ))}
         </div>
 
-        {/* Summary */}
+        {/* Summary - Final Calculated Values */}
         <div className="border-t pt-4">
-          <div className="flex justify-between items-center text-sm">
-            <span className="font-medium">Total Distribución:</span>
-            <span className={`font-bold ${isValidDistribution ? 'text-green-600' : 'text-red-600'}`}>
-              {totalPercentage}%
-            </span>
-          </div>
-          <div className="flex justify-between items-center text-sm mt-1">
-            <span className="font-medium">Total Monto:</span>
-            <span className="font-bold text-primary">
-              {formatCurrency(amounts.owners + amounts.savings + amounts.investing)}
-            </span>
+          <h4 className="font-semibold text-sm mb-2">Valores Calculados (Finales)</h4>
+          <div className="space-y-1">
+            <div className="flex justify-between items-center text-sm">
+              <span className="font-medium">Salario Final:</span>
+              <span className="font-bold text-primary">{formatCurrency(editableSalary)}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="font-medium">Total Distribución:</span>
+              <span className={`font-bold ${isValidDistribution ? 'text-green-600' : 'text-red-600'}`}>
+                {totalPercentage}%
+              </span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="font-medium">Total Monto:</span>
+              <span className="font-bold text-primary">
+                {formatCurrency(amounts.owners + amounts.savings + amounts.investing)}
+              </span>
+            </div>
           </div>
         </div>
 

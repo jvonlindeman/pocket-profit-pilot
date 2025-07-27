@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 
 export interface PersonalDistribution {
   owners: number;
@@ -25,8 +25,17 @@ const DEFAULT_DISTRIBUTION: PersonalDistribution = {
 export const usePersonalSalaryDistribution = (initialSalary: number = 0) => {
   const [estimatedSalary, setEstimatedSalary] = useState(initialSalary);
   const [distribution, setDistribution] = useState<PersonalDistribution>(DEFAULT_DISTRIBUTION);
+  
+  // Draft states for manual editing
+  const [draftSalary, setDraftSalary] = useState(initialSalary);
+  const [draftDistribution, setDraftDistribution] = useState<PersonalDistribution>(DEFAULT_DISTRIBUTION);
+  const [draftAmounts, setDraftAmounts] = useState({
+    owners: 0,
+    savings: 0,
+    investing: 0,
+  });
 
-  // Calculate amounts based on salary and distribution
+  // Calculate final amounts based on salary and distribution
   const amounts = useMemo(() => {
     const calculated = {
       owners: (estimatedSalary * distribution.owners) / 100,
@@ -43,131 +52,101 @@ export const usePersonalSalaryDistribution = (initialSalary: number = 0) => {
     return calculated;
   }, [estimatedSalary, distribution]);
 
+  // Update draft amounts when final amounts change
+  useEffect(() => {
+    setDraftAmounts(amounts);
+  }, [amounts]);
+
+  // Update draft values when main values change
+  useEffect(() => {
+    setDraftSalary(estimatedSalary);
+    setDraftDistribution(distribution);
+  }, [estimatedSalary, distribution]);
+
   // Validate that distribution sums to 100%
   const totalPercentage = useMemo(() => 
     distribution.owners + distribution.savings + distribution.investing
   , [distribution]);
 
-  const isValidDistribution = totalPercentage === 100;
+  const draftTotalPercentage = useMemo(() =>
+    draftDistribution.owners + draftDistribution.savings + draftDistribution.investing
+  , [draftDistribution]);
 
-  // Update individual percentage with automatic adjustment
-  const updatePercentage = useCallback((
+  const isValidDistribution = totalPercentage === 100;
+  const isDraftValidDistribution = draftTotalPercentage === 100;
+
+  // Update draft percentage
+  const updateDraftPercentage = useCallback((
     category: keyof PersonalDistribution, 
     newValue: number
   ) => {
     const clampedValue = Math.max(0, Math.min(100, newValue));
-    
-    setDistribution(prev => {
-      const newDistribution = { ...prev };
-      newDistribution[category] = clampedValue;
-      
-      // Calculate remaining percentage to distribute
-      const remaining = 100 - clampedValue;
-      const otherCategories = Object.keys(newDistribution).filter(
-        key => key !== category
-      ) as (keyof PersonalDistribution)[];
-      
-      if (remaining >= 0 && otherCategories.length > 0) {
-        // Get current total of other categories
-        const currentOthersTotal = otherCategories.reduce(
-          (sum, key) => sum + prev[key], 0
-        );
-        
-        if (currentOthersTotal > 0) {
-          // Distribute remaining proportionally
-          let distributedTotal = 0;
-          otherCategories.forEach((key, index) => {
-            if (index === otherCategories.length - 1) {
-              // Last category gets the remainder to ensure exact 100%
-              newDistribution[key] = remaining - distributedTotal;
-            } else {
-              const proportionalValue = Math.floor((prev[key] / currentOthersTotal) * remaining);
-              newDistribution[key] = proportionalValue;
-              distributedTotal += proportionalValue;
-            }
-          });
-        } else {
-          // If other categories are 0, distribute evenly
-          const evenDistribution = Math.floor(remaining / otherCategories.length);
-          const remainder = remaining % otherCategories.length;
-          
-          otherCategories.forEach((key, index) => {
-            newDistribution[key] = evenDistribution + (index < remainder ? 1 : 0);
-          });
-        }
-      }
-      
-      return newDistribution;
-    });
+    setDraftDistribution(prev => ({
+      ...prev,
+      [category]: clampedValue
+    }));
   }, []);
 
-  // Update individual amount with automatic recalculation
-  const updateAmount = useCallback((
+  // Update draft amount
+  const updateDraftAmount = useCallback((
     category: keyof PersonalDistribution, 
     newAmount: number
   ) => {
     const clampedAmount = Math.max(0, newAmount);
-    
-    // Get current displayed amounts (use the amounts calculated in useMemo)
-    // but access them directly to avoid circular dependency
-    const currentAmounts = {
-      owners: (estimatedSalary * distribution.owners) / 100,
-      savings: (estimatedSalary * distribution.savings) / 100,
-      investing: (estimatedSalary * distribution.investing) / 100,
-    };
-    
-    // Create new amounts object with the changed value
-    const newAmounts = {
-      ...currentAmounts,
+    setDraftAmounts(prev => ({
+      ...prev,
       [category]: clampedAmount
+    }));
+  }, []);
+
+  // Recalculate based on draft values - determines what was changed
+  const recalculate = useCallback(() => {
+    const draftTotal = draftAmounts.owners + draftAmounts.savings + draftAmounts.investing;
+    const draftPercentageTotal = draftDistribution.owners + draftDistribution.savings + draftDistribution.investing;
+    
+    // Check if amounts were changed (different from calculated amounts)
+    const calculatedAmounts = {
+      owners: (draftSalary * distribution.owners) / 100,
+      savings: (draftSalary * distribution.savings) / 100,
+      investing: (draftSalary * distribution.investing) / 100,
     };
     
-    // Calculate new total salary from all amounts
-    const newTotalSalary = newAmounts.owners + newAmounts.savings + newAmounts.investing;
+    const amountsChanged = 
+      Math.abs(draftAmounts.owners - calculatedAmounts.owners) > 0.01 ||
+      Math.abs(draftAmounts.savings - calculatedAmounts.savings) > 0.01 ||
+      Math.abs(draftAmounts.investing - calculatedAmounts.investing) > 0.01;
     
-    if (newTotalSalary > 0) {
-      // Calculate new percentages based on new amounts
+    const salaryChanged = Math.abs(draftSalary - estimatedSalary) > 0.01;
+    const percentagesChanged = 
+      draftDistribution.owners !== distribution.owners ||
+      draftDistribution.savings !== distribution.savings ||
+      draftDistribution.investing !== distribution.investing;
+
+    if (amountsChanged && draftTotal > 0) {
+      // Calculate from amounts: derive salary and percentages
+      const newSalary = draftTotal;
       const newDistribution = {
-        owners: Math.round((newAmounts.owners / newTotalSalary) * 100),
-        savings: Math.round((newAmounts.savings / newTotalSalary) * 100),
-        investing: Math.round((newAmounts.investing / newTotalSalary) * 100),
+        owners: Math.round((draftAmounts.owners / newSalary) * 100),
+        savings: Math.round((draftAmounts.savings / newSalary) * 100),
+        investing: Math.round((draftAmounts.investing / newSalary) * 100),
       };
       
-      // Ensure percentages add up to 100% - adjust the category being changed
+      // Ensure percentages add up to 100%
       const total = newDistribution.owners + newDistribution.savings + newDistribution.investing;
       if (total !== 100) {
-        const diff = 100 - total;
-        newDistribution[category] += diff;
+        newDistribution.owners += (100 - total);
       }
       
-      // Update both salary and distribution
-      setEstimatedSalary(newTotalSalary);
+      setEstimatedSalary(newSalary);
       setDistribution(newDistribution);
-    } else if (clampedAmount === 0) {
-      // If the amount is 0, just update that category to 0 and redistribute
-      const newDistribution = { ...distribution };
-      newDistribution[category] = 0;
-      
-      // Redistribute remaining percentage among other categories
-      const otherCategories = Object.keys(newDistribution).filter(k => k !== category) as (keyof PersonalDistribution)[];
-      const remainingPercentage = 100;
-      const currentOthersTotal = otherCategories.reduce((sum, key) => sum + distribution[key], 0);
-      
-      if (currentOthersTotal > 0) {
-        otherCategories.forEach(key => {
-          newDistribution[key] = Math.round((distribution[key] / currentOthersTotal) * remainingPercentage);
-        });
-        
-        // Ensure total is 100%
-        const total = newDistribution.owners + newDistribution.savings + newDistribution.investing;
-        if (total !== 100 && otherCategories.length > 0) {
-          newDistribution[otherCategories[0]] += (100 - total);
-        }
-      }
-      
-      setDistribution(newDistribution);
+    } else if (percentagesChanged && draftPercentageTotal === 100) {
+      // Calculate from percentages: derive amounts using current salary
+      setDistribution(draftDistribution);
+    } else if (salaryChanged) {
+      // Calculate from salary: derive amounts using current percentages
+      setEstimatedSalary(draftSalary);
     }
-  }, []);
+  }, [draftSalary, draftDistribution, draftAmounts, estimatedSalary, distribution]);
 
   // Auto-balance to ensure 100% total
   const balanceDistribution = useCallback(() => {
@@ -192,8 +171,19 @@ export const usePersonalSalaryDistribution = (initialSalary: number = 0) => {
     amounts,
     totalPercentage,
     isValidDistribution,
-    updatePercentage,
-    updateAmount,
+    // Draft states
+    draftSalary,
+    setDraftSalary,
+    draftDistribution,
+    draftAmounts,
+    draftTotalPercentage,
+    isDraftValidDistribution,
+    // Draft update functions
+    updateDraftPercentage,
+    updateDraftAmount,
+    // Recalculate function
+    recalculate,
+    // Legacy functions (kept for compatibility)
     balanceDistribution,
     resetToDefaults,
   };
