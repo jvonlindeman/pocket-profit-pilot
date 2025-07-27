@@ -35,6 +35,11 @@ export const usePersonalSalaryDistribution = (initialSalary: number = 0) => {
     investing: 0,
   });
 
+  // Change tracking states
+  const [salaryManuallyChanged, setSalaryManuallyChanged] = useState(false);
+  const [amountsManuallyChanged, setAmountsManuallyChanged] = useState(false);
+  const [percentagesManuallyChanged, setPercentagesManuallyChanged] = useState(false);
+
   // Calculate final amounts based on salary and distribution
   const amounts = useMemo(() => {
     const calculated = {
@@ -85,6 +90,7 @@ export const usePersonalSalaryDistribution = (initialSalary: number = 0) => {
       ...prev,
       [category]: clampedValue
     }));
+    setPercentagesManuallyChanged(true);
   }, []);
 
   // Update draft amount
@@ -97,38 +103,33 @@ export const usePersonalSalaryDistribution = (initialSalary: number = 0) => {
       ...prev,
       [category]: clampedAmount
     }));
+    setAmountsManuallyChanged(true);
   }, []);
 
-  // Recalculate based on draft values - determines what was changed
+  // Update draft salary
+  const updateDraftSalary = useCallback((newSalary: number) => {
+    setDraftSalary(Math.max(0, newSalary));
+    setSalaryManuallyChanged(true);
+  }, []);
+
+  // Recalculate based on draft values with improved logic
   const recalculate = useCallback(() => {
     const draftTotal = draftAmounts.owners + draftAmounts.savings + draftAmounts.investing;
     const draftPercentageTotal = draftDistribution.owners + draftDistribution.savings + draftDistribution.investing;
     
-    // Check if amounts were changed (different from calculated amounts)
-    const calculatedAmounts = {
-      owners: (draftSalary * distribution.owners) / 100,
-      savings: (draftSalary * distribution.savings) / 100,
-      investing: (draftSalary * distribution.investing) / 100,
-    };
-    
-    const amountsChanged = 
-      Math.abs(draftAmounts.owners - calculatedAmounts.owners) > 0.01 ||
-      Math.abs(draftAmounts.savings - calculatedAmounts.savings) > 0.01 ||
-      Math.abs(draftAmounts.investing - calculatedAmounts.investing) > 0.01;
-    
-    const salaryChanged = Math.abs(draftSalary - estimatedSalary) > 0.01;
-    const percentagesChanged = 
-      draftDistribution.owners !== distribution.owners ||
-      draftDistribution.savings !== distribution.savings ||
-      draftDistribution.investing !== distribution.investing;
-
-    if (amountsChanged && draftTotal > 0) {
-      // Calculate from amounts: derive salary and percentages
-      const newSalary = draftTotal;
+    // Priority system based on what was manually changed
+    if (salaryManuallyChanged && !amountsManuallyChanged && !percentagesManuallyChanged) {
+      // Only salary was changed: calculate amounts from salary + current percentages
+      setEstimatedSalary(draftSalary);
+    } else if (percentagesManuallyChanged && !amountsManuallyChanged && draftPercentageTotal === 100) {
+      // Only percentages were changed: calculate amounts from current salary + new percentages
+      setDistribution(draftDistribution);
+    } else if (amountsManuallyChanged && draftTotal > 0) {
+      // Amounts were changed: calculate percentages from amounts (only change salary if it wasn't manually set)
       const newDistribution = {
-        owners: Math.round((draftAmounts.owners / newSalary) * 100),
-        savings: Math.round((draftAmounts.savings / newSalary) * 100),
-        investing: Math.round((draftAmounts.investing / newSalary) * 100),
+        owners: Math.round((draftAmounts.owners / draftTotal) * 100),
+        savings: Math.round((draftAmounts.savings / draftTotal) * 100),
+        investing: Math.round((draftAmounts.investing / draftTotal) * 100),
       };
       
       // Ensure percentages add up to 100%
@@ -137,16 +138,38 @@ export const usePersonalSalaryDistribution = (initialSalary: number = 0) => {
         newDistribution.owners += (100 - total);
       }
       
-      setEstimatedSalary(newSalary);
       setDistribution(newDistribution);
-    } else if (percentagesChanged && draftPercentageTotal === 100) {
-      // Calculate from percentages: derive amounts using current salary
-      setDistribution(draftDistribution);
-    } else if (salaryChanged) {
-      // Calculate from salary: derive amounts using current percentages
+      
+      // Only update salary if it wasn't manually changed by the user
+      if (!salaryManuallyChanged) {
+        setEstimatedSalary(draftTotal);
+      }
+    } else if (salaryManuallyChanged && percentagesManuallyChanged && draftPercentageTotal === 100) {
+      // Both salary and percentages changed: use both, calculate amounts
       setEstimatedSalary(draftSalary);
+      setDistribution(draftDistribution);
+    } else if (salaryManuallyChanged && amountsManuallyChanged && draftTotal > 0) {
+      // Both salary and amounts changed: keep salary, derive percentages from amounts
+      setEstimatedSalary(draftSalary);
+      const newDistribution = {
+        owners: Math.round((draftAmounts.owners / draftSalary) * 100),
+        savings: Math.round((draftAmounts.savings / draftSalary) * 100),
+        investing: Math.round((draftAmounts.investing / draftSalary) * 100),
+      };
+      
+      const total = newDistribution.owners + newDistribution.savings + newDistribution.investing;
+      if (total !== 100) {
+        newDistribution.owners += (100 - total);
+      }
+      
+      setDistribution(newDistribution);
     }
-  }, [draftSalary, draftDistribution, draftAmounts, estimatedSalary, distribution]);
+    
+    // Reset change tracking after recalculation
+    setSalaryManuallyChanged(false);
+    setAmountsManuallyChanged(false);
+    setPercentagesManuallyChanged(false);
+  }, [draftSalary, draftDistribution, draftAmounts, salaryManuallyChanged, amountsManuallyChanged, percentagesManuallyChanged]);
 
   // Auto-balance to ensure 100% total
   const balanceDistribution = useCallback(() => {
@@ -181,6 +204,7 @@ export const usePersonalSalaryDistribution = (initialSalary: number = 0) => {
     // Draft update functions
     updateDraftPercentage,
     updateDraftAmount,
+    updateDraftSalary,
     // Recalculate function
     recalculate,
     // Legacy functions (kept for compatibility)

@@ -34,6 +34,7 @@ const PersonalSalaryCalculator: React.FC<PersonalSalaryCalculatorProps> = ({
     // Draft update functions
     updateDraftPercentage,
     updateDraftAmount,
+    updateDraftSalary,
     // Recalculate function
     recalculate,
     balanceDistribution,
@@ -57,7 +58,7 @@ const PersonalSalaryCalculator: React.FC<PersonalSalaryCalculatorProps> = ({
 
   const handleSalaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value) || 0;
-    setDraftSalary(value);
+    updateDraftSalary(value);
   };
 
   const distributionData = [
