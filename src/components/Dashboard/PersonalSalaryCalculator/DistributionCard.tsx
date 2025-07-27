@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { LucideIcon } from 'lucide-react';
-import { useFinance } from '@/contexts/FinanceContext';
+import { useFinanceFormatter } from '@/hooks/useFinanceFormatter';
 
 interface DistributionCardProps {
   title: string;
@@ -22,7 +22,7 @@ const DistributionCard: React.FC<DistributionCardProps> = ({
   description,
   onPercentageChange,
 }) => {
-  const { formatCurrency } = useFinance();
+  const { formatCurrency } = useFinanceFormatter();
 
   const handlePercentageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value) || 0;

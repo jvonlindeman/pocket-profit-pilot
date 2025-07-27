@@ -5,8 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { User, PiggyBank, TrendingUp, RefreshCw, AlertTriangle } from 'lucide-react';
-import { useFinance } from '@/contexts/FinanceContext';
 import { usePersonalSalaryDistribution } from '@/hooks/usePersonalSalaryDistribution';
+import { useFinanceFormatter } from '@/hooks/useFinanceFormatter';
 import DistributionCard from './PersonalSalaryCalculator/DistributionCard';
 
 interface PersonalSalaryCalculatorProps {
@@ -16,7 +16,7 @@ interface PersonalSalaryCalculatorProps {
 const PersonalSalaryCalculator: React.FC<PersonalSalaryCalculatorProps> = ({
   estimatedSalary = 0
 }) => {
-  const { formatCurrency } = useFinance();
+  const { formatCurrency } = useFinanceFormatter();
   const {
     estimatedSalary: editableSalary,
     setEstimatedSalary,
@@ -28,6 +28,16 @@ const PersonalSalaryCalculator: React.FC<PersonalSalaryCalculatorProps> = ({
     balanceDistribution,
     resetToDefaults,
   } = usePersonalSalaryDistribution(estimatedSalary);
+
+  // Debug logs
+  console.log('Personal Salary Calculator Debug:', {
+    estimatedSalary,
+    editableSalary,
+    distribution,
+    amounts,
+    totalPercentage,
+    isValidDistribution
+  });
 
   // Update when prop changes
   useEffect(() => {

@@ -27,11 +27,21 @@ export const usePersonalSalaryDistribution = (initialSalary: number = 0) => {
   const [distribution, setDistribution] = useState<PersonalDistribution>(DEFAULT_DISTRIBUTION);
 
   // Calculate amounts based on salary and distribution
-  const amounts = useMemo(() => ({
-    owners: (estimatedSalary * distribution.owners) / 100,
-    savings: (estimatedSalary * distribution.savings) / 100,
-    investing: (estimatedSalary * distribution.investing) / 100,
-  }), [estimatedSalary, distribution]);
+  const amounts = useMemo(() => {
+    const calculated = {
+      owners: (estimatedSalary * distribution.owners) / 100,
+      savings: (estimatedSalary * distribution.savings) / 100,
+      investing: (estimatedSalary * distribution.investing) / 100,
+    };
+    
+    console.log('Hook amounts calculation:', {
+      estimatedSalary,
+      distribution,
+      calculated
+    });
+    
+    return calculated;
+  }, [estimatedSalary, distribution]);
 
   // Validate that distribution sums to 100%
   const totalPercentage = useMemo(() => 
