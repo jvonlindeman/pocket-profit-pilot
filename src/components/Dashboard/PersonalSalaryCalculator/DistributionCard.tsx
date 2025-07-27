@@ -26,7 +26,7 @@ const DistributionCard: React.FC<DistributionCardProps> = ({
 
   const handlePercentageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value) || 0;
-    onPercentageChange(value);
+    onPercentageChange(Math.max(0, Math.min(100, value)));
   };
 
   return (
@@ -64,9 +64,11 @@ const DistributionCard: React.FC<DistributionCardProps> = ({
                 min="0"
                 max="100"
                 step="1"
-                className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer slider"
+                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer"
                 style={{
-                  background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${percentage}%, hsl(var(--secondary)) ${percentage}%, hsl(var(--secondary)) 100%)`
+                  background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${percentage}%, hsl(var(--muted)) ${percentage}%, hsl(var(--muted)) 100%)`,
+                  WebkitAppearance: 'none',
+                  outline: 'none'
                 }}
               />
             </div>

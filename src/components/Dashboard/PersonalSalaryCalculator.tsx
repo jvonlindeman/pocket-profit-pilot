@@ -31,10 +31,8 @@ const PersonalSalaryCalculator: React.FC<PersonalSalaryCalculatorProps> = ({
 
   // Update when prop changes
   useEffect(() => {
-    if (estimatedSalary !== editableSalary) {
-      setEstimatedSalary(estimatedSalary);
-    }
-  }, [estimatedSalary, editableSalary, setEstimatedSalary]);
+    setEstimatedSalary(estimatedSalary);
+  }, [estimatedSalary, setEstimatedSalary]);
 
   const handleSalaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value) || 0;

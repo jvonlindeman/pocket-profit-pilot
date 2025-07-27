@@ -45,32 +45,44 @@ export const usePersonalSalaryDistribution = (initialSalary: number = 0) => {
     category: keyof PersonalDistribution, 
     newValue: number
   ) => {
-    const maxValue = 100;
-    const clampedValue = Math.max(0, Math.min(maxValue, newValue));
+    const clampedValue = Math.max(0, Math.min(100, newValue));
     
     setDistribution(prev => {
       const newDistribution = { ...prev };
-      const oldValue = newDistribution[category];
-      const difference = clampedValue - oldValue;
-      
       newDistribution[category] = clampedValue;
       
-      // Adjust other categories proportionally if needed
-      if (difference !== 0) {
-        const otherCategories = Object.keys(newDistribution).filter(
-          key => key !== category
-        ) as (keyof PersonalDistribution)[];
-        
-        const totalOthers = otherCategories.reduce(
-          (sum, key) => sum + newDistribution[key], 0
+      // Calculate remaining percentage to distribute
+      const remaining = 100 - clampedValue;
+      const otherCategories = Object.keys(newDistribution).filter(
+        key => key !== category
+      ) as (keyof PersonalDistribution)[];
+      
+      if (remaining >= 0 && otherCategories.length > 0) {
+        // Get current total of other categories
+        const currentOthersTotal = otherCategories.reduce(
+          (sum, key) => sum + prev[key], 0
         );
         
-        if (totalOthers > 0) {
-          const remaining = 100 - clampedValue;
-          const ratio = remaining / totalOthers;
+        if (currentOthersTotal > 0) {
+          // Distribute remaining proportionally
+          let distributedTotal = 0;
+          otherCategories.forEach((key, index) => {
+            if (index === otherCategories.length - 1) {
+              // Last category gets the remainder to ensure exact 100%
+              newDistribution[key] = remaining - distributedTotal;
+            } else {
+              const proportionalValue = Math.floor((prev[key] / currentOthersTotal) * remaining);
+              newDistribution[key] = proportionalValue;
+              distributedTotal += proportionalValue;
+            }
+          });
+        } else {
+          // If other categories are 0, distribute evenly
+          const evenDistribution = Math.floor(remaining / otherCategories.length);
+          const remainder = remaining % otherCategories.length;
           
-          otherCategories.forEach(key => {
-            newDistribution[key] = Math.round(newDistribution[key] * ratio);
+          otherCategories.forEach((key, index) => {
+            newDistribution[key] = evenDistribution + (index < remainder ? 1 : 0);
           });
         }
       }
