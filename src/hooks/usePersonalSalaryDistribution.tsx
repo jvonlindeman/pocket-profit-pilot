@@ -149,12 +149,11 @@ export const usePersonalSalaryDistribution = (initialSalary: number = 0) => {
       setEstimatedSalary(draftSalary);
       setDistribution(draftDistribution);
     } else if (salaryManuallyChanged && amountsManuallyChanged && draftTotal > 0) {
-      // Both salary and amounts changed: keep salary, derive percentages from amounts
-      setEstimatedSalary(draftSalary);
+      // Both salary and amounts changed: keep manually set salary, derive percentages from amounts
       const newDistribution = {
-        owners: Math.round((draftAmounts.owners / draftSalary) * 100),
-        savings: Math.round((draftAmounts.savings / draftSalary) * 100),
-        investing: Math.round((draftAmounts.investing / draftSalary) * 100),
+        owners: Math.round((draftAmounts.owners / estimatedSalary) * 100),
+        savings: Math.round((draftAmounts.savings / estimatedSalary) * 100),
+        investing: Math.round((draftAmounts.investing / estimatedSalary) * 100),
       };
       
       const total = newDistribution.owners + newDistribution.savings + newDistribution.investing;
