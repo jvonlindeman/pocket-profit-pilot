@@ -409,6 +409,48 @@ export type Database = {
         }
         Relationships: []
       }
+      retainers: {
+        Row: {
+          active: boolean
+          client_name: string
+          created_at: string
+          id: string
+          metadata: Json
+          net_income: number
+          notes: string | null
+          social_media_cost: number
+          specialty: string | null
+          total_expenses: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          client_name: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          net_income?: number
+          notes?: string | null
+          social_media_cost?: number
+          specialty?: string | null
+          total_expenses?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          client_name?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          net_income?: number
+          notes?: string | null
+          social_media_cost?: number
+          specialty?: string | null
+          total_expenses?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       zoho_integration: {
         Row: {
           access_token: string | null
