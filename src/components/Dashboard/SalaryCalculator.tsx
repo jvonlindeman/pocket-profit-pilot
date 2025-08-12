@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calculator, DollarSign, ArrowDown, ArrowUp, Percent, Info, ToggleLeft, ToggleRight, Settings } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
+import BankReconciliation from './BankReconciliation';
 
 interface SalaryCalculatorProps {
   zohoIncome: number;
@@ -314,6 +315,14 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                     <p className="text-xs">Dinero real disponible en el banco después de gastos del mes actual. Fórmula: Balance Inicial + Ingresos Zoho - Gastos del Mes.</p>
                   </TooltipContent>
                 </Tooltip>
+
+                <BankReconciliation
+                  startingBalance={startingBalance}
+                  zohoIncome={zohoIncome}
+                  totalZohoExpenses={totalZohoExpenses}
+                  adjustedZohoIncome={adjustedZohoIncome}
+                  onEditInitialBalance={onConfigureClick}
+                />
 
                 {/* Profit First - Now shows dynamic percentage */}
                 <Tooltip>
