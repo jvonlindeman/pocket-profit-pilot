@@ -80,7 +80,7 @@ const RetainersPage: React.FC = () => {
     () => Array.from(new Set(rows.map((d) => d.specialty).filter(Boolean))) as string[],
     [rows]
   );
-  const [specialty, setSpecialty] = React.useState<string>("");
+  const [specialty, setSpecialty] = React.useState<string>("ALL");
 
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<RetainerRow | null>(null);
@@ -90,7 +90,7 @@ const RetainersPage: React.FC = () => {
   const filtered = React.useMemo(() => {
     return rows.filter((r) => {
       if (onlyActive && !r.active) return false;
-      if (specialty && (r.specialty ?? "") !== specialty) return false;
+      if (specialty !== "ALL" && (r.specialty ?? "") !== specialty) return false;
       if (search) {
         const s = search.toLowerCase();
         if (!r.client_name.toLowerCase().includes(s) && !(r.specialty ?? "").toLowerCase().includes(s)) return false;
@@ -181,7 +181,7 @@ const RetainersPage: React.FC = () => {
                   <SelectValue placeholder="Todas" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas</SelectItem>
+                  <SelectItem value="ALL">Todas</SelectItem>
                   {specialties.map((s) => (
                     <SelectItem key={s} value={s}>{s}</SelectItem>
                   ))}
