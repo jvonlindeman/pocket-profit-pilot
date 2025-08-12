@@ -66,14 +66,20 @@ function exportCsv(rows: RetainerRow[]) {
 
 const RetainersPage: React.FC = () => {
   useSEO();
-  const { data = [], isLoading } = useRetainersQuery();
+  const { data, isLoading } = useRetainersQuery();
   const createMut = useCreateRetainer();
   const updateMut = useUpdateRetainer();
   const deleteMut = useDeleteRetainer();
 
+  // Ensure we always have an array to avoid runtime errors when data is not an array
+  const rows = React.useMemo(() => (Array.isArray(data) ? data : []), [data]);
+
   const [search, setSearch] = React.useState("");
   const [onlyActive, setOnlyActive] = React.useState(true);
-  const specialties = React.useMemo(() => Array.from(new Set((data ?? []).map((d) => d.specialty).filter(Boolean))) as string[], [data]);
+  const specialties = React.useMemo(
+    () => Array.from(new Set(rows.map((d) => d.specialty).filter(Boolean))) as string[],
+    [rows]
+  );
   const [specialty, setSpecialty] = React.useState<string>("");
 
   const [formOpen, setFormOpen] = React.useState(false);
@@ -82,7 +88,7 @@ const RetainersPage: React.FC = () => {
   const [csvOpen, setCsvOpen] = React.useState(false);
 
   const filtered = React.useMemo(() => {
-    return (data ?? []).filter((r) => {
+    return rows.filter((r) => {
       if (onlyActive && !r.active) return false;
       if (specialty && (r.specialty ?? "") !== specialty) return false;
       if (search) {
@@ -91,7 +97,7 @@ const RetainersPage: React.FC = () => {
       }
       return true;
     });
-  }, [data, onlyActive, specialty, search]);
+  }, [rows, onlyActive, specialty, search]);
 
   const summary = React.useMemo(() => {
     const map = new Map<string, { count: number; income: number; expenses: number; margin: number }>();
