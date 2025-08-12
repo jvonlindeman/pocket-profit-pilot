@@ -11,7 +11,7 @@ import type { RetainerInsert, RetainerRow } from "@/types/retainers";
 import { RetainersTable } from "@/components/Retainers/RetainersTable";
 import { RetainerFormDialog } from "@/components/Retainers/RetainerFormDialog";
 import { CsvPasteDialog } from "@/components/Retainers/CsvPasteDialog";
-
+import { useChurnMetrics } from "@/hooks/useChurnCalculator";
 function useSEO() {
   React.useEffect(() => {
     const title = "Retainers | Gestión de clientes retainer";
@@ -120,6 +120,15 @@ const RetainersPage: React.FC = () => {
     return "outline";
   };
 
+  // Churn (logo churn) state & metrics
+  const [monthStr, setMonthStr] = React.useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const selectedDate = React.useMemo(() => new Date(`${monthStr}-01T00:00:00`), [monthStr]);
+  const churn = useChurnMetrics(rows, selectedDate);
+  const formatPercent = (n: number) =>
+    new Intl.NumberFormat("es-PA", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n ?? 0);
   const handleSave = async (values: RetainerInsert | Partial<RetainerRow>) => {
     const payload = values as RetainerInsert;
     if (editing) {
@@ -129,7 +138,6 @@ const RetainersPage: React.FC = () => {
     }
     setEditing(null);
   };
-
   const handleDelete = async (row: RetainerRow) => {
     if (!confirm(`¿Eliminar retainer de ${row.client_name}?`)) return;
     await deleteMut.mutateAsync(row.id);
@@ -236,6 +244,48 @@ const RetainersPage: React.FC = () => {
                 {countsBySpecialty.length === 0 && (
                   <div className="text-sm text-muted-foreground">Sin datos</div>
                 )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="mt-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Churn de retainers</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 md:grid-cols-3 items-end mb-4">
+              <div className="md:col-span-1">
+                <label className="text-sm">Mes</label>
+                <Input type="month" value={monthStr} onChange={(e) => setMonthStr(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="border rounded-md p-3">
+                <div className="text-sm text-muted-foreground">Activos al inicio</div>
+                <div className="text-xl font-semibold">{churn.startingActive}</div>
+              </div>
+              <div className="border rounded-md p-3">
+                <div className="text-sm text-muted-foreground">Nuevos</div>
+                <div className="text-xl font-semibold">{churn.newThisPeriod}</div>
+              </div>
+              <div className="border rounded-md p-3">
+                <div className="text-sm text-muted-foreground">Churn (bajas)</div>
+                <div className="text-xl font-semibold">{churn.churnedThisPeriod}</div>
+              </div>
+              <div className="border rounded-md p-3">
+                <div className="text-sm text-muted-foreground">Activos al cierre</div>
+                <div className="text-xl font-semibold">{churn.endingActive}</div>
+              </div>
+              <div className="border rounded-md p-3">
+                <div className="text-sm text-muted-foreground">Churn rate</div>
+                <div className="text-xl font-semibold">{formatPercent(churn.churnRate)}</div>
+              </div>
+              <div className="border rounded-md p-3">
+                <div className="text-sm text-muted-foreground">Retention rate</div>
+                <div className="text-xl font-semibold">{formatPercent(churn.retentionRate)}</div>
               </div>
             </div>
           </CardContent>

@@ -412,6 +412,7 @@ export type Database = {
       retainers: {
         Row: {
           active: boolean
+          canceled_at: string | null
           client_name: string
           created_at: string
           id: string
@@ -425,6 +426,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          canceled_at?: string | null
           client_name: string
           created_at?: string
           id?: string
@@ -438,6 +440,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          canceled_at?: string | null
           client_name?: string
           created_at?: string
           id?: string
