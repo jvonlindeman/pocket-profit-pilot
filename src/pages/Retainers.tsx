@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { useRetainersQuery, useCreateRetainer, useUpdateRetainer, useDeleteRetainer, upsertByClientName } from "@/hooks/queries/useRetainers";
 import type { RetainerInsert, RetainerRow } from "@/types/retainers";
@@ -99,19 +100,25 @@ const RetainersPage: React.FC = () => {
     });
   }, [rows, onlyActive, specialty, search]);
 
-  const summary = React.useMemo(() => {
-    const map = new Map<string, { count: number; income: number; expenses: number; margin: number }>();
+  const countsBySpecialty = React.useMemo(() => {
+    const map = new Map<string, number>();
     for (const r of filtered) {
       const key = (r.specialty ?? "(sin especialidad)") as string;
-      if (!map.has(key)) map.set(key, { count: 0, income: 0, expenses: 0, margin: 0 });
-      const agg = map.get(key)!;
-      agg.count += 1;
-      agg.income += Number(r.net_income ?? 0);
-      agg.expenses += Number(r.total_expenses ?? 0);
-      agg.margin += Number(r.net_income ?? 0) - Number(r.total_expenses ?? 0);
+      map.set(key, (map.get(key) ?? 0) + 1);
     }
-    return Array.from(map.entries()).map(([k, v]) => ({ specialty: k, ...v })).sort((a, b) => b.income - a.income);
+    return Array.from(map.entries())
+      .map(([specialty, count]) => ({ specialty, count }))
+      .sort((a, b) => b.count - a.count);
   }, [filtered]);
+
+  const maxCount = countsBySpecialty[0]?.count ?? 0;
+  const getBadgeVariant = (count: number): "success" | "secondary" | "outline" => {
+    if (maxCount <= 1) return "secondary";
+    const ratio = count / maxCount;
+    if (ratio >= 0.66) return "success";
+    if (ratio >= 0.33) return "secondary";
+    return "outline";
+  };
 
   const handleSave = async (values: RetainerInsert | Partial<RetainerRow>) => {
     const payload = values as RetainerInsert;
@@ -211,20 +218,25 @@ const RetainersPage: React.FC = () => {
       <section className="mt-6">
         <Card>
           <CardHeader>
-            <CardTitle>Resumen por especialidad</CardTitle>
+            <CardTitle>Resumen</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {summary.map((s) => (
-                <div key={s.specialty} className="border rounded-md p-3">
-                  <div className="font-medium">{s.specialty}</div>
-                  <div className="text-sm text-muted-foreground">Clientes: {s.count}</div>
-                  <div className="text-sm">Ingresos: {formatCurrency(s.income)}</div>
-                  <div className="text-sm">Gastos: {formatCurrency(s.expenses)}</div>
-                  <div className="text-sm">Margen: {formatCurrency(s.margin)}</div>
-                </div>
-              ))}
-              {summary.length === 0 && <div className="text-sm text-muted-foreground">Sin datos</div>}
+            <div className="text-sm mb-4">
+              <span className="font-medium">Total de retainers:</span> {filtered.length}
+            </div>
+            <div>
+              <div className="font-medium mb-2">Conteo por especialidad</div>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {countsBySpecialty.map((s) => (
+                  <div key={s.specialty} className="border rounded-md p-3 flex items-center justify-between">
+                    <div>{s.specialty}</div>
+                    <Badge variant={getBadgeVariant(s.count)}>{s.count}</Badge>
+                  </div>
+                ))}
+                {countsBySpecialty.length === 0 && (
+                  <div className="text-sm text-muted-foreground">Sin datos</div>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
