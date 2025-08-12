@@ -2,8 +2,9 @@
 import React from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import { Button } from '@/components/ui/button';
-import { Settings } from 'lucide-react';
+import { Settings, Menu, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { DateRange as DayPickerDateRange } from 'react-day-picker';
 import { toDayPickerDateRange, toFinancialDateRange } from '@/utils/dateRangeAdapter';
 
@@ -27,12 +28,28 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             <p className="mt-1 text-sm text-gray-500">Análisis de ingresos y gastos para tu agencia</p>
           </div>
           <div className="mt-4 md:mt-0 flex items-center space-x-3">
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/settings">
-                <Settings className="h-4 w-4 mr-2" />
-                Configuración
-              </Link>
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Menu className="h-4 w-4 mr-2" />
+                  Menú
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link to="/settings" className="flex items-center">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Configuración
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/retainers" className="flex items-center">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Retainers
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <div className="w-full md:w-64">
               <DateRangePicker
                 dateRange={toDayPickerDateRange(dateRange)}
