@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -496,57 +496,57 @@ export type Database = {
     }
     Functions: {
       calculate_monthly_trends: {
-        Args: { target_year: number; target_month: number }
+        Args: { target_month: number; target_year: number }
         Returns: boolean
       }
       find_similar_transactions: {
         Args: {
+          limit_count?: number
           reference_transaction_id: string
           similarity_threshold?: number
-          limit_count?: number
         }
         Returns: {
-          id: string
-          external_id: string
-          description: string
           amount: number
-          date: string
           category: string
-          type: string
-          source: string
+          date: string
+          description: string
+          external_id: string
+          id: string
           similarity: number
+          source: string
+          type: string
         }[]
       }
       get_monthly_summaries_for_ai: {
         Args: { months_back?: number }
         Returns: {
-          year: number
+          expense_trend: string
+          income_trend: string
+          mom_expense_change: number
+          mom_income_change: number
+          mom_profit_change: number
           month: number
-          total_income: number
-          total_expense: number
           profit: number
           profit_margin: number
-          mom_income_change: number
-          mom_expense_change: number
-          mom_profit_change: number
-          income_trend: string
-          expense_trend: string
           profit_trend: string
+          total_expense: number
+          total_income: number
           transaction_count: number
+          year: number
         }[]
       }
       is_date_range_cached: {
-        Args: { p_source: string; p_start_date: string; p_end_date: string }
+        Args: { p_end_date: string; p_source: string; p_start_date: string }
         Returns: {
           is_cached: boolean
           is_partial: boolean
-          segments_found: number
-          missing_start_date: string
           missing_end_date: string
+          missing_start_date: string
+          segments_found: number
         }[]
       }
       is_month_cached: {
-        Args: { p_source: string; p_year: number; p_month: number }
+        Args: { p_month: number; p_source: string; p_year: number }
         Returns: {
           is_cached: boolean
           transaction_count: number
@@ -554,26 +554,26 @@ export type Database = {
       }
       search_transactions_semantic: {
         Args: {
+          limit_count?: number
+          p_end_date?: string
+          p_start_date?: string
           query_embedding: string
           similarity_threshold?: number
-          limit_count?: number
-          p_start_date?: string
-          p_end_date?: string
         }
         Returns: {
-          id: string
-          external_id: string
-          description: string
           amount: number
-          date: string
           category: string
-          type: string
-          source: string
+          date: string
+          description: string
+          external_id: string
+          id: string
           similarity: number
+          source: string
+          type: string
         }[]
       }
       update_transaction_embedding: {
-        Args: { transaction_id: string; embedding: string }
+        Args: { embedding: string; transaction_id: string }
         Returns: boolean
       }
     }

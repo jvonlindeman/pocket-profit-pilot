@@ -277,6 +277,7 @@ export const useReceivablesData = () => {
           selected,
           amount,
           metadata,
+          user_id: null, // Set to null for anonymous access
         }, {
           onConflict: 'selection_type,item_id'
         });
