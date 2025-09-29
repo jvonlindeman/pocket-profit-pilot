@@ -17,6 +17,7 @@ import SalaryCalculator from './SalaryCalculator';
 import PersonalSalaryCalculator from './PersonalSalaryCalculator';
 import { ReceivablesManager } from './Receivables/ReceivablesManager';
 import { FinancialPredictionCard } from './Prediction/FinancialPredictionCard';
+import { MonthlySavingsManager } from './Savings/MonthlySavingsManager';
 
 interface DashboardContentProps {
   // Core data
@@ -234,6 +235,11 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
               historicalMonthlyExpenses={totalZohoExpenses}
               startingBalance={startingBalance}
             />
+
+            <Separator />
+
+            {/* Monthly Savings Manager */}
+            <MonthlySavingsManager />
 
             <Separator />
 

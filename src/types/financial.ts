@@ -188,3 +188,14 @@ export interface ShortTermPrediction {
     optimistic: { profit: number; confidence: 60 };
   };
 }
+
+// Monthly savings types
+export interface MonthlySavings {
+  id: string;
+  month_year: string;
+  amount: number;
+  deposit_date: string;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+}
