@@ -119,8 +119,8 @@ export const useReceivablesCalculations = (data: ReceivablesData): ReceivablesCa
     // Calculate total fees/commissions
     const totalFeesCommissions = grandGrossTotal - grandNetTotal;
 
-    // CORRECT CALCULATION: Stripe Neto (receivables) + Stripe Neto (ya cobrado)
-    const totalStripeProjection = stripeNetTotal + stripeNet;
+    // CORRECT CALCULATION: Stripe Bruto (receivables) + Stripe Neto (ya cobrado)
+    const totalStripeProjection = stripeGrossTotal + stripeNet;
 
     console.log('🧮 RECEIVABLES CALCULATIONS BREAKDOWN:', {
       zohoSelectedInvoices: `$${zohoSelectedInvoices.toFixed(2)} (facturas seleccionadas)`,
@@ -129,7 +129,7 @@ export const useReceivablesCalculations = (data: ReceivablesData): ReceivablesCa
       stripeGrossTotal: `$${stripeGrossTotal.toFixed(2)} (receivables seleccionados bruto)`,
       stripeNetTotal: `$${stripeNetTotal.toFixed(2)} (receivables seleccionados neto)`,
       stripeNetProp: `$${stripeNet.toFixed(2)} (ya cobrado este mes, neto)`,
-      totalStripeProjection: `$${totalStripeProjection.toFixed(2)} (Total Stripe Neto: receivables + cobrado)`,
+      totalStripeProjection: `$${totalStripeProjection.toFixed(2)} (Receivables bruto + Neto cobrado)`,
     });
 
     return {
