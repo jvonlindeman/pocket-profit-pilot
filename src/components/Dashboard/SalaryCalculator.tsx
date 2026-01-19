@@ -17,6 +17,9 @@ interface SalaryCalculatorProps {
   startingBalance?: number;
   totalZohoExpenses?: number;
   onConfigureClick?: () => void;
+  // New prop for Stripe estimated (Total Stripe / 2)
+  stripeEstimatedHalf?: number;
+  totalStripeProjection?: number;
 }
 
 const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({ 
@@ -30,7 +33,9 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
   includeZohoFiftyPercent,
   startingBalance = 0,
   totalZohoExpenses = 0,
-  onConfigureClick
+  onConfigureClick,
+  stripeEstimatedHalf = 0,
+  totalStripeProjection = 0
 }) => {
   // Enhanced debugging to track value changes and detect updates
   useEffect(() => {
@@ -435,6 +440,37 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                     </p>
                   </TooltipContent>
                 </Tooltip>
+
+                {/* 50% Stripe Estimado - NEW: Based on Total Stripe (Neto + Bruto) */}
+                {stripeEstimatedHalf > 0 && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="bg-gradient-to-r from-purple-50 to-violet-100 p-3 rounded-lg border border-purple-200">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="text-xs text-purple-700 font-medium">50% Stripe Estimado</p>
+                            <p className="font-bold text-purple-800">{formatCurrency(stripeEstimatedHalf)}</p>
+                            <p className="text-xs text-purple-600 mt-1">
+                              De Total Stripe: {formatCurrency(totalStripeProjection)}
+                            </p>
+                          </div>
+                          <div className="bg-purple-200 p-2 rounded-full">
+                            <DollarSign className="h-4 w-4 text-purple-700" />
+                          </div>
+                        </div>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-xs">
+                        <strong>50% del Total Stripe (Neto + Bruto)</strong>
+                        <br /><br />
+                        Fórmula: (Stripe Neto ya cobrado + Stripe Bruto receivables) ÷ 2
+                        <br /><br />
+                        Esto incluye el dinero ya cobrado este mes más los receivables seleccionados pendientes de cobro.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
 
                 {/* 50% de Zoho Restante - Now shows if it's included or not */}
                 <Tooltip>

@@ -18,6 +18,7 @@ import PersonalSalaryCalculator from './PersonalSalaryCalculator';
 import { ReceivablesManager } from './Receivables/ReceivablesManager';
 import { FinancialPredictionCard } from './Prediction/FinancialPredictionCard';
 import { MonthlySavingsManager } from './Savings/MonthlySavingsManager';
+import { useStripeEstimated } from '@/hooks/useStripeEstimated';
 
 interface DashboardContentProps {
   // Core data
@@ -107,6 +108,9 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   // Calculate adjustedZohoIncome using the same formula as the salary calculator
   const adjustedZohoIncome = startingBalance + regularIncome - totalZohoExpenses;
 
+  // Get Stripe estimated data (50% of Total Stripe)
+  const { halfStripeEstimated, totalStripeProjection } = useStripeEstimated(stripeNet, adjustedZohoIncome);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Initial Balance Dialog */}
@@ -163,6 +167,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
               startingBalance={startingBalance}
               totalZohoExpenses={totalZohoExpenses}
               onConfigureClick={() => setShowBalanceDialog(true)}
+              stripeEstimatedHalf={halfStripeEstimated}
+              totalStripeProjection={totalStripeProjection}
             />
 
             {/* Personal Salary Calculator - Profit First Method */}
