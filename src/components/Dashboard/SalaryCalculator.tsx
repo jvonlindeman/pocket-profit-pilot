@@ -144,7 +144,8 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
         <CardContent className="p-0">
           {/* Sección de resumen principal - Visible primero */}
           <div className="p-6 bg-gradient-to-br from-blue-500/10 to-indigo-500/5">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-6">
+            <div className="flex flex-col gap-4 mb-6">
+              {/* Salario Calculado */}
               <div className="w-full">
                 <div className={`text-center p-5 rounded-lg shadow-md ${
                   includeZohoFiftyPercent 
@@ -163,6 +164,40 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                   </p>
                 </div>
               </div>
+
+              {/* 50% Stripe Estimado - PROMINENT position below salary */}
+              {stripeEstimatedHalf > 0 && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="w-full bg-gradient-to-r from-purple-100 to-violet-200 p-5 rounded-lg shadow-md border-2 border-purple-300">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-sm font-medium text-purple-700 mb-1">50% Stripe Estimado</h3>
+                          <div className="flex items-center">
+                            <DollarSign className="h-5 w-5 text-purple-800 mr-1" />
+                            <span className="text-2xl font-bold text-purple-800">{formatCurrency(stripeEstimatedHalf)}</span>
+                          </div>
+                          <p className="text-xs text-purple-600 mt-1">
+                            De Total Stripe: {formatCurrency(totalStripeProjection)}
+                          </p>
+                        </div>
+                        <div className="bg-purple-300 p-3 rounded-full">
+                          <DollarSign className="h-6 w-6 text-purple-700" />
+                        </div>
+                      </div>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-xs">
+                      <strong>50% del Total Stripe (Neto + Bruto)</strong>
+                      <br /><br />
+                      Fórmula: (Stripe Neto ya cobrado + Stripe Bruto receivables) ÷ 2
+                      <br /><br />
+                      Esto incluye el dinero ya cobrado este mes más los receivables seleccionados pendientes de cobro.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -440,37 +475,6 @@ const SalaryCalculator: React.FC<SalaryCalculatorProps> = ({
                     </p>
                   </TooltipContent>
                 </Tooltip>
-
-                {/* 50% Stripe Estimado - NEW: Based on Total Stripe (Neto + Bruto) */}
-                {stripeEstimatedHalf > 0 && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="bg-gradient-to-r from-purple-50 to-violet-100 p-3 rounded-lg border border-purple-200">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="text-xs text-purple-700 font-medium">50% Stripe Estimado</p>
-                            <p className="font-bold text-purple-800">{formatCurrency(stripeEstimatedHalf)}</p>
-                            <p className="text-xs text-purple-600 mt-1">
-                              De Total Stripe: {formatCurrency(totalStripeProjection)}
-                            </p>
-                          </div>
-                          <div className="bg-purple-200 p-2 rounded-full">
-                            <DollarSign className="h-4 w-4 text-purple-700" />
-                          </div>
-                        </div>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p className="text-xs">
-                        <strong>50% del Total Stripe (Neto + Bruto)</strong>
-                        <br /><br />
-                        Fórmula: (Stripe Neto ya cobrado + Stripe Bruto receivables) ÷ 2
-                        <br /><br />
-                        Esto incluye el dinero ya cobrado este mes más los receivables seleccionados pendientes de cobro.
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
 
                 {/* 50% de Zoho Restante - Now shows if it's included or not */}
                 <Tooltip>
