@@ -1,170 +1,211 @@
 
 
-# Plan: Limpiar Elementos UI de Caché Restantes
+# Plan: Remover Historial Financiero y Asistente Financiero
 
-## Resumen del Problema
+## Resumen
 
-Aunque el sistema de caché persistente fue eliminado, todavía existen múltiples elementos de UI y props que hacen referencia al concepto de "caché", lo cual confunde porque ya no hay caché persistente - solo React Query en memoria.
+Según la imagen proporcionada, se identifican dos componentes principales que ya no se utilizan:
 
-## Archivos a Modificar
+1. **Historial Financiero** - Muestra "No hay datos históricos disponibles" con mensaje sobre guardar resúmenes
+2. **Asistente Financiero** - La tarjeta promocional para el chatbot de IA con GPT
 
-### 1. `src/components/Dashboard/PeriodHeader.tsx`
-**Problema**: Muestra badges de "Cache", opciones de "Usar Cache" vs "Datos Frescos", y status de cacheStatus
-
-**Cambios**:
-- Eliminar props `hasCachedData`, `usingCachedData`, `cacheStatus`
-- Simplificar el dropdown a un solo botón "Actualizar Datos"
-- Remover los badges de cache (Z, S) y el indicador "Cache"
-- Mantener solo la funcionalidad de refresh con debounce
-
-### 2. `src/components/Dashboard/InitialLoadPrompt.tsx`
-**Problema**: Muestra mensajes sobre "Verificando Datos en Caché" y "Datos en Caché Disponibles"
-
-**Cambios**:
-- Eliminar props `cacheChecked`, `hasCachedData`
-- Simplificar a un solo mensaje: "Cargar Datos Financieros"
-- Remover el estado de "verificando caché"
-- Un solo botón para cargar datos desde API
-
-### 3. `src/components/Dashboard/NoDataLoadedState.tsx`
-**Problema**: Tiene botones separados para "Cargar desde Cache" y "Cargar Datos Frescos"
-
-**Cambios**:
-- Eliminar props `onLoadCache`, `hasCachedData`
-- Simplificar a un solo botón "Cargar Datos"
-- Remover explicaciones de cache vs frescos
-
-### 4. `src/components/Dashboard/InitialSetup.tsx`
-**Problema**: Pasa props de cache a InitialLoadPrompt
-
-**Cambios**:
-- Eliminar props `cacheChecked`, `hasCachedData`
-- Simplificar la interfaz
-
-### 5. `src/components/Dashboard/DashboardDataHandlers.tsx`
-**Problema**: Tiene lógica y mensajes sobre caché
-
-**Cambios**:
-- Eliminar prop `hasCachedData`
-- Actualizar mensajes de toast para no mencionar caché
-
-### 6. `src/components/Dashboard/DashboardContent.tsx`
-**Problema**: Recibe y pasa props de cache
-
-**Cambios**:
-- Eliminar props `hasCachedData`, `usingCachedData`, `cacheStatus`
-- Actualizar llamadas a componentes hijos
-
-### 7. `src/components/Dashboard/DashboardStateManager.tsx`
-**Problema**: Exporta valores de cache
-
-**Cambios**:
-- Mantener internamente pero no exponer `usingCachedData`, `cacheStatus`, `cacheChecked`, `hasCachedData`
-
-### 8. `src/components/Dashboard/DashboardPageWrapper.tsx`
-**Problema**: Pasa props de cache a componentes
-
-**Cambios**:
-- Eliminar props de cache en llamadas a componentes
-- Actualizar logging para no mencionar cache
-
-### 9. `src/components/Dashboard/DebugTools/CacheStorageDiagnostic.tsx`
-**Problema**: Componente completo de diagnóstico de caché que ya no funciona (las tablas fueron eliminadas)
-
-**Cambios**:
-- **ELIMINAR** este archivo completamente
-
-### 10. `src/hooks/queries/useOptimizedFinancialData.ts`
-**Problema**: Mantiene estado de cache que ya no tiene sentido
-
-**Cambios**:
-- Simplificar estado: eliminar `usingCachedData`, `cacheStatus`, `hasCachedData`, `cacheChecked`
-- Retornar solo el estado relevante: `transactions`, `loading`, `error`, `isRefreshing`, `isDataRequested`
-
-### 11. `src/hooks/useFinanceData.tsx`
-**Problema**: Expone valores de cache desde useOptimizedFinancialData
-
-**Cambios**:
-- Eliminar exports de `usingCachedData`, `cacheStatus`, `cacheChecked`, `hasCachedData`
-- Simplificar el return del hook
+Estos componentes dependen de sistemas de almacenamiento que ya no funcionan correctamente tras la remoción del sistema de caché.
 
 ---
 
-## Sección Técnica
+## Alcance de Remoción
 
-### Flujo de Datos Simplificado
+### Componentes de UI a Eliminar
 
-```text
-Usuario → "Cargar Datos" → useFinanceData.refreshData() → useOptimizedFinancialData.fetchData()
-                                                              ↓
-                                                    stripeRepository.getTransactions()
-                                                    zohoRepository.getTransactions()
-                                                              ↓
-                                                    React Query (caché en memoria)
-```
+| Archivo | Descripción |
+|---------|-------------|
+| `src/components/Dashboard/FinancialHistory/FinancialHistorySummary.tsx` | Componente de historial financiero |
+| `src/components/Dashboard/FinancialAssistant/FinancialAssistantPromo.tsx` | Tarjeta promocional del asistente |
+| `src/components/FinancialAssistant/ChatInput.tsx` | Input del chat |
+| `src/components/FinancialAssistant/ChatMessages.tsx` | Lista de mensajes |
+| `src/components/FinancialAssistant/FinancialAssistantButton.tsx` | Botón flotante global |
+| `src/components/FinancialAssistant/FinancialAssistantDialog.tsx` | Diálogo principal |
+| `src/components/FinancialAssistant/LoadingIndicator.tsx` | Indicador de carga |
+| `src/components/FinancialAssistant/MessageBubble.tsx` | Burbuja de mensaje |
+| `src/components/FinancialAssistant/SuggestedQuestion.tsx` | Pregunta sugerida |
+| `src/components/FinancialAssistant/SuggestedQuestionsList.tsx` | Lista de preguntas |
+| `src/components/Dashboard/StoredDataManager.tsx` | Manager de datos almacenados |
 
-### Props a Eliminar por Componente
+### Hooks a Eliminar
 
-| Componente | Props a Eliminar |
-|------------|------------------|
-| PeriodHeader | hasCachedData, usingCachedData, cacheStatus |
-| InitialLoadPrompt | cacheChecked, hasCachedData |
-| NoDataLoadedState | onLoadCache, hasCachedData |
-| InitialSetup | cacheChecked, hasCachedData |
-| DashboardDataHandlers | hasCachedData |
-| DashboardContent | hasCachedData, usingCachedData, cacheStatus |
+| Archivo | Descripción |
+|---------|-------------|
+| `src/hooks/useFinancialAssistant.tsx` | Hook principal del asistente |
+| `src/hooks/useFinancialAssistant/constants.ts` | Constantes del asistente |
+| `src/hooks/useFinancialAssistant/conversationMemoryService.ts` | Servicio de memoria |
+| `src/hooks/useFinancialAssistant/messageProcessor.ts` | Procesador de mensajes |
+| `src/hooks/useFinancialAssistant/types.ts` | Tipos del asistente |
+| `src/hooks/useFinancialAssistant/uiDataEnhancer.ts` | Enhancer de datos UI |
+| `src/hooks/useStoredFinancialData.tsx` | Hook de datos almacenados |
+| `src/hooks/useStoredFinancialSummaries.tsx` | Hook de resúmenes almacenados |
 
-### Estado a Simplificar en Hooks
+### Servicios a Eliminar
 
-**useOptimizedFinancialData**:
-```typescript
-// ANTES
-interface FinancialData {
-  transactions: Transaction[];
-  stripeData?: any;
-  loading: boolean;
-  error: string | null;
-  usingCachedData: boolean;      // ELIMINAR
-  cacheStatus: {...};            // ELIMINAR
-  isDataRequested: boolean;
-  cacheChecked: boolean;         // ELIMINAR
-  hasCachedData: boolean;        // ELIMINAR
-  isRefreshing: boolean;
-}
+| Archivo | Descripción |
+|---------|-------------|
+| `src/services/financialAssistantService.ts` | Servicio para llamar a GPT |
+| `src/services/semanticSearchService.ts` | Búsqueda semántica (ya es stub) |
+| `src/services/financialDataStorage/` (directorio completo) | Almacenamiento de snapshots |
+| `src/services/financialSummaryService.ts` | Servicio de resúmenes |
 
-// DESPUÉS
-interface FinancialData {
-  transactions: Transaction[];
-  stripeData?: any;
-  loading: boolean;
-  error: string | null;
-  isDataRequested: boolean;
-  isRefreshing: boolean;
-}
-```
+### Utils a Eliminar
+
+| Archivo | Descripción |
+|---------|-------------|
+| `src/utils/insightExtraction.ts` | Extracción de insights para GPT |
+| `src/utils/suggestionGenerator.ts` | Generador de preguntas sugeridas |
+| `src/utils/uiCapture/historicalDataCapture.ts` | Captura de datos históricos |
+
+### Edge Function a Eliminar
+
+| Archivo | Descripción |
+|---------|-------------|
+| `supabase/functions/financial-assistant/index.ts` | Edge function del asistente GPT |
+
+### Tipos a Eliminar
+
+| Archivo | Descripción |
+|---------|-------------|
+| `src/types/chat.ts` | Tipos para el chat del asistente |
+
+---
+
+## Archivos a Modificar
+
+### 1. `src/App.tsx`
+**Cambios**:
+- Remover import de `FinancialAssistantButton`
+- Remover el componente `<FinancialAssistantButton />` del árbol
+
+### 2. `src/components/Dashboard/FinancialCards/RefinedFinancialSummary.tsx`
+**Cambios**:
+- Remover import de `FinancialHistorySummary`
+- Remover import de `FinancialAssistantPromo`
+- Eliminar el grid de 3 columnas con historial y promo del asistente
+- Mantener IncomeTabs, RefinedExpensesSection, ProfitSection, UnpaidInvoicesSection
+
+### 3. `src/components/Dashboard/DebugTools/FinancialDebugHelper.tsx`
+**Cambios**:
+- Remover import de `StoredDataManager`
+- Eliminar el componente `<StoredDataManager />` del render
+
+### 4. `src/utils/uiCapture/index.ts`
+**Cambios**:
+- Remover import de `captureHistoricalFinancialData`
+- Remover la lógica de `historicalContext` y `temporalAnalysisAvailable`
+- Simplificar `captureUIData` para no incluir datos históricos
+
+### 5. `src/utils/uiCapture/dataOptimization.ts`
+**Cambios**:
+- Remover import de `HistoricalFinancialContext`
+- Actualizar la interfaz para no incluir datos históricos
+
+---
+
+## Resumen de Cambios
+
+| Tipo | Cantidad |
+|------|----------|
+| Archivos a eliminar | ~25 archivos |
+| Directorios a eliminar | 3 directorios |
+| Archivos a modificar | 5 archivos |
+| Edge functions a eliminar | 1 |
 
 ---
 
 ## Orden de Implementación
 
-1. Modificar `useOptimizedFinancialData.ts` - simplificar el estado
-2. Modificar `useFinanceData.tsx` - eliminar exports de cache
-3. Modificar `DashboardStateManager.tsx` - no exponer valores de cache
-4. Modificar `PeriodHeader.tsx` - simplificar UI
-5. Modificar `InitialLoadPrompt.tsx` - simplificar UI
-6. Modificar `NoDataLoadedState.tsx` - simplificar UI
-7. Modificar `InitialSetup.tsx` - eliminar props
-8. Modificar `DashboardDataHandlers.tsx` - eliminar props y mensajes
-9. Modificar `DashboardContent.tsx` - eliminar props
-10. Modificar `DashboardPageWrapper.tsx` - eliminar props
-11. **ELIMINAR** `CacheStorageDiagnostic.tsx`
+1. **Modificar `App.tsx`** - Remover botón flotante del asistente
+2. **Modificar `RefinedFinancialSummary.tsx`** - Remover secciones de historial y promo
+3. **Modificar `FinancialDebugHelper.tsx`** - Remover StoredDataManager
+4. **Modificar `utils/uiCapture/`** - Simplificar captura de datos
+5. **Eliminar componentes del Financial Assistant** - Directorio completo
+6. **Eliminar hooks relacionados** - useFinancialAssistant, useStoredFinancialData, etc.
+7. **Eliminar servicios** - financialAssistantService, semanticSearchService, etc.
+8. **Eliminar utils** - insightExtraction, suggestionGenerator, historicalDataCapture
+9. **Eliminar edge function** - financial-assistant
+10. **Eliminar tipos** - chat.ts
 
 ---
 
-## Resultado Final
+## Sección Técnica
 
-- UI sin menciones de "caché"
-- Un solo botón "Cargar Datos" o "Actualizar"
-- Código más simple y fácil de mantener
-- ~11 archivos modificados, 1 archivo eliminado
+### Estructura de Archivos a Eliminar
+
+```text
+src/
+├── components/
+│   ├── Dashboard/
+│   │   ├── FinancialAssistant/
+│   │   │   └── FinancialAssistantPromo.tsx
+│   │   ├── FinancialHistory/
+│   │   │   └── FinancialHistorySummary.tsx
+│   │   └── StoredDataManager.tsx
+│   └── FinancialAssistant/
+│       ├── ChatInput.tsx
+│       ├── ChatMessages.tsx
+│       ├── FinancialAssistantButton.tsx
+│       ├── FinancialAssistantDialog.tsx
+│       ├── LoadingIndicator.tsx
+│       ├── MessageBubble.tsx
+│       ├── SuggestedQuestion.tsx
+│       └── SuggestedQuestionsList.tsx
+├── hooks/
+│   ├── useFinancialAssistant.tsx
+│   ├── useFinancialAssistant/
+│   │   ├── constants.ts
+│   │   ├── conversationMemoryService.ts
+│   │   ├── messageProcessor.ts
+│   │   ├── types.ts
+│   │   └── uiDataEnhancer.ts
+│   ├── useStoredFinancialData.tsx
+│   └── useStoredFinancialSummaries.tsx
+├── services/
+│   ├── financialAssistantService.ts
+│   ├── financialDataStorage/
+│   │   ├── constants.ts
+│   │   ├── gptFormatter.ts
+│   │   ├── index.ts
+│   │   ├── snapshotManager.ts
+│   │   ├── storageOperations.ts
+│   │   └── types.ts
+│   ├── financialSummaryService.ts
+│   └── semanticSearchService.ts
+├── types/
+│   └── chat.ts
+└── utils/
+    ├── insightExtraction.ts
+    ├── suggestionGenerator.ts
+    └── uiCapture/
+        └── historicalDataCapture.ts
+
+supabase/
+└── functions/
+    └── financial-assistant/
+        └── index.ts
+```
+
+### Dependencias que se Romperán (y Cómo se Resolverán)
+
+| Archivo Dependiente | Dependencia | Solución |
+|---------------------|-------------|----------|
+| `App.tsx` | `FinancialAssistantButton` | Eliminar import y uso |
+| `RefinedFinancialSummary.tsx` | `FinancialHistorySummary`, `FinancialAssistantPromo` | Eliminar imports y secciones del render |
+| `FinancialDebugHelper.tsx` | `StoredDataManager` | Eliminar import y uso |
+| `uiCapture/index.ts` | `historicalDataCapture` | Eliminar import y simplificar función |
+
+---
+
+## Beneficios
+
+1. **Menos código**: ~25 archivos menos
+2. **Sin dependencia de GPT API Key**: Ya no se necesita la variable de entorno `GPT_API_KEY`
+3. **UI más simple**: Dashboard sin componentes que muestran "sin datos"
+4. **Menos edge functions**: Una función menos que mantener y pagar
+5. **Sin almacenamiento local innecesario**: Se elimina el sistema de snapshots en localStorage
 
