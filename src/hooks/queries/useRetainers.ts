@@ -77,17 +77,23 @@ export async function upsertByClientName(row: RetainerInsert): Promise<void> {
   if (selErr) throw selErr;
 
   if (existing?.id) {
+    const updatePayload: any = {
+      specialty: row.specialty ?? null,
+      net_income: row.net_income ?? 0,
+      social_media_cost: row.social_media_cost ?? 0,
+      total_expenses: row.total_expenses ?? 0,
+      active: row.active ?? true,
+      notes: row.notes ?? null,
+      metadata: row.metadata ?? {},
+    };
+    // Add new fields if present
+    if ((row as any).uses_stripe !== undefined) updatePayload.uses_stripe = (row as any).uses_stripe;
+    if ((row as any).articles_per_month !== undefined) updatePayload.articles_per_month = (row as any).articles_per_month;
+    if ((row as any).has_whatsapp_bot !== undefined) updatePayload.has_whatsapp_bot = (row as any).has_whatsapp_bot;
+    
     const { error } = await supabase
       .from("retainers")
-      .update({
-        specialty: row.specialty ?? null,
-        net_income: row.net_income ?? 0,
-        social_media_cost: row.social_media_cost ?? 0,
-        total_expenses: row.total_expenses ?? 0,
-        active: row.active ?? true,
-        notes: row.notes ?? null,
-        metadata: row.metadata ?? {},
-      })
+      .update(updatePayload)
       .eq("id", existing.id);
     if (error) throw error;
   } else {
