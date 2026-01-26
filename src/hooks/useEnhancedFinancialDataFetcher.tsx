@@ -4,7 +4,6 @@ import { Transaction } from '@/types/financial';
 import { useFinancialDataFetcher } from '@/hooks/useFinancialDataFetcher';
 import { useThrottledFetch } from '@/hooks/useThrottledFetch';
 import { useUrlParamCleaner } from '@/hooks/useUrlParamCleaner';
-import { useStripeDebug } from '@/hooks/useStripeDebug';
 
 /**
  * Enhanced hook to handle fetching of financial data with transaction management
@@ -18,7 +17,6 @@ export const useEnhancedFinancialDataFetcher = () => {
   
   // Use smaller, focused hooks
   const { executeThrottledFetch, cleanup } = useThrottledFetch(1000);
-  const { debugStripeCaching } = useStripeDebug();
   
   // Handle URL parameter cleanup
   useUrlParamCleaner();
@@ -116,7 +114,6 @@ export const useEnhancedFinancialDataFetcher = () => {
     checkApiConnectivity,
     fetchData,
     refreshData,
-    cleanupCache,
-    debugStripeCaching
+    cleanupCache
   };
 };
