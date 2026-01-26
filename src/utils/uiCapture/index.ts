@@ -1,8 +1,7 @@
-import { FinancialData, Transaction, CategorySummary, UnpaidInvoice } from '@/types/financial';
+import { Transaction, CategorySummary, UnpaidInvoice } from '@/types/financial';
 import { getDOMElementsBySelector } from './domUtils';
 import { analyzeFinancialData } from './dataAnalysis';
 import { optimizeUIDataPayload } from './dataOptimization';
-import { captureHistoricalFinancialData, HistoricalFinancialContext } from './historicalDataCapture';
 
 // Store for user interactions
 export const InteractionStore = {
@@ -45,8 +44,7 @@ export const registerInteraction = (
   console.log(`Interaction: ${component} - ${action}`, data || '');
 };
 
-interface EnhancedUIData {
-  // Existing fields
+interface UIData {
   activeComponents: string[];
   focusedElement: string | null;
   summary: any;
@@ -58,17 +56,13 @@ interface EnhancedUIData {
   stripeIncome: number;
   stripeFees: number;
   dateRange: any;
-  
-  // New historical data
-  historicalContext: HistoricalFinancialContext | null;
-  temporalAnalysisAvailable: boolean;
 }
 
 /**
- * Enhanced UI data capture with historical financial context
+ * Capture current UI data for analysis
  */
-export const captureUIData = async (financeContext: any): Promise<EnhancedUIData> => {
-  console.log('Starting enhanced UI data capture with historical context...');
+export const captureUIData = async (financeContext: any): Promise<UIData> => {
+  console.log('Starting UI data capture...');
   
   // Capture existing UI data
   const activeComponents = getDOMElementsBySelector('[data-component]')
@@ -101,12 +95,7 @@ export const captureUIData = async (financeContext: any): Promise<EnhancedUIData
     }
   });
 
-  // Capture historical financial context
-  console.log('Fetching historical financial context...');
-  const historicalContext = await captureHistoricalFinancialData(dateRange);
-  const temporalAnalysisAvailable = historicalContext !== null && historicalContext.monthlyHistory.length > 0;
-
-  const uiData: EnhancedUIData = {
+  const uiData: UIData = {
     activeComponents,
     focusedElement,
     summary,
@@ -117,22 +106,18 @@ export const captureUIData = async (financeContext: any): Promise<EnhancedUIData
     regularIncome,
     stripeIncome,
     stripeFees,
-    dateRange,
-    historicalContext,
-    temporalAnalysisAvailable
+    dateRange
   };
 
-  // Optimize the payload for AI consumption
+  // Optimize the payload
   const optimizedData = optimizeUIDataPayload(uiData);
 
-  console.log('Enhanced UI data capture completed:', {
+  console.log('UI data capture completed:', {
     activeComponents: activeComponents.length,
-    transactionCount: transactions.length,
-    historicalMonths: historicalContext?.monthlyHistory.length || 0,
-    temporalAnalysisAvailable
+    transactionCount: transactions.length
   });
 
-  return optimizedData as EnhancedUIData;
+  return optimizedData as UIData;
 };
 
 /**
