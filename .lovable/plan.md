@@ -1,123 +1,85 @@
 
-# Plan: Agregar Campos Faltantes a Retainers
+
+# Plan: Corregir Error RLS para Importación de Retainers
 
 ## Resumen
 
-Se agregarán 3 nuevos campos a la tabla `retainers` para coincidir con la estructura del Excel: indicador de Stripe, artículos por mes, y bot de WhatsApp.
+El error ocurre porque las políticas RLS actuales solo permiten INSERT/UPDATE/DELETE al rol `authenticated`, pero la aplicación está usando el rol `anon` (no hay login). Se agregarán políticas permisivas para el rol `anon`.
 
 ---
 
-## Nuevos Campos
+## Diagnóstico
 
-| Campo | Tipo | Descripción |
-|-------|------|-------------|
-| `uses_stripe` | boolean | Indica si el cliente paga mediante Stripe (default: false) |
-| `articles_per_month` | integer | Cantidad de artículos entregados por mes (default: 0) |
-| `has_whatsapp_bot` | boolean | Indica si el cliente tiene bot de WhatsApp (default: false) |
+| Operación | Rol permitido actual | Estado |
+|-----------|---------------------|--------|
+| SELECT | `authenticated` + `anon` | ✅ Funciona |
+| INSERT | `authenticated` solamente | ❌ Falla |
+| UPDATE | `authenticated` solamente | ❌ Falla |
+| DELETE | `authenticated` solamente | ❌ Falla |
+
+---
+
+## Solución Propuesta
+
+Crear una migración SQL que agregue políticas para el rol `anon`:
+
+```sql
+-- Permitir INSERT para anon
+CREATE POLICY "Anon can insert retainers" 
+ON public.retainers 
+FOR INSERT 
+TO anon 
+WITH CHECK (true);
+
+-- Permitir UPDATE para anon
+CREATE POLICY "Anon can update retainers" 
+ON public.retainers 
+FOR UPDATE 
+TO anon 
+USING (true);
+
+-- Permitir DELETE para anon
+CREATE POLICY "Anon can delete retainers" 
+ON public.retainers 
+FOR DELETE 
+TO anon 
+USING (true);
+```
+
+---
+
+## Impacto
+
+| Aspecto | Antes | Después |
+|---------|-------|---------|
+| Lectura | ✅ Funciona | ✅ Funciona |
+| Importar CSV | ❌ Error RLS | ✅ Funcionará |
+| Crear retainer | ❌ Error RLS | ✅ Funcionará |
+| Editar retainer | ❌ Error RLS | ✅ Funcionará |
+| Eliminar retainer | ❌ Error RLS | ✅ Funcionará |
 
 ---
 
 ## Archivos a Modificar
 
-### 1. Migración SQL (nueva)
-Agregar los 3 campos a la tabla `retainers`:
-```sql
-ALTER TABLE retainers
-  ADD COLUMN uses_stripe boolean NOT NULL DEFAULT false,
-  ADD COLUMN articles_per_month integer NOT NULL DEFAULT 0,
-  ADD COLUMN has_whatsapp_bot boolean NOT NULL DEFAULT false;
-```
-
-### 2. `src/components/Retainers/RetainerFormDialog.tsx`
-Agregar inputs para los 3 nuevos campos:
-- Switch para "Stripe"
-- Input numérico para "Artículos/mes"
-- Switch para "WhatsApp Bot"
-
-### 3. `src/components/Retainers/RetainersTable.tsx`
-Agregar 3 columnas nuevas a la tabla:
-- Stripe (Sí/No)
-- Artículos/mes (número)
-- WhatsApp Bot (Sí/No)
-
-### 4. `src/components/Retainers/CsvPasteDialog.tsx`
-Actualizar el mapeo CSV para reconocer las nuevas columnas al importar.
-
-### 5. `src/pages/Retainers.tsx`
-Actualizar la función `exportCsv` para incluir los nuevos campos en la exportación.
+| Archivo | Tipo | Descripción |
+|---------|------|-------------|
+| Nueva migración SQL | Crear | Agregar políticas RLS para rol anon |
 
 ---
 
-## Resumen de Cambios
+## Sección Técnica
 
-| Tipo | Cantidad |
-|------|----------|
-| Migración SQL | 1 |
-| Archivos a modificar | 4 |
+### Consideración de Seguridad
 
----
+Esta solución es apropiada porque:
+- El dashboard es para uso personal/interno
+- No hay autenticación implementada en la aplicación
+- Los datos de retainers no son sensibles (no contienen PII crítica)
 
-## Orden de Implementación
+Si en el futuro se implementa autenticación, estas políticas pueden restringirse.
 
-1. Crear migración SQL para agregar columnas
-2. Actualizar `RetainerFormDialog.tsx` con nuevos inputs
-3. Actualizar `RetainersTable.tsx` con nuevas columnas
-4. Actualizar `CsvPasteDialog.tsx` para mapeo de nuevos campos
-5. Actualizar `Retainers.tsx` para exportación CSV
-6. Los tipos de Supabase se actualizarán automáticamente
+### Alternativa (No recomendada para este caso)
 
----
+Implementar autenticación completa con Supabase Auth. Esto sería excesivo para un dashboard personal pero es la opción correcta si múltiples usuarios accederán al sistema.
 
-## Sección Tecnica
-
-### Estructura Final de Retainers
-
-```text
-retainers
-├── id (uuid)
-├── client_name (text)
-├── specialty (text, nullable)
-├── net_income (numeric)
-├── social_media_cost (numeric)
-├── total_expenses (numeric)
-├── uses_stripe (boolean)         -- NUEVO
-├── articles_per_month (integer)  -- NUEVO
-├── has_whatsapp_bot (boolean)    -- NUEVO
-├── active (boolean)
-├── notes (text, nullable)
-├── metadata (jsonb)
-├── created_at (timestamptz)
-├── updated_at (timestamptz)
-└── canceled_at (timestamptz, nullable)
-```
-
-### Mapeo CSV Actualizado
-
-| Header CSV esperado | Campo DB |
-|---------------------|----------|
-| Cliente | client_name |
-| Especialidad | specialty |
-| income / Ingreso neto | net_income |
-| Stripe | uses_stripe |
-| Articulos/mes | articles_per_month |
-| Redes | social_media_cost |
-| Total Gastos | total_expenses |
-| wha bot / WhatsApp | has_whatsapp_bot |
-| Activo | active |
-| Notas | notes |
-
-### Actualización del Formulario
-
-El formulario de retainer tendrá esta estructura:
-- Fila 1: Cliente | Especialidad
-- Fila 2: Ingreso neto | Redes (costo)
-- Fila 3: Total gastos | Artículos/mes
-- Fila 4: Stripe (switch) | WhatsApp Bot (switch) | Activo (switch)
-- Fila 5: Notas (textarea, ancho completo)
-
-### Actualización de la Tabla
-
-Nueva estructura de columnas:
-```text
-Cliente | Especialidad | Ingreso | Stripe | Art/mes | Redes | Gastos | Margen | Margen% | WA Bot | Activo | Acciones
-```
