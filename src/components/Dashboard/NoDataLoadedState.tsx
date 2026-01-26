@@ -1,19 +1,15 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Cloud, Database, Info } from 'lucide-react';
+import { Cloud, Info } from 'lucide-react';
 
 interface NoDataLoadedStateProps {
-  onLoadCache: () => void;
-  onLoadFresh: () => void;
-  hasCachedData: boolean;
+  onLoadData: () => void;
   isLoading: boolean;
 }
 
 const NoDataLoadedState: React.FC<NoDataLoadedStateProps> = ({
-  onLoadCache,
-  onLoadFresh,
-  hasCachedData,
+  onLoadData,
   isLoading
 }) => {
   return (
@@ -26,34 +22,23 @@ const NoDataLoadedState: React.FC<NoDataLoadedStateProps> = ({
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-center text-muted-foreground">
-          Haz clic en "Llamar API" para cargar los datos financieros del período seleccionado.
+          Haz clic en el botón para cargar los datos financieros del período seleccionado.
         </p>
         
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        <div className="flex justify-center">
           <Button
-            onClick={onLoadCache}
-            variant="outline"
-            disabled={isLoading || !hasCachedData}
-            className="flex items-center gap-2"
-          >
-            <Database className="h-4 w-4" />
-            {hasCachedData ? 'Cargar desde Cache' : 'Sin Cache Disponible'}
-          </Button>
-          
-          <Button
-            onClick={onLoadFresh}
+            onClick={onLoadData}
             disabled={isLoading}
             className="flex items-center gap-2"
           >
             <Cloud className="h-4 w-4" />
-            Cargar Datos Frescos
+            {isLoading ? 'Cargando...' : 'Cargar Datos'}
           </Button>
         </div>
         
-        <div className="text-xs text-center text-muted-foreground space-y-1">
-          <p><strong>Cache:</strong> Datos previamente guardados (más rápido)</p>
-          <p><strong>Frescos:</strong> Datos directos de las APIs (más actualizado)</p>
-        </div>
+        <p className="text-xs text-center text-muted-foreground">
+          Los datos se obtendrán directamente desde las APIs de Zoho Books y Stripe
+        </p>
       </CardContent>
     </Card>
   );

@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Transaction } from '@/types/financial';
 
@@ -23,7 +22,7 @@ export const searchTransactionsSemantic = async (
   try {
     console.log('Performing semantic search:', searchQuery);
 
-    // First, generate embedding for the search query via edge function
+    // Generate embedding for the search query via edge function
     const { data, error } = await supabase.functions.invoke('financial-assistant', {
       body: {
         messages: [{ role: 'user', content: `[SEMANTIC_SEARCH] ${searchQuery.query}` }],
@@ -91,37 +90,20 @@ export const findSimilarTransactions = async (
 };
 
 /**
- * Checks if semantic search is available (i.e., if transactions have embeddings)
+ * Checks if semantic search is available
+ * Note: This is now a stub since cached_transactions table was removed
  */
 export const checkSemanticSearchAvailability = async (): Promise<{
   available: boolean;
   embeddedCount: number;
   totalCount: number;
 }> => {
-  try {
-    const { data: totalResult } = await supabase
-      .from('cached_transactions')
-      .select('id', { count: 'exact', head: true });
-
-    const { data: embeddedResult } = await supabase
-      .from('cached_transactions')
-      .select('id', { count: 'exact', head: true })
-      .not('description_embedding', 'is', null);
-
-    const totalCount = totalResult?.length || 0;
-    const embeddedCount = embeddedResult?.length || 0;
-
-    return {
-      available: embeddedCount > 0,
-      embeddedCount,
-      totalCount
-    };
-  } catch (err) {
-    console.error('Error checking semantic search availability:', err);
-    return {
-      available: false,
-      embeddedCount: 0,
-      totalCount: 0
-    };
-  }
+  // Semantic search via cached_transactions is no longer available
+  // The feature would need to be reimplemented with a different approach
+  console.log('Semantic search via cached_transactions is not available - table was removed');
+  return {
+    available: false,
+    embeddedCount: 0,
+    totalCount: 0
+  };
 };

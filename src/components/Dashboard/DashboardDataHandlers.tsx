@@ -1,4 +1,3 @@
-
 import { useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -17,7 +16,6 @@ interface DashboardDataHandlersProps {
     notes?: string
   ) => Promise<boolean>;
   setStartingBalance: (balance: number) => void;
-  hasCachedData: boolean;
   isRefreshing?: boolean;
 }
 
@@ -27,16 +25,13 @@ export const useDashboardDataHandlers = ({
   refreshData,
   updateMonthlyBalance,
   setStartingBalance,
-  hasCachedData,
   isRefreshing = false,
 }: DashboardDataHandlersProps) => {
   const { toast } = useToast();
 
   // Handler for manual data loading - triggered by user action only
   const handleInitialLoad = useCallback(async () => {
-    console.log("🚀 DashboardDataHandlers: Manual data load requested by user", {
-      hasCachedData
-    });
+    console.log("🚀 DashboardDataHandlers: Manual data load requested by user");
     
     // Check if we need to set the initial balance first
     const balanceExists = await checkBalanceExists();
@@ -48,13 +43,13 @@ export const useDashboardDataHandlers = ({
       // Balance exists, trigger manual data load
       toast({
         title: 'Cargando datos financieros',
-        description: hasCachedData ? 'Cargando desde caché local' : 'Obteniendo desde APIs',
+        description: 'Obteniendo datos desde las APIs...',
       });
-      refreshData(false); // Manual load, use cache-first approach
+      refreshData(false);
     }
-  }, [checkBalanceExists, setShowBalanceDialog, toast, hasCachedData, refreshData]);
+  }, [checkBalanceExists, setShowBalanceDialog, toast, refreshData]);
 
-  // Handle balance saved in dialog - ENHANCED with immediate state propagation
+  // Handle balance saved in dialog
   const handleBalanceSaved = useCallback(async (
     balance: number,
     opexAmount: number = 35,
@@ -70,11 +65,10 @@ export const useDashboardDataHandlers = ({
     });
     
     try {
-      // PHASE 1: Immediate state propagation - update starting balance first
-      console.log("💾 DashboardDataHandlers: Immediately updating starting balance before database save");
+      // Immediate state propagation - update starting balance first
       setStartingBalance(balance);
       
-      // PHASE 2: Save to database
+      // Save to database
       const success = await updateMonthlyBalance(
         balance,
         opexAmount,
@@ -92,13 +86,12 @@ export const useDashboardDataHandlers = ({
           description: 'Configuración actualizada exitosamente',
         });
         
-        // PHASE 3: Small delay before refresh to allow UI to update
-        console.log("💾 DashboardDataHandlers: Waiting 100ms before refresh to allow UI update");
+        // Small delay before refresh to allow UI to update
         await new Promise(resolve => setTimeout(resolve, 100));
         
-        // PHASE 4: Background refresh with FRESH API CALLS
-        console.log("💾 DashboardDataHandlers: Starting FRESH API refresh (no cache)");
-        refreshData(true); // Force fresh API calls after balance changes
+        // Background refresh with fresh API calls
+        console.log("💾 DashboardDataHandlers: Starting API refresh");
+        refreshData(true);
         return true;
       } else {
         throw new Error("Failed to save balance");
@@ -114,7 +107,7 @@ export const useDashboardDataHandlers = ({
     }
   }, [updateMonthlyBalance, setStartingBalance, toast, refreshData]);
 
-  // ENHANCED handler for balance changes - with detailed parameter logging
+  // Handler for balance changes
   const handleBalanceChange = useCallback(async (
     balance: number, 
     opexAmount: number = 35, 
@@ -124,27 +117,11 @@ export const useDashboardDataHandlers = ({
     stripeSavingsPercentage: number = 0,
     includeZohoFiftyPercent: boolean = true
   ): Promise<boolean> => {
-    console.log("💰 DashboardDataHandlers: handleBalanceChange CALLED WITH ENHANCED LOGGING:", {
-      balance: { value: balance, type: typeof balance },
-      opexAmount: { value: opexAmount, type: typeof opexAmount },
-      itbmAmount: { value: itbmAmount, type: typeof itbmAmount },
-      profitPercentage: { value: profitPercentage, type: typeof profitPercentage, isZero: profitPercentage === 0, isDefault: profitPercentage === 1 },
-      taxReservePercentage: { value: taxReservePercentage, type: typeof taxReservePercentage, isZero: taxReservePercentage === 0, isDefault: taxReservePercentage === 5 },
-      includeZohoFiftyPercent: { value: includeZohoFiftyPercent, type: typeof includeZohoFiftyPercent },
-      timestamp: new Date().toISOString()
+    console.log("💰 DashboardDataHandlers: handleBalanceChange CALLED:", {
+      balance, opexAmount, itbmAmount, profitPercentage, taxReservePercentage, includeZohoFiftyPercent
     });
     
     try {
-      // ENHANCED: Log exactly what we're passing to updateMonthlyBalance
-      console.log("💰 DashboardDataHandlers: About to call updateMonthlyBalance with EXACT parameters:", {
-        balance,
-        opexAmount,
-        itbmAmount,
-        profitPercentage,
-        taxReservePercentage,
-        includeZohoFiftyPercent
-      });
-      
       const success = await updateMonthlyBalance(
         balance, 
         opexAmount,
@@ -156,19 +133,16 @@ export const useDashboardDataHandlers = ({
       );
 
       if (success) {
-        console.log("💰 DashboardDataHandlers: updateMonthlyBalance SUCCESS - Updating local starting balance to:", balance);
         setStartingBalance(balance);
         
         toast({
-          title: 'Balance actualizado inmediatamente',
+          title: 'Balance actualizado',
           description: `Profit: ${profitPercentage}%, Tax: ${taxReservePercentage}%`,
         });
 
-        console.log("💰 DashboardDataHandlers: Triggering FRESH API refresh (no cache)");
-        refreshData(true); // Force fresh API calls after balance changes
+        refreshData(true);
         return true;
       } else {
-        console.error("💰 DashboardDataHandlers: updateMonthlyBalance FAILED");
         throw new Error("Failed to update monthly balance");
       }
     } catch (error) {
@@ -182,14 +156,14 @@ export const useDashboardDataHandlers = ({
     }
   }, [updateMonthlyBalance, setStartingBalance, toast, refreshData]);
 
-  // Enhanced handler for data refresh with smart refresh feedback
+  // Handler for data refresh
   const handleRefresh = useCallback(() => {
     console.log("🔄 DashboardDataHandlers: Manual refresh requested - user action");
     
     if (isRefreshing) {
       toast({
         title: 'Actualización en progreso',
-        description: 'Los datos se están actualizando en segundo plano...',
+        description: 'Los datos se están actualizando...',
       });
     } else {
       toast({
@@ -198,7 +172,7 @@ export const useDashboardDataHandlers = ({
       });
     }
     
-    refreshData(true); // Force refresh for manual user action
+    refreshData(true);
   }, [toast, refreshData, isRefreshing]);
 
   return {

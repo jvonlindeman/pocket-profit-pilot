@@ -1,11 +1,10 @@
-
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { Transaction } from '@/types/financial';
 import { useOptimizedFinancialData } from '@/hooks/queries/useOptimizedFinancialData';
 
 /**
- * Unified hook for financial data management with optimized cache-first approach
+ * Unified hook for financial data management
  */
 export const useUnifiedFinancialData = () => {
   // State for the current date range
@@ -22,9 +21,8 @@ export const useUnifiedFinancialData = () => {
     stripeData,
     loading,
     error,
-    usingCachedData,
-    cacheStatus,
-    refetch
+    refetch,
+    isRefreshing
   } = useOptimizedFinancialData(
     dateRange?.startDate || new Date(),
     dateRange?.endDate || new Date()
@@ -63,7 +61,7 @@ export const useUnifiedFinancialData = () => {
     }
   }, []);
 
-  // Function to check cache status (now provided by the optimized hook)
+  // Function to check cache status (simplified - no persistent cache)
   const checkCacheStatus = useCallback(async (newDateRange: { startDate: Date; endDate: Date }) => {
     if (!dateRange || 
         dateRange.startDate.getTime() !== newDateRange.startDate.getTime() ||
@@ -71,11 +69,12 @@ export const useUnifiedFinancialData = () => {
       setDateRange(newDateRange);
     }
     
+    // No persistent cache - always return not cached
     return {
-      zoho: { cached: cacheStatus.zoho.hit, partial: cacheStatus.zoho.partial },
-      stripe: { cached: cacheStatus.stripe.hit, partial: cacheStatus.stripe.partial }
+      zoho: { cached: false, partial: false },
+      stripe: { cached: false, partial: false }
     };
-  }, [dateRange, cacheStatus]);
+  }, [dateRange]);
 
   // Function to fetch data with throttling
   const fetchData = useCallback(async (
@@ -155,12 +154,10 @@ export const useUnifiedFinancialData = () => {
   useEffect(() => {
     if (stripeData) {
       setRawResponse({
-        stripe: stripeData,
-        cached: usingCachedData,
-        cacheStatus
+        stripe: stripeData
       });
     }
-  }, [stripeData, usingCachedData, cacheStatus]);
+  }, [stripeData]);
 
   return {
     transactions,
@@ -168,8 +165,7 @@ export const useUnifiedFinancialData = () => {
     loading,
     error,
     rawResponse,
-    usingCachedData,
-    cacheStatus,
+    isRefreshing,
     apiConnectivity,
     checkApiConnectivity,
     fetchData,

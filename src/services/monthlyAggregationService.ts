@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Transaction } from '@/types/financial';
 
@@ -188,90 +187,14 @@ export class MonthlyAggregationService {
   }
 
   /**
-   * Backfill historical monthly summaries from cached transactions
+   * Backfill historical monthly summaries from monthly_financial_summaries table
+   * Note: This method is simplified since cached_transactions table was removed
    */
   static async backfillHistoricalSummaries(): Promise<{ processed: number; errors: number }> {
     try {
-      console.log('Starting historical monthly summaries backfill...');
-      
-      // Get distinct months from cached transactions
-      const { data: months, error } = await supabase
-        .from('cached_transactions')
-        .select('year, month')
-        .not('year', 'is', null)
-        .not('month', 'is', null)
-        .order('year', { ascending: false })
-        .order('month', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching months:', error);
-        return { processed: 0, errors: 1 };
-      }
-
-      const uniqueMonths = Array.from(
-        new Set((months || []).map(m => `${m.year}-${m.month}`))
-      ).map(key => {
-        const [year, month] = key.split('-').map(Number);
-        return { year, month };
-      });
-
-      let processed = 0;
-      let errors = 0;
-
-      for (const { year, month } of uniqueMonths) {
-        try {
-          // Get transactions for this month
-          const { data: transactions, error: txError } = await supabase
-            .from('cached_transactions')
-            .select('*')
-            .eq('year', year)
-            .eq('month', month);
-
-          if (txError) {
-            console.error(`Error fetching transactions for ${year}-${month}:`, txError);
-            errors++;
-            continue;
-          }
-
-          // Convert to Transaction format
-          const formattedTransactions: Transaction[] = (transactions || []).map(tx => ({
-            id: tx.id,
-            external_id: tx.external_id,
-            date: tx.date,
-            amount: Number(tx.amount),
-            description: tx.description || '',
-            category: tx.category || '',
-            type: tx.type as 'income' | 'expense',
-            source: tx.source as 'Zoho' | 'Stripe',
-            fees: tx.fees ? Number(tx.fees) : undefined,
-            gross: tx.gross ? Number(tx.gross) : undefined,
-            metadata: tx.metadata
-          }));
-
-          // Process the month
-          const success = await this.processTransactionsForMonth(
-            formattedTransactions,
-            year,
-            month,
-            0 // Starting balance - you may want to fetch this from monthly_balances
-          );
-
-          if (success) {
-            processed++;
-          } else {
-            errors++;
-          }
-
-          // Small delay to avoid overwhelming the database
-          await new Promise(resolve => setTimeout(resolve, 100));
-        } catch (err) {
-          console.error(`Exception processing ${year}-${month}:`, err);
-          errors++;
-        }
-      }
-
-      console.log(`Backfill completed. Processed: ${processed}, Errors: ${errors}`);
-      return { processed, errors };
+      console.log('Backfill not available - cached_transactions table was removed');
+      console.log('Use processTransactionsForMonth with live data instead');
+      return { processed: 0, errors: 0 };
     } catch (err) {
       console.error('Exception in backfill:', err);
       return { processed: 0, errors: 1 };

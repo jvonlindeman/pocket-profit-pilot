@@ -1,11 +1,10 @@
-import { useMemo, useCallback, useRef, useEffect } from 'react';
+import { useMemo, useCallback, useRef } from 'react';
 import { useFinanceDateRange } from '@/hooks/useFinanceDateRange';
 import { useCollaboratorProcessor } from '@/hooks/useCollaboratorProcessor';
 import { useIncomeProcessor } from '@/hooks/useIncomeProcessor';
 import { useMonthlyBalanceManager } from '@/hooks/useMonthlyBalanceManager';
 import { useOptimizedFinancialData } from '@/hooks/queries/useOptimizedFinancialData';
 import { useUrlParamCleaner } from '@/hooks/useUrlParamCleaner';
-import { useStoredFinancialData } from '@/hooks/useStoredFinancialData';
 import { processTransactionData } from '@/services/financialService';
 import { getCurrentMonthRange } from '@/utils/dateUtils';
 import { zohoRepository } from '@/repositories/zohoRepository';
@@ -29,41 +28,26 @@ export const useFinanceData = () => {
     regularIncome, processIncomeTypes 
   } = useIncomeProcessor();
 
-  // Storage hook for saving financial data
-  const { saveSnapshot } = useStoredFinancialData();
-
   // Use the date range hook
   const { dateRange, updateDateRange } = useFinanceDateRange(fetchMonthlyBalance);
   
-  // Use PASSIVE financial data hook - no auto-loading
+  // Use financial data hook
   const { 
     transactions, 
     stripeData,
     loading, 
     error, 
-    usingCachedData, 
-    cacheStatus, 
     refetch,
     isDataRequested,
-    cacheChecked,
-    hasCachedData,
     isRefreshing
   } = useOptimizedFinancialData(dateRange.startDate, dateRange.endDate);
 
-  console.log("🏠 useFinanceData: Hook rendered with PASSIVE MODE", {
+  console.log("🏠 useFinanceData: Hook rendered", {
     dateRange: `${dateRange.startDate.toISOString().split('T')[0]} to ${dateRange.endDate.toISOString().split('T')[0]}`,
     transactionCount: transactions.length,
     isDataRequested,
-    cacheChecked,
-    hasCachedData,
     loading,
-    usingCachedData,
-    isLegitimateRefresh,
-    autoLoadingPrevented: true,
-    cacheStatus: {
-      zohoHit: cacheStatus.zoho.hit,
-      stripeHit: cacheStatus.stripe.hit
-    }
+    isLegitimateRefresh
   });
 
   // Process data when transactions change
@@ -95,59 +79,6 @@ export const useFinanceData = () => {
     return processTransactionData(transactions, startingBalance, collaboratorExpenses);
   }, [transactions, startingBalance, collaboratorExpenses]);
 
-  // Auto-save financial data snapshot when data is successfully loaded
-  useEffect(() => {
-    if (transactions.length > 0 && isDataRequested && !loading) {
-      const snapshotData = {
-        transactions,
-        zohoTransactions: transactions.filter(tx => tx.source === 'Zoho'),
-        stripeTransactions: transactions.filter(tx => tx.source === 'Stripe'),
-        stripeData,
-        summary: financialData,
-        collaboratorExpenses,
-        unpaidInvoices,
-        startingBalance,
-        regularIncome,
-        stripeIncome,
-        stripeFees,
-        stripeNet,
-        cacheStatus,
-        apiConnectivity: { zoho: true, stripe: true },
-      };
-
-      saveSnapshot(
-        dateRange,
-        snapshotData,
-        {
-          dataSource: 'useFinanceData',
-          usingCachedData,
-        }
-      );
-
-      console.log('💾 Auto-saved financial data snapshot', {
-        dateRange,
-        transactionCount: transactions.length,
-        usingCachedData,
-      });
-    }
-  }, [
-    transactions.length,
-    isDataRequested,
-    loading,
-    dateRange,
-    financialData,
-    collaboratorExpenses,
-    unpaidInvoices,
-    startingBalance,
-    regularIncome,
-    stripeIncome,
-    stripeFees,
-    stripeNet,
-    cacheStatus,
-    usingCachedData,
-    saveSnapshot
-  ]);
-
   // Check API connectivity (simplified)
   const checkApiConnectivity = useCallback(async () => {
     try {
@@ -161,24 +92,21 @@ export const useFinanceData = () => {
     }
   }, []);
 
-  // Data initialized flag - FIXED: Only true when user explicitly loads data
+  // Data initialized flag - Only true when user explicitly loads data
   const dataInitialized = useMemo(() => {
     // Data is only initialized when explicitly requested AND has transactions
     const initialized = isDataRequested && transactions.length > 0;
     
-    console.log("🔍 useFinanceData: Data initialization check with PASSIVE MODE", {
+    console.log("🔍 useFinanceData: Data initialization check", {
       initialized,
       isDataRequested,
       transactionCount: transactions.length,
-      cacheChecked,
-      hasCachedData,
-      usingCachedData,
       reason: initialized ? 
         'user_explicitly_loaded_data' : 
         (isDataRequested ? 'no_transactions_loaded' : 'no_explicit_request')
     });
     return initialized;
-  }, [isDataRequested, transactions.length, cacheChecked, hasCachedData, usingCachedData]);
+  }, [isDataRequested, transactions.length]);
 
   // MANUAL DATA REFRESH FUNCTION - only loads data when explicitly called
   const refreshData = useCallback((force = false) => {
@@ -246,12 +174,8 @@ export const useFinanceData = () => {
     updateStartingBalance,
     setStartingBalance,
     setNotes,
-    usingCachedData,
-    cacheStatus,
     apiConnectivity: { zoho: true, stripe: true }, // Simplified
     checkApiConnectivity,
-    cacheChecked,
-    hasCachedData,
     isRefreshing
   };
 };
