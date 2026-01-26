@@ -1,9 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Bug } from 'lucide-react';
 import { Transaction } from '@/types/financial';
-import CacheInfo from './CacheInfo';
 import TransactionFilters, { FilterOptions } from './TransactionFilters';
 import TransactionCategorySummary from './TransactionCategorySummary';
 import TransactionTable from './TransactionTable';
@@ -47,17 +45,6 @@ const TransactionList: React.FC<TransactionListProps> = ({
   const handleFilterChange = (filtered: Transaction[]) => {
     setFilteredTransactions(filtered);
   };
-  
-  // Cache info props
-  const cacheProps = {
-    dateRange: dateRange || { startDate: new Date(), endDate: new Date() },
-    cacheStatus: cacheStatus || {
-      zoho: { hit: false, partial: false },
-      stripe: { hit: false, partial: false }
-    },
-    isUsingCache: isUsingCache || false,
-    onRefresh
-  };
 
   const handleForceRefresh = () => {
     console.log("🔄 TransactionList: Forcing complete refresh");
@@ -66,11 +53,6 @@ const TransactionList: React.FC<TransactionListProps> = ({
   
   return (
     <div className="space-y-4">
-      {/* Cache information */}
-      {dateRange && cacheStatus && (
-        <CacheInfo {...cacheProps} />
-      )}
-
       {/* Debug Helper - Show when there are potential collaborator issues */}
       {showDebug && (
         <CollaboratorDebugHelper 

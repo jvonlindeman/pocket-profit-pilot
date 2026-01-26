@@ -1,16 +1,15 @@
-
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from "@/hooks/use-toast";
 import { Transaction } from '@/types/financial';
 import { useFinancialDataFetcher } from '@/hooks/useFinancialDataFetcher';
 import { useThrottledFetch } from '@/hooks/useThrottledFetch';
-import { useCacheManagement } from '@/hooks/useCacheManagement';
 import { useUrlParamCleaner } from '@/hooks/useUrlParamCleaner';
 import { useStripeDebug } from '@/hooks/useStripeDebug';
 
 /**
  * Enhanced hook to handle fetching of financial data with transaction management
  * and throttling to prevent duplicate API calls
+ * Simplified to not use persistent cache management
  */
 export const useEnhancedFinancialDataFetcher = () => {
   // States
@@ -19,7 +18,6 @@ export const useEnhancedFinancialDataFetcher = () => {
   
   // Use smaller, focused hooks
   const { executeThrottledFetch, cleanup } = useThrottledFetch(1000);
-  const { fixLegacyCacheEntries, cleanupCache } = useCacheManagement();
   const { debugStripeCaching } = useStripeDebug();
   
   // Handle URL parameter cleanup
@@ -35,11 +33,6 @@ export const useEnhancedFinancialDataFetcher = () => {
     apiConnectivity,
     checkApiConnectivity
   } = useFinancialDataFetcher();
-
-  // Check if we need to fix any legacy cache entries with missing year/month values
-  useEffect(() => {
-    fixLegacyCacheEntries();
-  }, [fixLegacyCacheEntries]);
 
   // Actual fetch execution logic
   const executeFetchData = useCallback(async (
@@ -65,13 +58,13 @@ export const useEnhancedFinancialDataFetcher = () => {
     
     if (success && transactions.length > 0) {
       toast({
-        title: usingCachedData ? "Datos financieros cargados desde caché" : "Datos financieros actualizados",
-        description: `Se procesaron ${transactions.length} transacciones${usingCachedData ? " (desde caché)" : ""}`
+        title: "Datos financieros actualizados",
+        description: `Se procesaron ${transactions.length} transacciones`
       });
     }
     
     return success;
-  }, [fetchFinancialData, transactions.length, usingCachedData]);
+  }, [fetchFinancialData, transactions.length]);
 
   // Function to fetch data with throttling
   const fetchData = useCallback(async (
@@ -99,6 +92,12 @@ export const useEnhancedFinancialDataFetcher = () => {
     
     return fetchData; // Return the fetchData function for later use
   }, [fetchData]);
+
+  // Cleanup function - no-op stub for cache cleanup
+  const cleanupCache = useCallback(async () => {
+    // No-op since we no longer use persistent cache
+    return 0;
+  }, []);
 
   // Cleanup function
   useEffect(() => {

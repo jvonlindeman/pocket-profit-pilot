@@ -8,7 +8,6 @@ import ErrorDisplay from './ErrorDisplay';
 import InitialBalanceDialog from './InitialBalanceDialog';
 import NoDataLoadedState from './NoDataLoadedState';
 import { Separator } from '@/components/ui/separator';
-import CacheEfficiencyDashboard from './CacheEfficiencyDashboard';
 import TransactionCategorySummary from './TransactionCategorySummary';
 import { FinanceProvider } from '@/contexts/FinanceContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -253,34 +252,24 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
 
             <Separator />
 
-            <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-              <div className="xl:col-span-3">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
-                      Transacciones
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <TransactionFilters 
-                      transactions={financialData.transactions}
-                      onFilterChange={() => {}}
-                    />
-                    <TransactionTable 
-                      transactions={financialData.transactions}
-                      isLoading={loading}
-                    />
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="xl:col-span-1">
-                <CacheEfficiencyDashboard 
-                  dateRange={{ startDate: new Date(), endDate: new Date() }}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Transacciones
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <TransactionFilters 
+                  transactions={financialData.transactions}
+                  onFilterChange={() => {}}
                 />
-              </div>
-            </div>
+                <TransactionTable 
+                  transactions={financialData.transactions}
+                  isLoading={loading}
+                />
+              </CardContent>
+            </Card>
           </>
         )}
       </div>

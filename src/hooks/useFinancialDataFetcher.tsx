@@ -1,13 +1,10 @@
-
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { financialService } from '@/services/financialService';
-import { zohoRepository } from '@/repositories/zohoRepository';
-import { useCacheSegments } from '@/hooks/cache/useCacheSegments';
-import CacheService from '@/services/cache';
 import { apiRequestManager } from '@/utils/ApiRequestManager';
 
 /**
  * Base hook for fetching financial data with improved deduplication
+ * Simplified to not use persistent cache - React Query handles caching
  */
 export const useFinancialDataFetcher = () => {
   // States
@@ -32,73 +29,30 @@ export const useFinancialDataFetcher = () => {
   
   // References to prevent duplicate calls
   const currentRequestIdRef = useRef<string>('');
-  const cacheCheckInProgressRef = useRef<boolean>(false);
   const connectivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Get cache segments helper
-  const { checkSourceCache } = useCacheSegments();
-
-  // Check cache status with improved deduplication
+  // Check cache status - simplified stub that returns defaults
   const checkCacheStatus = useCallback(async (
     dateRange: { startDate: Date; endDate: Date },
     skipIfInProgress = true
   ) => {
     if (!dateRange.startDate || !dateRange.endDate) return null;
 
-    // Skip if another check is in progress
-    if (skipIfInProgress && cacheCheckInProgressRef.current) {
-      console.log("Cache check already in progress, skipping duplicate check");
-      return null;
-    }
+    // Since we no longer use persistent cache, just return defaults
+    const result = {
+      zoho: { cached: false, partial: false },
+      stripe: { cached: false, partial: false }
+    };
 
-    // Generate a cache key for the cache check itself
-    const cacheCheckKey = `cache-status-${dateRange.startDate.getTime()}-${dateRange.endDate.getTime()}`;
+    setCacheStatus({
+      zoho: { hit: false, partial: false },
+      stripe: { hit: false, partial: false }
+    });
     
-    try {
-      cacheCheckInProgressRef.current = true;
-
-      // Use ApiRequestManager to deduplicate cache check calls with shorter TTL
-      const result = await apiRequestManager.executeRequest(
-        cacheCheckKey,
-        async () => {
-          // Check Zoho cache
-          const zohoCache = await checkSourceCache('Zoho', dateRange);
-          
-          // Check Stripe cache
-          const stripeCache = await checkSourceCache('Stripe', dateRange);
-          
-          return {
-            zoho: zohoCache,
-            stripe: stripeCache
-          };
-        },
-        15000, // 15 second TTL (reduced from 10s)
-        3000   // 3 second cooldown (reduced from 5s)
-      );
-
-      // Update states using the result
-      setCacheStatus({
-        zoho: { 
-          hit: result.zoho.cached, 
-          partial: result.zoho.partial || false 
-        },
-        stripe: { 
-          hit: result.stripe.cached, 
-          partial: result.stripe.partial || false 
-        }
-      });
-      
-      // Determine if we're using cached data
-      setUsingCachedData(result.zoho.cached || result.stripe.cached);
-      
-      return result;
-    } catch (err) {
-      console.error("Error checking cache status:", err);
-      return null;
-    } finally {
-      cacheCheckInProgressRef.current = false;
-    }
-  }, [checkSourceCache]);
+    setUsingCachedData(false);
+    
+    return result;
+  }, []);
 
   // Check API connectivity with improved caching
   const checkApiConnectivity = useCallback(async () => {
@@ -116,8 +70,8 @@ export const useFinancialDataFetcher = () => {
           return result;
         }
       },
-      45000, // 45 second TTL (reduced from 60s)
-      3000   // 3 second cooldown (reduced from 5s)
+      45000, // 45 second TTL
+      3000   // 3 second cooldown
     );
   }, []);
 
@@ -149,11 +103,6 @@ export const useFinancialDataFetcher = () => {
           // Check connectivity first (cached)
           await checkApiConnectivity();
           
-          // Check cache status first - but only once
-          if (!cacheCheckInProgressRef.current) {
-            await checkCacheStatus(dateRange, false);
-          }
-          
           // Fetch the financial data
           const result = await financialService.fetchFinancialData(
             dateRange, 
@@ -167,9 +116,6 @@ export const useFinancialDataFetcher = () => {
             setRawResponse(rawData);
           }
           
-          // Check cache status again after fetch to update the UI
-          await checkCacheStatus(dateRange);
-          
           return result;
         },
         30000, // 30 second TTL
@@ -181,7 +127,7 @@ export const useFinancialDataFetcher = () => {
     } catch (err: any) {
       console.error("Error in fetchFinancialData:", err);
       
-      // Si es un error de cooldown, no establecer como error crítico
+      // If it's a cooldown error, don't set as critical error
       if (err.message?.includes('Request too frequent')) {
         console.warn("Request throttled, skipping this call");
         return false;
@@ -191,24 +137,16 @@ export const useFinancialDataFetcher = () => {
       setLoading(false);
       return false;
     }
-  }, [checkApiConnectivity, checkCacheStatus]);
+  }, [checkApiConnectivity]);
 
-  // Check cache status on mount
+  // Clean up timeout on unmount
   useEffect(() => {
-    // This will run once on mount
-    const currentDate = new Date();
-    const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-    
-    checkCacheStatus({ startDate, endDate });
-    
-    // Clean up timeout on unmount
     return () => {
       if (connectivityTimeoutRef.current) {
         clearTimeout(connectivityTimeoutRef.current);
       }
     };
-  }, [checkCacheStatus]);
+  }, []);
 
   return {
     loading,
