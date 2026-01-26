@@ -4,7 +4,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ApiCallsProvider } from "./contexts/ApiCallsContext";
-import { FinancialAssistantButton } from "./components/FinancialAssistant/FinancialAssistantButton";
 import { queryClient } from "./lib/react-query/queryClient";
 import { QueryDevTools } from "./components/ReactQueryDevTools";
 import Index from "./pages/Index";
@@ -28,7 +27,6 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-          <FinancialAssistantButton />
           <QueryDevTools />
         </ApiCallsProvider>
       </BrowserRouter>

@@ -3,7 +3,6 @@ import React from 'react';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { ApiStatusIndicator } from './ApiStatusIndicator';
 import ExpenseCalculationVerifier from './ExpenseCalculationVerifier';
-import { StoredDataManager } from '../StoredDataManager';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -19,8 +18,7 @@ export default function FinancialDebugHelper() {
   const { 
     refreshData, 
     loading,
-    apiConnectivity,
-    cacheStatus
+    apiConnectivity
   } = useFinancialData(
     dateRange?.startDate || new Date(), 
     dateRange?.endDate || new Date()
@@ -60,9 +58,6 @@ export default function FinancialDebugHelper() {
   
   return (
     <div className="mt-4 space-y-4">
-      {/* Stored Data Manager */}
-      <StoredDataManager />
-      
       {/* Expense Calculation Verifier */}
       <ExpenseCalculationVerifier />
       
@@ -74,12 +69,6 @@ export default function FinancialDebugHelper() {
         </div>
         
         <div className="flex items-center gap-2">
-          {cacheStatus && (
-            <div className="text-xs text-gray-500">
-              Cache: {cacheStatus.zoho?.cached ? '✓' : '✗'} Zoho / {cacheStatus.stripe?.cached ? '✓' : '✗'} Stripe
-            </div>
-          )}
-          
           <Button
             variant="outline"
             size="sm"

@@ -1,5 +1,3 @@
-import { HistoricalFinancialContext } from './historicalDataCapture';
-
 /**
  * Optimize summary data for AI consumption
  */
@@ -87,15 +85,14 @@ export const optimizeUnpaidInvoices = (invoices: any[]): any[] => {
 };
 
 /**
- * Enhanced optimization including historical data
+ * Optimize UI data payload
  */
 export const optimizeUIDataPayload = (uiData: any): any => {
   const optimized = {
-    // Existing optimization
     activeComponents: uiData.activeComponents || [],
     focusedElement: uiData.focusedElement,
     
-    // Current period financial data (keep existing optimization)
+    // Current period financial data
     summary: optimizeSummaryData(uiData.summary),
     transactions: optimizeTransactionData(uiData.transactions),
     transactionInsights: optimizeInsightData(uiData.transactionInsights),
@@ -108,60 +105,14 @@ export const optimizeUIDataPayload = (uiData: any): any => {
     stripeFees: uiData.stripeFees || 0,
     
     // Date range
-    dateRange: uiData.dateRange,
-    
-    // New: Historical context optimization
-    historicalContext: optimizeHistoricalContext(uiData.historicalContext),
-    temporalAnalysisAvailable: uiData.temporalAnalysisAvailable || false
+    dateRange: uiData.dateRange
   };
 
   // Log optimization results
   console.log('Data payload optimized:', {
     transactions: `${uiData.transactions?.length || 0} -> ${optimized.transactions?.length || 0}`,
-    historicalMonths: optimized.historicalContext?.monthlyHistory?.length || 0,
     payloadSizeEstimate: `${JSON.stringify(optimized).length} chars`
   });
 
   return optimized;
 };
-
-/**
- * Optimize historical context for AI consumption
- */
-function optimizeHistoricalContext(historicalContext: HistoricalFinancialContext | null): any {
-  if (!historicalContext) {
-    return null;
-  }
-
-  return {
-    monthlyHistory: historicalContext.monthlyHistory.map(month => ({
-      year: month.year,
-      month: month.month,
-      total_income: Number(month.total_income),
-      total_expense: Number(month.total_expense),
-      profit: Number(month.profit),
-      profit_margin: Number(month.profit_margin),
-      transaction_count: month.transaction_count,
-      mom_income_change: month.mom_income_change ? Number(month.mom_income_change) : null,
-      mom_expense_change: month.mom_expense_change ? Number(month.mom_expense_change) : null,
-      mom_profit_change: month.mom_profit_change ? Number(month.mom_profit_change) : null,
-      income_trend: month.income_trend,
-      expense_trend: month.expense_trend,
-      profit_trend: month.profit_trend
-    })),
-    currentPeriod: historicalContext.currentPeriod,
-    trends: {
-      overallIncomesTrend: historicalContext.trends.overallIncomesTrend,
-      overallExpensesTrend: historicalContext.trends.overallExpensesTrend,
-      overallProfitTrend: historicalContext.trends.overallProfitTrend,
-      volatility: Math.round(historicalContext.trends.volatility * 100) / 100
-    },
-    seasonalPatterns: {
-      highestIncomeMonth: historicalContext.seasonalPatterns.highestIncomeMonth,
-      lowestIncomeMonth: historicalContext.seasonalPatterns.lowestIncomeMonth,
-      highestExpenseMonth: historicalContext.seasonalPatterns.highestExpenseMonth,
-      lowestExpenseMonth: historicalContext.seasonalPatterns.lowestExpenseMonth,
-      averageMonthlyProfit: Math.round(historicalContext.seasonalPatterns.averageMonthlyProfit * 100) / 100
-    }
-  };
-}

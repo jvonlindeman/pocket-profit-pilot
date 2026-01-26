@@ -5,15 +5,13 @@ import RefinedExpensesSection from './RefinedExpensesSection';
 import ProfitSection from './ProfitSection';
 import UnpaidInvoicesSection from './UnpaidInvoicesSection';
 import FinancialDebugHelper from '../DebugTools/FinancialDebugHelper';
-import FinancialHistorySummary from '../FinancialHistory/FinancialHistorySummary';
-import { FinancialAssistantPromo } from '../FinancialAssistant/FinancialAssistantPromo';
 import { useFinance } from '@/contexts/FinanceContext';
 import { registerInteraction } from '@/utils/uiCapture';
 import { useIsMobile } from '@/hooks/use-mobile';
 import IncomeTabs from './IncomeTabs';
 
 const RefinedFinancialSummary: React.FC = () => {
-  const { dateRange, unpaidInvoices } = useFinance();
+  const { unpaidInvoices } = useFinance();
   const isMobile = useIsMobile();
   
   // Register components as visible
@@ -42,23 +40,6 @@ const RefinedFinancialSummary: React.FC = () => {
           <UnpaidInvoicesSection />
         </SummaryCardSection>
       )}
-      
-      <div className={`grid ${isMobile ? 'grid-cols-1 gap-4' : 'md:grid-cols-3 gap-4'}`}>
-        <div className={isMobile ? "" : "md:col-span-2"}>
-          {/* Financial history section */}
-          <SummaryCardSection title="Historial Financiero" data-component="financial-history" className="financial-history-summary">
-            <FinancialHistorySummary 
-              startDate={dateRange?.startDate}
-              endDate={dateRange?.endDate}
-            />
-          </SummaryCardSection>
-        </div>
-        
-        <div className={isMobile ? "mt-4" : "md:col-span-1"}>
-          {/* Financial assistant promo section */}
-          <FinancialAssistantPromo />
-        </div>
-      </div>
       
       {/* Add the debug helper */}
       <FinancialDebugHelper />
