@@ -20,6 +20,9 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
   const [netIncome, setNetIncome] = React.useState(String(initial?.net_income ?? ""));
   const [socialCost, setSocialCost] = React.useState(String(initial?.social_media_cost ?? ""));
   const [totalExpenses, setTotalExpenses] = React.useState(String(initial?.total_expenses ?? ""));
+  const [usesStripe, setUsesStripe] = React.useState<boolean>((initial as any)?.uses_stripe ?? false);
+  const [articlesPerMonth, setArticlesPerMonth] = React.useState(String((initial as any)?.articles_per_month ?? "0"));
+  const [hasWhatsappBot, setHasWhatsappBot] = React.useState<boolean>((initial as any)?.has_whatsapp_bot ?? false);
   const [active, setActive] = React.useState<boolean>(initial?.active ?? true);
   const [notes, setNotes] = React.useState(initial?.notes ?? "");
 
@@ -30,6 +33,9 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
       setNetIncome(String(initial?.net_income ?? ""));
       setSocialCost(String(initial?.social_media_cost ?? ""));
       setTotalExpenses(String(initial?.total_expenses ?? ""));
+      setUsesStripe((initial as any)?.uses_stripe ?? false);
+      setArticlesPerMonth(String((initial as any)?.articles_per_month ?? "0"));
+      setHasWhatsappBot((initial as any)?.has_whatsapp_bot ?? false);
       setActive(initial?.active ?? true);
       setNotes(initial?.notes ?? "");
     }
@@ -42,6 +48,9 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
       net_income: parseNumberLike(netIncome),
       social_media_cost: parseNumberLike(socialCost),
       total_expenses: parseNumberLike(totalExpenses),
+      uses_stripe: usesStripe,
+      articles_per_month: parseInt(articlesPerMonth, 10) || 0,
+      has_whatsapp_bot: hasWhatsappBot,
       active,
       notes: notes?.trim() || null,
     } as RetainerInsert;
@@ -82,6 +91,19 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
             <label className="text-sm font-medium">Total de gastos</label>
             <Input value={totalExpenses} onChange={(e) => setTotalExpenses(e.target.value)} placeholder="0"
               inputMode="decimal" />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Artículos/mes</label>
+            <Input value={articlesPerMonth} onChange={(e) => setArticlesPerMonth(e.target.value)} placeholder="0"
+              inputMode="numeric" />
+          </div>
+          <div className="flex items-center gap-3">
+            <Switch checked={usesStripe} onCheckedChange={setUsesStripe} id="usesStripe" />
+            <label htmlFor="usesStripe" className="text-sm">Stripe</label>
+          </div>
+          <div className="flex items-center gap-3">
+            <Switch checked={hasWhatsappBot} onCheckedChange={setHasWhatsappBot} id="hasWhatsappBot" />
+            <label htmlFor="hasWhatsappBot" className="text-sm">WhatsApp Bot</label>
           </div>
           <div className="flex items-center gap-3">
             <Switch checked={active} onCheckedChange={setActive} id="active" />

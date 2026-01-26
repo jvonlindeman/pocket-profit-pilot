@@ -41,20 +41,29 @@ function exportCsv(rows: RetainerRow[]) {
     "Cliente",
     "Especialidad",
     "Ingreso neto",
-    "Columna de redes",
-    "Total de gastos",
+    "Stripe",
+    "Articulos/mes",
+    "Redes",
+    "Total Gastos",
+    "WHA Bot",
     "Activo",
     "Notas",
   ];
-  const body = rows.map((r) => [
-    r.client_name,
-    r.specialty ?? "",
-    r.net_income ?? 0,
-    r.social_media_cost ?? 0,
-    r.total_expenses ?? 0,
-    r.active ? "sí" : "no",
-    r.notes ?? "",
-  ]);
+  const body = rows.map((r) => {
+    const row = r as any;
+    return [
+      r.client_name,
+      r.specialty ?? "",
+      r.net_income ?? 0,
+      row.uses_stripe ? "sí" : "no",
+      row.articles_per_month ?? 0,
+      r.social_media_cost ?? 0,
+      r.total_expenses ?? 0,
+      row.has_whatsapp_bot ? "sí" : "no",
+      r.active ? "sí" : "no",
+      r.notes ?? "",
+    ];
+  });
   const csv = [headers.join(","), ...body.map((row) => row.join(","))].join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -150,11 +159,14 @@ const RetainersPage: React.FC = () => {
           client_name: r.client_name,
           specialty: r.specialty ?? null,
           net_income: Number(r.net_income ?? 0),
+          uses_stripe: r.uses_stripe ?? false,
+          articles_per_month: Number(r.articles_per_month ?? 0),
           social_media_cost: Number(r.social_media_cost ?? 0),
           total_expenses: Number(r.total_expenses ?? 0),
+          has_whatsapp_bot: r.has_whatsapp_bot ?? false,
           active: r.active ?? true,
           notes: r.notes ?? null,
-        };
+        } as any;
         if (updateIfExists) {
           await upsertByClientName(insert);
         } else {

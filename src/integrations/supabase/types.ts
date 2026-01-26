@@ -236,9 +236,11 @@ export type Database = {
       retainers: {
         Row: {
           active: boolean
+          articles_per_month: number
           canceled_at: string | null
           client_name: string
           created_at: string
+          has_whatsapp_bot: boolean
           id: string
           metadata: Json
           net_income: number
@@ -247,12 +249,15 @@ export type Database = {
           specialty: string | null
           total_expenses: number
           updated_at: string
+          uses_stripe: boolean
         }
         Insert: {
           active?: boolean
+          articles_per_month?: number
           canceled_at?: string | null
           client_name: string
           created_at?: string
+          has_whatsapp_bot?: boolean
           id?: string
           metadata?: Json
           net_income?: number
@@ -261,12 +266,15 @@ export type Database = {
           specialty?: string | null
           total_expenses?: number
           updated_at?: string
+          uses_stripe?: boolean
         }
         Update: {
           active?: boolean
+          articles_per_month?: number
           canceled_at?: string | null
           client_name?: string
           created_at?: string
+          has_whatsapp_bot?: boolean
           id?: string
           metadata?: Json
           net_income?: number
@@ -275,6 +283,7 @@ export type Database = {
           specialty?: string | null
           total_expenses?: number
           updated_at?: string
+          uses_stripe?: boolean
         }
         Relationships: []
       }

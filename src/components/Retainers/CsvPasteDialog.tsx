@@ -9,8 +9,11 @@ type ParsedRow = {
   client_name: string;
   specialty?: string | null;
   net_income?: number;
+  uses_stripe?: boolean;
+  articles_per_month?: number;
   social_media_cost?: number;
   total_expenses?: number;
+  has_whatsapp_bot?: boolean;
   active?: boolean;
   notes?: string | null;
 };
@@ -29,15 +32,26 @@ const headerMap: Record<string, keyof ParsedRow> = {
   "especialidad": "specialty",
   "specialty": "specialty",
   "ingreso neto": "net_income",
+  "income": "net_income",
   "net income": "net_income",
   "net_income": "net_income",
+  "stripe": "uses_stripe",
+  "uses_stripe": "uses_stripe",
+  "articulos/mes": "articles_per_month",
+  "artículos/mes": "articles_per_month",
+  "articles_per_month": "articles_per_month",
   "columna de redes": "social_media_cost",
   "redes": "social_media_cost",
   "social media": "social_media_cost",
   "social_media_cost": "social_media_cost",
   "total de gastos": "total_expenses",
+  "total gastos": "total_expenses",
   "gastos": "total_expenses",
   "total_expenses": "total_expenses",
+  "wha bot": "has_whatsapp_bot",
+  "whatsapp": "has_whatsapp_bot",
+  "whatsapp bot": "has_whatsapp_bot",
+  "has_whatsapp_bot": "has_whatsapp_bot",
   "activo": "active",
   "active": "active",
   "notas": "notes",
@@ -84,11 +98,20 @@ function parseCsv(text: string): ParsedRow[] {
         case "net_income":
           row.net_income = parseNumberLike(raw);
           break;
+        case "uses_stripe":
+          row.uses_stripe = toBooleanLike(raw);
+          break;
+        case "articles_per_month":
+          row.articles_per_month = parseInt(raw, 10) || 0;
+          break;
         case "social_media_cost":
           row.social_media_cost = parseNumberLike(raw);
           break;
         case "total_expenses":
           row.total_expenses = parseNumberLike(raw);
+          break;
+        case "has_whatsapp_bot":
+          row.has_whatsapp_bot = toBooleanLike(raw);
           break;
         case "active":
           row.active = toBooleanLike(raw);
@@ -145,9 +168,12 @@ export const CsvPasteDialog: React.FC<Props> = ({ open, onOpenChange, onImport }
                   <tr className="text-left">
                     <th>Cliente</th>
                     <th>Especialidad</th>
-                    <th>Ingreso neto</th>
+                    <th>Ingreso</th>
+                    <th>Stripe</th>
+                    <th>Art/mes</th>
                     <th>Redes</th>
                     <th>Gastos</th>
+                    <th>WA Bot</th>
                     <th>Activo</th>
                     <th>Notas</th>
                   </tr>
@@ -158,8 +184,11 @@ export const CsvPasteDialog: React.FC<Props> = ({ open, onOpenChange, onImport }
                       <td>{r.client_name}</td>
                       <td>{r.specialty ?? ""}</td>
                       <td>{r.net_income ?? 0}</td>
+                      <td>{r.uses_stripe ? "Sí" : "No"}</td>
+                      <td>{r.articles_per_month ?? 0}</td>
                       <td>{r.social_media_cost ?? 0}</td>
                       <td>{r.total_expenses ?? 0}</td>
+                      <td>{r.has_whatsapp_bot ? "Sí" : "No"}</td>
                       <td>{r.active ? "Sí" : "No"}</td>
                       <td>{r.notes ?? ""}</td>
                     </tr>
