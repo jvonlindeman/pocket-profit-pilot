@@ -2,7 +2,6 @@ import React from 'react';
 import DashboardHeader from '@/components/Dashboard/Header/DashboardHeader';
 import LoadingErrorState from '@/components/Dashboard/LoadingErrorState';
 import DashboardContent from '@/components/Dashboard/DashboardContent';
-import DebugSection from '@/components/Dashboard/DebugTools/DebugSection';
 import Footer from '@/components/Dashboard/Footer';
 import InitialSetup from '@/components/Dashboard/InitialSetup';
 import { useDashboardStateManager } from './DashboardStateManager';
@@ -109,13 +108,6 @@ const DashboardPageWrapper: React.FC = () => {
             onBalanceSaved={handleBalanceSaved}
           />
         )}
-
-        {/* Debug section */}
-        <DebugSection 
-          dateRange={dashboardState.dateRange}
-          refreshData={dashboardState.refreshData}
-          rawResponse={dashboardState.rawResponse}
-        />
       </main>
 
       {/* Footer */}
