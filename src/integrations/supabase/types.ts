@@ -197,36 +197,6 @@ export type Database = {
         }
         Relationships: []
       }
-      monthly_savings: {
-        Row: {
-          amount: number
-          created_at: string
-          deposit_date: string
-          id: string
-          month_year: string
-          notes: string | null
-          updated_at: string
-        }
-        Insert: {
-          amount?: number
-          created_at?: string
-          deposit_date: string
-          id?: string
-          month_year: string
-          notes?: string | null
-          updated_at?: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          deposit_date?: string
-          id?: string
-          month_year?: string
-          notes?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
       receivables_selections: {
         Row: {
           amount: number
