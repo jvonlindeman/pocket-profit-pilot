@@ -1,10 +1,10 @@
 
 
-# Plan: Remover Sistema de Gestión de Ahorros
+# Plan: Remover Página /zoho-callback
 
 ## Resumen
 
-Se eliminará completamente la funcionalidad de "Gestión de Ahorros" que incluye el registro manual de depósitos mensuales, resumen de ahorros totales y historial.
+Se eliminará únicamente la página de callback OAuth de Zoho que ya no se utiliza. La integración de Zoho Books seguirá funcionando normalmente, solo se remueve el flujo OAuth automático.
 
 ---
 
@@ -12,34 +12,16 @@ Se eliminará completamente la funcionalidad de "Gestión de Ahorros" que incluy
 
 | Archivo | Descripción |
 |---------|-------------|
-| `src/components/Dashboard/Savings/MonthlySavingsManager.tsx` | Componente principal del manager |
-| `src/components/Dashboard/Savings/SavingsFormDialog.tsx` | Diálogo para registrar/editar ahorros |
-| `src/components/Dashboard/Savings/SavingsHistory.tsx` | Tabla de historial de ahorros |
-| `src/components/Dashboard/Savings/SavingsSummaryCard.tsx` | Tarjeta de resumen con totales |
-| `src/hooks/useMonthlySavings.tsx` | Hook con CRUD de ahorros |
+| `src/pages/ZohoCallback.tsx` | Página de callback para OAuth de Zoho |
 
 ---
 
 ## Archivos a Modificar
 
-### 1. `src/components/Dashboard/DashboardContent.tsx`
+### 1. `src/App.tsx`
 **Cambios**:
-- Remover import de `MonthlySavingsManager`
-- Eliminar `<MonthlySavingsManager />` del render (línea ~217)
-
-### 2. `src/types/financial.ts`
-**Cambios**:
-- Eliminar la interface `MonthlySavings` (líneas 192-201)
-
----
-
-## Migración de Base de Datos
-
-Se eliminará la tabla `monthly_savings` de Supabase:
-
-```sql
-DROP TABLE IF EXISTS monthly_savings CASCADE;
-```
+- Remover import de `ZohoCallback`
+- Eliminar la ruta `/zoho-callback`
 
 ---
 
@@ -47,48 +29,36 @@ DROP TABLE IF EXISTS monthly_savings CASCADE;
 
 | Tipo | Cantidad |
 |------|----------|
-| Archivos a eliminar | 5 |
-| Archivos a modificar | 2 |
-| Tablas a eliminar | 1 |
+| Archivos a eliminar | 1 |
+| Archivos a modificar | 1 |
 
 ---
 
 ## Orden de Implementación
 
-1. **Modificar `DashboardContent.tsx`** - Remover import y uso del componente
-2. **Eliminar directorio `src/components/Dashboard/Savings/`** - Todos los componentes UI
-3. **Eliminar `src/hooks/useMonthlySavings.tsx`** - Hook de CRUD
-4. **Modificar `src/types/financial.ts`** - Remover interface MonthlySavings
-5. **Migración de base de datos** - Eliminar tabla `monthly_savings`
+1. **Modificar `App.tsx`** - Remover import y ruta del callback
+2. **Eliminar `src/pages/ZohoCallback.tsx`** - Página completa
 
 ---
 
 ## Sección Técnica
 
-### Estructura de Archivos a Eliminar
+### Impacto
+
+- La integración de Zoho seguirá funcionando mediante la configuración manual en `ZohoConfig.tsx`
+- El componente `ZohoConfig` tiene lógica para manejar tokens de URL pero seguirá funcionando sin el callback
+- Las edge functions `zoho-tokens`, `zoho-config`, y `zoho-transactions` permanecen intactas
+- Los servicios y hooks de Zoho continúan funcionando normalmente
+
+### Código a Modificar en App.tsx
 
 ```text
-src/
-├── components/
-│   └── Dashboard/
-│       └── Savings/                  (eliminar directorio completo)
-│           ├── MonthlySavingsManager.tsx
-│           ├── SavingsFormDialog.tsx
-│           ├── SavingsHistory.tsx
-│           └── SavingsSummaryCard.tsx
-└── hooks/
-    └── useMonthlySavings.tsx
+Antes:
+import ZohoCallback from "./pages/ZohoCallback";
+...
+<Route path="/zoho-callback" element={<ZohoCallback />} />
+
+Después:
+(líneas eliminadas)
 ```
-
-### Actualización de Tipos Supabase
-
-Después de eliminar la tabla `monthly_savings`, se actualizará automáticamente `src/integrations/supabase/types.ts` para reflejar el nuevo schema sin esa tabla.
-
----
-
-## Beneficios
-
-1. **Menos código**: 5 archivos menos de mantener
-2. **UI más simple**: Dashboard sin sección de ahorros vacía
-3. **Menos tablas DB**: Una tabla menos en Supabase
 
