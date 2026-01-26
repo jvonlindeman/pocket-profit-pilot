@@ -6,10 +6,12 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ApiCallsProvider } from "./contexts/ApiCallsContext";
 import { queryClient } from "./lib/react-query/queryClient";
 import { QueryDevTools } from "./components/ReactQueryDevTools";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
 import Retainers from "./pages/Retainers";
+import Login from "./pages/Login";
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -19,9 +21,10 @@ const App = () => (
           <Toaster />
           <Sonner />
           <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/retainers" element={<Retainers />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/retainers" element={<ProtectedRoute><Retainers /></ProtectedRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
