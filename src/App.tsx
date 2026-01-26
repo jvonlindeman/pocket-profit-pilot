@@ -9,7 +9,6 @@ import { QueryDevTools } from "./components/ReactQueryDevTools";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
-import ZohoCallback from "./pages/ZohoCallback";
 import Retainers from "./pages/Retainers";
 
 const App = () => (
@@ -22,7 +21,6 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/zoho-callback" element={<ZohoCallback />} />
             <Route path="/retainers" element={<Retainers />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
