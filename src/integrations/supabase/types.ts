@@ -14,141 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      cache_metrics: {
-        Row: {
-          cache_hit: boolean
-          end_date: string
-          fetch_duration_ms: number | null
-          id: string
-          partial_hit: boolean
-          refresh_triggered: boolean
-          request_id: string | null
-          source: string
-          start_date: string
-          timestamp: string | null
-          transaction_count: number | null
-          user_agent: string | null
-        }
-        Insert: {
-          cache_hit: boolean
-          end_date: string
-          fetch_duration_ms?: number | null
-          id?: string
-          partial_hit: boolean
-          refresh_triggered: boolean
-          request_id?: string | null
-          source: string
-          start_date: string
-          timestamp?: string | null
-          transaction_count?: number | null
-          user_agent?: string | null
-        }
-        Update: {
-          cache_hit?: boolean
-          end_date?: string
-          fetch_duration_ms?: number | null
-          id?: string
-          partial_hit?: boolean
-          refresh_triggered?: boolean
-          request_id?: string | null
-          source?: string
-          start_date?: string
-          timestamp?: string | null
-          transaction_count?: number | null
-          user_agent?: string | null
-        }
-        Relationships: []
-      }
-      cache_segments: {
-        Row: {
-          end_date: string
-          id: string
-          last_refreshed_at: string | null
-          metadata: Json | null
-          source: string
-          start_date: string
-          status: string
-          transaction_count: number
-        }
-        Insert: {
-          end_date: string
-          id?: string
-          last_refreshed_at?: string | null
-          metadata?: Json | null
-          source: string
-          start_date: string
-          status?: string
-          transaction_count?: number
-        }
-        Update: {
-          end_date?: string
-          id?: string
-          last_refreshed_at?: string | null
-          metadata?: Json | null
-          source?: string
-          start_date?: string
-          status?: string
-          transaction_count?: number
-        }
-        Relationships: []
-      }
-      cached_transactions: {
-        Row: {
-          amount: number
-          category: string | null
-          created_at: string | null
-          date: string
-          description: string | null
-          description_embedding: string | null
-          external_id: string
-          fees: number | null
-          fetched_at: string | null
-          gross: number | null
-          id: string
-          metadata: Json | null
-          month: number | null
-          source: string
-          type: string
-          year: number | null
-        }
-        Insert: {
-          amount: number
-          category?: string | null
-          created_at?: string | null
-          date: string
-          description?: string | null
-          description_embedding?: string | null
-          external_id: string
-          fees?: number | null
-          fetched_at?: string | null
-          gross?: number | null
-          id?: string
-          metadata?: Json | null
-          month?: number | null
-          source: string
-          type: string
-          year?: number | null
-        }
-        Update: {
-          amount?: number
-          category?: string | null
-          created_at?: string | null
-          date?: string
-          description?: string | null
-          description_embedding?: string | null
-          external_id?: string
-          fees?: number | null
-          fetched_at?: string | null
-          gross?: number | null
-          id?: string
-          metadata?: Json | null
-          month?: number | null
-          source?: string
-          type?: string
-          year?: number | null
-        }
-        Relationships: []
-      }
       financial_summaries: {
         Row: {
           cache_segment_id: string | null
@@ -198,15 +63,7 @@ export type Database = {
           total_income?: number
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "financial_summaries_cache_segment_id_fkey"
-            columns: ["cache_segment_id"]
-            isOneToOne: false
-            referencedRelation: "cache_segments"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       monthly_balances: {
         Row: {
@@ -256,39 +113,6 @@ export type Database = {
           stripe_savings_percentage?: number | null
           tax_reserve_percentage?: number | null
           updated_at?: string
-        }
-        Relationships: []
-      }
-      monthly_cache: {
-        Row: {
-          created_at: string
-          id: string
-          month: number
-          source: string
-          status: string
-          transaction_count: number
-          updated_at: string
-          year: number
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          month: number
-          source: string
-          status?: string
-          transaction_count?: number
-          updated_at?: string
-          year: number
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          month?: number
-          source?: string
-          status?: string
-          transaction_count?: number
-          updated_at?: string
-          year?: number
         }
         Relationships: []
       }
