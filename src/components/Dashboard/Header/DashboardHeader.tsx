@@ -1,12 +1,12 @@
-
 import React from 'react';
 import DateRangePicker from '@/components/Dashboard/DateRangePicker';
 import { Button } from '@/components/ui/button';
-import { Settings, Menu, FileText } from 'lucide-react';
+import { Settings, Menu, FileText, LogOut } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { DateRange as DayPickerDateRange } from 'react-day-picker';
-import { toDayPickerDateRange, toFinancialDateRange } from '@/utils/dateRangeAdapter';
+import { toDayPickerDateRange } from '@/utils/dateRangeAdapter';
+import { useAuth } from '@/hooks/useAuth';
 
 interface DashboardHeaderProps {
   dateRange: { startDate: Date; endDate: Date };
@@ -19,6 +19,12 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   onDateRangeChange,
   getCurrentMonthRange
 }) => {
+  const { signOut, user } = useAuth();
+
+  const handleLogout = async () => {
+    await signOut();
+  };
+
   return (
     <header className="bg-white shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -47,6 +53,11 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                     <FileText className="h-4 w-4 mr-2" />
                     Retainers
                   </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Cerrar Sesión
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
