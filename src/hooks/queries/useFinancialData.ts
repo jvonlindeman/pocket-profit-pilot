@@ -1,11 +1,8 @@
-
 import { useMemo } from 'react';
 import { useZohoTransactions } from './useZohoTransactions';
 import { useStripeTransactions } from './useStripeTransactions';
-import { useCacheStatus } from './useCacheStatus';
 import { useApiConnectivity } from './useApiConnectivity';
 import { queryClient } from '@/lib/react-query/queryClient';
-import { Transaction } from '@/types/financial';
 
 export function useFinancialData(startDate: Date, endDate: Date) {
   // Fetch Zoho transactions
@@ -25,12 +22,6 @@ export function useFinancialData(startDate: Date, endDate: Date) {
     error: stripeErrorDetails,
     refetch: refetchStripe
   } = useStripeTransactions(startDate, endDate);
-
-  // Check cache status
-  const { 
-    data: cacheStatus,
-    isLoading: cacheStatusLoading 
-  } = useCacheStatus(startDate, endDate);
 
   // Check API connectivity
   const { data: apiConnectivity } = useApiConnectivity();
@@ -64,9 +55,6 @@ export function useFinancialData(startDate: Date, endDate: Date) {
         queryClient.invalidateQueries({
           queryKey: ["stripe-transactions"],
         }),
-        queryClient.invalidateQueries({
-          queryKey: ["cache-status"],
-        }),
       ]);
     }
     
@@ -79,13 +67,11 @@ export function useFinancialData(startDate: Date, endDate: Date) {
     return zohoResult.isSuccess && stripeResult.isSuccess;
   };
 
-  // Safely determine if we're using cached data
-  const usingCachedData = useMemo(() => {
-    return (
-      cacheStatus?.zoho?.cached === true || 
-      cacheStatus?.stripe?.cached === true
-    );
-  }, [cacheStatus]);
+  // Cache status - always false since we don't use persistent cache
+  const cacheStatus = {
+    zoho: { cached: false, partial: false },
+    stripe: { cached: false, partial: false }
+  };
 
   return {
     transactions: allTransactions,
@@ -97,9 +83,9 @@ export function useFinancialData(startDate: Date, endDate: Date) {
     error: zohoError || stripeError,
     errorDetails: zohoError ? zohoErrorDetails : stripeErrorDetails,
     cacheStatus,
-    cacheStatusLoading,
+    cacheStatusLoading: false,
     apiConnectivity,
     refreshData,
-    usingCachedData
+    usingCachedData: false
   };
 }

@@ -1,8 +1,6 @@
-
 import { Transaction } from "../types/financial";
 import StripeService from "../services/stripeService";
 import { formatDateYYYYMMDD } from "@/utils/dateUtils";
-import CacheService from "@/services/cache";
 
 /**
  * Interface for Stripe data results that includes transactions and aggregate data
@@ -19,13 +17,15 @@ export interface StripeResult {
 }
 
 /**
- * StripeRepository - SIMPLIFIED to avoid duplicate API calls
+ * StripeRepository - Simplified to use React Query for caching
+ * Only handles request deduplication, no persistent cache
  */
 export class StripeRepository {
   private inProgressRequestsMap: Map<string, Promise<any>> = new Map();
 
   /**
-   * Get transactions for a date range - SIMPLIFIED without redundant layers
+   * Get transactions for a date range
+   * React Query handles caching, this just fetches data with deduplication
    */
   async getTransactions(
     startDate: Date,
@@ -76,7 +76,7 @@ export class StripeRepository {
   }
   
   /**
-   * Execute the actual request - ONLY makes API call, no caching here
+   * Execute the actual request - Direct API call
    */
   private async executeRequest(
     startDate: Date, 
@@ -85,20 +85,8 @@ export class StripeRepository {
   ): Promise<StripeResult> {
     console.log(`StripeRepository: Making API call for ${formatDateYYYYMMDD(startDate)}-${formatDateYYYYMMDD(endDate)}`);
     
-    // Call StripeService directly - no redundant caching
+    // Call StripeService directly
     const result = await StripeService.getTransactions(startDate, endDate, forceRefresh);
-    
-    // Store data in persistent cache after successful API call
-    if (result.transactions && result.transactions.length > 0) {
-      console.log(`StripeRepository: Storing ${result.transactions.length} transactions in persistent cache`);
-      
-      try {
-        await CacheService.storeTransactions('Stripe', startDate, endDate, result.transactions);
-        console.log("StripeRepository: Successfully stored transactions in persistent cache");
-      } catch (storeError) {
-        console.error("StripeRepository: Exception storing transactions in persistent cache:", storeError);
-      }
-    }
     
     return {
       transactions: result.transactions,

@@ -3,7 +3,6 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { CacheProvider } from "./contexts/CacheContext";
 import { ApiCallsProvider } from "./contexts/ApiCallsContext";
 import { FinancialAssistantButton } from "./components/FinancialAssistant/FinancialAssistantButton";
 import { queryClient } from "./lib/react-query/queryClient";
@@ -18,22 +17,20 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <BrowserRouter>
-        <CacheProvider>
-          <ApiCallsProvider>
-            <Toaster />
-            <Sonner />
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/zoho-callback" element={<ZohoCallback />} />
-              <Route path="/retainers" element={<Retainers />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            <FinancialAssistantButton />
-            <QueryDevTools />
-          </ApiCallsProvider>
-        </CacheProvider>
+        <ApiCallsProvider>
+          <Toaster />
+          <Sonner />
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/zoho-callback" element={<ZohoCallback />} />
+            <Route path="/retainers" element={<Retainers />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+          <FinancialAssistantButton />
+          <QueryDevTools />
+        </ApiCallsProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

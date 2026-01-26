@@ -1,9 +1,7 @@
-
 import { stripeRepository } from "@/repositories/stripeRepository";
 import { zohoRepository } from "@/repositories/zohoRepository";
 import { apiRequestManager } from "@/utils/ApiRequestManager";
 import { Transaction } from "@/types/financial";
-import CacheService from "@/services/cache";
 
 class DataFetcherService {
   private static instance: DataFetcherService;
@@ -219,34 +217,18 @@ class DataFetcherService {
   
   /**
    * Check cache status for a date range
+   * Returns false for all since we no longer use persistent cache
    */
   async checkCacheStatus(dateRange: { startDate: Date; endDate: Date }): Promise<{
     zoho: { cached: boolean; partial: boolean };
     stripe: { cached: boolean; partial: boolean };
   }> {
-    try {
-      const [zohoCache, stripeCache] = await Promise.all([
-        CacheService.checkCache('Zoho', dateRange.startDate, dateRange.endDate),
-        CacheService.checkCache('Stripe', dateRange.startDate, dateRange.endDate)
-      ]);
-      
-      return {
-        zoho: { 
-          cached: zohoCache.cached, 
-          partial: zohoCache.partial || false 
-        },
-        stripe: { 
-          cached: stripeCache.cached, 
-          partial: stripeCache.partial || false 
-        }
-      };
-    } catch (error) {
-      console.error("DataFetcherService: Error checking cache status:", error);
-      return {
-        zoho: { cached: false, partial: false },
-        stripe: { cached: false, partial: false }
-      };
-    }
+    // Always return false since we no longer use persistent cache
+    // React Query handles in-memory caching
+    return {
+      zoho: { cached: false, partial: false },
+      stripe: { cached: false, partial: false }
+    };
   }
 }
 
