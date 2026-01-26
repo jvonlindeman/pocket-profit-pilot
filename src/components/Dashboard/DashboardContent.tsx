@@ -26,13 +26,7 @@ interface DashboardContentProps {
   loading: boolean;
   error: string | null;
   dataInitialized: boolean;
-  hasCachedData: boolean;
-  usingCachedData: boolean;
   isRefreshing: boolean;
-  cacheStatus: {
-    zoho: { hit: boolean; partial: boolean };
-    stripe: { hit: boolean; partial: boolean };
-  };
 
   // Financial data
   stripeIncome: number;
@@ -74,10 +68,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   loading,
   error,
   dataInitialized,
-  hasCachedData,
-  usingCachedData,
   isRefreshing,
-  cacheStatus,
   stripeIncome,
   stripeFees,
   stripeTransactionFees,
@@ -126,10 +117,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
         <PeriodHeader 
           periodTitle={periodTitle}
           onRefresh={refreshData}
-          hasCachedData={hasCachedData}
-          usingCachedData={usingCachedData}
           isRefreshing={isRefreshing}
-          cacheStatus={cacheStatus}
         />
 
         {error && (
@@ -143,9 +131,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
 
         {!dataInitialized && !loading && !error && (
           <NoDataLoadedState
-            onLoadCache={() => refreshData(false)}
-            onLoadFresh={() => refreshData(true)}
-            hasCachedData={hasCachedData}
+            onLoadData={() => refreshData(true)}
             isLoading={loading}
           />
         )}
@@ -189,22 +175,6 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
 
             <Separator />
 
-            {/* Log financial data before providing to context */}
-            {(() => {
-              console.log("💰 DashboardContent: Providing financial data to FinanceProvider:", {
-                summaryTotalIncome: financialData.summary?.totalIncome,
-                summaryTotalExpense: financialData.summary?.totalExpense,
-                summaryProfit: financialData.summary?.profit,
-                transactionCount: financialData.transactions?.length,
-                stripeIncome,
-                stripeFees,
-                regularIncome,
-                collaboratorExpensesCount: Array.isArray(collaboratorExpenses) ? collaboratorExpenses.length : 0,
-                unpaidInvoicesCount: unpaidInvoices?.length,
-                adjustedZohoIncome
-              });
-              return null;
-            })()}
             <FinanceProvider
               summary={financialData.summary}
               transactions={financialData.transactions}
@@ -225,7 +195,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
 
             <Separator />
 
-            {/* Receivables Management - Now with stripeNet and adjustedZohoIncome props */}
+            {/* Receivables Management */}
             <ReceivablesManager 
               unpaidInvoices={unpaidInvoices || []}
               stripeNet={stripeNet}

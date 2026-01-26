@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Transaction } from '@/types/financial';
 import { stripeRepository } from '@/repositories/stripeRepository';
 import { zohoRepository } from '@/repositories/zohoRepository';
@@ -8,14 +8,7 @@ interface FinancialData {
   stripeData?: any;
   loading: boolean;
   error: string | null;
-  usingCachedData: boolean;
-  cacheStatus: {
-    zoho: { hit: boolean, partial: boolean },
-    stripe: { hit: boolean, partial: boolean }
-  };
   isDataRequested: boolean;
-  cacheChecked: boolean;
-  hasCachedData: boolean;
   isRefreshing: boolean;
   lastRefreshTime?: number;
 }
@@ -29,31 +22,9 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
     transactions: [],
     loading: false,
     error: null,
-    usingCachedData: false,
-    cacheStatus: {
-      zoho: { hit: false, partial: false },
-      stripe: { hit: false, partial: false }
-    },
     isDataRequested: false,
-    cacheChecked: false,
-    hasCachedData: false,
     isRefreshing: false
   });
-
-  // COMPLETELY PASSIVE - No automatic cache checks or API calls
-  useEffect(() => {
-    console.log("🔍 useOptimizedFinancialData: PASSIVE MODE - No auto-checks", {
-      dateRange: `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
-      note: "All operations must be user-initiated"
-    });
-
-    // Set basic state to indicate hook is ready but no auto-loading
-    setData(prev => ({
-      ...prev,
-      cacheChecked: true,
-      hasCachedData: false,
-    }));
-  }, [startDate, endDate]);
 
   const fetchData = useCallback(async (forceRefresh = false) => {
     console.log("🚀 useOptimizedFinancialData: MANUAL fetch requested by user action", {
@@ -69,12 +40,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
       setData(prev => ({ 
         ...prev, 
         isRefreshing: true,
-        error: null,
-        cacheStatus: {
-          zoho: { hit: false, partial: false },
-          stripe: { hit: false, partial: false }
-        },
-        usingCachedData: false
+        error: null
       }));
       
       try {
@@ -106,11 +72,6 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
           stripeData,
           isRefreshing: false,
           error: null,
-          usingCachedData: false,
-          cacheStatus: {
-            zoho: { hit: false, partial: false },
-            stripe: { hit: false, partial: false }
-          },
           lastRefreshTime: Date.now()
         }));
         
@@ -139,10 +100,6 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
     try {
       let allTransactions: Transaction[] = [];
       let stripeData: any = null;
-      const cacheStatus = {
-        zoho: { hit: false, partial: false },
-        stripe: { hit: false, partial: false }
-      };
 
       console.log("🌐 useOptimizedFinancialData: Fetching from API");
 
@@ -169,11 +126,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         stripeData,
         loading: false,
         error: null,
-        usingCachedData: false,
-        cacheStatus,
         isDataRequested: true,
-        cacheChecked: true,
-        hasCachedData: allTransactions.length > 0,
         isRefreshing: false,
         lastRefreshTime: Date.now()
       });
@@ -186,8 +139,7 @@ export function useOptimizedFinancialData(startDate: Date, endDate: Date) {
         loading: false,
         isRefreshing: false,
         error: error instanceof Error ? error.message : 'Unknown error',
-        isDataRequested: true,
-        cacheChecked: true
+        isDataRequested: true
       }));
     }
   }, [startDate, endDate, data.transactions.length]);

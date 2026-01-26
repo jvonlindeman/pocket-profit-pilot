@@ -1,4 +1,3 @@
-
 import React from 'react';
 import DashboardHeader from '@/components/Dashboard/Header/DashboardHeader';
 import LoadingErrorState from '@/components/Dashboard/LoadingErrorState';
@@ -23,57 +22,20 @@ const DashboardPageWrapper: React.FC = () => {
     refreshData: dashboardState.refreshData,
     updateMonthlyBalance: dashboardState.updateMonthlyBalance,
     setStartingBalance: dashboardState.setStartingBalance,
-    hasCachedData: dashboardState.hasCachedData,
     isRefreshing: dashboardState.isRefreshing,
   });
 
-  console.log("🏠 DashboardPageWrapper: Rendering with PASSIVE MODE + SMART REFRESH (FIXED)", {
+  console.log("🏠 DashboardPageWrapper: Rendering", {
     dataInitialized: dashboardState.dataInitialized,
     loading: dashboardState.loading,
     isRefreshing: dashboardState.isRefreshing,
     error: !!dashboardState.error,
-    cacheChecked: dashboardState.cacheChecked,
-    hasCachedData: dashboardState.hasCachedData,
-    usingCachedData: dashboardState.usingCachedData,
-    transactionCount: dashboardState.financialData.transactions.length,
-    autoLoadingDisabled: true,
-    smartRefreshEnabled: true,
-    monthlyBalanceId: dashboardState.monthlyBalance?.id,
-    monthlyBalanceTimestamp: dashboardState.monthlyBalance?.updated_at,
-    includeZohoFiftyPercent: dashboardState.includeZohoFiftyPercent // TRACKING THE NEW VALUE
+    transactionCount: dashboardState.financialData.transactions.length
   });
-
-  const coreData = {
-    periodTitle: dashboardState.periodTitle,
-    dateRange: dashboardState.dateRange,
-    financialData: dashboardState.financialData,
-    currentMonthDate: dashboardState.currentMonthDate,
-    monthlyBalance: dashboardState.monthlyBalance,
-    totalZohoExpenses: dashboardState.totalZohoExpenses,
-    unpaidInvoices: dashboardState.unpaidInvoices,
-    startingBalance: dashboardState.startingBalance,
-    regularIncome: dashboardState.regularIncome,
-  };
-
-  const stripeData = {
-    stripeIncome: dashboardState.stripeIncome,
-    stripeFees: dashboardState.stripeFees,
-    stripeTransactionFees: dashboardState.stripeTransactionFees,
-    stripePayoutFees: dashboardState.stripePayoutFees,
-    stripeAdditionalFees: dashboardState.stripeAdditionalFees,
-    stripeNet: dashboardState.stripeNet,
-    stripeFeePercentage: dashboardState.stripeFeePercentage,
-  };
-
-  const actions = {
-    refreshData: dashboardState.refreshData,
-    handleBalanceChange: handleBalanceChange,
-    handleRefresh: handleRefresh,
-  };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Initial setup components - now requires explicit user action */}
+      {/* Initial setup components - requires explicit user action */}
       <InitialSetup 
         dataInitialized={dashboardState.dataInitialized}
         onLoadData={handleInitialLoad}
@@ -81,8 +43,6 @@ const DashboardPageWrapper: React.FC = () => {
         setShowBalanceDialog={dashboardState.setShowBalanceDialog}
         currentMonthDate={dashboardState.currentMonthDate}
         onBalanceSaved={handleBalanceSaved}
-        cacheChecked={dashboardState.cacheChecked}
-        hasCachedData={dashboardState.hasCachedData}
       />
       
       {/* Header section */}
@@ -107,16 +67,13 @@ const DashboardPageWrapper: React.FC = () => {
             <div className="flex items-center">
               <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full mr-2"></div>
               <span className="text-blue-800 text-sm">
-                {dashboardState.globalRefreshInProgress 
-                  ? "Actualizando datos (deduplicado)..." 
-                  : "Actualizando datos en segundo plano..."
-                }
+                Actualizando datos...
               </span>
             </div>
           </div>
         )}
         
-        {/* Dashboard content - only shows when data is explicitly loaded */}
+        {/* Dashboard content */}
         {(dashboardState.dataInitialized || !dashboardState.dataInitialized) && !dashboardState.error && (
           <DashboardContent 
             periodTitle={dashboardState.periodTitle}
@@ -124,10 +81,7 @@ const DashboardPageWrapper: React.FC = () => {
             loading={dashboardState.loading}
             error={dashboardState.error}
             dataInitialized={dashboardState.dataInitialized}
-            hasCachedData={dashboardState.hasCachedData}
-            usingCachedData={dashboardState.usingCachedData}
             isRefreshing={dashboardState.isRefreshing || dashboardState.globalRefreshInProgress}
-            cacheStatus={dashboardState.cacheStatus}
             stripeIncome={dashboardState.stripeIncome}
             stripeFees={dashboardState.stripeFees}
             stripeTransactionFees={dashboardState.stripeTransactionFees}

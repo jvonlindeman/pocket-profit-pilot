@@ -1,6 +1,4 @@
-
 import React from 'react';
-import { useToast } from '@/hooks/use-toast';
 import InitialLoadPrompt from '@/components/Dashboard/InitialLoadPrompt';
 import InitialBalanceDialog from '@/components/Dashboard/InitialBalanceDialog';
 
@@ -11,8 +9,6 @@ interface InitialSetupProps {
   setShowBalanceDialog: (show: boolean) => void;
   currentMonthDate: Date;
   onBalanceSaved: (balance: number, opexAmount?: number, itbmAmount?: number, profitPercentage?: number, taxReservePercentage?: number, stripeSavingsPercentage?: number, includeZohoFiftyPercent?: boolean, notes?: string) => Promise<boolean>;
-  cacheChecked?: boolean;
-  hasCachedData?: boolean;
 }
 
 const InitialSetup: React.FC<InitialSetupProps> = ({
@@ -22,8 +18,6 @@ const InitialSetup: React.FC<InitialSetupProps> = ({
   setShowBalanceDialog,
   currentMonthDate,
   onBalanceSaved,
-  cacheChecked = false,
-  hasCachedData = false,
 }) => {
   return (
     <>
@@ -37,11 +31,7 @@ const InitialSetup: React.FC<InitialSetupProps> = ({
       
       {/* Initial load prompt if data not initialized */}
       {!dataInitialized && (
-        <InitialLoadPrompt 
-          onLoadData={onLoadData} 
-          cacheChecked={cacheChecked}
-          hasCachedData={hasCachedData}
-        />
+        <InitialLoadPrompt onLoadData={onLoadData} />
       )}
     </>
   );
