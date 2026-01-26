@@ -1,242 +1,170 @@
 
-# Plan Revisado: Remover Sistema de Caché Sin Romper Funcionalidad
 
-## Problema Identificado
+# Plan: Limpiar Elementos UI de Caché Restantes
 
-El sistema de caché está **profundamente integrado** en el flujo de datos financieros. No es solo UI de administración - los repositorios (`zohoRepository`, `stripeRepository`) dependen de `CacheService` para:
+## Resumen del Problema
 
-1. **Cache-first approach**: Verificar si hay datos en caché antes de llamar webhooks
-2. **Almacenar transacciones**: Guardar datos después de cada fetch exitoso
-3. **Verificar estado de caché**: Mostrar indicadores de si los datos son frescos o cacheados
+Aunque el sistema de caché persistente fue eliminado, todavía existen múltiples elementos de UI y props que hacen referencia al concepto de "caché", lo cual confunde porque ya no hay caché persistente - solo React Query en memoria.
 
-## Estrategia Revisada
+## Archivos a Modificar
 
-En lugar de eliminar archivos masivamente, necesitamos **modificar** los archivos críticos para que funcionen sin caché, manteniendo React Query como la única capa de caché en memoria.
+### 1. `src/components/Dashboard/PeriodHeader.tsx`
+**Problema**: Muestra badges de "Cache", opciones de "Usar Cache" vs "Datos Frescos", y status de cacheStatus
+
+**Cambios**:
+- Eliminar props `hasCachedData`, `usingCachedData`, `cacheStatus`
+- Simplificar el dropdown a un solo botón "Actualizar Datos"
+- Remover los badges de cache (Z, S) y el indicador "Cache"
+- Mantener solo la funcionalidad de refresh con debounce
+
+### 2. `src/components/Dashboard/InitialLoadPrompt.tsx`
+**Problema**: Muestra mensajes sobre "Verificando Datos en Caché" y "Datos en Caché Disponibles"
+
+**Cambios**:
+- Eliminar props `cacheChecked`, `hasCachedData`
+- Simplificar a un solo mensaje: "Cargar Datos Financieros"
+- Remover el estado de "verificando caché"
+- Un solo botón para cargar datos desde API
+
+### 3. `src/components/Dashboard/NoDataLoadedState.tsx`
+**Problema**: Tiene botones separados para "Cargar desde Cache" y "Cargar Datos Frescos"
+
+**Cambios**:
+- Eliminar props `onLoadCache`, `hasCachedData`
+- Simplificar a un solo botón "Cargar Datos"
+- Remover explicaciones de cache vs frescos
+
+### 4. `src/components/Dashboard/InitialSetup.tsx`
+**Problema**: Pasa props de cache a InitialLoadPrompt
+
+**Cambios**:
+- Eliminar props `cacheChecked`, `hasCachedData`
+- Simplificar la interfaz
+
+### 5. `src/components/Dashboard/DashboardDataHandlers.tsx`
+**Problema**: Tiene lógica y mensajes sobre caché
+
+**Cambios**:
+- Eliminar prop `hasCachedData`
+- Actualizar mensajes de toast para no mencionar caché
+
+### 6. `src/components/Dashboard/DashboardContent.tsx`
+**Problema**: Recibe y pasa props de cache
+
+**Cambios**:
+- Eliminar props `hasCachedData`, `usingCachedData`, `cacheStatus`
+- Actualizar llamadas a componentes hijos
+
+### 7. `src/components/Dashboard/DashboardStateManager.tsx`
+**Problema**: Exporta valores de cache
+
+**Cambios**:
+- Mantener internamente pero no exponer `usingCachedData`, `cacheStatus`, `cacheChecked`, `hasCachedData`
+
+### 8. `src/components/Dashboard/DashboardPageWrapper.tsx`
+**Problema**: Pasa props de cache a componentes
+
+**Cambios**:
+- Eliminar props de cache en llamadas a componentes
+- Actualizar logging para no mencionar cache
+
+### 9. `src/components/Dashboard/DebugTools/CacheStorageDiagnostic.tsx`
+**Problema**: Componente completo de diagnóstico de caché que ya no funciona (las tablas fueron eliminadas)
+
+**Cambios**:
+- **ELIMINAR** este archivo completamente
+
+### 10. `src/hooks/queries/useOptimizedFinancialData.ts`
+**Problema**: Mantiene estado de cache que ya no tiene sentido
+
+**Cambios**:
+- Simplificar estado: eliminar `usingCachedData`, `cacheStatus`, `hasCachedData`, `cacheChecked`
+- Retornar solo el estado relevante: `transactions`, `loading`, `error`, `isRefreshing`, `isDataRequested`
+
+### 11. `src/hooks/useFinanceData.tsx`
+**Problema**: Expone valores de cache desde useOptimizedFinancialData
+
+**Cambios**:
+- Eliminar exports de `usingCachedData`, `cacheStatus`, `cacheChecked`, `hasCachedData`
+- Simplificar el return del hook
 
 ---
 
-## Fase 1: Modificar Repositorios (CRÍTICO)
+## Sección Técnica
 
-### 1.1 `src/repositories/zohoRepository.ts`
-**Cambios necesarios:**
-- Remover imports de `CacheService` y `cacheStorage`
-- Eliminar el bloque "cache-first approach" (líneas 74-94)
-- Eliminar llamada a `CacheService.clearCache` (líneas 97-103)
-- Eliminar llamada a `CacheService.storeTransactions` (líneas 180-188)
-- **MANTENER**: Deduplicación con `inProgressRequestsMap` (esto es importante)
+### Flujo de Datos Simplificado
 
-**Antes (simplificado):**
+```text
+Usuario → "Cargar Datos" → useFinanceData.refreshData() → useOptimizedFinancialData.fetchData()
+                                                              ↓
+                                                    stripeRepository.getTransactions()
+                                                    zohoRepository.getTransactions()
+                                                              ↓
+                                                    React Query (caché en memoria)
+```
+
+### Props a Eliminar por Componente
+
+| Componente | Props a Eliminar |
+|------------|------------------|
+| PeriodHeader | hasCachedData, usingCachedData, cacheStatus |
+| InitialLoadPrompt | cacheChecked, hasCachedData |
+| NoDataLoadedState | onLoadCache, hasCachedData |
+| InitialSetup | cacheChecked, hasCachedData |
+| DashboardDataHandlers | hasCachedData |
+| DashboardContent | hasCachedData, usingCachedData, cacheStatus |
+
+### Estado a Simplificar en Hooks
+
+**useOptimizedFinancialData**:
 ```typescript
-// Cache-first approach
-if (!forceRefresh) {
-  const cacheResult = await CacheService.checkCache(...);
-  if (cacheResult.cached) {
-    return cachedTransactions;
-  }
+// ANTES
+interface FinancialData {
+  transactions: Transaction[];
+  stripeData?: any;
+  loading: boolean;
+  error: string | null;
+  usingCachedData: boolean;      // ELIMINAR
+  cacheStatus: {...};            // ELIMINAR
+  isDataRequested: boolean;
+  cacheChecked: boolean;         // ELIMINAR
+  hasCachedData: boolean;        // ELIMINAR
+  isRefreshing: boolean;
 }
-// Call webhook...
-await CacheService.storeTransactions(...);
-```
 
-**Después:**
-```typescript
-// Direct API call (React Query handles caching)
-return await this.executeTransactionsRequest(...);
-```
-
-### 1.2 `src/repositories/stripeRepository.ts`
-**Cambios necesarios:**
-- Remover import de `CacheService`
-- Eliminar llamada a `CacheService.storeTransactions` (líneas 91-101)
-- **MANTENER**: Deduplicación con `inProgressRequestsMap`
-
----
-
-## Fase 2: Simplificar Servicios de Fetch
-
-### 2.1 `src/services/dataFetcherService.ts`
-**Cambios necesarios:**
-- Remover import de `CacheService`
-- **Eliminar** método `checkCacheStatus()` (líneas 223-250)
-- O cambiarlo para retornar siempre `{ cached: false, partial: false }`
-
-### 2.2 `src/hooks/useFinancialDataFetcher.tsx`
-**Cambios necesarios:**
-- Remover import de `CacheService`
-- Remover import de `useCacheSegments`
-- Simplificar `checkCacheStatus` para que no haga nada o retorne valores por defecto
-- **Mantener** la estructura del hook para no romper componentes que lo usan
-
-### 2.3 `src/hooks/useEnhancedFinancialDataFetcher.tsx`
-**Cambios necesarios:**
-- Remover import de `useCacheManagement`
-- Remover llamadas a `fixLegacyCacheEntries` y `cleanupCache`
-- **Mantener** el resto de la lógica de fetching
-
----
-
-## Fase 3: Crear Stubs para Hooks de Caché
-
-En lugar de eliminar completamente, convertir en stubs que retornan valores vacíos:
-
-### 3.1 `src/hooks/queries/useCacheStatus.ts`
-**Opción A**: Modificar para retornar siempre:
-```typescript
-return {
-  data: { zoho: { cached: false, partial: false }, stripe: { cached: false, partial: false } },
-  isLoading: false
-};
-```
-
-**Opción B**: Eliminar y actualizar `useFinancialData.ts` para no importarlo
-
-### 3.2 `src/hooks/cache/useCacheSegments.tsx`
-**Modificar** para retornar funciones stub:
-```typescript
-return {
-  getCacheSegmentIds: async () => ({ zoho: null, stripe: null }),
-  checkSourceCache: async () => ({ cached: false, partial: false }),
-  refreshSourceCache: async () => false
-};
+// DESPUÉS
+interface FinancialData {
+  transactions: Transaction[];
+  stripeData?: any;
+  loading: boolean;
+  error: string | null;
+  isDataRequested: boolean;
+  isRefreshing: boolean;
+}
 ```
 
 ---
 
-## Fase 4: Remover Componentes UI de Caché
+## Orden de Implementación
 
-### 4.1 Componentes a ELIMINAR (solo UI de administración):
-```
-src/components/Dashboard/Cache/CacheAnalysisPrompt.tsx
-src/components/Dashboard/Cache/CacheEfficiencyMetrics.tsx
-src/components/Dashboard/Cache/CacheLoadingState.tsx
-src/components/Dashboard/Cache/CacheRecommendations.tsx
-src/components/Dashboard/Cache/CacheSourceStatus.tsx
-src/components/Dashboard/CacheClearTool.tsx
-src/components/Dashboard/CacheEfficiencyDashboard.tsx
-src/components/Dashboard/CacheMonitor.tsx
-src/components/Dashboard/CacheStats.tsx
-```
-
-### 4.2 Componente a MODIFICAR:
-- `src/components/Dashboard/CacheInfo.tsx` - Simplificar o eliminar (usado en TransactionList)
-- `src/components/Dashboard/TransactionList.tsx` - Remover uso de CacheInfo
-- `src/components/Dashboard/DashboardContent.tsx` - Remover CacheEfficiencyDashboard
+1. Modificar `useOptimizedFinancialData.ts` - simplificar el estado
+2. Modificar `useFinanceData.tsx` - eliminar exports de cache
+3. Modificar `DashboardStateManager.tsx` - no exponer valores de cache
+4. Modificar `PeriodHeader.tsx` - simplificar UI
+5. Modificar `InitialLoadPrompt.tsx` - simplificar UI
+6. Modificar `NoDataLoadedState.tsx` - simplificar UI
+7. Modificar `InitialSetup.tsx` - eliminar props
+8. Modificar `DashboardDataHandlers.tsx` - eliminar props y mensajes
+9. Modificar `DashboardContent.tsx` - eliminar props
+10. Modificar `DashboardPageWrapper.tsx` - eliminar props
+11. **ELIMINAR** `CacheStorageDiagnostic.tsx`
 
 ---
 
-## Fase 5: Eliminar Servicios de Caché (Solo después de Fases 1-4)
+## Resultado Final
 
-### Archivos a eliminar SOLO después de que los repositorios funcionen sin ellos:
-```
-src/services/cache/              (todo el directorio)
-src/services/cacheIntelligence.ts
-src/services/queryOptimizer.ts
-src/services/predictiveCacheService.ts
-src/services/smartDataFetcherService.ts
-src/services/hybridDataService.ts
-```
+- UI sin menciones de "caché"
+- Un solo botón "Cargar Datos" o "Actualizar"
+- Código más simple y fácil de mantener
+- ~11 archivos modificados, 1 archivo eliminado
 
-### Hooks a eliminar:
-```
-src/hooks/useCacheManagement.tsx
-src/hooks/cache/useCacheAdmin.tsx
-src/hooks/useRealCacheMetrics.tsx
-src/hooks/useQueryOptimization.tsx
-```
-
----
-
-## Fase 6: Eliminar CacheContext
-
-### 6.1 `src/contexts/CacheContext.tsx`
-**Opción A**: Eliminar completamente
-**Opción B**: Convertir en stub que retorna valores por defecto
-
-### 6.2 `src/App.tsx`
-- Remover `CacheProvider` del árbol de componentes
-
----
-
-## Fase 7: Migración de Base de Datos (ÚLTIMA)
-
-Solo ejecutar después de que todo el código esté modificado:
-
-```sql
-DROP TABLE IF EXISTS cache_metrics CASCADE;
-DROP TABLE IF EXISTS cache_segments CASCADE;
-DROP TABLE IF EXISTS monthly_cache CASCADE;
-DROP TABLE IF EXISTS cached_transactions CASCADE;
-```
-
----
-
-## Orden de Implementación Crítico
-
-1. **Primero**: Modificar `zohoRepository.ts` y `stripeRepository.ts` (remover lógica de caché pero mantener deduplicación)
-2. **Segundo**: Simplificar `dataFetcherService.ts` 
-3. **Tercero**: Crear stubs en `useCacheSegments.tsx` y `useCacheStatus.ts`
-4. **Cuarto**: Modificar `useFinancialDataFetcher.tsx` y `useEnhancedFinancialDataFetcher.tsx`
-5. **Quinto**: Remover componentes UI de caché del dashboard
-6. **Sexto**: Eliminar servicios de caché
-7. **Séptimo**: Eliminar CacheContext
-8. **Último**: Migración de base de datos
-
----
-
-## Archivos a MODIFICAR (no eliminar inicialmente)
-
-| Archivo | Acción |
-|---------|--------|
-| `src/repositories/zohoRepository.ts` | Remover lógica de cache-first |
-| `src/repositories/stripeRepository.ts` | Remover CacheService.store |
-| `src/services/dataFetcherService.ts` | Remover checkCacheStatus o stub |
-| `src/hooks/useFinancialDataFetcher.tsx` | Remover dependencias de caché |
-| `src/hooks/useEnhancedFinancialDataFetcher.tsx` | Remover useCacheManagement |
-| `src/hooks/queries/useFinancialData.ts` | Remover useCacheStatus |
-| `src/hooks/cache/useCacheSegments.tsx` | Convertir en stub |
-| `src/components/Dashboard/TransactionList.tsx` | Remover CacheInfo |
-| `src/components/Dashboard/DashboardContent.tsx` | Remover CacheEfficiencyDashboard |
-| `src/App.tsx` | Remover CacheProvider |
-
-## Archivos a ELIMINAR (después de modificaciones)
-
-- `src/services/cache/` (directorio completo)
-- `src/services/cacheIntelligence.ts`
-- `src/services/queryOptimizer.ts`
-- `src/services/predictiveCacheService.ts`
-- `src/services/smartDataFetcherService.ts`
-- `src/services/hybridDataService.ts`
-- `src/contexts/CacheContext.tsx`
-- `src/hooks/useCacheManagement.tsx`
-- `src/hooks/cache/useCacheAdmin.tsx`
-- `src/hooks/queries/useCacheStatus.ts`
-- `src/hooks/useRealCacheMetrics.tsx`
-- `src/hooks/useQueryOptimization.tsx`
-- `src/components/Dashboard/Cache/` (directorio completo)
-- `src/components/Dashboard/CacheClearTool.tsx`
-- `src/components/Dashboard/CacheEfficiencyDashboard.tsx`
-- `src/components/Dashboard/CacheInfo.tsx`
-- `src/components/Dashboard/CacheMonitor.tsx`
-- `src/components/Dashboard/CacheStats.tsx`
-- `supabase/functions/cache-manager/`
-
----
-
-## Riesgos Mitigados
-
-| Riesgo Original | Mitigación |
-|-----------------|------------|
-| Romper fetch de datos | Modificar repositorios ANTES de eliminar servicios |
-| Hooks que fallan | Crear stubs que retornan valores por defecto |
-| Componentes rotos | Remover referencias antes de eliminar archivos |
-| Pérdida de deduplicación | Mantener `inProgressRequestsMap` en repositorios |
-
----
-
-## Beneficios del Nuevo Plan
-
-1. **No rompe funcionalidad**: Los datos siguen fluyendo
-2. **Incremental**: Cada fase se puede probar independientemente  
-3. **React Query como reemplazo**: Mantiene caché en memoria (staleTime: 10min)
-4. **Menos código**: ~40 archivos menos al final
-5. **Menos tablas DB**: 4 tablas menos en Supabase
