@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ApiCallsProvider } from "./contexts/ApiCallsContext";
+import { FinancialDataProvider } from "./contexts/FinancialDataContext";
 import { queryClient } from "./lib/react-query/queryClient";
 import { QueryDevTools } from "./components/ReactQueryDevTools";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -18,17 +19,19 @@ const App = () => (
     <TooltipProvider>
       <BrowserRouter>
         <ApiCallsProvider>
-          <Toaster />
-          <Sonner />
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-            <Route path="/retainers" element={<ProtectedRoute><Retainers /></ProtectedRoute>} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          <QueryDevTools />
+          <FinancialDataProvider>
+            <Toaster />
+            <Sonner />
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/retainers" element={<ProtectedRoute><Retainers /></ProtectedRoute>} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <QueryDevTools />
+          </FinancialDataProvider>
         </ApiCallsProvider>
       </BrowserRouter>
     </TooltipProvider>

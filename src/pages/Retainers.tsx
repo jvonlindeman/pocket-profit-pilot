@@ -18,6 +18,7 @@ import { ProfitabilityDashboard } from "@/components/Retainers/ProfitabilityDash
 import { ReactivationAlerts } from "@/components/Retainers/ReactivationAlerts";
 import { CanceledClientsHistory } from "@/components/Retainers/CanceledClientsHistory";
 import { isMedicalClient } from "@/utils/retainerClassification";
+import { useSharedFinancialData } from "@/contexts/FinancialDataContext";
 import { cn } from "@/lib/utils";
 function useSEO() {
   React.useEffect(() => {
@@ -80,6 +81,26 @@ function exportCsv(rows: RetainerRow[]) {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+// Separate component to consume financial data context
+const ProfitabilityDashboardSection: React.FC<{ rows: RetainerRow[] }> = ({ rows }) => {
+  const financialData = useSharedFinancialData();
+  
+  return (
+    <section className="mt-6">
+      <ProfitabilityDashboard 
+        retainers={rows} 
+        financialData={{
+          stripeFees: financialData.stripeFees,
+          stripeFeePercentage: financialData.stripeFeePercentage,
+          stripeIncome: financialData.stripeIncome,
+          totalZohoExpenses: financialData.totalZohoExpenses,
+          opexAmount: financialData.opexAmount,
+        }}
+      />
+    </section>
+  );
+};
 
 const RetainersPage: React.FC = () => {
   useSEO();
@@ -543,9 +564,7 @@ const RetainersPage: React.FC = () => {
       </section>
 
       {/* Profitability Dashboard */}
-      <section className="mt-6">
-        <ProfitabilityDashboard retainers={rows} />
-      </section>
+      <ProfitabilityDashboardSection rows={rows} />
 
       <RetainerFormDialog
         open={formOpen}
