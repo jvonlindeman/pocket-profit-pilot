@@ -49,6 +49,7 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
   const [hasWhatsappBot, setHasWhatsappBot] = React.useState<boolean>((initial as any)?.has_whatsapp_bot ?? false);
   const [isLegacy, setIsLegacy] = React.useState<boolean>((initial as any)?.is_legacy ?? false);
   const [notes, setNotes] = React.useState(initial?.notes ?? "");
+  const [n8nId, setN8nId] = React.useState(initial?.n8n_id ?? "");
   
   // New status management
   const [status, setStatus] = React.useState<ClientStatus>(getInitialStatus(initial));
@@ -71,6 +72,7 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
       setHasWhatsappBot((initial as any)?.has_whatsapp_bot ?? false);
       setIsLegacy((initial as any)?.is_legacy ?? false);
       setNotes(initial?.notes ?? "");
+      setN8nId(initial?.n8n_id ?? "");
       setStatus(getInitialStatus(initial));
       setPausedAt((initial as any)?.paused_at ? formatDateForInput((initial as any).paused_at) : getTodayDateString());
       setCanceledAt(initial?.canceled_at ? formatDateForInput(initial.canceled_at) : getTodayDateString());
@@ -89,6 +91,7 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
       has_whatsapp_bot: hasWhatsappBot,
       is_legacy: isLegacy,
       notes: notes?.trim() || null,
+      n8n_id: n8nId?.trim() || null,
       // Status-based fields
       active: status !== "canceled",
       paused_at: status === "paused" ? new Date(pausedAt).toISOString() : null,
@@ -148,6 +151,15 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
           <div className="flex items-center gap-3">
             <Switch checked={isLegacy} onCheckedChange={setIsLegacy} id="isLegacy" />
             <label htmlFor="isLegacy" className="text-sm text-muted-foreground">Legacy (importado)</label>
+          </div>
+          <div className="md:col-span-2">
+            <label className="text-sm font-medium">n8n ID</label>
+            <Input 
+              value={n8nId ?? ""} 
+              onChange={(e) => setN8nId(e.target.value)} 
+              placeholder="ID único en n8n (ej: 3nuuwjh)"
+              className="font-mono text-sm"
+            />
           </div>
         </div>
 
