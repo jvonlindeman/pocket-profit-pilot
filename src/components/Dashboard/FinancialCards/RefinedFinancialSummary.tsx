@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import SummaryCardSection from './SummaryCardSection';
 import RefinedExpensesSection from './RefinedExpensesSection';
@@ -6,12 +5,24 @@ import ProfitSection from './ProfitSection';
 import UnpaidInvoicesSection from './UnpaidInvoicesSection';
 import FinancialDebugHelper from '../DebugTools/FinancialDebugHelper';
 import { useFinance } from '@/contexts/FinanceContext';
+import { useSharedFinancialData } from '@/contexts/FinancialDataContext';
 import { registerInteraction } from '@/utils/uiCapture';
 import { useIsMobile } from '@/hooks/use-mobile';
 import IncomeTabs from './IncomeTabs';
+import { useMonthlyBalance } from '@/hooks/useMonthlyBalance';
 
 const RefinedFinancialSummary: React.FC = () => {
-  const { unpaidInvoices } = useFinance();
+  const { 
+    unpaidInvoices,
+    stripeFees,
+    stripeFeePercentage,
+    stripeIncome,
+    stripeNet,
+    regularIncome,
+    collaboratorExpenses
+  } = useFinance();
+  const { setFinancialData } = useSharedFinancialData();
+  const { monthlyBalance } = useMonthlyBalance({ currentDate: new Date() });
   const isMobile = useIsMobile();
   
   // Register components as visible
@@ -19,6 +30,23 @@ const RefinedFinancialSummary: React.FC = () => {
     registerInteraction('visible-section', 'view', { section: 'financial-summary' });
     return () => {}; // No need to unregister as component unmount will take care of it
   }, []);
+
+  // Sync financial data to shared context when data changes
+  useEffect(() => {
+    // Calculate total Zoho expenses from collaborator expenses (using 'amount' property)
+    const totalZohoExpenses = collaboratorExpenses?.reduce((sum, cat) => sum + (cat.amount || 0), 0) ?? 0;
+    
+    setFinancialData({
+      stripeFees: stripeFees ?? 0,
+      stripeFeePercentage: stripeFeePercentage ?? 4.43,
+      stripeIncome: stripeIncome ?? 0,
+      stripeNet: stripeNet ?? 0,
+      regularIncome: regularIncome ?? 0,
+      collaboratorExpenses: collaboratorExpenses ?? [],
+      totalZohoExpenses,
+      opexAmount: monthlyBalance?.opex_amount ?? 0,
+    });
+  }, [stripeFees, stripeFeePercentage, stripeIncome, stripeNet, regularIncome, collaboratorExpenses, monthlyBalance, setFinancialData]);
   
   return (
     <div className="space-y-4">

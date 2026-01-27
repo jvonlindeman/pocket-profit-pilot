@@ -1,6 +1,6 @@
 import React from "react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { useProfitabilityMetrics } from "@/hooks/useProfitabilityMetrics";
+import { useProfitabilityMetrics, FinancialDataInput } from "@/hooks/useProfitabilityMetrics";
 import { KPISummaryCards } from "./KPISummaryCards";
 import { MarginDistributionChart } from "./MarginDistributionChart";
 import { TopClientsChart } from "./TopClientsChart";
@@ -10,10 +10,11 @@ import type { RetainerRow } from "@/types/retainers";
 
 interface ProfitabilityDashboardProps {
   retainers: RetainerRow[];
+  financialData?: FinancialDataInput;
 }
 
-export const ProfitabilityDashboard: React.FC<ProfitabilityDashboardProps> = ({ retainers }) => {
-  const metrics = useProfitabilityMetrics(retainers);
+export const ProfitabilityDashboard: React.FC<ProfitabilityDashboardProps> = ({ retainers, financialData }) => {
+  const metrics = useProfitabilityMetrics(retainers, financialData);
 
   return (
     <Card>
@@ -34,7 +35,7 @@ export const ProfitabilityDashboard: React.FC<ProfitabilityDashboardProps> = ({ 
         <SpecialtyAnalysis specialties={metrics.bySpecialty} />
 
         {/* Detailed Table */}
-        <ProfitabilityTable clients={metrics.clientMetrics} />
+        <ProfitabilityTable clients={metrics.clientMetrics} hasRealData={metrics.hasRealData} />
       </div>
     </Card>
   );
