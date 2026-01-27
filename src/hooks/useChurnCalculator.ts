@@ -57,9 +57,13 @@ export function calculateChurn(retainers: RetainerRow[], monthDate: Date): Churn
   let endingMRR = 0;
 
   for (const r of retainers) {
-    const createdAt = toDate((r as any).created_at) ?? periodStart;
-    const canceledAt: Date | null = toDate((r as any).canceled_at);
     const isLegacy = Boolean((r as any).is_legacy);
+    const rawCreatedAt = toDate((r as any).created_at);
+    // Los clientes legacy se consideran activos "desde siempre"
+    const createdAt = isLegacy 
+      ? new Date('2000-01-01') 
+      : (rawCreatedAt ?? periodStart);
+    const canceledAt: Date | null = toDate((r as any).canceled_at);
     const netIncome = Number(r.net_income) || 0;
 
     const wasActiveAtStart = isOnOrBefore(createdAt, periodStart) && (!canceledAt || isOnOrAfter(canceledAt, periodStart));
