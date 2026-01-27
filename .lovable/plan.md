@@ -1,130 +1,165 @@
 
 
-# Plan: Agregar ID de n8n a clientes
+# Integrar Webhook n8n para Estado de Clientes
 
 ## Resumen
 
-Agregar una nueva columna `n8n_id` a la tabla `retainers` para almacenar el identificador único de cada cliente en n8n. Esto permitirá recibir datos de sentimiento y estado desde n8n y vincularlos correctamente.
-
-## Cambios a realizar
-
-### 1. Migración de base de datos
-
-Agregar columna `n8n_id` de tipo texto, única y nullable:
-
-```sql
-ALTER TABLE retainers 
-ADD COLUMN n8n_id text DEFAULT NULL;
-
-CREATE UNIQUE INDEX idx_retainers_n8n_id 
-ON retainers (n8n_id) 
-WHERE n8n_id IS NOT NULL;
-
-COMMENT ON COLUMN retainers.n8n_id IS 
-  'ID unico del cliente en n8n para sincronizacion';
-```
-
-### 2. Poblar datos iniciales
-
-Script SQL para asignar los IDs de n8n basado en el mapeo de las imagenes:
-
-| Cliente (Supabase) | n8n_id |
-|--------------------|--------|
-| AutoCash | 3nuuwjh |
-| Centro Urologico | 86dtqvqr1 |
-| CDA | 86drbpmmp |
-| Cendigastro | 86dw5rh34 |
-| Clinica Dental Obarrio | 86du2fx0d |
-| Clinica Ford | 3nuuwr2 |
-| Copac | 3nuuvcy |
-| Cremaciones la Gloria | 86du5t3jy |
-| Docati | 86dvdy783 |
-| Dr. Alejandro | 865d9e8n7 |
-| Dr. Carlos Rebollon | 3nuuve5 |
-| Dr. Christopher Chung | 86dqy50ce |
-| Dr. David Espinosa | 86dumpm4d |
-| Dr Fernando Agreda | 86drmh86q |
-| Dr Fernando Ku | 86dvuzjnm |
-| Dr. Guillermo Julio Tatis | 3nuuvnh |
-| Dr. Humberto Juarez | 86dr1eduj |
-| Dr Jose Batista | 86dtn2ccp |
-| Dr. Jose Felix | 3nuuwvg |
-| Dr Jose Francisco | 86drwz1m5 |
-| Dr Kam | 86dtg2nyx |
-| Dr Lech | 3nuuvtk |
-| Dr. Mario | 3nuuwz0 |
-| Dr Nelson | 86dv66ncy |
-| Dr. Oman | 86dw784c8 |
-| Dr Raul | 86dt1tayx |
-| Dr. Roberto Garcia | 3nuux8e |
-| Dr. Trejos | 3nuuwug |
-| Eco Ink | 866a05kpj |
-| eurocash | 3y7yg8w |
-| Fudimi | 86dqktuby |
-| Fumigadora Express | 86dwjwyh9 |
-| funeraria virgen | 86dv2aaj7 |
-| Grupo Tecnik | 86dr4razm |
-| Julio effio | 866am5r12 |
-| Laboratorio America | 86dv7jc0g |
-| Legalia | 861n7r2r8 |
-| Panama Gili | 86dtgg9er |
-| Panama Vision Institute | 86dwx9zq4 |
-| Petclub | 86dxzxxdx |
-| PGS Legal | 8669gx0tb |
-| Think Safety | 3nuuw65 |
-| Biosinfex | 86dwqjzwp |
-| CDA Express | 86dt115bd |
-| Cheers | 86dx2vdkd |
-| Dra. Brenda | 3nuuwak |
-| Dra. Diana Tejada | 3nuuwv9 |
-| Dra Maria Alejandra | 85ztuz3b7 |
-| Dra Yurielis | 86dvzftby |
-| Dr Cesar Diaz | 86dwc0pcm |
-| BH Contadores | 86dvf4tvg |
-| Alfa Panama | 86dxtdch4 |
-| Arcom | (falta en imagenes) |
-| Optirex | 86duttbhc |
-| Transporte Serrano | 3nuuv5e |
-| ... | ... |
-
-(Total: ~75 clientes para mapear)
-
-### 3. Actualizar tipos TypeScript
-
-El archivo `src/integrations/supabase/types.ts` se actualizara automaticamente con:
-```typescript
-n8n_id: string | null
-```
-
-### 4. Agregar campo al formulario (opcional)
-
-Si quieres poder editar el n8n_id manualmente, agregarlo a `RetainerFormDialog.tsx` como campo de solo lectura o editable.
-
-### 5. Mostrar en tabla (opcional)
-
-Agregar columna visible en `RetainersTable.tsx` para verificar que el mapeo sea correcto.
+Crear una edge function que consulte el webhook de n8n para obtener el estado/sentimiento de cada cliente y actualizar la tabla `retainers` con esa informacion. El estado se mostrara visualmente en la tabla de retainers.
 
 ---
 
-## Archivos a modificar
+## Paso 1: Agregar columnas a la tabla retainers
 
-| Archivo | Cambio |
+Nuevas columnas para almacenar el estado del cliente:
+
+| Columna | Tipo | Descripcion |
+|---------|------|-------------|
+| `client_status` | `text` | Estado actual ("OK", "Agradecido", "En seguimiento", etc.) |
+| `client_status_date` | `timestamptz` | Fecha de la ultima actualizacion del estado |
+
+Los 11 valores posibles de status:
+- OK, Agradecido, En seguimiento, Con pendiente, Esperando respuesta
+- Duda o consulta, Insatisfecho leve, Enojado, Frustrado
+- Amenaza con irse, Reclamo grave
+
+---
+
+## Paso 2: Crear Edge Function `sync-client-status`
+
+La funcion realizara:
+
+1. **Fetch al webhook n8n** - Consultar `https://drpremiern8n.lat/webhook/dc0d2f76-3d5c-4d59-9f8c-e34a55712254`
+2. **Parsear respuesta** - Obtener array de `{client_id, name, status, date}`
+3. **Actualizar retainers** - Para cada item, hacer UPDATE donde `n8n_id = client_id`
+4. **Retornar resumen** - Cuantos actualizados, cuantos no encontrados
+
+Configuracion en `config.toml`:
+- `verify_jwt = true` (solo usuarios autenticados pueden sincronizar)
+
+---
+
+## Paso 3: Visualizacion en la UI
+
+### 3.1 Badge de estado en RetainersTable
+
+Agregar una columna "Estado" con badge de color segun el sentimiento:
+
+| Color | Estados |
+|-------|---------|
+| Verde | OK, Agradecido |
+| Azul | En seguimiento, Esperando respuesta |
+| Amarillo | Duda o consulta, Con pendiente |
+| Naranja | Insatisfecho leve |
+| Rojo | Enojado, Frustrado, Amenaza con irse, Reclamo grave |
+
+### 3.2 Boton de sincronizacion
+
+En la pagina Retainers, agregar boton "Sincronizar estado n8n" que:
+- Llame a la edge function
+- Muestre toast con resultado
+- Refresque la query de retainers
+
+---
+
+## Paso 4: Actualizar tipos TypeScript
+
+Agregar a `RetainerRow`:
+- `client_status: string | null`
+- `client_status_date: string | null`
+
+(Los tipos se regeneran automaticamente tras la migracion)
+
+---
+
+## Flujo de datos
+
+```text
++------------------+     HTTP GET     +-------------------------+
+|  Pagina          | --------------> |  Edge Function          |
+|  Retainers.tsx   |                 |  sync-client-status     |
+|  (boton sync)    |                 +-------------------------+
++------------------+                           |
+        ^                                      | fetch webhook
+        |                                      v
+        |                          +-------------------------+
+        |   invalidate query       |  n8n Webhook            |
+        |<-------------------------|  (datos de sentimiento) |
+        |                          +-------------------------+
+        |                                      |
+        |                                      | parse response
+        v                                      v
++------------------+     UPDATE      +-------------------------+
+|  React Query     | <------------- |  Supabase DB            |
+|  useRetainers    |                 |  tabla retainers        |
++------------------+                 +-------------------------+
+```
+
+---
+
+## Archivos a crear/modificar
+
+| Archivo | Accion |
 |---------|--------|
-| Migracion SQL | Agregar columna `n8n_id` |
-| Script SQL | Poblar IDs existentes |
-| `src/integrations/supabase/types.ts` | Se regenera automaticamente |
-| `src/components/Retainers/RetainerFormDialog.tsx` | (Opcional) Campo para ver/editar n8n_id |
+| `supabase/functions/sync-client-status/index.ts` | Crear |
+| `supabase/config.toml` | Agregar funcion |
+| `src/components/Retainers/RetainersTable.tsx` | Agregar columna estado |
+| `src/pages/Retainers.tsx` | Agregar boton sync |
+| `src/hooks/queries/useRetainers.ts` | Agregar mutation para sync |
 
 ---
 
-## Notas importantes
+## Seccion Tecnica
 
-1. **Mapeo manual necesario**: Los nombres no coinciden exactamente, asi que hare el mejor esfuerzo de mapear. Algunos casos ambiguos:
-   - "Ortopedas Panama" puede ser "Centro Esp. Ortopedicas" o "CEOSA" 
-   - "Dr. Guillermo Brennan" no existe en tu base de datos
-   - "Doctor Premier" / "pruebas" parecen ser cuentas de prueba
+### Edge Function (sync-client-status/index.ts)
 
-2. **Clientes sin ID de n8n**: Algunos clientes en tu base de datos no aparecen en las imagenes (ej: "Carlos Esposo Irma", "Fonoaudiologia"). Quedaran con `n8n_id = NULL`.
+```typescript
+// Pseudocodigo
+const response = await fetch(N8N_WEBHOOK_URL);
+const clients = await response.json();
 
-3. **Indice unico**: El indice garantiza que no haya duplicados, pero permite NULLs multiples.
+for (const client of clients) {
+  await supabase
+    .from('retainers')
+    .update({
+      client_status: client.status.trim(),
+      client_status_date: client.date
+    })
+    .eq('n8n_id', client.client_id);
+}
+```
+
+### Mapeo de colores para badges
+
+```typescript
+const statusColors: Record<string, string> = {
+  'OK': 'bg-green-100 text-green-800',
+  'Agradecido': 'bg-green-100 text-green-800',
+  'En seguimiento': 'bg-blue-100 text-blue-800',
+  'Esperando respuesta': 'bg-blue-100 text-blue-800',
+  'Duda o consulta': 'bg-yellow-100 text-yellow-800',
+  'Con pendiente': 'bg-yellow-100 text-yellow-800',
+  'Insatisfecho leve': 'bg-orange-100 text-orange-800',
+  'Enojado': 'bg-red-100 text-red-800',
+  'Frustrado': 'bg-red-100 text-red-800',
+  'Amenaza con irse': 'bg-red-100 text-red-800',
+  'Reclamo grave': 'bg-red-100 text-red-800',
+};
+```
+
+### Idempotencia (evitar llamadas duplicadas)
+
+Para cumplir con el requisito de "solo una vez":
+- La funcion usa service_role para updates directos
+- No hay riesgo de duplicacion porque es una operacion de lectura del webhook + update puntual
+- El boton de sync se deshabilitara mientras este en progreso (loading state)
+
+---
+
+## Consideraciones
+
+1. **Sin n8n_id**: Clientes que no tienen `n8n_id` asignado no se actualizaran. El endpoint reportara cuantos quedaron sin match.
+
+2. **Trim de status**: El webhook trae espacios al inicio (" Agradecido"), se hara `.trim()` antes de guardar.
+
+3. **Refresh automatico**: Tras sincronizar, se invalida la query para mostrar datos actualizados.
 
