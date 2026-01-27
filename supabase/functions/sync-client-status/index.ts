@@ -65,7 +65,44 @@ Deno.serve(async (req) => {
       );
     }
 
-    const clientStatuses: N8nClientStatus[] = await webhookResponse.json();
+    // Parse response and handle different formats
+    const rawResponse = await webhookResponse.json();
+    console.log(`[sync-client-status] Raw response type: ${typeof rawResponse}, isArray: ${Array.isArray(rawResponse)}`);
+
+    // Handle both array and wrapped object formats
+    let clientStatuses: N8nClientStatus[];
+
+    if (Array.isArray(rawResponse)) {
+      // Direct array format
+      clientStatuses = rawResponse;
+    } else if (rawResponse && typeof rawResponse === 'object') {
+      // Check common wrapper properties: data, clients, items, results
+      const possibleArrays = ['data', 'clients', 'items', 'results'];
+      const arrayProp = possibleArrays.find(prop => Array.isArray(rawResponse[prop]));
+      
+      if (arrayProp) {
+        clientStatuses = rawResponse[arrayProp];
+        console.log(`[sync-client-status] Found array in property: ${arrayProp}`);
+      } else {
+        // Log the actual structure for debugging
+        console.error(`[sync-client-status] Unexpected format. Keys: ${Object.keys(rawResponse).join(', ')}`);
+        return new Response(
+          JSON.stringify({ 
+            error: "Invalid webhook response format", 
+            receivedKeys: Object.keys(rawResponse),
+            hint: "Expected an array or object with data/clients/items property"
+          }),
+          { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    } else {
+      console.error(`[sync-client-status] Response is not array or object: ${rawResponse}`);
+      return new Response(
+        JSON.stringify({ error: "Invalid webhook response", received: String(rawResponse) }),
+        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     console.log(`[sync-client-status] Received ${clientStatuses.length} client statuses from n8n`);
 
     // Track results
