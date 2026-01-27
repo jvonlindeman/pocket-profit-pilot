@@ -246,6 +246,7 @@ export type Database = {
           metadata: Json
           net_income: number
           notes: string | null
+          paused_at: string | null
           social_media_cost: number
           specialty: string | null
           total_expenses: number
@@ -264,6 +265,7 @@ export type Database = {
           metadata?: Json
           net_income?: number
           notes?: string | null
+          paused_at?: string | null
           social_media_cost?: number
           specialty?: string | null
           total_expenses?: number
@@ -282,6 +284,7 @@ export type Database = {
           metadata?: Json
           net_income?: number
           notes?: string | null
+          paused_at?: string | null
           social_media_cost?: number
           specialty?: string | null
           total_expenses?: number
