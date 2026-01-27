@@ -1,70 +1,61 @@
 
+# Integrar Upsells en Cálculo de Churn
 
-# Implementar Sistema de Upsells (Continuación)
+## Problema Actual
 
-## Estado Actual
+El cálculo de churn en `useChurnCalculator.ts` no considera:
+- **Expansion MRR**: Ingresos adicionales por upsells a clientes existentes
+- **Contraction MRR**: Reducción de ingresos si un cliente baja de plan
 
-- Plan de upsells fue aprobado anteriormente
-- La base de datos **no tiene** las columnas `base_income` ni `upsell_income`
-- El formulario sigue usando solo `net_income`
+Actualmente:
+- `newMRR` = solo clientes nuevos
+- `churnedMRR` = solo clientes cancelados
 
----
+## Solución Propuesta
 
-## Pasos a Implementar
-
-### 1. Migración de Base de Datos
-
-Agregar las columnas necesarias:
-
-```sql
-ALTER TABLE retainers
-ADD COLUMN base_income numeric NOT NULL DEFAULT 0,
-ADD COLUMN upsell_income numeric NOT NULL DEFAULT 0;
-
--- Migrar datos existentes: todo el net_income actual es base_income
-UPDATE retainers SET base_income = net_income WHERE base_income = 0;
-```
-
-### 2. Actualizar Tipos TypeScript
-
-En `src/integrations/supabase/types.ts`, agregar a la definición de retainers:
-- `base_income: number`
-- `upsell_income: number`
-
-### 3. Modificar Formulario (RetainerFormDialog.tsx)
-
-Cambiar el campo "Ingreso neto" por:
-- **Ingreso base**: MRR inicial del cliente
-- **Upsells**: Ventas adicionales
-- **Total MRR**: Calculado automáticamente (readonly)
+Usar el campo `upsell_income` existente para calcular Expansion MRR:
 
 ```text
-+------------------------------------------+
-| Ingreso base        | $400              |
-+------------------------------------------+
-| Upsells             | $597              |
-+------------------------------------------+
-| Total MRR           | $997 (calculado)  |
-+------------------------------------------+
++---------------------------+---------------------------------------------+
+| Métrica                   | Cálculo                                     |
++---------------------------+---------------------------------------------+
+| Expansion MRR             | Suma de upsell_income de clientes activos   |
+| Net New MRR               | newMRR + expansionMRR                       |
+| Gross Revenue Churn       | churnedMRR + contractionMRR                 |
+| Net Revenue Retention     | (startingMRR + expansion - churn) / start   |
++---------------------------+---------------------------------------------+
 ```
 
-### 4. Actualizar Tabla (RetainersTable.tsx)
+## Cambios en ChurnMetrics
 
-En la columna de Ingreso, mostrar:
-- El total ($997)
-- Indicador de upsell si hay (+$597 en verde)
-- Tooltip con desglose completo
+Agregar al tipo `ChurnMetrics`:
 
-### 5. Métricas de Expansión (useProfitabilityMetrics.ts)
+| Campo | Descripción |
+|-------|-------------|
+| `expansionMRR` | Suma de upsell_income de clientes activos |
+| `contractionMRR` | Para futuro: cuando se baje un plan |
+| `netNewMRR` | newMRR + expansionMRR |
+| `grossRevenueChurn` | churnedMRR + contractionMRR |
 
-Agregar nuevas métricas:
-- `totalUpsellRevenue`: Suma de todos los upsells
-- `clientsWithUpsells`: Cantidad de clientes con upsells
-- `expansionRate`: % de ingresos que viene de upsells
+## Cambios en UI (Retainers.tsx)
 
-### 6. Card de Expansion MRR (KPISummaryCards.tsx)
+Actualizar las cards de churn para mostrar:
 
-Nuevo card mostrando Expansion MRR total
+```text
++---------------------+---------------------+
+| MRR Nuevo           | MRR Perdido         |
+| $2,500              | $400                |
+| (+$1,500 expansion) | (contraction: $0)   |
++---------------------+---------------------+
+```
+
+## Sobre Contraction MRR
+
+Para trackear reducciones de plan necesitaríamos:
+1. Guardar el ingreso anterior cuando se edita un cliente
+2. O crear historial de cambios de ingresos
+
+Por ahora, podemos calcular Expansion MRR usando `upsell_income` y dejar Contraction MRR en 0 (o implementar historial después).
 
 ---
 
@@ -72,21 +63,47 @@ Nuevo card mostrando Expansion MRR total
 
 | Archivo | Cambio |
 |---------|--------|
-| Nueva migración SQL | Agregar columnas `base_income` y `upsell_income` |
-| `src/integrations/supabase/types.ts` | Tipos actualizados |
-| `src/components/Retainers/RetainerFormDialog.tsx` | Campos separados base + upsell |
-| `src/components/Retainers/RetainersTable.tsx` | Indicador visual de upsell |
-| `src/hooks/useProfitabilityMetrics.ts` | Métricas de expansión |
-| `src/components/Retainers/ProfitabilityDashboard/KPISummaryCards.tsx` | Card Expansion MRR |
+| `src/hooks/useChurnCalculator.ts` | Agregar expansionMRR, netNewMRR al cálculo |
+| `src/pages/Retainers.tsx` | Mostrar expansionMRR en las cards de churn |
 
 ---
 
-## Ejemplo con Fernando Agreda
+## Sección Técnica
 
-Después de implementar:
-1. Editas a Fernando Agreda
-2. Pones: Base = $400, Upsell = $597
-3. El sistema calcula: net_income = $997
-4. En la tabla ves: "$997 (+$597)"
-5. En KPIs ves: "Expansion MRR: $597"
+### Lógica en useChurnCalculator.ts
 
+```typescript
+// Nuevo en el loop
+const upsellIncome = Number((r as any).upsell_income) || 0;
+
+// Para clientes activos que existían antes del período
+if (wasActiveAtStart && !isNewThisPeriod && wasActiveAtEnd && !isPausedAtEnd) {
+  expansionMRR += upsellIncome;
+}
+
+// Nuevas métricas
+const netNewMRR = newMRR + expansionMRR;
+const grossRevenueChurn = churnedMRR + contractionMRR;
+```
+
+### Vista en UI
+
+```
+MRR Nuevo: $2,500
+├── Clientes nuevos: $1,000
+└── Expansion (upsells): $1,500
+
+MRR Perdido: $400
+├── Cancelaciones: $400
+└── Contraction: $0
+```
+
+---
+
+## Consideración Importante
+
+Este enfoque asume que todos los `upsell_income` son expansión del período actual. Si necesitas trackear cuándo ocurrió cada upsell, se requeriría:
+1. Agregar campo `upsell_date` a retainers, o
+2. Crear tabla de historial de cambios de ingresos
+
+Por ahora, el enfoque simple funciona para ver el impacto de upsells en las métricas de churn.
