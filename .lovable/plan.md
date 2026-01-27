@@ -1,187 +1,218 @@
 
-# Plan: Implementar Autenticación y Corregir Problemas de Seguridad
+
+# Plan: Corregir Warnings de Seguridad RLS
 
 ## Resumen
 
-Se implementará un sistema de autenticación con Supabase Auth para proteger el dashboard financiero. Esto incluye login/logout, protección de rutas, y corrección de políticas RLS para requerir autenticación.
+Fortalecer las políticas RLS para eliminar los warnings del linter de Supabase. Las políticas actuales usan `USING (true)` que es considerado inseguro. Se cambiarán a verificaciones explícitas del rol de autenticación.
 
 ---
 
-## Problemas de Seguridad Detectados
+## Problemas Detectados
 
-| Problema | Severidad | Tabla/Recurso |
-|----------|-----------|---------------|
-| Credenciales OAuth expuestas sin protección RLS | CRÍTICO | `zoho_integration` |
-| Datos de clientes públicamente accesibles | ALTO | `retainers` |
-| Acceso anónimo a INSERT/UPDATE/DELETE | ALTO | `retainers` |
-| Políticas "always true" para escritura | MEDIO | Múltiples tablas |
-
----
-
-## Solución Propuesta
-
-### Fase 1: Crear Página de Login
-
-| Archivo | Descripción |
-|---------|-------------|
-| `src/pages/Login.tsx` | Página con formulario de email/password |
-| `src/hooks/useAuth.ts` | Hook para gestionar estado de autenticación |
-
-### Fase 2: Proteger Rutas
-
-| Archivo | Descripción |
-|---------|-------------|
-| `src/components/ProtectedRoute.tsx` | Componente que redirige a login si no hay sesión |
-| `src/App.tsx` | Envolver rutas protegidas |
-
-### Fase 3: Corregir Políticas RLS
-
-| Tabla | Cambio |
-|-------|--------|
-| `retainers` | Eliminar políticas anon, mantener solo authenticated |
-| `zoho_integration` | Agregar RLS que solo permita service_role |
-| `receivables_selections` | Cambiar de anon a authenticated |
-| `monthly_balances` | Agregar políticas para authenticated |
-| `financial_summaries` | Cambiar a authenticated |
+| Tabla | Problema | Severidad |
+|-------|----------|-----------|
+| `zoho_integration` | Política usa `true` en lugar de verificar `service_role` | CRITICO |
+| `retainers` | INSERT/UPDATE/DELETE usan `USING (true)` | ALTO |
+| `financial_summaries` | INSERT/UPDATE/DELETE usan `USING (true)` | ALTO |
+| `monthly_balances` | INSERT/UPDATE/DELETE usan `USING (true)` | ALTO |
+| `receivables_selections` | INSERT/UPDATE/DELETE usan `USING (true)` | ALTO |
+| `monthly_financial_summaries` | INSERT/UPDATE/DELETE usan `USING (true)` | ALTO |
 
 ---
 
-## Flujo de Usuario
+## Solucion Propuesta
 
-```text
-Usuario → App.tsx
-           ↓
-    ¿Tiene sesión?
-     /         \
-   Sí           No
-   ↓             ↓
-Dashboard    Login Page
-                 ↓
-         Email/Password
-                 ↓
-         Supabase Auth
-                 ↓
-         Sesión creada → Dashboard
-```
+Crear una migracion SQL que:
 
----
-
-## Archivos a Crear/Modificar
-
-### Nuevos Archivos
-
-| Archivo | Descripción |
-|---------|-------------|
-| `src/pages/Login.tsx` | Formulario de login con email/password |
-| `src/hooks/useAuth.ts` | Hook para autenticación (signIn, signOut, session) |
-| `src/components/ProtectedRoute.tsx` | HOC para proteger rutas |
-
-### Archivos a Modificar
-
-| Archivo | Cambio |
-|---------|--------|
-| `src/App.tsx` | Agregar ruta /login y envolver rutas con ProtectedRoute |
-| `src/components/Dashboard/Header/DashboardHeader.tsx` | Agregar botón de logout |
-
-### Migración SQL
-
-Crear migración para corregir políticas RLS:
-- Eliminar políticas `anon` de `retainers`
-- Agregar RLS restrictivo a `zoho_integration`
-- Actualizar políticas en otras tablas
+1. Elimine las politicas existentes que usan `USING (true)`
+2. Cree nuevas politicas que verifiquen explicitamente `auth.role() = 'authenticated'`
+3. Para `zoho_integration`, verificar `auth.role() = 'service_role'`
 
 ---
 
 ## Impacto
 
-| Aspecto | Antes | Después |
+| Aspecto | Antes | Despues |
 |---------|-------|---------|
-| Acceso al dashboard | Público | Requiere login |
-| Datos de clientes | Públicos | Solo usuarios autenticados |
-| Credenciales Zoho | Sin protección | Solo service_role |
-| Operaciones de escritura | Anónimas | Solo autenticados |
+| Linter warnings | 19 warnings RLS | 0 warnings RLS |
+| Acceso a datos | Cualquier authenticated | Solo authenticated verificado |
+| zoho_integration | Politica ambigua | Solo service_role explicito |
 
 ---
 
-## Notas Importantes
+## Archivos a Modificar
 
-1. **Crear primer usuario**: Después de implementar, se creará el usuario en el dashboard de Supabase (Authentication > Users > Add User)
-
-2. **Sin registro público**: El formulario solo tendrá login, no signup. Los usuarios se crean manualmente para mayor seguridad.
-
-3. **Sesión persistente**: La sesión se mantendrá en localStorage del navegador
+| Archivo | Tipo | Descripcion |
+|---------|------|-------------|
+| Nueva migracion SQL | Crear | Reescribir politicas RLS con verificaciones explicitas |
 
 ---
 
-## Sección Técnica
+## Seccion Tecnica
 
-### Estructura del Hook useAuth
+### Patron de Politica Corregida
 
-```text
-useAuth()
-├── session: Session | null
-├── user: User | null
-├── loading: boolean
-├── signIn(email, password): Promise<void>
-├── signOut(): Promise<void>
-└── isAuthenticated: boolean
+En lugar de:
+```sql
+CREATE POLICY "..." ON table FOR INSERT TO authenticated WITH CHECK (true);
 ```
 
-### Políticas RLS Corregidas
-
-Para `retainers`:
+Usar:
 ```sql
--- Eliminar políticas anon
-DROP POLICY IF EXISTS "Anon can insert retainers" ON public.retainers;
-DROP POLICY IF EXISTS "Anon can update retainers" ON public.retainers;
-DROP POLICY IF EXISTS "Anon can delete retainers" ON public.retainers;
-DROP POLICY IF EXISTS "Public can read retainers" ON public.retainers;
+CREATE POLICY "..." ON table FOR INSERT TO authenticated WITH CHECK (auth.role() = 'authenticated');
 ```
 
-Para `zoho_integration`:
-```sql
--- Habilitar RLS
-ALTER TABLE public.zoho_integration ENABLE ROW LEVEL SECURITY;
+### Migracion SQL Completa
 
--- Solo service_role puede acceder (usado por edge functions)
-CREATE POLICY "Only service role can access zoho_integration"
+```sql
+-- =============================================
+-- ZOHO_INTEGRATION: Solo service_role
+-- =============================================
+DROP POLICY IF EXISTS "Only service role can access zoho_integration" ON public.zoho_integration;
+
+CREATE POLICY "Service role only access zoho_integration"
 ON public.zoho_integration FOR ALL
 TO service_role
-USING (true)
-WITH CHECK (true);
+USING (auth.role() = 'service_role')
+WITH CHECK (auth.role() = 'service_role');
+
+-- =============================================
+-- RETAINERS: Verificacion explicita
+-- =============================================
+DROP POLICY IF EXISTS "Authenticated can select retainers" ON public.retainers;
+DROP POLICY IF EXISTS "Authenticated can insert retainers" ON public.retainers;
+DROP POLICY IF EXISTS "Authenticated can update retainers" ON public.retainers;
+DROP POLICY IF EXISTS "Authenticated can delete retainers" ON public.retainers;
+
+CREATE POLICY "Authenticated select retainers"
+ON public.retainers FOR SELECT TO authenticated
+USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Authenticated insert retainers"
+ON public.retainers FOR INSERT TO authenticated
+WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY "Authenticated update retainers"
+ON public.retainers FOR UPDATE TO authenticated
+USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Authenticated delete retainers"
+ON public.retainers FOR DELETE TO authenticated
+USING (auth.role() = 'authenticated');
+
+-- =============================================
+-- FINANCIAL_SUMMARIES: Verificacion explicita
+-- =============================================
+DROP POLICY IF EXISTS "Authenticated can select financial_summaries" ON public.financial_summaries;
+DROP POLICY IF EXISTS "Authenticated can insert financial_summaries" ON public.financial_summaries;
+DROP POLICY IF EXISTS "Authenticated can update financial_summaries" ON public.financial_summaries;
+DROP POLICY IF EXISTS "Authenticated can delete financial_summaries" ON public.financial_summaries;
+DROP POLICY IF EXISTS "Service role full access financial_summaries" ON public.financial_summaries;
+
+CREATE POLICY "Authenticated select financial_summaries"
+ON public.financial_summaries FOR SELECT TO authenticated
+USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Authenticated insert financial_summaries"
+ON public.financial_summaries FOR INSERT TO authenticated
+WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY "Authenticated update financial_summaries"
+ON public.financial_summaries FOR UPDATE TO authenticated
+USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Authenticated delete financial_summaries"
+ON public.financial_summaries FOR DELETE TO authenticated
+USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Service role access financial_summaries"
+ON public.financial_summaries FOR ALL TO service_role
+USING (auth.role() = 'service_role')
+WITH CHECK (auth.role() = 'service_role');
+
+-- =============================================
+-- MONTHLY_BALANCES: Verificacion explicita
+-- =============================================
+DROP POLICY IF EXISTS "Authenticated can select monthly_balances" ON public.monthly_balances;
+DROP POLICY IF EXISTS "Authenticated can insert monthly_balances" ON public.monthly_balances;
+DROP POLICY IF EXISTS "Authenticated can update monthly_balances" ON public.monthly_balances;
+DROP POLICY IF EXISTS "Authenticated can delete monthly_balances" ON public.monthly_balances;
+DROP POLICY IF EXISTS "Service role full access monthly_balances" ON public.monthly_balances;
+
+CREATE POLICY "Authenticated select monthly_balances"
+ON public.monthly_balances FOR SELECT TO authenticated
+USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Authenticated insert monthly_balances"
+ON public.monthly_balances FOR INSERT TO authenticated
+WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY "Authenticated update monthly_balances"
+ON public.monthly_balances FOR UPDATE TO authenticated
+USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Authenticated delete monthly_balances"
+ON public.monthly_balances FOR DELETE TO authenticated
+USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Service role access monthly_balances"
+ON public.monthly_balances FOR ALL TO service_role
+USING (auth.role() = 'service_role')
+WITH CHECK (auth.role() = 'service_role');
+
+-- =============================================
+-- RECEIVABLES_SELECTIONS: Verificacion explicita
+-- =============================================
+DROP POLICY IF EXISTS "Authenticated can select receivables_selections" ON public.receivables_selections;
+DROP POLICY IF EXISTS "Authenticated can insert receivables_selections" ON public.receivables_selections;
+DROP POLICY IF EXISTS "Authenticated can update receivables_selections" ON public.receivables_selections;
+DROP POLICY IF EXISTS "Authenticated can delete receivables_selections" ON public.receivables_selections;
+
+CREATE POLICY "Authenticated select receivables_selections"
+ON public.receivables_selections FOR SELECT TO authenticated
+USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Authenticated insert receivables_selections"
+ON public.receivables_selections FOR INSERT TO authenticated
+WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY "Authenticated update receivables_selections"
+ON public.receivables_selections FOR UPDATE TO authenticated
+USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Authenticated delete receivables_selections"
+ON public.receivables_selections FOR DELETE TO authenticated
+USING (auth.role() = 'authenticated');
+
+-- =============================================
+-- MONTHLY_FINANCIAL_SUMMARIES: Verificacion explicita
+-- =============================================
+DROP POLICY IF EXISTS "Authenticated can select monthly_financial_summaries" ON public.monthly_financial_summaries;
+DROP POLICY IF EXISTS "Authenticated can insert monthly_financial_summaries" ON public.monthly_financial_summaries;
+DROP POLICY IF EXISTS "Authenticated can update monthly_financial_summaries" ON public.monthly_financial_summaries;
+DROP POLICY IF EXISTS "Authenticated can delete monthly_financial_summaries" ON public.monthly_financial_summaries;
+
+CREATE POLICY "Authenticated select monthly_financial_summaries"
+ON public.monthly_financial_summaries FOR SELECT TO authenticated
+USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Authenticated insert monthly_financial_summaries"
+ON public.monthly_financial_summaries FOR INSERT TO authenticated
+WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY "Authenticated update monthly_financial_summaries"
+ON public.monthly_financial_summaries FOR UPDATE TO authenticated
+USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Authenticated delete monthly_financial_summaries"
+ON public.monthly_financial_summaries FOR DELETE TO authenticated
+USING (auth.role() = 'authenticated');
 ```
 
-### Componente ProtectedRoute
+### Notas Adicionales
 
-```text
-ProtectedRoute
-├── Props: children
-├── Behavior:
-│   ├── Si loading → Spinner
-│   ├── Si !session → Navigate to /login
-│   └── Si session → Renderizar children
-```
+- El warning de `function_search_path_mutable` es un issue de configuracion de Supabase que no afecta la seguridad de tu aplicacion directamente
+- El warning de `auth_otp_long_expiry` se configura en el dashboard de Supabase (Authentication > Settings)
+- El warning de `vulnerable_postgres_version` requiere upgrade del proyecto en Supabase dashboard
 
-### Modificación de App.tsx
-
-```text
-Routes
-├── /login → Login (público)
-├── / → ProtectedRoute → Index
-├── /settings → ProtectedRoute → Settings
-├── /retainers → ProtectedRoute → Retainers
-└── * → NotFound
-```
-
-### Formulario de Login
-
-Campos:
-- Email (input type="email", required)
-- Password (input type="password", required)
-- Botón "Iniciar Sesión"
-- Mensaje de error (si credenciales inválidas)
-
-Comportamiento:
-- Al submit → supabase.auth.signInWithPassword()
-- Si éxito → redirigir a /
-- Si error → mostrar mensaje
