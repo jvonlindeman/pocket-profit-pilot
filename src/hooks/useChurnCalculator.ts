@@ -19,9 +19,14 @@ export type ChurnMetrics = {
   endingMRR: number;
   revenueChurnRate: number; // 0..1
   netRevenueRetention: number; // 0..1+
-  // Paused metrics (new)
+  // Paused metrics
   pausedCount: number;
   pausedMRR: number;
+  // Expansion/Contraction MRR
+  expansionMRR: number;
+  contractionMRR: number;
+  netNewMRR: number;
+  grossRevenueChurn: number;
 };
 
 function toDate(value: any): Date | null {
@@ -59,9 +64,13 @@ export function calculateChurn(retainers: RetainerRow[], monthDate: Date): Churn
   let newMRR = 0;
   let endingMRR = 0;
 
-  // Paused counters (new)
+  // Paused counters
   let pausedCount = 0;
   let pausedMRR = 0;
+
+  // Expansion/Contraction MRR
+  let expansionMRR = 0;
+  let contractionMRR = 0; // For future: when tracking plan downgrades
 
   for (const r of retainers) {
     const isLegacy = Boolean((r as any).is_legacy);
@@ -73,6 +82,7 @@ export function calculateChurn(retainers: RetainerRow[], monthDate: Date): Churn
     const canceledAt: Date | null = toDate((r as any).canceled_at);
     const pausedAt: Date | null = toDate((r as any).paused_at);
     const netIncome = Number(r.net_income) || 0;
+    const upsellIncome = Number((r as any).upsell_income) || 0;
 
     const wasActiveAtStart = isOnOrBefore(createdAt, periodStart) && (!canceledAt || isOnOrAfter(canceledAt, periodStart));
     // Solo contar como nuevo si NO es legacy y fue creado en el período
@@ -104,6 +114,11 @@ export function calculateChurn(retainers: RetainerRow[], monthDate: Date): Churn
       pausedCount += 1;
       pausedMRR += netIncome;
     }
+
+    // Expansion MRR: upsells from existing clients (not new, active at end, not paused)
+    if (wasActiveAtStart && !isNewThisPeriod && wasActiveAtEnd && !isPausedAtEnd) {
+      expansionMRR += upsellIncome;
+    }
   }
 
   // Logo Churn rates
@@ -115,6 +130,10 @@ export function calculateChurn(retainers: RetainerRow[], monthDate: Date): Churn
   const revenueDenom = Math.max(startingMRR, 1);
   const revenueChurnRate = churnedMRR / revenueDenom;
   const netRevenueRetention = endingMRR / revenueDenom;
+
+  // Expansion/Contraction aggregates
+  const netNewMRR = newMRR + expansionMRR;
+  const grossRevenueChurn = churnedMRR + contractionMRR;
 
   return {
     periodStart,
@@ -136,6 +155,11 @@ export function calculateChurn(retainers: RetainerRow[], monthDate: Date): Churn
     // Paused
     pausedCount,
     pausedMRR,
+    // Expansion/Contraction
+    expansionMRR,
+    contractionMRR,
+    netNewMRR,
+    grossRevenueChurn,
   };
 }
 
