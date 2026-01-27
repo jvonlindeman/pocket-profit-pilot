@@ -1,51 +1,36 @@
 
-# Plan: Agregar funcionalidad de baja de retainers para calcular churn
+
+# Plan: Implementar Revenue Churn (Churn de Ingresos)
 
 ## Resumen
 
-Actualmente el sistema tiene la columna `canceled_at` en la base de datos y el cálculo de churn la usa correctamente, pero **no existe forma de establecer esta fecha desde la interfaz**. Se agregará la opción de dar de baja a un cliente registrando la fecha de cancelación.
+Agregar metricas de Revenue Churn junto al Logo Churn existente para medir el impacto financiero real de las bajas y altas de clientes. Esto incluye MRR perdido, MRR ganado, y Net Revenue Retention (NRR).
 
 ---
 
-## Estado Actual
+## Metricas a Implementar
 
-| Componente | Estado |
-|------------|--------|
-| Columna `canceled_at` en BD | Ya existe |
-| Cálculo de churn con `canceled_at` | Funcionando |
-| Campo en formulario para `canceled_at` | No existe |
-| Automatización al desactivar | No existe |
-
----
-
-## Solución Propuesta
-
-### Opción elegida: Campo de fecha + automatización
-
-Cuando el usuario desactive un retainer (toggle "Activo" = off):
-1. Mostrar un campo de fecha para seleccionar la fecha de baja
-2. Si no se especifica fecha, usar la fecha actual automáticamente
-3. Si se reactiva el cliente, limpiar `canceled_at`
+| Metrica | Formula | Descripcion |
+|---------|---------|-------------|
+| MRR Inicial | Suma de `net_income` de clientes activos al inicio del mes | Ingresos recurrentes al comenzar el periodo |
+| MRR Perdido (Churned) | Suma de `net_income` de clientes que cancelaron en el mes | Impacto financiero de las bajas |
+| MRR Nuevo | Suma de `net_income` de clientes nuevos en el mes | Ingresos por nuevos clientes |
+| MRR Final | Suma de `net_income` de clientes activos al cierre | Ingresos recurrentes al final del periodo |
+| Revenue Churn Rate | MRR Perdido / MRR Inicial | Porcentaje de ingresos perdidos |
+| Net Revenue Retention (NRR) | (MRR Final / MRR Inicial) x 100 | Retencion neta de ingresos |
 
 ---
 
-## Flujo de Usuario
+## Comparacion Logo Churn vs Revenue Churn
 
 ```text
-Usuario edita retainer
-        |
-        v
-Desactiva toggle "Activo"
-        |
-        v
-Aparece campo "Fecha de baja"
-(pre-llenado con fecha actual)
-        |
-        v
-Usuario puede ajustar fecha
-        |
-        v
-Al guardar -> canceled_at = fecha seleccionada
+Ejemplo:
+- Pierdes 2 clientes que pagaban $100/mes cada uno = $200 perdidos
+- Ganas 1 cliente nuevo que paga $500/mes = $500 ganados
+
+Logo Churn: -2 clientes (parece malo)
+Revenue Churn: +$300 neto (realidad positiva)
+NRR: >100% (crecimiento)
 ```
 
 ---
@@ -54,68 +39,79 @@ Al guardar -> canceled_at = fecha seleccionada
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/components/Retainers/RetainerFormDialog.tsx` | Agregar campo de fecha de baja condicional |
-| `src/components/Retainers/RetainersTable.tsx` | Mostrar fecha de baja en tabla (opcional) |
-| `src/types/retainers.ts` | Verificar que `canceled_at` esté tipado |
+| `src/hooks/useChurnCalculator.ts` | Agregar calculo de Revenue Churn |
+| `src/pages/Retainers.tsx` | Mostrar nuevas metricas en la UI |
 
 ---
 
-## Cambios en el Formulario
+## Cambios en la UI
 
-El formulario mostrará:
-- Toggle "Activo" (ya existe)
-- Cuando "Activo" = false: campo "Fecha de baja" (input type="date")
-- Pre-llenado con fecha actual si no hay valor previo
+La seccion "Churn de retainers" tendra dos subsecciones:
+
+### Logo Churn (existente)
+- Activos al inicio
+- Nuevos
+- Bajas
+- Activos al cierre
+- Churn Rate
+- Retention Rate
+
+### Revenue Churn (nuevo)
+- MRR Inicial
+- MRR Perdido
+- MRR Nuevo
+- MRR Final
+- Revenue Churn Rate
+- Net Revenue Retention (NRR)
 
 ---
 
-## Lógica de Guardado
+## Indicadores Visuales
+
+| Metrica | Color |
+|---------|-------|
+| NRR >= 100% | Verde (crecimiento) |
+| NRR 90-99% | Amarillo (alerta) |
+| NRR < 90% | Rojo (problema) |
+
+---
+
+## Seccion Tecnica
+
+### Nuevo tipo RevenueChurnMetrics
 
 ```text
-Si active = true:
-  -> canceled_at = null (cliente activo, sin cancelación)
-
-Si active = false:
-  -> canceled_at = fecha seleccionada o fecha actual
-```
-
----
-
-## Impacto en Churn
-
-| Escenario | Antes | Después |
-|-----------|-------|---------|
-| Desactivar cliente | Solo cambia `active` | Registra `canceled_at` |
-| Cálculo de bajas | Siempre 0 (sin fechas) | Cuenta bajas reales |
-| Reactivar cliente | - | Limpia `canceled_at` |
-
----
-
-## Sección Técnica
-
-### Nuevo estado en RetainerFormDialog
-
-```text
-const [canceledAt, setCanceledAt] = useState<string | null>(null);
-```
-
-### Campo condicional en el formulario
-
-Mostrar solo cuando `active = false`:
-- Input type="date"
-- Valor por defecto: fecha actual en formato YYYY-MM-DD
-- Label: "Fecha de baja"
-
-### Modificación del payload
-
-```text
-payload = {
-  ...existingFields,
-  active,
-  canceled_at: active ? null : (canceledAt || new Date().toISOString())
+type RevenueChurnMetrics = {
+  startingMRR: number;      // MRR al inicio del mes
+  churnedMRR: number;       // MRR perdido por bajas
+  newMRR: number;           // MRR de nuevos clientes
+  endingMRR: number;        // MRR al cierre
+  revenueChurnRate: number; // churnedMRR / startingMRR (0..1)
+  netRevenueRetention: number; // endingMRR / startingMRR (0..1+)
 }
 ```
 
-### Columna adicional en tabla (opcional)
+### Logica de calculo
 
-Agregar columna "Fecha baja" que muestre `canceled_at` formateada si existe, o "-" si está activo.
+```text
+Para cada retainer:
+  - Si estaba activo al inicio del mes:
+      startingMRR += net_income
+  
+  - Si se cancelo durante el mes:
+      churnedMRR += net_income
+  
+  - Si se creo durante el mes:
+      newMRR += net_income
+  
+  - Si esta activo al cierre del mes:
+      endingMRR += net_income
+
+revenueChurnRate = churnedMRR / max(startingMRR, 1)
+netRevenueRetention = endingMRR / max(startingMRR, 1)
+```
+
+### Nuevo hook combinado
+
+El hook `useChurnMetrics` retornara tanto Logo Churn como Revenue Churn en un solo objeto para evitar multiples iteraciones sobre los datos.
+
