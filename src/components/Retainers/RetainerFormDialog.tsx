@@ -37,6 +37,7 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
   const [articlesPerMonth, setArticlesPerMonth] = React.useState(String((initial as any)?.articles_per_month ?? "0"));
   const [hasWhatsappBot, setHasWhatsappBot] = React.useState<boolean>((initial as any)?.has_whatsapp_bot ?? false);
   const [active, setActive] = React.useState<boolean>(initial?.active ?? true);
+  const [isLegacy, setIsLegacy] = React.useState<boolean>((initial as any)?.is_legacy ?? false);
   const [canceledAt, setCanceledAt] = React.useState<string>(
     initial?.canceled_at ? formatDateForInput(initial.canceled_at) : getTodayDateString()
   );
@@ -53,6 +54,7 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
       setArticlesPerMonth(String((initial as any)?.articles_per_month ?? "0"));
       setHasWhatsappBot((initial as any)?.has_whatsapp_bot ?? false);
       setActive(initial?.active ?? true);
+      setIsLegacy((initial as any)?.is_legacy ?? false);
       setCanceledAt(initial?.canceled_at ? formatDateForInput(initial.canceled_at) : getTodayDateString());
       setNotes(initial?.notes ?? "");
     }
@@ -76,6 +78,7 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
       articles_per_month: parseInt(articlesPerMonth, 10) || 0,
       has_whatsapp_bot: hasWhatsappBot,
       active,
+      is_legacy: isLegacy,
       canceled_at: active ? null : new Date(canceledAt).toISOString(),
       notes: notes?.trim() || null,
     } as RetainerInsert;
@@ -133,6 +136,10 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
           <div className="flex items-center gap-3">
             <Switch checked={active} onCheckedChange={handleActiveChange} id="active" />
             <label htmlFor="active" className="text-sm">Activo</label>
+          </div>
+          <div className="flex items-center gap-3">
+            <Switch checked={isLegacy} onCheckedChange={setIsLegacy} id="isLegacy" />
+            <label htmlFor="isLegacy" className="text-sm text-muted-foreground">Legacy (importado)</label>
           </div>
           {!active && (
             <div>

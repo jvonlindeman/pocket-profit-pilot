@@ -1,6 +1,7 @@
 import React from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import type { RetainerRow } from "@/types/retainers";
 
 interface Props {
@@ -54,7 +55,14 @@ export const RetainersTable: React.FC<Props> = ({ data, onEdit, onDelete }) => {
             const row = r as any;
             return (
               <TableRow key={r.id}>
-                <TableCell className="font-medium">{r.client_name}</TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-2">
+                    {r.client_name}
+                    {row.is_legacy && (
+                      <Badge variant="outline" className="text-xs text-muted-foreground">Legacy</Badge>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell>{r.specialty ?? "-"}</TableCell>
                 <TableCell className="text-right">{formatCurrency(Number(r.net_income ?? 0))}</TableCell>
                 <TableCell className="text-center">{row.uses_stripe ? "Sí" : "No"}</TableCell>
