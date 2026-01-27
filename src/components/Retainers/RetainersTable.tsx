@@ -2,6 +2,7 @@ import React from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CreditCard, MessageSquare, Pencil, Trash2 } from "lucide-react";
 import type { RetainerRow } from "@/types/retainers";
 
@@ -153,12 +154,29 @@ export const RetainersTable: React.FC<Props> = ({ data, onEdit, onDelete }) => {
                 </TableCell>
                 <TableCell className="py-2 text-sm">{r.specialty ?? "-"}</TableCell>
                 <TableCell className="py-2">
-                  <Badge 
-                    variant="outline" 
-                    className={`text-[10px] px-1.5 py-0.5 ${getStatusBadgeClass(clientStatus)}`}
-                  >
-                    {clientStatus || "—"}
-                  </Badge>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge 
+                          variant="outline" 
+                          className={`text-[10px] px-1.5 py-0.5 cursor-help ${getStatusBadgeClass(clientStatus)}`}
+                        >
+                          {clientStatus || "—"}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">
+                          {(r as any).client_status_date 
+                            ? `Actualizado: ${new Date((r as any).client_status_date).toLocaleDateString('es-PA', { 
+                                day: 'numeric', 
+                                month: 'short', 
+                                year: 'numeric' 
+                              })}`
+                            : 'Sin fecha de actualización'}
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </TableCell>
                 <TableCell className="text-right py-2 text-sm">{formatCurrency(Number(r.net_income ?? 0))}</TableCell>
                 <TableCell className="text-right py-2 text-sm">{formatCurrency(Number(r.social_media_cost ?? 0))}</TableCell>
