@@ -12,6 +12,7 @@ import { RetainersTable } from "@/components/Retainers/RetainersTable";
 import { RetainerFormDialog } from "@/components/Retainers/RetainerFormDialog";
 import { CsvPasteDialog } from "@/components/Retainers/CsvPasteDialog";
 import { useChurnMetrics } from "@/hooks/useChurnCalculator";
+import { ProfitabilityDashboard } from "@/components/Retainers/ProfitabilityDashboard";
 function useSEO() {
   React.useEffect(() => {
     const title = "Retainers | Gestión de clientes retainer";
@@ -346,6 +347,11 @@ const RetainersPage: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+      </section>
+
+      {/* Profitability Dashboard */}
+      <section className="mt-6">
+        <ProfitabilityDashboard retainers={rows} />
       </section>
 
       <RetainerFormDialog
