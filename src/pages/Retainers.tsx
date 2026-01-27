@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { CreditCard, MessageSquare } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useRetainersQuery, useCreateRetainer, useUpdateRetainer, useDeleteRetainer, upsertByClientName } from "@/hooks/queries/useRetainers";
 import type { RetainerInsert, RetainerRow } from "@/types/retainers";
@@ -88,7 +89,9 @@ const RetainersPage: React.FC = () => {
   const rows = React.useMemo(() => (Array.isArray(data) ? data : []), [data]);
 
   const [search, setSearch] = React.useState("");
-  const [onlyActive, setOnlyActive] = React.useState(true);
+  const [statusFilter, setStatusFilter] = React.useState<"all" | "active" | "lost">("active");
+  const [stripeOnly, setStripeOnly] = React.useState(false);
+  const [whatsappOnly, setWhatsappOnly] = React.useState(false);
   const specialties = React.useMemo(
     () => Array.from(new Set(rows.map((d) => d.specialty).filter(Boolean))) as string[],
     [rows]
@@ -102,15 +105,28 @@ const RetainersPage: React.FC = () => {
 
   const filtered = React.useMemo(() => {
     return rows.filter((r) => {
-      if (onlyActive && !r.active) return false;
+      // Filtro de estado
+      if (statusFilter === "active" && !r.active) return false;
+      if (statusFilter === "lost" && r.active) return false;
+      // statusFilter === "all" muestra todos
+      
+      // Filtro de Stripe
+      if (stripeOnly && !r.uses_stripe) return false;
+      
+      // Filtro de WhatsApp Bot
+      if (whatsappOnly && !r.has_whatsapp_bot) return false;
+      
+      // Filtro de especialidad
       if (specialty !== "ALL" && (r.specialty ?? "") !== specialty) return false;
+      
+      // Búsqueda de texto
       if (search) {
         const s = search.toLowerCase();
         if (!r.client_name.toLowerCase().includes(s) && !(r.specialty ?? "").toLowerCase().includes(s)) return false;
       }
       return true;
     });
-  }, [rows, onlyActive, specialty, search]);
+  }, [rows, statusFilter, stripeOnly, whatsappOnly, specialty, search]);
 
   // Separate filtered retainers into Doctor Premier and Webart groups
   const { doctorPremier, webart } = React.useMemo(() => {
@@ -232,9 +248,42 @@ const RetainersPage: React.FC = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center gap-3">
-              <Switch checked={onlyActive} onCheckedChange={setOnlyActive} id="onlyActive" />
-              <label htmlFor="onlyActive" className="text-sm">Solo activos</label>
+            <div>
+              <label className="text-sm">Estado</label>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | "active" | "lost")}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="active">Solo activos</SelectItem>
+                  <SelectItem value="lost">Solo perdidos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          {/* Fila de checkboxes para servicios */}
+          <div className="flex flex-wrap gap-4 mt-4">
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="stripeOnly" 
+                checked={stripeOnly} 
+                onCheckedChange={(checked) => setStripeOnly(!!checked)} 
+              />
+              <label htmlFor="stripeOnly" className="text-sm flex items-center gap-1">
+                <CreditCard className="h-4 w-4" /> Usa Stripe
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="whatsappOnly" 
+                checked={whatsappOnly} 
+                onCheckedChange={(checked) => setWhatsappOnly(!!checked)} 
+              />
+              <label htmlFor="whatsappOnly" className="text-sm flex items-center gap-1">
+                <MessageSquare className="h-4 w-4" /> WhatsApp Bot
+              </label>
             </div>
           </div>
         </CardContent>
