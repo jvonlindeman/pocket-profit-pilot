@@ -15,6 +15,8 @@ export interface ClientMetric {
   usesStripe: boolean;
   articlesPerMonth: number;
   hasWhatsappBot: boolean;
+  baseIncome: number;
+  upsellIncome: number;
 }
 
 export interface SpecialtyMetric {
@@ -44,6 +46,10 @@ export interface ProfitabilityMetrics {
   bySpecialty: SpecialtyMetric[];
   topClient: ClientMetric | null;
   bottomClient: ClientMetric | null;
+  // Expansion metrics
+  totalUpsellRevenue: number;
+  clientsWithUpsells: number;
+  expansionRate: number;
 }
 
 export function getMarginStatus(marginPercent: number): { status: MarginStatus; color: string; label: string } {
@@ -60,6 +66,8 @@ export function useProfitabilityMetrics(retainers: RetainerRow[]): Profitability
 
     // Calculate metrics per client
     const clientMetrics: ClientMetric[] = activeRetainers.map((r) => {
+      const baseIncome = Number((r as any).base_income) || 0;
+      const upsellIncome = Number((r as any).upsell_income) || 0;
       const income = Number(r.net_income) || 0;
       const expenses = Number(r.total_expenses) || 0;
       const margin = income - expenses;
@@ -78,6 +86,8 @@ export function useProfitabilityMetrics(retainers: RetainerRow[]): Profitability
         usesStripe: r.uses_stripe,
         articlesPerMonth: r.articles_per_month,
         hasWhatsappBot: r.has_whatsapp_bot,
+        baseIncome,
+        upsellIncome,
       };
     });
 
@@ -131,6 +141,11 @@ export function useProfitabilityMetrics(retainers: RetainerRow[]): Profitability
     const topClient = sortedByMargin[0] ?? null;
     const bottomClient = sortedByMargin[sortedByMargin.length - 1] ?? null;
 
+    // Expansion metrics
+    const totalUpsellRevenue = clientMetrics.reduce((sum, c) => sum + c.upsellIncome, 0);
+    const clientsWithUpsells = clientMetrics.filter((c) => c.upsellIncome > 0).length;
+    const expansionRate = totalIncome > 0 ? (totalUpsellRevenue / totalIncome) * 100 : 0;
+
     return {
       totalClients,
       totalIncome,
@@ -142,6 +157,9 @@ export function useProfitabilityMetrics(retainers: RetainerRow[]): Profitability
       bySpecialty,
       topClient,
       bottomClient,
+      totalUpsellRevenue,
+      clientsWithUpsells,
+      expansionRate,
     };
   }, [retainers]);
 }

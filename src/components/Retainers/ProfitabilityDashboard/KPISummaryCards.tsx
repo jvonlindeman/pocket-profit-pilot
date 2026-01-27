@@ -1,6 +1,6 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Users, DollarSign, TrendingUp, TrendingDown, Percent } from "lucide-react";
+import { Users, DollarSign, TrendingUp, TrendingDown, Percent, ArrowUpRight } from "lucide-react";
 import type { ProfitabilityMetrics } from "@/hooks/useProfitabilityMetrics";
 
 interface KPISummaryCardsProps {
@@ -30,11 +30,14 @@ export const KPISummaryCards: React.FC<KPISummaryCardsProps> = ({ metrics }) => 
       bgColor: "bg-green-50",
     },
     {
-      title: "Gastos Totales",
-      value: formatCurrency(metrics.totalExpenses),
-      icon: TrendingDown,
-      color: "text-red-600",
-      bgColor: "bg-red-50",
+      title: "Expansion MRR",
+      value: formatCurrency(metrics.totalUpsellRevenue),
+      subtitle: metrics.clientsWithUpsells > 0 
+        ? `${metrics.clientsWithUpsells} cliente${metrics.clientsWithUpsells > 1 ? 's' : ''} (${formatPercent(metrics.expansionRate)})`
+        : undefined,
+      icon: ArrowUpRight,
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-50",
     },
     {
       title: "Margen Promedio",
@@ -42,6 +45,13 @@ export const KPISummaryCards: React.FC<KPISummaryCardsProps> = ({ metrics }) => 
       icon: Percent,
       color: metrics.averageMarginPercent >= 50 ? "text-green-600" : metrics.averageMarginPercent >= 20 ? "text-yellow-600" : "text-red-600",
       bgColor: metrics.averageMarginPercent >= 50 ? "bg-green-50" : metrics.averageMarginPercent >= 20 ? "bg-yellow-50" : "bg-red-50",
+    },
+    {
+      title: "Gastos Totales",
+      value: formatCurrency(metrics.totalExpenses),
+      icon: TrendingDown,
+      color: "text-red-600",
+      bgColor: "bg-red-50",
     },
     {
       title: "Más Rentable",
@@ -54,7 +64,7 @@ export const KPISummaryCards: React.FC<KPISummaryCardsProps> = ({ metrics }) => 
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
       {cards.map((card) => (
         <Card key={card.title} className="overflow-hidden">
           <CardContent className="p-4">

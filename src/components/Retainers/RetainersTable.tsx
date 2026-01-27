@@ -178,7 +178,29 @@ export const RetainersTable: React.FC<Props> = ({ data, onEdit, onDelete }) => {
                     </Tooltip>
                   </TooltipProvider>
                 </TableCell>
-                <TableCell className="text-right py-2 text-sm">{formatCurrency(Number(r.net_income ?? 0))}</TableCell>
+                <TableCell className="text-right py-2 text-sm">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="cursor-help">
+                          <span>{formatCurrency(Number(r.net_income ?? 0))}</span>
+                          {Number((r as any).upsell_income ?? 0) > 0 && (
+                            <span className="text-xs text-green-600 ml-1">
+                              +{formatCurrency(Number((r as any).upsell_income))}
+                            </span>
+                          )}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="text-xs space-y-1">
+                          <p>Base: {formatCurrency(Number((r as any).base_income ?? r.net_income ?? 0))}</p>
+                          <p>Upsells: {formatCurrency(Number((r as any).upsell_income ?? 0))}</p>
+                          <p className="font-medium border-t pt-1">Total: {formatCurrency(Number(r.net_income ?? 0))}</p>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </TableCell>
                 <TableCell className="text-right py-2 text-sm">{formatCurrency(Number(r.social_media_cost ?? 0))}</TableCell>
                 <TableCell className="text-right py-2 text-sm">{formatCurrency(Number(r.total_expenses ?? 0))}</TableCell>
                 <TableCell className="text-right py-2">

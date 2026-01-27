@@ -41,7 +41,8 @@ function getInitialStatus(initial: RetainerRow | null | undefined): ClientStatus
 export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initial, onSave }) => {
   const [clientName, setClientName] = React.useState(initial?.client_name ?? "");
   const [specialty, setSpecialty] = React.useState(initial?.specialty ?? "");
-  const [netIncome, setNetIncome] = React.useState(String(initial?.net_income ?? ""));
+  const [baseIncome, setBaseIncome] = React.useState(String((initial as any)?.base_income ?? initial?.net_income ?? ""));
+  const [upsellIncome, setUpsellIncome] = React.useState(String((initial as any)?.upsell_income ?? "0"));
   const [socialCost, setSocialCost] = React.useState(String(initial?.social_media_cost ?? ""));
   const [totalExpenses, setTotalExpenses] = React.useState(String(initial?.total_expenses ?? ""));
   const [usesStripe, setUsesStripe] = React.useState<boolean>((initial as any)?.uses_stripe ?? false);
@@ -50,6 +51,9 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
   const [isLegacy, setIsLegacy] = React.useState<boolean>((initial as any)?.is_legacy ?? false);
   const [notes, setNotes] = React.useState(initial?.notes ?? "");
   const [n8nId, setN8nId] = React.useState(initial?.n8n_id ?? "");
+  
+  // Calculated total MRR
+  const totalMRR = parseNumberLike(baseIncome) + parseNumberLike(upsellIncome);
   
   // New status management
   const [status, setStatus] = React.useState<ClientStatus>(getInitialStatus(initial));
@@ -64,7 +68,8 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
     if (open) {
       setClientName(initial?.client_name ?? "");
       setSpecialty(initial?.specialty ?? "");
-      setNetIncome(String(initial?.net_income ?? ""));
+      setBaseIncome(String((initial as any)?.base_income ?? initial?.net_income ?? ""));
+      setUpsellIncome(String((initial as any)?.upsell_income ?? "0"));
       setSocialCost(String(initial?.social_media_cost ?? ""));
       setTotalExpenses(String(initial?.total_expenses ?? ""));
       setUsesStripe((initial as any)?.uses_stripe ?? false);
@@ -80,10 +85,15 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
   }, [open, initial]);
 
   const handleSubmit = async () => {
+    const baseIncomeValue = parseNumberLike(baseIncome);
+    const upsellIncomeValue = parseNumberLike(upsellIncome);
+    
     const payload: any = {
       client_name: clientName.trim(),
       specialty: specialty.trim() || null,
-      net_income: parseNumberLike(netIncome),
+      base_income: baseIncomeValue,
+      upsell_income: upsellIncomeValue,
+      net_income: baseIncomeValue + upsellIncomeValue, // Calculated from base + upsell
       social_media_cost: parseNumberLike(socialCost),
       total_expenses: parseNumberLike(totalExpenses),
       uses_stripe: usesStripe,
@@ -121,9 +131,23 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
             <Input value={specialty ?? ""} onChange={(e) => setSpecialty(e.target.value)} placeholder="Ej. SEO, Ads" />
           </div>
           <div>
-            <label className="text-sm font-medium">Ingreso neto</label>
-            <Input value={netIncome} onChange={(e) => setNetIncome(e.target.value)} placeholder="0"
+            <label className="text-sm font-medium">Ingreso base</label>
+            <Input value={baseIncome} onChange={(e) => setBaseIncome(e.target.value)} placeholder="0"
               inputMode="decimal" />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Upsells</label>
+            <Input value={upsellIncome} onChange={(e) => setUpsellIncome(e.target.value)} placeholder="0"
+              inputMode="decimal" className="border-green-200 focus:border-green-400" />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Total MRR</label>
+            <div className="h-10 px-3 py-2 rounded-md bg-muted text-sm font-medium flex items-center">
+              ${totalMRR.toLocaleString('es-PA', { maximumFractionDigits: 0 })}
+              {parseNumberLike(upsellIncome) > 0 && (
+                <span className="ml-2 text-xs text-green-600">(+${parseNumberLike(upsellIncome).toLocaleString('es-PA', { maximumFractionDigits: 0 })} upsell)</span>
+              )}
+            </div>
           </div>
           <div>
             <label className="text-sm font-medium">Redes (costo)</label>
