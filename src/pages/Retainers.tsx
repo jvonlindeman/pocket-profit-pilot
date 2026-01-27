@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, MessageSquare, RefreshCw } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { CreditCard, MessageSquare, RefreshCw, ChevronDown, Code } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useRetainersQuery, useCreateRetainer, useUpdateRetainer, useDeleteRetainer, upsertByClientName, useSyncClientStatus } from "@/hooks/queries/useRetainers";
 import type { RetainerInsert, RetainerRow } from "@/types/retainers";
@@ -16,6 +17,7 @@ import { useChurnMetrics } from "@/hooks/useChurnCalculator";
 import { ProfitabilityDashboard } from "@/components/Retainers/ProfitabilityDashboard";
 import { ReactivationAlerts } from "@/components/Retainers/ReactivationAlerts";
 import { isMedicalClient } from "@/utils/retainerClassification";
+import { cn } from "@/lib/utils";
 
 function useSEO() {
   React.useEffect(() => {
@@ -104,6 +106,16 @@ const RetainersPage: React.FC = () => {
   const [editing, setEditing] = React.useState<RetainerRow | null>(null);
 
   const [csvOpen, setCsvOpen] = React.useState(false);
+  const [debugOpen, setDebugOpen] = React.useState(false);
+
+  // Auto-sync on load (once per session)
+  const hasSyncedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!isLoading && rows.length > 0 && !hasSyncedRef.current) {
+      hasSyncedRef.current = true;
+      syncStatusMut.mutate();
+    }
+  }, [isLoading, rows.length]);
 
   const filtered = React.useMemo(() => {
     return rows.filter((r) => {
@@ -233,9 +245,41 @@ const RetainersPage: React.FC = () => {
           onClick={() => syncStatusMut.mutate()}
           disabled={syncStatusMut.isPending}
         >
-          <RefreshCw className={`h-4 w-4 mr-2 ${syncStatusMut.isPending ? 'animate-spin' : ''}`} />
+          <RefreshCw className={cn("h-4 w-4 mr-2", syncStatusMut.isPending && "animate-spin")} />
           {syncStatusMut.isPending ? 'Sincronizando...' : 'Sincronizar estado n8n'}
         </Button>
+        
+        {syncStatusMut.data && (
+          <Collapsible open={debugOpen} onOpenChange={setDebugOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-1">
+                <Code className="h-4 w-4" />
+                Ver respuesta JSON
+                <ChevronDown className={cn(
+                  "h-4 w-4 transition-transform",
+                  debugOpen && "rotate-180"
+                )} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="absolute z-10 mt-2">
+              <Card className="bg-slate-50 dark:bg-slate-900 border shadow-lg max-w-md">
+                <CardContent className="pt-4">
+                  <div className="text-sm space-y-2">
+                    <div className="flex gap-2 flex-wrap">
+                      <Badge variant="success">{syncStatusMut.data.updated} actualizados</Badge>
+                      {syncStatusMut.data.notFound > 0 && (
+                        <Badge variant="secondary">{syncStatusMut.data.notFound} sin n8n_id</Badge>
+                      )}
+                    </div>
+                    <pre className="bg-slate-100 dark:bg-slate-800 p-3 rounded text-xs overflow-auto max-h-48">
+                      {JSON.stringify(syncStatusMut.data, null, 2)}
+                    </pre>
+                  </div>
+                </CardContent>
+              </Card>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
       </div>
 
       <Card className="mt-4">
