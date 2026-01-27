@@ -1,177 +1,183 @@
 
 
-# Plan: Agrupar clientes en Doctor Premier y Webart
+# Plan: Agregar filtros de Stripe, WhatsApp Bot y mejorar vista de inactivos
 
-## Objetivo
+## Situación actual
 
-Separar visualmente los retainers en dos secciones:
-- **Doctor Premier**: Clientes médicos (clínicas, doctores, hospitales, laboratorios)
-- **Webart**: Clientes no médicos (empresas, comercios, servicios generales)
+Los filtros existentes son:
+- Búsqueda por texto (cliente o especialidad)
+- Dropdown de especialidad
+- Toggle "Solo activos" (oculta inactivos cuando está ON)
 
----
+## Nuevos filtros a agregar
 
-## Lógica de clasificación
-
-| Grupo | Criterio |
-|-------|----------|
-| Doctor Premier | Tiene `specialty` médica (cualquier valor excepto Funeraria) |
-| Webart | `specialty` es NULL, vacío, o "Funeraria" |
-
-### Especialidades médicas detectadas:
-Alergologo, Cardiologo, Cardiovascular, Cirujano, Cirujano Plástico, Clinica Radiologia, Clínica Ultrasonidos, Dentista, Dermatologo, Fondoaudiologa, Gastro, Ginecologo, Hospital, Internista, Laboratorio, Oftalmologo, Oncologo, Ortopeda, Otorrino, Resonancia, Urólogo, Varices
-
-### Especialidades no médicas:
-Funeraria, NULL (sin especialidad)
+| Filtro | Tipo | Comportamiento |
+|--------|------|----------------|
+| Stripe | Toggle/Checkbox | Mostrar solo clientes que usan Stripe |
+| WhatsApp Bot | Toggle/Checkbox | Mostrar solo clientes con bot de WA |
+| Estado | Select con 3 opciones | Todos / Solo activos / Solo perdidos |
 
 ---
 
-## Diseño de la UI
+## Cambio en el filtro de estado
+
+Actualmente el toggle binario "Solo activos" no permite ver **solo** los perdidos. Lo cambiaremos a un Select con 3 opciones:
+
+| Opción | Muestra |
+|--------|---------|
+| Todos | Activos + Inactivos |
+| Solo activos | Solo `active = true` |
+| Solo perdidos | Solo `active = false` |
+
+Esto permite analizar específicamente los clientes que se fueron.
+
+---
+
+## Diseño de UI
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  [Botones: Agregar | Importar CSV | Exportar CSV]                           │
-│  [Filtros: Buscar | Especialidad | Solo activos]                            │
+│  Filtros                                                                    │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│  ┌─────────────────────────────────────────────────────────────────────────┐│
-│  │  DOCTOR PREMIER                                    43 clientes | $28,000 ││
-│  ├─────────────────────────────────────────────────────────────────────────┤│
-│  │  | Cliente     | Espec.   | Ingreso | Redes | Gastos | Margen   | Baja | ││
-│  │  | Dr. Batista | Alergo   | $850    | $0    | $200   | $650 77% |  -   | ││
-│  │  | Dr. Effio   | Cardio   | $800    | $100  | $300   | $500 63% |  -   | ││
-│  │  | ...         | ...      | ...     | ...   | ...    | ...      | ...  | ││
-│  └─────────────────────────────────────────────────────────────────────────┘│
+│  [Buscar___________________]  [Especialidad ▼]  [Estado ▼]                 │
 │                                                                             │
-│  ┌─────────────────────────────────────────────────────────────────────────┐│
-│  │  WEBART                                            23 clientes | $14,000 ││
-│  ├─────────────────────────────────────────────────────────────────────────┤│
-│  │  | Cliente      | Espec.     | Ingreso | Redes | Gastos | Margen | Baja | ││
-│  │  | Alfa Panama  | -          | $500    | $0    | $150   | $350   |  -   | ││
-│  │  | Arcom        | -          | $1180   | $200  | $400   | $780   |  -   | ││
-│  │  | Fudimi       | Funeraria  | $1100   | $150  | $350   | $750   |  -   | ││
-│  │  | ...          | ...        | ...     | ...   | ...    | ...    | ...  | ││
-│  └─────────────────────────────────────────────────────────────────────────┘│
+│  Servicios:                                                                 │
+│  ┌──────────────────┐  ┌──────────────────┐                                │
+│  │ ☐ Usa Stripe     │  │ ☐ WhatsApp Bot   │                                │
+│  └──────────────────┘  └──────────────────┘                                │
 │                                                                             │
-│  [Resumen | Churn | Dashboard de Rentabilidad]                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Componentes a crear/modificar
+## Lógica de filtrado actualizada
 
-| Archivo | Cambio |
-|---------|--------|
-| `src/utils/retainerClassification.ts` | Nuevo: lógica para clasificar médico/no-médico |
-| `src/components/Retainers/GroupedRetainersSection.tsx` | Nuevo: sección con header del grupo + tabla |
-| `src/pages/Retainers.tsx` | Modificar: usar secciones agrupadas en lugar de una sola tabla |
-
----
-
-## Detalle de cada sección
-
-Cada grupo mostrará:
-- **Header con nombre del grupo** (Doctor Premier / Webart)
-- **KPIs rápidos**: cantidad de clientes, MRR total del grupo
-- **Tabla de retainers** (la misma estructura optimizada actual)
-- **Colapsable** (opcional): poder expandir/contraer cada sección
+```typescript
+const filtered = React.useMemo(() => {
+  return rows.filter((r) => {
+    // Filtro de estado (nuevo)
+    if (statusFilter === "active" && !r.active) return false;
+    if (statusFilter === "lost" && r.active) return false;
+    // statusFilter === "all" muestra todos
+    
+    // Filtro de Stripe (nuevo)
+    if (stripeOnly && !r.uses_stripe) return false;
+    
+    // Filtro de WhatsApp Bot (nuevo)
+    if (whatsappOnly && !r.has_whatsapp_bot) return false;
+    
+    // Filtro de especialidad (existente)
+    if (specialty !== "ALL" && (r.specialty ?? "") !== specialty) return false;
+    
+    // Búsqueda de texto (existente)
+    if (search) {
+      const s = search.toLowerCase();
+      if (!r.client_name.toLowerCase().includes(s) && 
+          !(r.specialty ?? "").toLowerCase().includes(s)) return false;
+    }
+    
+    return true;
+  });
+}, [rows, statusFilter, stripeOnly, whatsappOnly, specialty, search]);
+```
 
 ---
 
 ## Sección Técnica
 
-### Archivo: `src/utils/retainerClassification.ts`
+### Archivo a modificar
+
+`src/pages/Retainers.tsx`
+
+### Nuevos estados
 
 ```typescript
-// Lista de especialidades médicas conocidas
-const MEDICAL_SPECIALTIES = [
-  "Alergologo", "Cardiologo", "Cardiovascular", 
-  "Cirjuano Cardiovascular", "Cirujano", "Cirujano Plástico",
-  "Clinica Radiologia", "Clínica Ultrasonidos", "Dentista",
-  "Dermatologo", "Fondoaudiologa", "Gastro", "Ginecologo",
-  "Hospital", "Internista", "Laboratorio", "Oftalmologo",
-  "Oncologo", "Ortopeda", "Otorrino", "Resonancia", 
-  "Urólogo", "Varices"
-];
+// Reemplazar onlyActive por statusFilter
+const [statusFilter, setStatusFilter] = React.useState<"all" | "active" | "lost">("active");
 
-export function isMedicalClient(specialty: string | null): boolean {
-  if (!specialty) return false;
-  return MEDICAL_SPECIALTIES.some(
-    s => s.toLowerCase() === specialty.toLowerCase()
-  );
-}
-
-export type ClientGroup = "doctor-premier" | "webart";
-
-export function getClientGroup(specialty: string | null): ClientGroup {
-  return isMedicalClient(specialty) ? "doctor-premier" : "webart";
-}
+// Nuevos filtros booleanos
+const [stripeOnly, setStripeOnly] = React.useState(false);
+const [whatsappOnly, setWhatsappOnly] = React.useState(false);
 ```
 
-### Archivo: `src/components/Retainers/GroupedRetainersSection.tsx`
+### Nueva UI de filtros
 
 ```typescript
-interface Props {
-  title: string;
-  icon?: React.ReactNode;
-  retainers: RetainerRow[];
-  onEdit: (row: RetainerRow) => void;
-  onDelete: (row: RetainerRow) => void;
-}
-
-// Componente que muestra:
-// 1. Collapsible header con título + métricas
-// 2. Tabla de retainers cuando está expandido
+<CardContent>
+  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+    {/* Búsqueda - existente */}
+    <div className="md:col-span-2">
+      <label className="text-sm">Buscar</label>
+      <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cliente o especialidad" />
+    </div>
+    
+    {/* Especialidad - existente */}
+    <div>
+      <label className="text-sm">Especialidad</label>
+      <Select value={specialty} onValueChange={setSpecialty}>
+        <SelectTrigger>
+          <SelectValue placeholder="Todas" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="ALL">Todas</SelectItem>
+          {specialties.map((s) => (
+            <SelectItem key={s} value={s}>{s}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+    
+    {/* Estado - NUEVO (reemplaza toggle) */}
+    <div>
+      <label className="text-sm">Estado</label>
+      <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | "active" | "lost")}>
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todos</SelectItem>
+          <SelectItem value="active">Solo activos</SelectItem>
+          <SelectItem value="lost">Solo perdidos</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  </div>
+  
+  {/* Fila de checkboxes para servicios */}
+  <div className="flex flex-wrap gap-4 mt-4">
+    <div className="flex items-center gap-2">
+      <Checkbox 
+        id="stripeOnly" 
+        checked={stripeOnly} 
+        onCheckedChange={(checked) => setStripeOnly(!!checked)} 
+      />
+      <label htmlFor="stripeOnly" className="text-sm flex items-center gap-1">
+        <CreditCard className="h-4 w-4" /> Usa Stripe
+      </label>
+    </div>
+    <div className="flex items-center gap-2">
+      <Checkbox 
+        id="whatsappOnly" 
+        checked={whatsappOnly} 
+        onCheckedChange={(checked) => setWhatsappOnly(!!checked)} 
+      />
+      <label htmlFor="whatsappOnly" className="text-sm flex items-center gap-1">
+        <MessageSquare className="h-4 w-4" /> WhatsApp Bot
+      </label>
+    </div>
+  </div>
+</CardContent>
 ```
-
-### Cambios en `src/pages/Retainers.tsx`
-
-```typescript
-// Separar los retainers filtrados en dos grupos
-const { doctorPremier, webart } = React.useMemo(() => {
-  const dp: RetainerRow[] = [];
-  const wa: RetainerRow[] = [];
-  for (const r of filtered) {
-    if (isMedicalClient(r.specialty)) {
-      dp.push(r);
-    } else {
-      wa.push(r);
-    }
-  }
-  return { doctorPremier: dp, webart: wa };
-}, [filtered]);
-
-// Renderizar dos secciones separadas
-<GroupedRetainersSection
-  title="Doctor Premier"
-  retainers={doctorPremier}
-  ...
-/>
-<GroupedRetainersSection
-  title="Webart"
-  retainers={webart}
-  ...
-/>
-```
-
----
-
-## Comportamiento de filtros
-
-Los filtros existentes seguirán funcionando normalmente:
-- "Buscar" filtra en ambos grupos
-- "Especialidad" filtra en ambos grupos
-- "Solo activos" filtra en ambos grupos
-
-Si después del filtro un grupo queda vacío, se oculta esa sección o se muestra un mensaje "Sin resultados".
 
 ---
 
 ## Resultado esperado
 
-- Dos secciones claramente diferenciadas
-- Doctor Premier arriba, Webart abajo
-- Cada sección muestra su MRR total y cantidad de clientes
-- Secciones colapsables para enfocarse en un grupo a la vez
-- Mantiene todas las funciones actuales (editar, eliminar, filtrar)
+- Dropdown de Estado con 3 opciones: Todos / Solo activos / Solo perdidos
+- Checkbox para filtrar solo clientes con Stripe
+- Checkbox para filtrar solo clientes con WhatsApp Bot
+- Los filtros son combinables (ej: "Solo perdidos" + "Usa Stripe" = clientes perdidos que usaban Stripe)
+- Contadores en los headers de grupo se actualizan según los filtros aplicados
 
