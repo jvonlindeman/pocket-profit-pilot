@@ -4,6 +4,7 @@ const MEDICAL_SPECIALTIES = [
   "Cardiologo",
   "Cardiovascular",
   "Cirjuano Cardiovascular",
+  "Cirujano Cardiovascular",
   "Cirujano",
   "Cirujano Plástico",
   "Clinica Radiologia",
