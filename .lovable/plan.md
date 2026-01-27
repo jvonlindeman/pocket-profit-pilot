@@ -1,186 +1,108 @@
 
 
-# Plan: Agregar estado de Pausa a clientes
+# Plan: Agregar ID de n8n a clientes
 
-## Concepto
+## Resumen
 
-Agregar un tercer estado para clientes: **Pausado**. Un cliente pausado:
-- Sigue existiendo como cliente (no es un "logo" perdido)
-- Pero no genera ingresos temporalmente
+Agregar una nueva columna `n8n_id` a la tabla `retainers` para almacenar el identificador único de cada cliente en n8n. Esto permitirá recibir datos de sentimiento y estado desde n8n y vincularlos correctamente.
 
-## Estados de cliente
-
-| Estado | active | canceled_at | paused_at | Descripción |
-|--------|--------|-------------|-----------|-------------|
-| Activo | true | null | null | Cliente normal generando MRR |
-| Pausado | true | null | fecha | Cliente temporalmente sin generar MRR |
-| Perdido | false | fecha | null | Cliente cancelado definitivamente |
-
-## Impacto en Churn Rate
-
-| Métrica | Activo | Pausado | Perdido |
-|---------|--------|---------|---------|
-| Logo Churn (cuenta como cliente) | Si | Si | No |
-| Revenue Churn (cuenta en MRR) | Si | No | No |
-| Ending Active count | Si | Si | No |
-| Ending MRR | Si | No | No |
-
-Esto significa:
-- Un cliente pausado **no** incrementa `churnedThisPeriod` (logo churn)
-- Un cliente pausado **si** reduce el `endingMRR` (revenue churn)
-- El Retention Rate de logos no se ve afectado por pausas
-- El Net Revenue Retention baja cuando hay clientes pausados
-
----
-
-## Diseño de UI
-
-### En la tabla de retainers
-
-```text
-| Cliente              | Espec. | Ingreso | ... | Estado |
-|----------------------|--------|---------|-----|--------|
-| Dr. Batista          | Cardio | $800    | ... | Activo |
-| Dr. Lopez            | Neuro  | $650    | ... | Pausado [icon] |
-| Clinica ABC          | Clinica| $1200   | ... | Perdido |
-```
-
-El indicador visual cambia:
-- Verde: Activo
-- Amarillo/Naranja: Pausado
-- Rojo: Perdido/Cancelado
-
-### En el formulario de edición
-
-```text
-Estado del cliente:
-┌─────────────────────────────────────────────┐
-│ ( ) Activo                                  │
-│ ( ) Pausado   [Fecha de pausa: ____]        │
-│ ( ) Cancelado [Fecha de baja: ____]         │
-└─────────────────────────────────────────────┘
-```
-
-### En los filtros
-
-El filtro de "Estado" tendrá 4 opciones:
-- Todos
-- Solo activos (incluye pausados)
-- Solo pausados
-- Solo perdidos
-
----
-
-## Sección Técnica
+## Cambios a realizar
 
 ### 1. Migración de base de datos
 
-Agregar columna `paused_at` a la tabla `retainers`:
+Agregar columna `n8n_id` de tipo texto, única y nullable:
 
 ```sql
 ALTER TABLE retainers 
-ADD COLUMN paused_at timestamptz DEFAULT NULL;
+ADD COLUMN n8n_id text DEFAULT NULL;
 
-COMMENT ON COLUMN retainers.paused_at IS 'Fecha en que el cliente entró en pausa. NULL = no está pausado.';
+CREATE UNIQUE INDEX idx_retainers_n8n_id 
+ON retainers (n8n_id) 
+WHERE n8n_id IS NOT NULL;
+
+COMMENT ON COLUMN retainers.n8n_id IS 
+  'ID unico del cliente en n8n para sincronizacion';
 ```
 
-### 2. Actualizar tipos TypeScript
+### 2. Poblar datos iniciales
 
-Archivo: `src/integrations/supabase/types.ts`
+Script SQL para asignar los IDs de n8n basado en el mapeo de las imagenes:
 
-El tipo se regenerará automáticamente con la migración, pero incluirá:
+| Cliente (Supabase) | n8n_id |
+|--------------------|--------|
+| AutoCash | 3nuuwjh |
+| Centro Urologico | 86dtqvqr1 |
+| CDA | 86drbpmmp |
+| Cendigastro | 86dw5rh34 |
+| Clinica Dental Obarrio | 86du2fx0d |
+| Clinica Ford | 3nuuwr2 |
+| Copac | 3nuuvcy |
+| Cremaciones la Gloria | 86du5t3jy |
+| Docati | 86dvdy783 |
+| Dr. Alejandro | 865d9e8n7 |
+| Dr. Carlos Rebollon | 3nuuve5 |
+| Dr. Christopher Chung | 86dqy50ce |
+| Dr. David Espinosa | 86dumpm4d |
+| Dr Fernando Agreda | 86drmh86q |
+| Dr Fernando Ku | 86dvuzjnm |
+| Dr. Guillermo Julio Tatis | 3nuuvnh |
+| Dr. Humberto Juarez | 86dr1eduj |
+| Dr Jose Batista | 86dtn2ccp |
+| Dr. Jose Felix | 3nuuwvg |
+| Dr Jose Francisco | 86drwz1m5 |
+| Dr Kam | 86dtg2nyx |
+| Dr Lech | 3nuuvtk |
+| Dr. Mario | 3nuuwz0 |
+| Dr Nelson | 86dv66ncy |
+| Dr. Oman | 86dw784c8 |
+| Dr Raul | 86dt1tayx |
+| Dr. Roberto Garcia | 3nuux8e |
+| Dr. Trejos | 3nuuwug |
+| Eco Ink | 866a05kpj |
+| eurocash | 3y7yg8w |
+| Fudimi | 86dqktuby |
+| Fumigadora Express | 86dwjwyh9 |
+| funeraria virgen | 86dv2aaj7 |
+| Grupo Tecnik | 86dr4razm |
+| Julio effio | 866am5r12 |
+| Laboratorio America | 86dv7jc0g |
+| Legalia | 861n7r2r8 |
+| Panama Gili | 86dtgg9er |
+| Panama Vision Institute | 86dwx9zq4 |
+| Petclub | 86dxzxxdx |
+| PGS Legal | 8669gx0tb |
+| Think Safety | 3nuuw65 |
+| Biosinfex | 86dwqjzwp |
+| CDA Express | 86dt115bd |
+| Cheers | 86dx2vdkd |
+| Dra. Brenda | 3nuuwak |
+| Dra. Diana Tejada | 3nuuwv9 |
+| Dra Maria Alejandra | 85ztuz3b7 |
+| Dra Yurielis | 86dvzftby |
+| Dr Cesar Diaz | 86dwc0pcm |
+| BH Contadores | 86dvf4tvg |
+| Alfa Panama | 86dxtdch4 |
+| Arcom | (falta en imagenes) |
+| Optirex | 86duttbhc |
+| Transporte Serrano | 3nuuv5e |
+| ... | ... |
+
+(Total: ~75 clientes para mapear)
+
+### 3. Actualizar tipos TypeScript
+
+El archivo `src/integrations/supabase/types.ts` se actualizara automaticamente con:
 ```typescript
-paused_at: string | null
+n8n_id: string | null
 ```
 
-### 3. Modificar cálculo de Churn
+### 4. Agregar campo al formulario (opcional)
 
-Archivo: `src/hooks/useChurnCalculator.ts`
+Si quieres poder editar el n8n_id manualmente, agregarlo a `RetainerFormDialog.tsx` como campo de solo lectura o editable.
 
-Lógica actualizada:
-```typescript
-const pausedAt: Date | null = toDate((r as any).paused_at);
+### 5. Mostrar en tabla (opcional)
 
-// Un cliente está "activo para logos" si:
-// - Fue creado antes del período Y
-// - No está cancelado (o fue cancelado después del período)
-// Nota: pausado NO afecta logo churn
-
-// Para Revenue Churn, un cliente pausado NO contribuye al MRR
-const isPausedDuringPeriod = !!pausedAt && isOnOrBefore(pausedAt, periodEnd);
-
-// Logo Churn (sin cambios para pausados)
-if (wasActiveAtEnd) endingActive += 1;
-
-// Revenue Churn (pausados no contribuyen)
-if (wasActiveAtEnd && !isPausedDuringPeriod) {
-  endingMRR += netIncome;
-}
-```
-
-### 4. Actualizar métricas de Churn
-
-Agregar nuevas métricas al tipo `ChurnMetrics`:
-```typescript
-pausedCount: number;      // Clientes actualmente pausados
-pausedMRR: number;        // MRR de clientes pausados
-```
-
-### 5. Actualizar formulario de edición
-
-Archivo: `src/components/Retainers/RetainerFormDialog.tsx`
-
-Cambiar de toggle "Activo" a radio buttons con 3 estados:
-- Activo
-- Pausado (muestra campo fecha de pausa)
-- Cancelado (muestra campo fecha de baja)
-
-### 6. Actualizar tabla de retainers
-
-Archivo: `src/components/Retainers/RetainersTable.tsx`
-
-Cambiar indicador de estado:
-```typescript
-// Color del indicador
-const getStatusColor = (r: RetainerRow) => {
-  if (!r.active) return 'bg-red-500';      // Perdido
-  if (r.paused_at) return 'bg-yellow-500'; // Pausado
-  return 'bg-green-500';                   // Activo
-};
-
-// Tooltip o texto
-const getStatusLabel = (r: RetainerRow) => {
-  if (!r.active) return 'Perdido';
-  if (r.paused_at) return 'Pausado';
-  return 'Activo';
-};
-```
-
-### 7. Actualizar filtros
-
-Archivo: `src/pages/Retainers.tsx`
-
-Cambiar el Select de estado:
-```typescript
-type StatusFilter = "all" | "active" | "paused" | "lost";
-
-// En el filtrado:
-if (statusFilter === "active" && (!r.active || r.paused_at)) return false;
-if (statusFilter === "paused" && (!r.active || !r.paused_at)) return false;
-if (statusFilter === "lost" && r.active) return false;
-```
-
-### 8. Actualizar sección de Churn en UI
-
-Mostrar nuevas métricas:
-```text
-┌─────────────────────────────────────────────────────────┐
-│ Churn Rate (Enero 2026)                                │
-├─────────────────────────────────────────────────────────┤
-│ Logo Retention: 95.2%  │  Revenue Retention: 89.5%     │
-│ Perdidos: 2            │  Pausados: 3 ($1,500 MRR)     │
-└─────────────────────────────────────────────────────────┘
-```
+Agregar columna visible en `RetainersTable.tsx` para verificar que el mapeo sea correcto.
 
 ---
 
@@ -188,22 +110,21 @@ Mostrar nuevas métricas:
 
 | Archivo | Cambio |
 |---------|--------|
-| Migración SQL | Agregar columna `paused_at` |
-| `src/integrations/supabase/types.ts` | Se regenera automáticamente |
-| `src/hooks/useChurnCalculator.ts` | Lógica de churn parcial para pausados |
-| `src/components/Retainers/RetainerFormDialog.tsx` | Radio buttons para estado |
-| `src/components/Retainers/RetainersTable.tsx` | Indicador visual de pausa |
-| `src/pages/Retainers.tsx` | Filtro "Solo pausados" |
-| `src/types/retainers.ts` | Helpers para estado de cliente |
+| Migracion SQL | Agregar columna `n8n_id` |
+| Script SQL | Poblar IDs existentes |
+| `src/integrations/supabase/types.ts` | Se regenera automaticamente |
+| `src/components/Retainers/RetainerFormDialog.tsx` | (Opcional) Campo para ver/editar n8n_id |
 
 ---
 
-## Resultado esperado
+## Notas importantes
 
-- Nuevo estado "Pausado" disponible para clientes
-- Los clientes pausados siguen contando como "logos activos"
-- Los clientes pausados NO contribuyen al MRR (afecta Revenue Churn)
-- UI clara con indicadores de color (verde/amarillo/rojo)
-- Filtros actualizados para ver solo pausados
-- Métricas de churn muestran cuántos clientes y MRR están pausados
+1. **Mapeo manual necesario**: Los nombres no coinciden exactamente, asi que hare el mejor esfuerzo de mapear. Algunos casos ambiguos:
+   - "Ortopedas Panama" puede ser "Centro Esp. Ortopedicas" o "CEOSA" 
+   - "Dr. Guillermo Brennan" no existe en tu base de datos
+   - "Doctor Premier" / "pruebas" parecen ser cuentas de prueba
+
+2. **Clientes sin ID de n8n**: Algunos clientes en tu base de datos no aparecen en las imagenes (ej: "Carlos Esposo Irma", "Fonoaudiologia"). Quedaran con `n8n_id = NULL`.
+
+3. **Indice unico**: El indice garantiza que no haya duplicados, pero permite NULLs multiples.
 
