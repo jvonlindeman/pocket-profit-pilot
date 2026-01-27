@@ -1,85 +1,230 @@
 
 
-# Plan: Corregir cálculo de Retention Rate para clientes Legacy
+# Plan: Dashboard de Rentabilidad por Cliente
 
-## Problema
+## Objetivo
 
-Los clientes marcados como "legacy" tienen `created_at` igual a la fecha de importación (26 enero 2026). La lógica actual usa esta fecha para determinar si estaban "activos al inicio del mes", causando que:
-
-- `startingActive = 0` (porque el 26 de enero es posterior al 1 de enero)
-- `retentionRate = 100%` matemáticamente, pero se muestra incorrectamente
-
-## Causa raíz
-
-```text
-// Lógica actual
-wasActiveAtStart = isOnOrBefore(createdAt, periodStart)
-
-// Para cliente legacy creado el 26/ene:
-createdAt = 26-ene-2026
-periodStart = 01-ene-2026
-isOnOrBefore(26-ene, 01-ene) = FALSE  <-- ¡Incorrecto!
-```
-
-## Solución
-
-Los clientes legacy deben considerarse como si hubieran existido "desde siempre". Modificar la lógica para usar una fecha muy antigua como `created_at` efectivo para clientes legacy.
+Crear un dashboard visual que muestre la rentabilidad de cada cliente (retainer), permitiendo identificar rápidamente cuáles generan más valor y cuáles tienen márgenes bajos o negativos.
 
 ---
 
-## Cambios requeridos
+## Datos disponibles en la tabla `retainers`
 
-| Archivo | Cambio |
-|---------|--------|
-| `src/hooks/useChurnCalculator.ts` | Tratar `created_at` de clientes legacy como fecha antigua |
+| Campo | Descripción |
+|-------|-------------|
+| `client_name` | Nombre del cliente |
+| `specialty` | Especialidad/vertical |
+| `net_income` | Ingreso mensual del retainer |
+| `social_media_cost` | Costo de gestión de redes sociales |
+| `total_expenses` | Gastos totales asociados al cliente |
+| `articles_per_month` | Artículos mensuales (para estimar costo) |
+| `has_whatsapp_bot` | Si usa bot de WhatsApp |
+| `uses_stripe` | Si paga por Stripe (comisiones) |
+| `active` | Estado activo/inactivo |
 
 ---
 
-## Nueva lógica
+## Cálculos de rentabilidad
 
 ```text
-Para cada retainer:
+Para cada cliente:
+
+  Ingreso Bruto = net_income
   
-  // Si es legacy, asumir que existía desde siempre
-  createdAt = is_legacy 
-    ? new Date('2000-01-01')  // Fecha muy antigua
-    : created_at del registro
+  Gastos Directos:
+    - Redes sociales: social_media_cost
+    - Otros gastos: total_expenses (ya incluye todo)
   
-  // El resto de la lógica permanece igual
-  wasActiveAtStart = createdAt <= periodStart 
-                   && (no cancelado O cancelado después de periodStart)
+  Margen = net_income - total_expenses
+  Margen % = (Margen / net_income) * 100
+  
+  Clasificación:
+    - Alto (>50%): verde
+    - Medio (20-50%): amarillo  
+    - Bajo (<20%): rojo
+    - Negativo (<0%): rojo oscuro
 ```
 
 ---
 
-## Resultado esperado
+## Componentes del dashboard
 
-Para el mes actual (enero 2026):
-- **Antes**: startingActive = 0, retentionRate = 0%
-- **Después**: startingActive = ~30 (todos los legacy), retentionRate = 100% (si no hay bajas)
+### 1. Resumen General (Cards KPI)
+- Total clientes activos
+- Ingreso total mensual (suma de net_income)
+- Gastos totales (suma de total_expenses)
+- Margen promedio ponderado
+- Cliente más rentable
+- Cliente menos rentable
+
+### 2. Gráfico de Distribución de Márgenes (Pie/Donut)
+- Segmentos por rango de margen (Alto/Medio/Bajo/Negativo)
+- Cantidad de clientes en cada segmento
+
+### 3. Gráfico de Barras - Top 10 Clientes por Margen
+- Barras horizontales ordenadas de mayor a menor margen
+- Mostrar monto de margen y porcentaje
+
+### 4. Tabla de Rentabilidad Detallada
+- Todas las columnas relevantes
+- Ordenable por cualquier columna
+- Indicadores visuales de estado (badges de color)
+- Filtrable por rango de margen
+
+### 5. Análisis por Especialidad
+- Agrupar clientes por especialidad
+- Mostrar margen promedio por vertical
+- Identificar especialidades más/menos rentables
+
+---
+
+## Estructura de archivos
+
+```text
+src/
+  components/
+    Retainers/
+      ProfitabilityDashboard/
+        index.tsx                    # Componente principal
+        KPISummaryCards.tsx          # Cards de KPIs
+        MarginDistributionChart.tsx  # Gráfico pie de distribución
+        TopClientsChart.tsx          # Gráfico barras top 10
+        ProfitabilityTable.tsx       # Tabla detallada
+        SpecialtyAnalysis.tsx        # Análisis por especialidad
+  hooks/
+    useProfitabilityMetrics.ts       # Hook con cálculos
+```
+
+---
+
+## Integración en la página
+
+Se agregará una nueva sección en `/retainers` debajo del área de Churn, o como una pestaña/tab separada para mantener la página organizada.
+
+---
+
+## Mockup visual
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│  Dashboard de Rentabilidad                                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐  │
+│  │Clientes │ │ Ingreso │ │ Gastos  │ │ Margen  │ │  Mejor  │  │
+│  │  30     │ │ $25,000 │ │ $8,500  │ │  66%    │ │ Cliente │  │
+│  └─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘  │
+│                                                                 │
+│  ┌────────────────────────┐  ┌────────────────────────────────┐│
+│  │  Distribución Márgenes │  │  Top 10 Clientes               ││
+│  │        ┌───┐           │  │  ████████████████ Cliente A    ││
+│  │       /     \          │  │  ██████████████   Cliente B    ││
+│  │      │ Alto │          │  │  ████████████     Cliente C    ││
+│  │       \     /          │  │  ██████████       Cliente D    ││
+│  │        └───┘           │  │  ████████         Cliente E    ││
+│  └────────────────────────┘  └────────────────────────────────┘│
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │ Cliente    │ Ingreso │ Gastos │ Margen │ Margen% │ Estado  ││
+│  ├─────────────────────────────────────────────────────────────┤│
+│  │ Cliente A  │ $2,500  │ $500   │ $2,000 │  80%    │ ● Alto  ││
+│  │ Cliente B  │ $1,800  │ $600   │ $1,200 │  67%    │ ● Alto  ││
+│  │ Cliente C  │ $1,500  │ $800   │ $700   │  47%    │ ● Medio ││
+│  └─────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## Sección Técnica
 
-### Cambio en useChurnCalculator.ts
+### Hook useProfitabilityMetrics
 
 ```typescript
-// Línea ~60, cambiar:
-const createdAt = toDate((r as any).created_at) ?? periodStart;
-
-// Por:
-const isLegacy = Boolean((r as any).is_legacy);
-const rawCreatedAt = toDate((r as any).created_at);
-// Los clientes legacy se consideran activos "desde siempre"
-const createdAt = isLegacy 
-  ? new Date('2000-01-01') 
-  : (rawCreatedAt ?? periodStart);
+interface ProfitabilityMetrics {
+  // KPIs globales
+  totalClients: number;
+  totalIncome: number;
+  totalExpenses: number;
+  totalMargin: number;
+  averageMarginPercent: number;
+  
+  // Distribución
+  distribution: {
+    high: number;    // >50%
+    medium: number;  // 20-50%
+    low: number;     // 0-20%
+    negative: number; // <0%
+  };
+  
+  // Por cliente
+  clientMetrics: Array<{
+    id: string;
+    clientName: string;
+    specialty: string;
+    income: number;
+    expenses: number;
+    margin: number;
+    marginPercent: number;
+    status: 'high' | 'medium' | 'low' | 'negative';
+  }>;
+  
+  // Por especialidad
+  bySpecialty: Array<{
+    specialty: string;
+    clientCount: number;
+    totalIncome: number;
+    totalExpenses: number;
+    averageMarginPercent: number;
+  }>;
+  
+  // Top/Bottom
+  topClient: ClientMetric | null;
+  bottomClient: ClientMetric | null;
+}
 ```
 
-Esto asegura que:
-1. Clientes legacy siempre cumplen `wasActiveAtStart` para cualquier mes
-2. Clientes legacy SÍ se cuentan en MRR inicial
-3. Nuevos clientes siguen usando su `created_at` real
-4. Las cancelaciones siguen funcionando correctamente
+### Gráfico de barras con Recharts
+
+```typescript
+<ResponsiveContainer width="100%" height={300}>
+  <BarChart data={top10Clients} layout="vertical">
+    <XAxis type="number" />
+    <YAxis dataKey="clientName" type="category" width={120} />
+    <Tooltip />
+    <Bar dataKey="margin" fill="#10b981">
+      {top10Clients.map((entry, index) => (
+        <Cell 
+          key={`cell-${index}`} 
+          fill={getColorByMargin(entry.marginPercent)} 
+        />
+      ))}
+    </Bar>
+  </BarChart>
+</ResponsiveContainer>
+```
+
+### Clasificación de colores
+
+```typescript
+function getMarginStatus(marginPercent: number) {
+  if (marginPercent >= 50) return { status: 'high', color: '#10b981', label: 'Alto' };
+  if (marginPercent >= 20) return { status: 'medium', color: '#f59e0b', label: 'Medio' };
+  if (marginPercent >= 0) return { status: 'low', color: '#ef4444', label: 'Bajo' };
+  return { status: 'negative', color: '#7f1d1d', label: 'Negativo' };
+}
+```
+
+---
+
+## Pasos de implementación
+
+1. Crear hook `useProfitabilityMetrics` con todos los cálculos
+2. Crear componente `KPISummaryCards` con las métricas principales
+3. Crear gráfico de distribución con PieChart de Recharts
+4. Crear gráfico de barras top 10 con BarChart
+5. Crear tabla de rentabilidad con ordenamiento
+6. Crear componente de análisis por especialidad
+7. Integrar todos los componentes en `ProfitabilityDashboard`
+8. Agregar sección en la página de Retainers
 
