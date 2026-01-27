@@ -14,6 +14,19 @@ interface Props {
   onSave: (values: RetainerInsert | Partial<RetainerRow>) => Promise<void> | void;
 }
 
+function getTodayDateString(): string {
+  return new Date().toISOString().split("T")[0];
+}
+
+function formatDateForInput(dateValue: string | null | undefined): string {
+  if (!dateValue) return getTodayDateString();
+  try {
+    return new Date(dateValue).toISOString().split("T")[0];
+  } catch {
+    return getTodayDateString();
+  }
+}
+
 export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initial, onSave }) => {
   const [clientName, setClientName] = React.useState(initial?.client_name ?? "");
   const [specialty, setSpecialty] = React.useState(initial?.specialty ?? "");
@@ -24,6 +37,9 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
   const [articlesPerMonth, setArticlesPerMonth] = React.useState(String((initial as any)?.articles_per_month ?? "0"));
   const [hasWhatsappBot, setHasWhatsappBot] = React.useState<boolean>((initial as any)?.has_whatsapp_bot ?? false);
   const [active, setActive] = React.useState<boolean>(initial?.active ?? true);
+  const [canceledAt, setCanceledAt] = React.useState<string>(
+    initial?.canceled_at ? formatDateForInput(initial.canceled_at) : getTodayDateString()
+  );
   const [notes, setNotes] = React.useState(initial?.notes ?? "");
 
   React.useEffect(() => {
@@ -37,9 +53,17 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
       setArticlesPerMonth(String((initial as any)?.articles_per_month ?? "0"));
       setHasWhatsappBot((initial as any)?.has_whatsapp_bot ?? false);
       setActive(initial?.active ?? true);
+      setCanceledAt(initial?.canceled_at ? formatDateForInput(initial.canceled_at) : getTodayDateString());
       setNotes(initial?.notes ?? "");
     }
   }, [open, initial]);
+
+  const handleActiveChange = (newActive: boolean) => {
+    setActive(newActive);
+    if (!newActive && !initial?.canceled_at) {
+      setCanceledAt(getTodayDateString());
+    }
+  };
 
   const handleSubmit = async () => {
     const payload: any = {
@@ -52,6 +76,7 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
       articles_per_month: parseInt(articlesPerMonth, 10) || 0,
       has_whatsapp_bot: hasWhatsappBot,
       active,
+      canceled_at: active ? null : new Date(canceledAt).toISOString(),
       notes: notes?.trim() || null,
     } as RetainerInsert;
     await onSave(payload);
@@ -106,9 +131,20 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
             <label htmlFor="hasWhatsappBot" className="text-sm">WhatsApp Bot</label>
           </div>
           <div className="flex items-center gap-3">
-            <Switch checked={active} onCheckedChange={setActive} id="active" />
+            <Switch checked={active} onCheckedChange={handleActiveChange} id="active" />
             <label htmlFor="active" className="text-sm">Activo</label>
           </div>
+          {!active && (
+            <div>
+              <label className="text-sm font-medium text-destructive">Fecha de baja</label>
+              <Input 
+                type="date" 
+                value={canceledAt} 
+                onChange={(e) => setCanceledAt(e.target.value)} 
+                className="border-destructive/50"
+              />
+            </div>
+          )}
           <div className="md:col-span-2">
             <label className="text-sm font-medium">Notas</label>
             <Textarea value={notes ?? ""} onChange={(e) => setNotes(e.target.value)} placeholder="Notas opcionales" />

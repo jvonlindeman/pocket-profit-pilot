@@ -13,6 +13,19 @@ function formatCurrency(n: number) {
   return new Intl.NumberFormat("es-PA", { style: "currency", currency: "USD" }).format(n ?? 0);
 }
 
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "-";
+  try {
+    return new Date(dateStr).toLocaleDateString("es-PA", { 
+      year: "numeric", 
+      month: "short", 
+      day: "numeric" 
+    });
+  } catch {
+    return "-";
+  }
+}
+
 export const RetainersTable: React.FC<Props> = ({ data, onEdit, onDelete }) => {
   return (
     <div className="overflow-x-auto border rounded-md">
@@ -30,6 +43,7 @@ export const RetainersTable: React.FC<Props> = ({ data, onEdit, onDelete }) => {
             <TableHead className="text-right">Margen %</TableHead>
             <TableHead className="text-center">WA Bot</TableHead>
             <TableHead className="text-center">Activo</TableHead>
+            <TableHead>Fecha baja</TableHead>
             <TableHead>Acciones</TableHead>
           </TableRow>
         </TableHeader>
@@ -51,6 +65,9 @@ export const RetainersTable: React.FC<Props> = ({ data, onEdit, onDelete }) => {
                 <TableCell className="text-right">{marginPct.toFixed(1)}%</TableCell>
                 <TableCell className="text-center">{row.has_whatsapp_bot ? "Sí" : "No"}</TableCell>
                 <TableCell className="text-center">{r.active ? "Sí" : "No"}</TableCell>
+                <TableCell className={r.canceled_at ? "text-destructive" : ""}>
+                  {formatDate(r.canceled_at)}
+                </TableCell>
                 <TableCell className="space-x-2">
                   <Button size="sm" variant="outline" onClick={() => onEdit(r)}>Editar</Button>
                   <Button size="sm" variant="destructive" onClick={() => onDelete(r)}>Eliminar</Button>
