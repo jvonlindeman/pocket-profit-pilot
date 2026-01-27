@@ -1,89 +1,115 @@
 
 
-# Colorear Filas Segun Estado del Cliente
+# Corregir Mapeo de Colores para Estados con Emojis
 
-## Objetivo
+## Problema Identificado
 
-Cambiar el color de fondo de toda la fila en la tabla de retainers segun el estado del cliente (`client_status`). Los colores seran pasteles suaves para no ser agresivos visualmente.
+Los valores de `client_status` en la base de datos incluyen emojis al inicio:
+- `🟢 Agradecido`
+- `🟢 En seguimiento`  
+- `🟡 Esperando respuesta`
+- `🟡 Duda o consulta`
+
+El codigo actual busca coincidencias exactas como `"En seguimiento"`, pero no encuentra match porque el valor real es `"🟢 En seguimiento"`.
 
 ---
 
-## Paleta de Colores Pastel por Estado
+## Solucion
 
-| Estado | Color de Fila |
-|--------|---------------|
-| OK / Agradecido | Verde pastel muy suave (`bg-green-50/60`) |
-| En seguimiento / Esperando respuesta | Azul pastel (`bg-blue-50/60`) |
-| Duda o consulta / Con pendiente | Amarillo pastel (`bg-amber-50/60`) |
-| Insatisfecho leve | Naranja pastel (`bg-orange-50/60`) |
-| Enojado / Frustrado / Amenaza / Reclamo grave | Rosa/rojo pastel (`bg-red-50/60`) |
-| Sin estado | Sin color (fondo normal) |
-
-La opacidad `/60` hace que el color sea aun mas sutil.
+Modificar la funcion `getRowBgClass()` para que busque si el status **contiene** alguna de las palabras clave, en lugar de requerir una coincidencia exacta.
 
 ---
 
 ## Cambios en RetainersTable.tsx
 
-### 1. Agregar funcion para obtener color de fila (linea 49)
+### Reemplazar la funcion getRowBgClass (lineas 50-69)
 
 ```typescript
 // Mapeo de colores pastel para el fondo de la fila segun estado
 function getRowBgClass(status: string | null): string {
   if (!status) return '';
   
-  const rowColors: Record<string, string> = {
-    'OK': 'bg-green-50/70',
-    'Agradecido': 'bg-green-50/70',
-    'En seguimiento': 'bg-blue-50/70',
-    'Esperando respuesta': 'bg-blue-50/70',
-    'Duda o consulta': 'bg-amber-50/70',
-    'Con pendiente': 'bg-amber-50/70',
-    'Insatisfecho leve': 'bg-orange-50/70',
-    'Enojado': 'bg-red-50/60',
-    'Frustrado': 'bg-red-50/60',
-    'Amenaza con irse': 'bg-red-50/60',
-    'Reclamo grave': 'bg-red-50/60',
-  };
+  // Buscar por contenido, no coincidencia exacta (los estados pueden tener emojis)
+  const statusLower = status.toLowerCase();
   
-  return rowColors[status] || '';
+  // Estados positivos - verde pastel
+  if (statusLower.includes('ok') || statusLower.includes('agradecido')) {
+    return 'bg-green-50/70';
+  }
+  
+  // Estados de seguimiento - azul pastel
+  if (statusLower.includes('seguimiento') || statusLower.includes('esperando')) {
+    return 'bg-blue-50/70';
+  }
+  
+  // Estados de atencion - amarillo/ambar pastel
+  if (statusLower.includes('duda') || statusLower.includes('consulta') || statusLower.includes('pendiente')) {
+    return 'bg-amber-50/70';
+  }
+  
+  // Estados de alerta leve - naranja pastel
+  if (statusLower.includes('insatisfecho')) {
+    return 'bg-orange-50/70';
+  }
+  
+  // Estados criticos - rojo pastel
+  if (statusLower.includes('enojado') || statusLower.includes('frustrado') || 
+      statusLower.includes('amenaza') || statusLower.includes('reclamo')) {
+    return 'bg-red-50/60';
+  }
+  
+  return '';
 }
 ```
 
-### 2. Aplicar clase a TableRow (linea 85)
+### Actualizar tambien getStatusBadgeClass (lineas 45-48)
 
-Cambiar:
-```tsx
-<TableRow key={r.id}>
-```
-
-Por:
-```tsx
-<TableRow key={r.id} className={getRowBgClass(clientStatus)}>
-```
-
-### 3. Actualizar celda de acciones sticky
-
-La celda sticky necesita heredar el color de fondo para mantener consistencia visual:
-
-```tsx
-<TableCell className={`sticky right-0 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] py-2 ${getRowBgClass(clientStatus) || 'bg-background'}`}>
+```typescript
+function getStatusBadgeClass(status: string | null): string {
+  if (!status) return 'bg-gray-100 text-gray-500 border-gray-200';
+  
+  const statusLower = status.toLowerCase();
+  
+  // Estados positivos
+  if (statusLower.includes('ok') || statusLower.includes('agradecido')) {
+    return 'bg-green-100 text-green-800 border-green-200';
+  }
+  
+  // Estados de seguimiento
+  if (statusLower.includes('seguimiento') || statusLower.includes('esperando')) {
+    return 'bg-blue-100 text-blue-800 border-blue-200';
+  }
+  
+  // Estados de atencion
+  if (statusLower.includes('duda') || statusLower.includes('consulta') || statusLower.includes('pendiente')) {
+    return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+  }
+  
+  // Estados de alerta
+  if (statusLower.includes('insatisfecho')) {
+    return 'bg-orange-100 text-orange-800 border-orange-200';
+  }
+  
+  // Estados criticos
+  if (statusLower.includes('enojado') || statusLower.includes('frustrado') || 
+      statusLower.includes('amenaza') || statusLower.includes('reclamo')) {
+    return 'bg-red-100 text-red-800 border-red-200';
+  }
+  
+  return 'bg-gray-100 text-gray-600 border-gray-200';
+}
 ```
 
 ---
 
-## Vista Previa Visual
+## Resultado Esperado
 
-```text
-+-----------------------------------------------------+
-| Cliente          | Espec.  | Estado         | ... |
-+-----------------------------------------------------+
-| Dr. Martinez     | Cardio  | OK             | ... | <- Verde pastel
-| Dra. Lopez       | Dermato | En seguimiento | ... | <- Azul pastel  
-| Dr. Perez        | General | Enojado        | ... | <- Rojo pastel
-| Clinica ABC      | Hospital| -              | ... | <- Sin color
-+-----------------------------------------------------+
-```
+Con esta correccion:
+- `🟢 Agradecido` -> detecta "agradecido" -> aplica `bg-green-50/70`
+- `🟡 Esperando respuesta` -> detecta "esperando" -> aplica `bg-blue-50/70`
+- `🟡 Duda o consulta` -> detecta "duda" -> aplica `bg-amber-50/70`
+
+Las filas ahora mostraran los colores pastel correctos independientemente de si tienen emojis u otros prefijos.
 
 ---
 
@@ -91,15 +117,14 @@ La celda sticky necesita heredar el color de fondo para mantener consistencia vi
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/components/Retainers/RetainersTable.tsx` | Agregar funcion `getRowBgClass` y aplicar a TableRow |
+| `src/components/Retainers/RetainersTable.tsx` | Cambiar funciones de mapeo para usar `includes()` en lugar de coincidencia exacta |
 
 ---
 
 ## Seccion Tecnica
 
-- Se usa Tailwind con opacidad (`/70` o `/60`) para lograr colores pastel sutiles
-- La celda sticky de acciones hereda el color de fondo para evitar discontinuidad visual
-- Los estados negativos (Enojado, Frustrado, etc.) usan rojo mas suave (`/60`) para no alarmar
-- Las filas sin estado mantienen el fondo por defecto de la tabla
-- Compatible con modo oscuro ya que Tailwind ajusta automaticamente los tonos
+- Se usa `toLowerCase()` para hacer la comparacion case-insensitive
+- Se usa `includes()` para buscar subcadenas en lugar de coincidencia exacta
+- El orden de las condiciones importa: se evaluan de mas especifico a mas general
+- Esto hace el codigo mas robusto ante variaciones en el formato del status
 
