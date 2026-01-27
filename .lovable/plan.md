@@ -1,118 +1,85 @@
 
 
-# Plan: Marcar clientes como "Legacy" para cálculo de churn correcto
+# Plan: Corregir cálculo de Retention Rate para clientes Legacy
 
 ## Problema
 
-Todos los clientes importados tienen `created_at` igual a la fecha de importación, lo que hace que el sistema los cuente como "nuevos" este mes, distorsionando las métricas de churn.
+Los clientes marcados como "legacy" tienen `created_at` igual a la fecha de importación (26 enero 2026). La lógica actual usa esta fecha para determinar si estaban "activos al inicio del mes", causando que:
+
+- `startingActive = 0` (porque el 26 de enero es posterior al 1 de enero)
+- `retentionRate = 100%` matemáticamente, pero se muestra incorrectamente
+
+## Causa raíz
+
+```text
+// Lógica actual
+wasActiveAtStart = isOnOrBefore(createdAt, periodStart)
+
+// Para cliente legacy creado el 26/ene:
+createdAt = 26-ene-2026
+periodStart = 01-ene-2026
+isOnOrBefore(26-ene, 01-ene) = FALSE  <-- ¡Incorrecto!
+```
 
 ## Solución
 
-Agregar un campo `is_legacy` a la tabla `retainers`. Los clientes marcados como legacy:
-- NO se cuentan como "nuevos" en ningún mes
-- SÍ se cuentan para churn si se cancelan
-- SÍ se incluyen en el MRR inicial/final
+Los clientes legacy deben considerarse como si hubieran existido "desde siempre". Modificar la lógica para usar una fecha muy antigua como `created_at` efectivo para clientes legacy.
 
 ---
 
 ## Cambios requeridos
 
-| Componente | Cambio |
-|------------|--------|
-| Base de datos | Agregar columna `is_legacy` (boolean, default false) |
-| Migración de datos | Marcar todos los existentes como `is_legacy = true` |
-| useChurnCalculator.ts | Excluir legacy del conteo de "nuevos" |
-| RetainerFormDialog.tsx | Agregar toggle "Cliente legacy" |
-| RetainersTable.tsx | Mostrar indicador visual de legacy |
+| Archivo | Cambio |
+|---------|--------|
+| `src/hooks/useChurnCalculator.ts` | Tratar `created_at` de clientes legacy como fecha antigua |
 
 ---
 
-## Lógica de churn actualizada
+## Nueva lógica
 
 ```text
 Para cada retainer:
-
-Logo Churn:
-  - Si es legacy: NO contar como nuevo
-  - Si NO es legacy y created_at en el mes: contar como nuevo
-  - Si canceled_at en el mes: contar como baja (sin importar legacy)
-
-Revenue Churn:
-  - MRR Inicial: incluir legacy (ya existían)
-  - MRR Nuevo: solo clientes NO legacy creados en el mes
-  - MRR Perdido: cualquier cancelación en el mes
+  
+  // Si es legacy, asumir que existía desde siempre
+  createdAt = is_legacy 
+    ? new Date('2000-01-01')  // Fecha muy antigua
+    : created_at del registro
+  
+  // El resto de la lógica permanece igual
+  wasActiveAtStart = createdAt <= periodStart 
+                   && (no cancelado O cancelado después de periodStart)
 ```
 
 ---
 
-## Flujo de usuario
+## Resultado esperado
 
-```text
-Importación masiva (ya hecha)
-         |
-         v
-Migración marca todos como legacy = true
-         |
-         v
-Nuevos clientes -> is_legacy = false (automático)
-         |
-         v
-Churn calcula correctamente:
-  - Legacy NO cuentan como nuevos
-  - Cancelaciones SÍ cuentan como bajas
-```
-
----
-
-## UI del formulario
-
-Se agregará un toggle "Cliente legacy" que:
-- Por defecto: false (nuevo cliente)
-- Si se activa: el cliente no contará como "nuevo" en ningún mes
-- Útil para ajustar manualmente si es necesario
-
----
-
-## Indicadores visuales en la tabla
-
-Los clientes legacy mostrarán un badge "Legacy" junto al nombre para identificarlos fácilmente.
+Para el mes actual (enero 2026):
+- **Antes**: startingActive = 0, retentionRate = 0%
+- **Después**: startingActive = ~30 (todos los legacy), retentionRate = 100% (si no hay bajas)
 
 ---
 
 ## Sección Técnica
 
-### Migración SQL
+### Cambio en useChurnCalculator.ts
 
-```sql
--- Agregar columna is_legacy
-ALTER TABLE retainers 
-ADD COLUMN is_legacy boolean NOT NULL DEFAULT false;
+```typescript
+// Línea ~60, cambiar:
+const createdAt = toDate((r as any).created_at) ?? periodStart;
 
--- Marcar todos los existentes como legacy
-UPDATE retainers SET is_legacy = true;
+// Por:
+const isLegacy = Boolean((r as any).is_legacy);
+const rawCreatedAt = toDate((r as any).created_at);
+// Los clientes legacy se consideran activos "desde siempre"
+const createdAt = isLegacy 
+  ? new Date('2000-01-01') 
+  : (rawCreatedAt ?? periodStart);
 ```
 
-### Cambio en calculateChurn
-
-```text
-// Solo contar como nuevo si:
-// 1. NO es legacy
-// 2. created_at está en el período
-const isNewThisPeriod = !r.is_legacy && 
-  isOnOrAfter(createdAt, periodStart) && 
-  isOnOrBefore(createdAt, periodEnd);
-
-// Las bajas se cuentan sin importar legacy
-const isChurnedThisPeriod = !!canceledAt && 
-  isOnOrAfter(canceledAt, periodStart) && 
-  isOnOrBefore(canceledAt, periodEnd);
-```
-
-### Toggle en formulario
-
-Agregar después del toggle "Activo":
-- Label: "Cliente legacy (importado)"
-- Descripción: "No contará como cliente nuevo"
-- Default para nuevos: false
-- Marcar legacy existentes vía migración
+Esto asegura que:
+1. Clientes legacy siempre cumplen `wasActiveAtStart` para cualquier mes
+2. Clientes legacy SÍ se cuentan en MRR inicial
+3. Nuevos clientes siguen usando su `created_at` real
+4. Las cancelaciones siguen funcionando correctamente
 
