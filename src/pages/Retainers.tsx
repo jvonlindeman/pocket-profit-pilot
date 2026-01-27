@@ -5,9 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, MessageSquare } from "lucide-react";
+import { CreditCard, MessageSquare, RefreshCw } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { useRetainersQuery, useCreateRetainer, useUpdateRetainer, useDeleteRetainer, upsertByClientName } from "@/hooks/queries/useRetainers";
+import { useRetainersQuery, useCreateRetainer, useUpdateRetainer, useDeleteRetainer, upsertByClientName, useSyncClientStatus } from "@/hooks/queries/useRetainers";
 import type { RetainerInsert, RetainerRow } from "@/types/retainers";
 import { RetainerFormDialog } from "@/components/Retainers/RetainerFormDialog";
 import { CsvPasteDialog } from "@/components/Retainers/CsvPasteDialog";
@@ -84,6 +84,7 @@ const RetainersPage: React.FC = () => {
   const createMut = useCreateRetainer();
   const updateMut = useUpdateRetainer();
   const deleteMut = useDeleteRetainer();
+  const syncStatusMut = useSyncClientStatus();
 
   // Ensure we always have an array to avoid runtime errors when data is not an array
   const rows = React.useMemo(() => (Array.isArray(data) ? data : []), [data]);
@@ -226,6 +227,14 @@ const RetainersPage: React.FC = () => {
         <Button onClick={() => { setEditing(null); setFormOpen(true); }}>Agregar retainer</Button>
         <Button variant="outline" onClick={() => setCsvOpen(true)}>Importar CSV (pegar)</Button>
         <Button variant="outline" onClick={() => exportCsv(filtered)}>Exportar CSV</Button>
+        <Button 
+          variant="outline" 
+          onClick={() => syncStatusMut.mutate()}
+          disabled={syncStatusMut.isPending}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${syncStatusMut.isPending ? 'animate-spin' : ''}`} />
+          {syncStatusMut.isPending ? 'Sincronizando...' : 'Sincronizar estado n8n'}
+        </Button>
       </div>
 
       <Card className="mt-4">

@@ -5,6 +5,8 @@ import type { RetainerRow, RetainerInsert, RetainerUpdate } from "@/types/retain
 
 const RETAINERS_QUERY_KEY = ["retainers"] as const;
 
+const SUPABASE_URL = "https://rstexocnpvtxfhqbnetn.supabase.co";
+
 export function useRetainersQuery() {
   return useQuery<RetainerRow[]>({
     queryKey: RETAINERS_QUERY_KEY,
@@ -100,4 +102,51 @@ export async function upsertByClientName(row: RetainerInsert): Promise<void> {
     const { error } = await supabase.from("retainers").insert(row);
     if (error) throw error;
   }
+}
+
+interface SyncClientStatusResult {
+  success: boolean;
+  updated: number;
+  notFound: number;
+  notFoundClients: string[];
+  total: number;
+}
+
+export function useSyncClientStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (): Promise<SyncClientStatusResult> => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("No hay sesión activa");
+      }
+
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/sync-client-status`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Error ${response.status}`);
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      const msg = data.notFound > 0
+        ? `${data.updated} actualizados, ${data.notFound} sin n8n_id asignado`
+        : `${data.updated} estados actualizados`;
+      toast({ title: "Sincronización completada", description: msg });
+      qc.invalidateQueries({ queryKey: RETAINERS_QUERY_KEY });
+    },
+    onError: (e: any) => toast({ 
+      title: "Error al sincronizar", 
+      description: e?.message ?? "No se pudo conectar con n8n", 
+      variant: "destructive" 
+    }),
+  });
 }

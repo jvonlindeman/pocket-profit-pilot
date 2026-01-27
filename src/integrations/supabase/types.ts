@@ -239,6 +239,8 @@ export type Database = {
           articles_per_month: number
           canceled_at: string | null
           client_name: string
+          client_status: string | null
+          client_status_date: string | null
           created_at: string
           has_whatsapp_bot: boolean
           id: string
@@ -259,6 +261,8 @@ export type Database = {
           articles_per_month?: number
           canceled_at?: string | null
           client_name: string
+          client_status?: string | null
+          client_status_date?: string | null
           created_at?: string
           has_whatsapp_bot?: boolean
           id?: string
@@ -279,6 +283,8 @@ export type Database = {
           articles_per_month?: number
           canceled_at?: string | null
           client_name?: string
+          client_status?: string | null
+          client_status_date?: string | null
           created_at?: string
           has_whatsapp_bot?: boolean
           id?: string
