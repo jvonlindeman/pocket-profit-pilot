@@ -1,117 +1,118 @@
 
 
-# Plan: Implementar Revenue Churn (Churn de Ingresos)
+# Plan: Marcar clientes como "Legacy" para cálculo de churn correcto
 
-## Resumen
+## Problema
 
-Agregar metricas de Revenue Churn junto al Logo Churn existente para medir el impacto financiero real de las bajas y altas de clientes. Esto incluye MRR perdido, MRR ganado, y Net Revenue Retention (NRR).
+Todos los clientes importados tienen `created_at` igual a la fecha de importación, lo que hace que el sistema los cuente como "nuevos" este mes, distorsionando las métricas de churn.
 
----
+## Solución
 
-## Metricas a Implementar
-
-| Metrica | Formula | Descripcion |
-|---------|---------|-------------|
-| MRR Inicial | Suma de `net_income` de clientes activos al inicio del mes | Ingresos recurrentes al comenzar el periodo |
-| MRR Perdido (Churned) | Suma de `net_income` de clientes que cancelaron en el mes | Impacto financiero de las bajas |
-| MRR Nuevo | Suma de `net_income` de clientes nuevos en el mes | Ingresos por nuevos clientes |
-| MRR Final | Suma de `net_income` de clientes activos al cierre | Ingresos recurrentes al final del periodo |
-| Revenue Churn Rate | MRR Perdido / MRR Inicial | Porcentaje de ingresos perdidos |
-| Net Revenue Retention (NRR) | (MRR Final / MRR Inicial) x 100 | Retencion neta de ingresos |
+Agregar un campo `is_legacy` a la tabla `retainers`. Los clientes marcados como legacy:
+- NO se cuentan como "nuevos" en ningún mes
+- SÍ se cuentan para churn si se cancelan
+- SÍ se incluyen en el MRR inicial/final
 
 ---
 
-## Comparacion Logo Churn vs Revenue Churn
+## Cambios requeridos
 
-```text
-Ejemplo:
-- Pierdes 2 clientes que pagaban $100/mes cada uno = $200 perdidos
-- Ganas 1 cliente nuevo que paga $500/mes = $500 ganados
-
-Logo Churn: -2 clientes (parece malo)
-Revenue Churn: +$300 neto (realidad positiva)
-NRR: >100% (crecimiento)
-```
+| Componente | Cambio |
+|------------|--------|
+| Base de datos | Agregar columna `is_legacy` (boolean, default false) |
+| Migración de datos | Marcar todos los existentes como `is_legacy = true` |
+| useChurnCalculator.ts | Excluir legacy del conteo de "nuevos" |
+| RetainerFormDialog.tsx | Agregar toggle "Cliente legacy" |
+| RetainersTable.tsx | Mostrar indicador visual de legacy |
 
 ---
 
-## Archivos a Modificar
-
-| Archivo | Cambio |
-|---------|--------|
-| `src/hooks/useChurnCalculator.ts` | Agregar calculo de Revenue Churn |
-| `src/pages/Retainers.tsx` | Mostrar nuevas metricas en la UI |
-
----
-
-## Cambios en la UI
-
-La seccion "Churn de retainers" tendra dos subsecciones:
-
-### Logo Churn (existente)
-- Activos al inicio
-- Nuevos
-- Bajas
-- Activos al cierre
-- Churn Rate
-- Retention Rate
-
-### Revenue Churn (nuevo)
-- MRR Inicial
-- MRR Perdido
-- MRR Nuevo
-- MRR Final
-- Revenue Churn Rate
-- Net Revenue Retention (NRR)
-
----
-
-## Indicadores Visuales
-
-| Metrica | Color |
-|---------|-------|
-| NRR >= 100% | Verde (crecimiento) |
-| NRR 90-99% | Amarillo (alerta) |
-| NRR < 90% | Rojo (problema) |
-
----
-
-## Seccion Tecnica
-
-### Nuevo tipo RevenueChurnMetrics
-
-```text
-type RevenueChurnMetrics = {
-  startingMRR: number;      // MRR al inicio del mes
-  churnedMRR: number;       // MRR perdido por bajas
-  newMRR: number;           // MRR de nuevos clientes
-  endingMRR: number;        // MRR al cierre
-  revenueChurnRate: number; // churnedMRR / startingMRR (0..1)
-  netRevenueRetention: number; // endingMRR / startingMRR (0..1+)
-}
-```
-
-### Logica de calculo
+## Lógica de churn actualizada
 
 ```text
 Para cada retainer:
-  - Si estaba activo al inicio del mes:
-      startingMRR += net_income
-  
-  - Si se cancelo durante el mes:
-      churnedMRR += net_income
-  
-  - Si se creo durante el mes:
-      newMRR += net_income
-  
-  - Si esta activo al cierre del mes:
-      endingMRR += net_income
 
-revenueChurnRate = churnedMRR / max(startingMRR, 1)
-netRevenueRetention = endingMRR / max(startingMRR, 1)
+Logo Churn:
+  - Si es legacy: NO contar como nuevo
+  - Si NO es legacy y created_at en el mes: contar como nuevo
+  - Si canceled_at en el mes: contar como baja (sin importar legacy)
+
+Revenue Churn:
+  - MRR Inicial: incluir legacy (ya existían)
+  - MRR Nuevo: solo clientes NO legacy creados en el mes
+  - MRR Perdido: cualquier cancelación en el mes
 ```
 
-### Nuevo hook combinado
+---
 
-El hook `useChurnMetrics` retornara tanto Logo Churn como Revenue Churn en un solo objeto para evitar multiples iteraciones sobre los datos.
+## Flujo de usuario
+
+```text
+Importación masiva (ya hecha)
+         |
+         v
+Migración marca todos como legacy = true
+         |
+         v
+Nuevos clientes -> is_legacy = false (automático)
+         |
+         v
+Churn calcula correctamente:
+  - Legacy NO cuentan como nuevos
+  - Cancelaciones SÍ cuentan como bajas
+```
+
+---
+
+## UI del formulario
+
+Se agregará un toggle "Cliente legacy" que:
+- Por defecto: false (nuevo cliente)
+- Si se activa: el cliente no contará como "nuevo" en ningún mes
+- Útil para ajustar manualmente si es necesario
+
+---
+
+## Indicadores visuales en la tabla
+
+Los clientes legacy mostrarán un badge "Legacy" junto al nombre para identificarlos fácilmente.
+
+---
+
+## Sección Técnica
+
+### Migración SQL
+
+```sql
+-- Agregar columna is_legacy
+ALTER TABLE retainers 
+ADD COLUMN is_legacy boolean NOT NULL DEFAULT false;
+
+-- Marcar todos los existentes como legacy
+UPDATE retainers SET is_legacy = true;
+```
+
+### Cambio en calculateChurn
+
+```text
+// Solo contar como nuevo si:
+// 1. NO es legacy
+// 2. created_at está en el período
+const isNewThisPeriod = !r.is_legacy && 
+  isOnOrAfter(createdAt, periodStart) && 
+  isOnOrBefore(createdAt, periodEnd);
+
+// Las bajas se cuentan sin importar legacy
+const isChurnedThisPeriod = !!canceledAt && 
+  isOnOrAfter(canceledAt, periodStart) && 
+  isOnOrBefore(canceledAt, periodEnd);
+```
+
+### Toggle en formulario
+
+Agregar después del toggle "Activo":
+- Label: "Cliente legacy (importado)"
+- Descripción: "No contará como cliente nuevo"
+- Default para nuevos: false
+- Marcar legacy existentes vía migración
 
