@@ -19,6 +19,9 @@ export type ChurnMetrics = {
   endingMRR: number;
   revenueChurnRate: number; // 0..1
   netRevenueRetention: number; // 0..1+
+  // Paused metrics (new)
+  pausedCount: number;
+  pausedMRR: number;
 };
 
 function toDate(value: any): Date | null {
@@ -56,6 +59,10 @@ export function calculateChurn(retainers: RetainerRow[], monthDate: Date): Churn
   let newMRR = 0;
   let endingMRR = 0;
 
+  // Paused counters (new)
+  let pausedCount = 0;
+  let pausedMRR = 0;
+
   for (const r of retainers) {
     const isLegacy = Boolean((r as any).is_legacy);
     const rawCreatedAt = toDate((r as any).created_at);
@@ -64,6 +71,7 @@ export function calculateChurn(retainers: RetainerRow[], monthDate: Date): Churn
       ? new Date('2000-01-01') 
       : (rawCreatedAt ?? periodStart);
     const canceledAt: Date | null = toDate((r as any).canceled_at);
+    const pausedAt: Date | null = toDate((r as any).paused_at);
     const netIncome = Number(r.net_income) || 0;
 
     const wasActiveAtStart = isOnOrBefore(createdAt, periodStart) && (!canceledAt || isOnOrAfter(canceledAt, periodStart));
@@ -71,18 +79,31 @@ export function calculateChurn(retainers: RetainerRow[], monthDate: Date): Churn
     const isNewThisPeriod = !isLegacy && isOnOrAfter(createdAt, periodStart) && isOnOrBefore(createdAt, periodEnd);
     const isChurnedThisPeriod = !!canceledAt && isOnOrAfter(canceledAt, periodStart) && isOnOrBefore(canceledAt, periodEnd);
     const wasActiveAtEnd = isOnOrBefore(createdAt, periodEnd) && (!canceledAt || isAfter(canceledAt, periodEnd));
+    
+    // Check if client was paused during/before period end
+    const isPausedAtEnd = !!pausedAt && isOnOrBefore(pausedAt, periodEnd);
 
-    // Logo Churn
+    // Logo Churn - pausados SIGUEN contando como clientes activos
     if (wasActiveAtStart) startingActive += 1;
     if (isNewThisPeriod) newThisPeriod += 1;
     if (isChurnedThisPeriod) churnedThisPeriod += 1;
     if (wasActiveAtEnd) endingActive += 1;
 
-    // Revenue Churn
+    // Revenue Churn - pausados NO contribuyen al MRR
     if (wasActiveAtStart) startingMRR += netIncome;
     if (isChurnedThisPeriod) churnedMRR += netIncome;
     if (isNewThisPeriod) newMRR += netIncome;
-    if (wasActiveAtEnd) endingMRR += netIncome;
+    
+    // Para endingMRR, solo contar si está activo Y no pausado
+    if (wasActiveAtEnd && !isPausedAtEnd) {
+      endingMRR += netIncome;
+    }
+    
+    // Track paused clients
+    if (wasActiveAtEnd && isPausedAtEnd) {
+      pausedCount += 1;
+      pausedMRR += netIncome;
+    }
   }
 
   // Logo Churn rates
@@ -112,6 +133,9 @@ export function calculateChurn(retainers: RetainerRow[], monthDate: Date): Churn
     endingMRR,
     revenueChurnRate,
     netRevenueRetention,
+    // Paused
+    pausedCount,
+    pausedMRR,
   };
 }
 

@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import type { RetainerInsert, RetainerRow } from "@/types/retainers";
 import { parseNumberLike } from "@/types/retainers";
 
@@ -13,6 +15,8 @@ interface Props {
   initial?: RetainerRow | null;
   onSave: (values: RetainerInsert | Partial<RetainerRow>) => Promise<void> | void;
 }
+
+type ClientStatus = "active" | "paused" | "canceled";
 
 function getTodayDateString(): string {
   return new Date().toISOString().split("T")[0];
@@ -27,6 +31,13 @@ function formatDateForInput(dateValue: string | null | undefined): string {
   }
 }
 
+function getInitialStatus(initial: RetainerRow | null | undefined): ClientStatus {
+  if (!initial) return "active";
+  if (!initial.active) return "canceled";
+  if ((initial as any).paused_at) return "paused";
+  return "active";
+}
+
 export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initial, onSave }) => {
   const [clientName, setClientName] = React.useState(initial?.client_name ?? "");
   const [specialty, setSpecialty] = React.useState(initial?.specialty ?? "");
@@ -36,12 +47,17 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
   const [usesStripe, setUsesStripe] = React.useState<boolean>((initial as any)?.uses_stripe ?? false);
   const [articlesPerMonth, setArticlesPerMonth] = React.useState(String((initial as any)?.articles_per_month ?? "0"));
   const [hasWhatsappBot, setHasWhatsappBot] = React.useState<boolean>((initial as any)?.has_whatsapp_bot ?? false);
-  const [active, setActive] = React.useState<boolean>(initial?.active ?? true);
   const [isLegacy, setIsLegacy] = React.useState<boolean>((initial as any)?.is_legacy ?? false);
+  const [notes, setNotes] = React.useState(initial?.notes ?? "");
+  
+  // New status management
+  const [status, setStatus] = React.useState<ClientStatus>(getInitialStatus(initial));
+  const [pausedAt, setPausedAt] = React.useState<string>(
+    (initial as any)?.paused_at ? formatDateForInput((initial as any).paused_at) : getTodayDateString()
+  );
   const [canceledAt, setCanceledAt] = React.useState<string>(
     initial?.canceled_at ? formatDateForInput(initial.canceled_at) : getTodayDateString()
   );
-  const [notes, setNotes] = React.useState(initial?.notes ?? "");
 
   React.useEffect(() => {
     if (open) {
@@ -53,19 +69,13 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
       setUsesStripe((initial as any)?.uses_stripe ?? false);
       setArticlesPerMonth(String((initial as any)?.articles_per_month ?? "0"));
       setHasWhatsappBot((initial as any)?.has_whatsapp_bot ?? false);
-      setActive(initial?.active ?? true);
       setIsLegacy((initial as any)?.is_legacy ?? false);
-      setCanceledAt(initial?.canceled_at ? formatDateForInput(initial.canceled_at) : getTodayDateString());
       setNotes(initial?.notes ?? "");
+      setStatus(getInitialStatus(initial));
+      setPausedAt((initial as any)?.paused_at ? formatDateForInput((initial as any).paused_at) : getTodayDateString());
+      setCanceledAt(initial?.canceled_at ? formatDateForInput(initial.canceled_at) : getTodayDateString());
     }
   }, [open, initial]);
-
-  const handleActiveChange = (newActive: boolean) => {
-    setActive(newActive);
-    if (!newActive && !initial?.canceled_at) {
-      setCanceledAt(getTodayDateString());
-    }
-  };
 
   const handleSubmit = async () => {
     const payload: any = {
@@ -77,10 +87,12 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
       uses_stripe: usesStripe,
       articles_per_month: parseInt(articlesPerMonth, 10) || 0,
       has_whatsapp_bot: hasWhatsappBot,
-      active,
       is_legacy: isLegacy,
-      canceled_at: active ? null : new Date(canceledAt).toISOString(),
       notes: notes?.trim() || null,
+      // Status-based fields
+      active: status !== "canceled",
+      paused_at: status === "paused" ? new Date(pausedAt).toISOString() : null,
+      canceled_at: status === "canceled" ? new Date(canceledAt).toISOString() : null,
     } as RetainerInsert;
     await onSave(payload);
     onOpenChange(false);
@@ -90,7 +102,7 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>{initial ? "Editar retainer" : "Nuevo retainer"}</DialogTitle>
           <DialogDescription>Gestiona los datos del cliente retainer.</DialogDescription>
@@ -134,28 +146,64 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
             <label htmlFor="hasWhatsappBot" className="text-sm">WhatsApp Bot</label>
           </div>
           <div className="flex items-center gap-3">
-            <Switch checked={active} onCheckedChange={handleActiveChange} id="active" />
-            <label htmlFor="active" className="text-sm">Activo</label>
-          </div>
-          <div className="flex items-center gap-3">
             <Switch checked={isLegacy} onCheckedChange={setIsLegacy} id="isLegacy" />
             <label htmlFor="isLegacy" className="text-sm text-muted-foreground">Legacy (importado)</label>
           </div>
-          {!active && (
-            <div>
-              <label className="text-sm font-medium text-destructive">Fecha de baja</label>
-              <Input 
-                type="date" 
-                value={canceledAt} 
-                onChange={(e) => setCanceledAt(e.target.value)} 
-                className="border-destructive/50"
-              />
+        </div>
+
+        {/* Status section with radio buttons */}
+        <div className="mt-4 border rounded-lg p-4">
+          <label className="text-sm font-medium mb-3 block">Estado del cliente</label>
+          <RadioGroup value={status} onValueChange={(v) => setStatus(v as ClientStatus)} className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="active" id="status-active" />
+              <Label htmlFor="status-active" className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-500" />
+                Activo
+              </Label>
             </div>
-          )}
-          <div className="md:col-span-2">
-            <label className="text-sm font-medium">Notas</label>
-            <Textarea value={notes ?? ""} onChange={(e) => setNotes(e.target.value)} placeholder="Notas opcionales" />
-          </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="paused" id="status-paused" />
+              <Label htmlFor="status-paused" className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-yellow-500" />
+                Pausado
+              </Label>
+            </div>
+            {status === "paused" && (
+              <div className="ml-6">
+                <label className="text-sm text-muted-foreground">Fecha de pausa</label>
+                <Input 
+                  type="date" 
+                  value={pausedAt} 
+                  onChange={(e) => setPausedAt(e.target.value)} 
+                  className="mt-1 max-w-[200px]"
+                />
+              </div>
+            )}
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="canceled" id="status-canceled" />
+              <Label htmlFor="status-canceled" className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-red-500" />
+                Cancelado
+              </Label>
+            </div>
+            {status === "canceled" && (
+              <div className="ml-6">
+                <label className="text-sm text-destructive">Fecha de baja</label>
+                <Input 
+                  type="date" 
+                  value={canceledAt} 
+                  onChange={(e) => setCanceledAt(e.target.value)} 
+                  className="mt-1 max-w-[200px] border-destructive/50"
+                />
+              </div>
+            )}
+          </RadioGroup>
+        </div>
+
+        <div className="mt-4">
+          <label className="text-sm font-medium">Notas</label>
+          <Textarea value={notes ?? ""} onChange={(e) => setNotes(e.target.value)} placeholder="Notas opcionales" />
         </div>
 
         <DialogFooter>

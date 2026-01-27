@@ -89,7 +89,7 @@ const RetainersPage: React.FC = () => {
   const rows = React.useMemo(() => (Array.isArray(data) ? data : []), [data]);
 
   const [search, setSearch] = React.useState("");
-  const [statusFilter, setStatusFilter] = React.useState<"all" | "active" | "lost">("active");
+  const [statusFilter, setStatusFilter] = React.useState<"all" | "active" | "paused" | "lost">("active");
   const [stripeOnly, setStripeOnly] = React.useState(false);
   const [whatsappOnly, setWhatsappOnly] = React.useState(false);
   const specialties = React.useMemo(
@@ -105,8 +105,12 @@ const RetainersPage: React.FC = () => {
 
   const filtered = React.useMemo(() => {
     return rows.filter((r) => {
-      // Filtro de estado
-      if (statusFilter === "active" && !r.active) return false;
+      // Filtro de estado (ahora con 4 opciones)
+      const isPaused = r.active && !!(r as any).paused_at;
+      const isActiveNotPaused = r.active && !(r as any).paused_at;
+      
+      if (statusFilter === "active" && !isActiveNotPaused) return false;
+      if (statusFilter === "paused" && !isPaused) return false;
       if (statusFilter === "lost" && r.active) return false;
       // statusFilter === "all" muestra todos
       
@@ -250,13 +254,14 @@ const RetainersPage: React.FC = () => {
             </div>
             <div>
               <label className="text-sm">Estado</label>
-              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | "active" | "lost")}>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | "active" | "paused" | "lost")}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="active">Solo activos</SelectItem>
+                  <SelectItem value="paused">Solo pausados</SelectItem>
                   <SelectItem value="lost">Solo perdidos</SelectItem>
                 </SelectContent>
               </Select>
@@ -403,6 +408,15 @@ const RetainersPage: React.FC = () => {
                 <div className="border rounded-md p-3">
                   <div className="text-sm text-muted-foreground">MRR Perdido</div>
                   <div className="text-xl font-semibold text-red-600">{formatCurrency(churn.churnedMRR)}</div>
+                </div>
+                <div className="border rounded-md p-3">
+                  <div className="text-sm text-muted-foreground">MRR Pausado</div>
+                  <div className="text-xl font-semibold text-yellow-600">
+                    {formatCurrency(churn.pausedMRR)}
+                    {churn.pausedCount > 0 && (
+                      <span className="text-sm font-normal ml-1">({churn.pausedCount} clientes)</span>
+                    )}
+                  </div>
                 </div>
                 <div className="border rounded-md p-3">
                   <div className="text-sm text-muted-foreground">MRR Final</div>

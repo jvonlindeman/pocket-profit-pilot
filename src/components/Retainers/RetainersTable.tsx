@@ -49,14 +49,25 @@ export const RetainersTable: React.FC<Props> = ({ data, onEdit, onDelete }) => {
           {data.map((r) => {
             const margin = (r.net_income ?? 0) - (r.total_expenses ?? 0);
             const marginPct = r.net_income ? (margin / r.net_income) * 100 : 0;
+            
+            // Status indicator color
+            const getStatusColor = () => {
+              if (!r.active) return 'bg-red-500';           // Cancelado/Perdido
+              if ((r as any).paused_at) return 'bg-yellow-500'; // Pausado
+              return 'bg-green-500';                        // Activo
+            };
+            
             return (
               <TableRow key={r.id}>
                 <TableCell className="font-medium py-2">
                   <div className="flex items-center gap-1.5">
-                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${r.active ? 'bg-green-500' : 'bg-red-500'}`} />
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${getStatusColor()}`} />
                     <span className="truncate max-w-[120px]">{r.client_name}</span>
                     {r.is_legacy && (
                       <Badge variant="outline" className="text-[10px] px-1 py-0">L</Badge>
+                    )}
+                    {(r as any).paused_at && r.active && (
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 border-yellow-500 text-yellow-600">P</Badge>
                     )}
                     {r.uses_stripe && (
                       <CreditCard className="h-3 w-3 text-muted-foreground flex-shrink-0" />
