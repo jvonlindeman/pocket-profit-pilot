@@ -268,36 +268,80 @@ const RetainersPage: React.FC = () => {
             <CardTitle>Churn de retainers</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-3 md:grid-cols-3 items-end mb-4">
+            <div className="grid gap-3 md:grid-cols-3 items-end mb-6">
               <div className="md:col-span-1">
                 <label className="text-sm">Mes</label>
                 <Input type="month" value={monthStr} onChange={(e) => setMonthStr(e.target.value)} />
               </div>
             </div>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <div className="border rounded-md p-3">
-                <div className="text-sm text-muted-foreground">Activos al inicio</div>
-                <div className="text-xl font-semibold">{churn.startingActive}</div>
+
+            {/* Logo Churn */}
+            <div className="mb-6">
+              <h3 className="text-sm font-medium text-muted-foreground mb-3">Logo Churn (clientes)</h3>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="border rounded-md p-3">
+                  <div className="text-sm text-muted-foreground">Activos al inicio</div>
+                  <div className="text-xl font-semibold">{churn.startingActive}</div>
+                </div>
+                <div className="border rounded-md p-3">
+                  <div className="text-sm text-muted-foreground">Nuevos</div>
+                  <div className="text-xl font-semibold">{churn.newThisPeriod}</div>
+                </div>
+                <div className="border rounded-md p-3">
+                  <div className="text-sm text-muted-foreground">Churn (bajas)</div>
+                  <div className="text-xl font-semibold">{churn.churnedThisPeriod}</div>
+                </div>
+                <div className="border rounded-md p-3">
+                  <div className="text-sm text-muted-foreground">Activos al cierre</div>
+                  <div className="text-xl font-semibold">{churn.endingActive}</div>
+                </div>
+                <div className="border rounded-md p-3">
+                  <div className="text-sm text-muted-foreground">Churn rate</div>
+                  <div className="text-xl font-semibold">{formatPercent(churn.churnRate)}</div>
+                </div>
+                <div className="border rounded-md p-3">
+                  <div className="text-sm text-muted-foreground">Retention rate</div>
+                  <div className="text-xl font-semibold">{formatPercent(churn.retentionRate)}</div>
+                </div>
               </div>
-              <div className="border rounded-md p-3">
-                <div className="text-sm text-muted-foreground">Nuevos</div>
-                <div className="text-xl font-semibold">{churn.newThisPeriod}</div>
-              </div>
-              <div className="border rounded-md p-3">
-                <div className="text-sm text-muted-foreground">Churn (bajas)</div>
-                <div className="text-xl font-semibold">{churn.churnedThisPeriod}</div>
-              </div>
-              <div className="border rounded-md p-3">
-                <div className="text-sm text-muted-foreground">Activos al cierre</div>
-                <div className="text-xl font-semibold">{churn.endingActive}</div>
-              </div>
-              <div className="border rounded-md p-3">
-                <div className="text-sm text-muted-foreground">Churn rate</div>
-                <div className="text-xl font-semibold">{formatPercent(churn.churnRate)}</div>
-              </div>
-              <div className="border rounded-md p-3">
-                <div className="text-sm text-muted-foreground">Retention rate</div>
-                <div className="text-xl font-semibold">{formatPercent(churn.retentionRate)}</div>
+            </div>
+
+            {/* Revenue Churn */}
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground mb-3">Revenue Churn (ingresos)</h3>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="border rounded-md p-3">
+                  <div className="text-sm text-muted-foreground">MRR Inicial</div>
+                  <div className="text-xl font-semibold">{formatCurrency(churn.startingMRR)}</div>
+                </div>
+                <div className="border rounded-md p-3">
+                  <div className="text-sm text-muted-foreground">MRR Nuevo</div>
+                  <div className="text-xl font-semibold text-green-600">{formatCurrency(churn.newMRR)}</div>
+                </div>
+                <div className="border rounded-md p-3">
+                  <div className="text-sm text-muted-foreground">MRR Perdido</div>
+                  <div className="text-xl font-semibold text-red-600">{formatCurrency(churn.churnedMRR)}</div>
+                </div>
+                <div className="border rounded-md p-3">
+                  <div className="text-sm text-muted-foreground">MRR Final</div>
+                  <div className="text-xl font-semibold">{formatCurrency(churn.endingMRR)}</div>
+                </div>
+                <div className="border rounded-md p-3">
+                  <div className="text-sm text-muted-foreground">Revenue Churn Rate</div>
+                  <div className="text-xl font-semibold">{formatPercent(churn.revenueChurnRate)}</div>
+                </div>
+                <div className="border rounded-md p-3">
+                  <div className="text-sm text-muted-foreground">Net Revenue Retention (NRR)</div>
+                  <div className={`text-xl font-semibold ${
+                    churn.netRevenueRetention >= 1 
+                      ? "text-green-600" 
+                      : churn.netRevenueRetention >= 0.9 
+                        ? "text-yellow-600" 
+                        : "text-red-600"
+                  }`}>
+                    {formatPercent(churn.netRevenueRetention)}
+                  </div>
+                </div>
               </div>
             </div>
           </CardContent>

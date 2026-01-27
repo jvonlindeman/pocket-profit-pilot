@@ -5,12 +5,20 @@ import type { RetainerRow } from "@/types/retainers";
 export type ChurnMetrics = {
   periodStart: Date;
   periodEnd: Date;
+  // Logo Churn
   startingActive: number;
   newThisPeriod: number;
   churnedThisPeriod: number;
   endingActive: number;
   churnRate: number; // 0..1
   retentionRate: number; // 0..1
+  // Revenue Churn
+  startingMRR: number;
+  churnedMRR: number;
+  newMRR: number;
+  endingMRR: number;
+  revenueChurnRate: number; // 0..1
+  netRevenueRetention: number; // 0..1+
 };
 
 function toDate(value: any): Date | null {
@@ -36,39 +44,68 @@ export function calculateChurn(retainers: RetainerRow[], monthDate: Date): Churn
   const periodStart = startOfMonth(monthDate);
   const periodEnd = endOfMonth(monthDate);
 
+  // Logo Churn counters
   let startingActive = 0;
   let newThisPeriod = 0;
   let churnedThisPeriod = 0;
   let endingActive = 0;
 
+  // Revenue Churn counters
+  let startingMRR = 0;
+  let churnedMRR = 0;
+  let newMRR = 0;
+  let endingMRR = 0;
+
   for (const r of retainers) {
     const createdAt = toDate((r as any).created_at) ?? periodStart;
     const canceledAt: Date | null = toDate((r as any).canceled_at);
+    const netIncome = Number(r.net_income) || 0;
 
     const wasActiveAtStart = isOnOrBefore(createdAt, periodStart) && (!canceledAt || isOnOrAfter(canceledAt, periodStart));
     const isNewThisPeriod = isOnOrAfter(createdAt, periodStart) && isOnOrBefore(createdAt, periodEnd);
     const isChurnedThisPeriod = !!canceledAt && isOnOrAfter(canceledAt, periodStart) && isOnOrBefore(canceledAt, periodEnd);
     const wasActiveAtEnd = isOnOrBefore(createdAt, periodEnd) && (!canceledAt || isAfter(canceledAt, periodEnd));
 
+    // Logo Churn
     if (wasActiveAtStart) startingActive += 1;
     if (isNewThisPeriod) newThisPeriod += 1;
     if (isChurnedThisPeriod) churnedThisPeriod += 1;
     if (wasActiveAtEnd) endingActive += 1;
+
+    // Revenue Churn
+    if (wasActiveAtStart) startingMRR += netIncome;
+    if (isChurnedThisPeriod) churnedMRR += netIncome;
+    if (isNewThisPeriod) newMRR += netIncome;
+    if (wasActiveAtEnd) endingMRR += netIncome;
   }
 
-  const denom = Math.max(startingActive, 1);
-  const churnRate = churnedThisPeriod / denom;
+  // Logo Churn rates
+  const logoDenom = Math.max(startingActive, 1);
+  const churnRate = churnedThisPeriod / logoDenom;
   const retentionRate = Math.max(0, 1 - churnRate);
+
+  // Revenue Churn rates
+  const revenueDenom = Math.max(startingMRR, 1);
+  const revenueChurnRate = churnedMRR / revenueDenom;
+  const netRevenueRetention = endingMRR / revenueDenom;
 
   return {
     periodStart,
     periodEnd,
+    // Logo Churn
     startingActive,
     newThisPeriod,
     churnedThisPeriod,
     endingActive,
     churnRate,
     retentionRate,
+    // Revenue Churn
+    startingMRR,
+    churnedMRR,
+    newMRR,
+    endingMRR,
+    revenueChurnRate,
+    netRevenueRetention,
   };
 }
 
