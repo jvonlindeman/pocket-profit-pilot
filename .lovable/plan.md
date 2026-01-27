@@ -1,218 +1,121 @@
 
-
-# Plan: Corregir Warnings de Seguridad RLS
+# Plan: Agregar funcionalidad de baja de retainers para calcular churn
 
 ## Resumen
 
-Fortalecer las políticas RLS para eliminar los warnings del linter de Supabase. Las políticas actuales usan `USING (true)` que es considerado inseguro. Se cambiarán a verificaciones explícitas del rol de autenticación.
+Actualmente el sistema tiene la columna `canceled_at` en la base de datos y el cálculo de churn la usa correctamente, pero **no existe forma de establecer esta fecha desde la interfaz**. Se agregará la opción de dar de baja a un cliente registrando la fecha de cancelación.
 
 ---
 
-## Problemas Detectados
+## Estado Actual
 
-| Tabla | Problema | Severidad |
-|-------|----------|-----------|
-| `zoho_integration` | Política usa `true` en lugar de verificar `service_role` | CRITICO |
-| `retainers` | INSERT/UPDATE/DELETE usan `USING (true)` | ALTO |
-| `financial_summaries` | INSERT/UPDATE/DELETE usan `USING (true)` | ALTO |
-| `monthly_balances` | INSERT/UPDATE/DELETE usan `USING (true)` | ALTO |
-| `receivables_selections` | INSERT/UPDATE/DELETE usan `USING (true)` | ALTO |
-| `monthly_financial_summaries` | INSERT/UPDATE/DELETE usan `USING (true)` | ALTO |
+| Componente | Estado |
+|------------|--------|
+| Columna `canceled_at` en BD | Ya existe |
+| Cálculo de churn con `canceled_at` | Funcionando |
+| Campo en formulario para `canceled_at` | No existe |
+| Automatización al desactivar | No existe |
 
 ---
 
-## Solucion Propuesta
+## Solución Propuesta
 
-Crear una migracion SQL que:
+### Opción elegida: Campo de fecha + automatización
 
-1. Elimine las politicas existentes que usan `USING (true)`
-2. Cree nuevas politicas que verifiquen explicitamente `auth.role() = 'authenticated'`
-3. Para `zoho_integration`, verificar `auth.role() = 'service_role'`
+Cuando el usuario desactive un retainer (toggle "Activo" = off):
+1. Mostrar un campo de fecha para seleccionar la fecha de baja
+2. Si no se especifica fecha, usar la fecha actual automáticamente
+3. Si se reactiva el cliente, limpiar `canceled_at`
 
 ---
 
-## Impacto
+## Flujo de Usuario
 
-| Aspecto | Antes | Despues |
-|---------|-------|---------|
-| Linter warnings | 19 warnings RLS | 0 warnings RLS |
-| Acceso a datos | Cualquier authenticated | Solo authenticated verificado |
-| zoho_integration | Politica ambigua | Solo service_role explicito |
+```text
+Usuario edita retainer
+        |
+        v
+Desactiva toggle "Activo"
+        |
+        v
+Aparece campo "Fecha de baja"
+(pre-llenado con fecha actual)
+        |
+        v
+Usuario puede ajustar fecha
+        |
+        v
+Al guardar -> canceled_at = fecha seleccionada
+```
 
 ---
 
 ## Archivos a Modificar
 
-| Archivo | Tipo | Descripcion |
-|---------|------|-------------|
-| Nueva migracion SQL | Crear | Reescribir politicas RLS con verificaciones explicitas |
+| Archivo | Cambio |
+|---------|--------|
+| `src/components/Retainers/RetainerFormDialog.tsx` | Agregar campo de fecha de baja condicional |
+| `src/components/Retainers/RetainersTable.tsx` | Mostrar fecha de baja en tabla (opcional) |
+| `src/types/retainers.ts` | Verificar que `canceled_at` esté tipado |
 
 ---
 
-## Seccion Tecnica
+## Cambios en el Formulario
 
-### Patron de Politica Corregida
+El formulario mostrará:
+- Toggle "Activo" (ya existe)
+- Cuando "Activo" = false: campo "Fecha de baja" (input type="date")
+- Pre-llenado con fecha actual si no hay valor previo
 
-En lugar de:
-```sql
-CREATE POLICY "..." ON table FOR INSERT TO authenticated WITH CHECK (true);
+---
+
+## Lógica de Guardado
+
+```text
+Si active = true:
+  -> canceled_at = null (cliente activo, sin cancelación)
+
+Si active = false:
+  -> canceled_at = fecha seleccionada o fecha actual
 ```
 
-Usar:
-```sql
-CREATE POLICY "..." ON table FOR INSERT TO authenticated WITH CHECK (auth.role() = 'authenticated');
+---
+
+## Impacto en Churn
+
+| Escenario | Antes | Después |
+|-----------|-------|---------|
+| Desactivar cliente | Solo cambia `active` | Registra `canceled_at` |
+| Cálculo de bajas | Siempre 0 (sin fechas) | Cuenta bajas reales |
+| Reactivar cliente | - | Limpia `canceled_at` |
+
+---
+
+## Sección Técnica
+
+### Nuevo estado en RetainerFormDialog
+
+```text
+const [canceledAt, setCanceledAt] = useState<string | null>(null);
 ```
 
-### Migracion SQL Completa
+### Campo condicional en el formulario
 
-```sql
--- =============================================
--- ZOHO_INTEGRATION: Solo service_role
--- =============================================
-DROP POLICY IF EXISTS "Only service role can access zoho_integration" ON public.zoho_integration;
+Mostrar solo cuando `active = false`:
+- Input type="date"
+- Valor por defecto: fecha actual en formato YYYY-MM-DD
+- Label: "Fecha de baja"
 
-CREATE POLICY "Service role only access zoho_integration"
-ON public.zoho_integration FOR ALL
-TO service_role
-USING (auth.role() = 'service_role')
-WITH CHECK (auth.role() = 'service_role');
+### Modificación del payload
 
--- =============================================
--- RETAINERS: Verificacion explicita
--- =============================================
-DROP POLICY IF EXISTS "Authenticated can select retainers" ON public.retainers;
-DROP POLICY IF EXISTS "Authenticated can insert retainers" ON public.retainers;
-DROP POLICY IF EXISTS "Authenticated can update retainers" ON public.retainers;
-DROP POLICY IF EXISTS "Authenticated can delete retainers" ON public.retainers;
-
-CREATE POLICY "Authenticated select retainers"
-ON public.retainers FOR SELECT TO authenticated
-USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated insert retainers"
-ON public.retainers FOR INSERT TO authenticated
-WITH CHECK (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated update retainers"
-ON public.retainers FOR UPDATE TO authenticated
-USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated delete retainers"
-ON public.retainers FOR DELETE TO authenticated
-USING (auth.role() = 'authenticated');
-
--- =============================================
--- FINANCIAL_SUMMARIES: Verificacion explicita
--- =============================================
-DROP POLICY IF EXISTS "Authenticated can select financial_summaries" ON public.financial_summaries;
-DROP POLICY IF EXISTS "Authenticated can insert financial_summaries" ON public.financial_summaries;
-DROP POLICY IF EXISTS "Authenticated can update financial_summaries" ON public.financial_summaries;
-DROP POLICY IF EXISTS "Authenticated can delete financial_summaries" ON public.financial_summaries;
-DROP POLICY IF EXISTS "Service role full access financial_summaries" ON public.financial_summaries;
-
-CREATE POLICY "Authenticated select financial_summaries"
-ON public.financial_summaries FOR SELECT TO authenticated
-USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated insert financial_summaries"
-ON public.financial_summaries FOR INSERT TO authenticated
-WITH CHECK (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated update financial_summaries"
-ON public.financial_summaries FOR UPDATE TO authenticated
-USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated delete financial_summaries"
-ON public.financial_summaries FOR DELETE TO authenticated
-USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Service role access financial_summaries"
-ON public.financial_summaries FOR ALL TO service_role
-USING (auth.role() = 'service_role')
-WITH CHECK (auth.role() = 'service_role');
-
--- =============================================
--- MONTHLY_BALANCES: Verificacion explicita
--- =============================================
-DROP POLICY IF EXISTS "Authenticated can select monthly_balances" ON public.monthly_balances;
-DROP POLICY IF EXISTS "Authenticated can insert monthly_balances" ON public.monthly_balances;
-DROP POLICY IF EXISTS "Authenticated can update monthly_balances" ON public.monthly_balances;
-DROP POLICY IF EXISTS "Authenticated can delete monthly_balances" ON public.monthly_balances;
-DROP POLICY IF EXISTS "Service role full access monthly_balances" ON public.monthly_balances;
-
-CREATE POLICY "Authenticated select monthly_balances"
-ON public.monthly_balances FOR SELECT TO authenticated
-USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated insert monthly_balances"
-ON public.monthly_balances FOR INSERT TO authenticated
-WITH CHECK (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated update monthly_balances"
-ON public.monthly_balances FOR UPDATE TO authenticated
-USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated delete monthly_balances"
-ON public.monthly_balances FOR DELETE TO authenticated
-USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Service role access monthly_balances"
-ON public.monthly_balances FOR ALL TO service_role
-USING (auth.role() = 'service_role')
-WITH CHECK (auth.role() = 'service_role');
-
--- =============================================
--- RECEIVABLES_SELECTIONS: Verificacion explicita
--- =============================================
-DROP POLICY IF EXISTS "Authenticated can select receivables_selections" ON public.receivables_selections;
-DROP POLICY IF EXISTS "Authenticated can insert receivables_selections" ON public.receivables_selections;
-DROP POLICY IF EXISTS "Authenticated can update receivables_selections" ON public.receivables_selections;
-DROP POLICY IF EXISTS "Authenticated can delete receivables_selections" ON public.receivables_selections;
-
-CREATE POLICY "Authenticated select receivables_selections"
-ON public.receivables_selections FOR SELECT TO authenticated
-USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated insert receivables_selections"
-ON public.receivables_selections FOR INSERT TO authenticated
-WITH CHECK (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated update receivables_selections"
-ON public.receivables_selections FOR UPDATE TO authenticated
-USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated delete receivables_selections"
-ON public.receivables_selections FOR DELETE TO authenticated
-USING (auth.role() = 'authenticated');
-
--- =============================================
--- MONTHLY_FINANCIAL_SUMMARIES: Verificacion explicita
--- =============================================
-DROP POLICY IF EXISTS "Authenticated can select monthly_financial_summaries" ON public.monthly_financial_summaries;
-DROP POLICY IF EXISTS "Authenticated can insert monthly_financial_summaries" ON public.monthly_financial_summaries;
-DROP POLICY IF EXISTS "Authenticated can update monthly_financial_summaries" ON public.monthly_financial_summaries;
-DROP POLICY IF EXISTS "Authenticated can delete monthly_financial_summaries" ON public.monthly_financial_summaries;
-
-CREATE POLICY "Authenticated select monthly_financial_summaries"
-ON public.monthly_financial_summaries FOR SELECT TO authenticated
-USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated insert monthly_financial_summaries"
-ON public.monthly_financial_summaries FOR INSERT TO authenticated
-WITH CHECK (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated update monthly_financial_summaries"
-ON public.monthly_financial_summaries FOR UPDATE TO authenticated
-USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated delete monthly_financial_summaries"
-ON public.monthly_financial_summaries FOR DELETE TO authenticated
-USING (auth.role() = 'authenticated');
+```text
+payload = {
+  ...existingFields,
+  active,
+  canceled_at: active ? null : (canceledAt || new Date().toISOString())
+}
 ```
 
-### Notas Adicionales
+### Columna adicional en tabla (opcional)
 
-- El warning de `function_search_path_mutable` es un issue de configuracion de Supabase que no afecta la seguridad de tu aplicacion directamente
-- El warning de `auth_otp_long_expiry` se configura en el dashboard de Supabase (Authentication > Settings)
-- El warning de `vulnerable_postgres_version` requiere upgrade del proyecto en Supabase dashboard
-
+Agregar columna "Fecha baja" que muestre `canceled_at` formateada si existe, o "-" si está activo.
