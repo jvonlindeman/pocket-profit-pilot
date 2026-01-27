@@ -1,61 +1,71 @@
 
-# Integrar Upsells en Cálculo de Churn
 
-## Problema Actual
+# Fecha de Reactivación para Clientes Pausados
 
-El cálculo de churn en `useChurnCalculator.ts` no considera:
-- **Expansion MRR**: Ingresos adicionales por upsells a clientes existentes
-- **Contraction MRR**: Reducción de ingresos si un cliente baja de plan
+## Problema
 
-Actualmente:
-- `newMRR` = solo clientes nuevos
-- `churnedMRR` = solo clientes cancelados
+Cuando un cliente está pausado, no hay forma de trackear cuándo se espera que vuelva ni recordar contactarle. El usuario pierde seguimiento de oportunidades de reactivación.
 
-## Solución Propuesta
+## Solución
 
-Usar el campo `upsell_income` existente para calcular Expansion MRR:
+Agregar un campo de "Fecha esperada de reactivación" para clientes pausados, con alertas en el dashboard cuando la fecha se acerca.
 
-```text
-+---------------------------+---------------------------------------------+
-| Métrica                   | Cálculo                                     |
-+---------------------------+---------------------------------------------+
-| Expansion MRR             | Suma de upsell_income de clientes activos   |
-| Net New MRR               | newMRR + expansionMRR                       |
-| Gross Revenue Churn       | churnedMRR + contractionMRR                 |
-| Net Revenue Retention     | (startingMRR + expansion - churn) / start   |
-+---------------------------+---------------------------------------------+
+---
+
+## Funcionalidades a Implementar
+
+### 1. Campo en formulario de edición
+
+Cuando el estado es "Pausado", mostrar un campo adicional:
+
+```
+Estado: ⚪ Activo  ⚪ Pausado  ⚪ Cancelado
+                     ↓
+        +------------------------+
+        | Fecha de pausa         |
+        | [28 ene 2026]          |
+        +------------------------+
+        | Fecha de reactivación  |
+        | [15 feb 2026]          |
+        +------------------------+
 ```
 
-## Cambios en ChurnMetrics
+### 2. Card de Recordatorios en Dashboard
 
-Agregar al tipo `ChurnMetrics`:
+Nueva sección arriba de la tabla que muestre clientes pausados con reactivación próxima:
 
-| Campo | Descripción |
-|-------|-------------|
-| `expansionMRR` | Suma de upsell_income de clientes activos |
-| `contractionMRR` | Para futuro: cuando se baje un plan |
-| `netNewMRR` | newMRR + expansionMRR |
-| `grossRevenueChurn` | churnedMRR + contractionMRR |
-
-## Cambios en UI (Retainers.tsx)
-
-Actualizar las cards de churn para mostrar:
-
-```text
-+---------------------+---------------------+
-| MRR Nuevo           | MRR Perdido         |
-| $2,500              | $400                |
-| (+$1,500 expansion) | (contraction: $0)   |
-+---------------------+---------------------+
+```
++----------------------------------------------------------+
+| ⏰ Clientes a contactar                                   |
++----------------------------------------------------------+
+| 🟡 Dr. García - Reactivación: 28 ene (hoy)     [Editar]  |
+| 🟡 Clínica Norte - Reactivación: 1 feb (4 días) [Editar] |
++----------------------------------------------------------+
 ```
 
-## Sobre Contraction MRR
+- Mostrar clientes cuya fecha de reactivación es dentro de los próximos 7 días
+- Resaltar en rojo si la fecha ya pasó (oportunidad perdida)
+- Incluir botón para editar directamente
 
-Para trackear reducciones de plan necesitaríamos:
-1. Guardar el ingreso anterior cuando se edita un cliente
-2. O crear historial de cambios de ingresos
+### 3. Indicador visual en la tabla
 
-Por ahora, podemos calcular Expansion MRR usando `upsell_income` y dejar Contraction MRR en 0 (o implementar historial después).
+En la columna de cliente pausado, mostrar la fecha de reactivación:
+
+```
+| Cliente       | Estado  | Reactivación |
+|---------------|---------|--------------|
+| Dr. García (P)| Pausado | 28 ene ⚠️    |
+```
+
+---
+
+## Cambios en Base de Datos
+
+Nueva columna en `retainers`:
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `expected_reactivation_date` | `date` | Fecha esperada de reactivación (nullable) |
 
 ---
 
@@ -63,47 +73,108 @@ Por ahora, podemos calcular Expansion MRR usando `upsell_income` y dejar Contrac
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/hooks/useChurnCalculator.ts` | Agregar expansionMRR, netNewMRR al cálculo |
-| `src/pages/Retainers.tsx` | Mostrar expansionMRR en las cards de churn |
+| Nueva migración SQL | Agregar columna `expected_reactivation_date` |
+| `RetainerFormDialog.tsx` | Campo de fecha cuando status = "paused" |
+| `RetainersTable.tsx` | Mostrar fecha de reactivación para pausados |
+| `Retainers.tsx` | Componente de alertas de reactivación |
 
 ---
 
 ## Sección Técnica
 
-### Lógica en useChurnCalculator.ts
+### Migración SQL
+
+```sql
+ALTER TABLE retainers
+ADD COLUMN expected_reactivation_date date NULL;
+
+-- Comentario para documentación
+COMMENT ON COLUMN retainers.expected_reactivation_date IS 
+  'Fecha esperada de reactivación para clientes pausados';
+```
+
+### Lógica de Alertas
 
 ```typescript
-// Nuevo en el loop
-const upsellIncome = Number((r as any).upsell_income) || 0;
-
-// Para clientes activos que existían antes del período
-if (wasActiveAtStart && !isNewThisPeriod && wasActiveAtEnd && !isPausedAtEnd) {
-  expansionMRR += upsellIncome;
-}
-
-// Nuevas métricas
-const netNewMRR = newMRR + expansionMRR;
-const grossRevenueChurn = churnedMRR + contractionMRR;
+// En Retainers.tsx
+const upcomingReactivations = useMemo(() => {
+  const today = new Date();
+  const weekFromNow = addDays(today, 7);
+  
+  return rows
+    .filter(r => {
+      if (!r.active || !r.paused_at || !r.expected_reactivation_date) return false;
+      const reactivationDate = new Date(r.expected_reactivation_date);
+      return reactivationDate <= weekFromNow;
+    })
+    .map(r => ({
+      ...r,
+      daysUntil: differenceInDays(new Date(r.expected_reactivation_date), today),
+      isOverdue: new Date(r.expected_reactivation_date) < today
+    }))
+    .sort((a, b) => a.daysUntil - b.daysUntil);
+}, [rows]);
 ```
 
-### Vista en UI
+### UI del Card de Alertas
 
+```tsx
+{upcomingReactivations.length > 0 && (
+  <Card className="border-yellow-200 bg-yellow-50/50">
+    <CardHeader className="pb-2">
+      <CardTitle className="text-lg flex items-center gap-2">
+        <Clock className="h-5 w-5 text-yellow-600" />
+        Clientes a contactar
+      </CardTitle>
+    </CardHeader>
+    <CardContent>
+      {upcomingReactivations.map(client => (
+        <div key={client.id} className={cn(
+          "flex items-center justify-between p-2 rounded",
+          client.isOverdue && "bg-red-50 text-red-700"
+        )}>
+          <div>
+            <span className="font-medium">{client.client_name}</span>
+            <span className="text-sm text-muted-foreground ml-2">
+              {client.isOverdue 
+                ? `Vencido hace ${Math.abs(client.daysUntil)} días`
+                : client.daysUntil === 0 
+                  ? "Hoy"
+                  : `En ${client.daysUntil} días`
+              }
+            </span>
+          </div>
+          <Button size="sm" variant="ghost" onClick={() => onEdit(client)}>
+            Editar
+          </Button>
+        </div>
+      ))}
+    </CardContent>
+  </Card>
+)}
 ```
-MRR Nuevo: $2,500
-├── Clientes nuevos: $1,000
-└── Expansion (upsells): $1,500
 
-MRR Perdido: $400
-├── Cancelaciones: $400
-└── Contraction: $0
+### Formulario (sección Estado)
+
+```tsx
+{status === "paused" && (
+  <div className="ml-6 space-y-3">
+    <div>
+      <Label className="text-xs text-muted-foreground">Fecha de pausa</Label>
+      <Input type="date" value={pausedAt} onChange={...} />
+    </div>
+    <div>
+      <Label className="text-xs text-yellow-600">
+        ¿Cuándo contactar para reactivar?
+      </Label>
+      <Input 
+        type="date" 
+        value={expectedReactivationDate} 
+        onChange={...}
+        min={getTodayDateString()} // No permitir fechas pasadas
+      />
+    </div>
+  </div>
+)}
 ```
 
----
-
-## Consideración Importante
-
-Este enfoque asume que todos los `upsell_income` son expansión del período actual. Si necesitas trackear cuándo ocurrió cada upsell, se requeriría:
-1. Agregar campo `upsell_date` a retainers, o
-2. Crear tabla de historial de cambios de ingresos
-
-Por ahora, el enfoque simple funciona para ver el impacto de upsells en las métricas de churn.
