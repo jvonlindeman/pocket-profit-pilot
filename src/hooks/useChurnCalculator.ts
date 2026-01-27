@@ -59,10 +59,12 @@ export function calculateChurn(retainers: RetainerRow[], monthDate: Date): Churn
   for (const r of retainers) {
     const createdAt = toDate((r as any).created_at) ?? periodStart;
     const canceledAt: Date | null = toDate((r as any).canceled_at);
+    const isLegacy = Boolean((r as any).is_legacy);
     const netIncome = Number(r.net_income) || 0;
 
     const wasActiveAtStart = isOnOrBefore(createdAt, periodStart) && (!canceledAt || isOnOrAfter(canceledAt, periodStart));
-    const isNewThisPeriod = isOnOrAfter(createdAt, periodStart) && isOnOrBefore(createdAt, periodEnd);
+    // Solo contar como nuevo si NO es legacy y fue creado en el período
+    const isNewThisPeriod = !isLegacy && isOnOrAfter(createdAt, periodStart) && isOnOrBefore(createdAt, periodEnd);
     const isChurnedThisPeriod = !!canceledAt && isOnOrAfter(canceledAt, periodStart) && isOnOrBefore(canceledAt, periodEnd);
     const wasActiveAtEnd = isOnOrBefore(createdAt, periodEnd) && (!canceledAt || isAfter(canceledAt, periodEnd));
 

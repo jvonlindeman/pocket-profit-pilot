@@ -242,6 +242,7 @@ export type Database = {
           created_at: string
           has_whatsapp_bot: boolean
           id: string
+          is_legacy: boolean
           metadata: Json
           net_income: number
           notes: string | null
@@ -259,6 +260,7 @@ export type Database = {
           created_at?: string
           has_whatsapp_bot?: boolean
           id?: string
+          is_legacy?: boolean
           metadata?: Json
           net_income?: number
           notes?: string | null
@@ -276,6 +278,7 @@ export type Database = {
           created_at?: string
           has_whatsapp_bot?: boolean
           id?: string
+          is_legacy?: boolean
           metadata?: Json
           net_income?: number
           notes?: string | null
