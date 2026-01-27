@@ -16,9 +16,9 @@ import { GroupedRetainersSection } from "@/components/Retainers/GroupedRetainers
 import { useChurnMetrics } from "@/hooks/useChurnCalculator";
 import { ProfitabilityDashboard } from "@/components/Retainers/ProfitabilityDashboard";
 import { ReactivationAlerts } from "@/components/Retainers/ReactivationAlerts";
+import { CanceledClientsHistory } from "@/components/Retainers/CanceledClientsHistory";
 import { isMedicalClient } from "@/utils/retainerClassification";
 import { cn } from "@/lib/utils";
-
 function useSEO() {
   React.useEffect(() => {
     const title = "Retainers | Gestión de clientes retainer";
@@ -93,7 +93,7 @@ const RetainersPage: React.FC = () => {
   const rows = React.useMemo(() => (Array.isArray(data) ? data : []), [data]);
 
   const [search, setSearch] = React.useState("");
-  const [statusFilter, setStatusFilter] = React.useState<"all" | "active" | "paused" | "lost">("active");
+  const [statusFilter, setStatusFilter] = React.useState<"current" | "active-only" | "paused-only" | "history">("current");
   const [stripeOnly, setStripeOnly] = React.useState(false);
   const [whatsappOnly, setWhatsappOnly] = React.useState(false);
   const specialties = React.useMemo(
@@ -119,14 +119,26 @@ const RetainersPage: React.FC = () => {
 
   const filtered = React.useMemo(() => {
     return rows.filter((r) => {
-      // Filtro de estado (ahora con 4 opciones)
+      // Filtro de estado con nuevas opciones
       const isPaused = r.active && !!(r as any).paused_at;
       const isActiveNotPaused = r.active && !(r as any).paused_at;
+      const isCanceled = !r.active;
       
-      if (statusFilter === "active" && !isActiveNotPaused) return false;
-      if (statusFilter === "paused" && !isPaused) return false;
-      if (statusFilter === "lost" && r.active) return false;
-      // statusFilter === "all" muestra todos
+      switch (statusFilter) {
+        case "current":
+          // Activos + Pausados (excluir cancelados)
+          if (isCanceled) return false;
+          break;
+        case "active-only":
+          if (!isActiveNotPaused) return false;
+          break;
+        case "paused-only":
+          if (!isPaused) return false;
+          break;
+        case "history":
+          if (!isCanceled) return false;
+          break;
+      }
       
       // Filtro de Stripe
       if (stripeOnly && !r.uses_stripe) return false;
@@ -145,6 +157,17 @@ const RetainersPage: React.FC = () => {
       return true;
     });
   }, [rows, statusFilter, stripeOnly, whatsappOnly, specialty, search]);
+
+  // Lista de cancelados para el historial (siempre disponible, separada del filtro)
+  const canceledClients = React.useMemo(() => {
+    return rows
+      .filter(r => !r.active)
+      .sort((a, b) => {
+        const dateA = a.canceled_at ? new Date(a.canceled_at).getTime() : 0;
+        const dateB = b.canceled_at ? new Date(b.canceled_at).getTime() : 0;
+        return dateB - dateA;
+      });
+  }, [rows]);
 
   // Separate filtered retainers into Doctor Premier and Webart groups
   const { doctorPremier, webart } = React.useMemo(() => {
@@ -308,15 +331,15 @@ const RetainersPage: React.FC = () => {
             </div>
             <div>
               <label className="text-sm">Estado</label>
-              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | "active" | "paused" | "lost")}>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "current" | "active-only" | "paused-only" | "history")}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="active">Solo activos</SelectItem>
-                  <SelectItem value="paused">Solo pausados</SelectItem>
-                  <SelectItem value="lost">Solo perdidos</SelectItem>
+                  <SelectItem value="current">Activos y pausados</SelectItem>
+                  <SelectItem value="active-only">Solo activos</SelectItem>
+                  <SelectItem value="paused-only">Solo pausados</SelectItem>
+                  <SelectItem value="history">Histórico (bajas)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -371,10 +394,15 @@ const RetainersPage: React.FC = () => {
               onEdit={(row) => { setEditing(row); setFormOpen(true); }}
               onDelete={handleDelete}
             />
-            {doctorPremier.length === 0 && webart.length === 0 && (
+            {doctorPremier.length === 0 && webart.length === 0 && statusFilter !== "history" && (
               <div className="text-center py-8 text-muted-foreground">
                 No se encontraron retainers con los filtros actuales.
               </div>
+            )}
+            
+            {/* Historial de cancelados - siempre visible excepto cuando se filtra por histórico */}
+            {statusFilter !== "history" && (
+              <CanceledClientsHistory clients={canceledClients} />
             )}
           </>
         )}

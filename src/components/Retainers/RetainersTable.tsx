@@ -132,17 +132,27 @@ export const RetainersTable: React.FC<Props> = ({ data, onEdit, onDelete }) => {
             // Get client status from row (cast to any since types may not be updated yet)
             const clientStatus = (r as any).client_status as string | null;
             
+            const isPaused = r.active && !!(r as any).paused_at;
+            const expectedReactivation = (r as any).expected_reactivation_date;
+            
+            // Row background: paused gets yellow tint, otherwise use client status
+            const rowBgClass = isPaused 
+              ? 'bg-yellow-50/70 dark:bg-yellow-950/20' 
+              : getRowBgClass(clientStatus);
+            
             return (
-              <TableRow key={r.id} className={getRowBgClass(clientStatus)}>
+              <TableRow key={r.id} className={rowBgClass}>
                 <TableCell className="font-medium py-2">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <span className={`w-2 h-2 rounded-full flex-shrink-0 ${getStatusColor()}`} />
                     <span className="truncate max-w-[120px]">{r.client_name}</span>
                     {r.is_legacy && (
                       <Badge variant="outline" className="text-[10px] px-1 py-0">L</Badge>
                     )}
-                    {(r as any).paused_at && r.active && (
-                      <Badge variant="outline" className="text-[10px] px-1 py-0 border-yellow-500 text-yellow-600">P</Badge>
+                    {isPaused && (
+                      <Badge className="text-[10px] px-1.5 py-0.5 bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/50 dark:text-yellow-400 dark:border-yellow-700">
+                        PAUSADO
+                      </Badge>
                     )}
                     {r.uses_stripe && (
                       <CreditCard className="h-3 w-3 text-muted-foreground flex-shrink-0" />
@@ -151,6 +161,15 @@ export const RetainersTable: React.FC<Props> = ({ data, onEdit, onDelete }) => {
                       <MessageSquare className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                     )}
                   </div>
+                  {/* Fecha de reactivación para pausados */}
+                  {isPaused && expectedReactivation && (
+                    <div className="text-xs text-yellow-600 dark:text-yellow-400 mt-0.5 ml-3.5">
+                      Reactiva: {new Date(expectedReactivation).toLocaleDateString('es-PA', { 
+                        month: 'short', 
+                        day: 'numeric' 
+                      })}
+                    </div>
+                  )}
                 </TableCell>
                 <TableCell className="py-2 text-sm">{r.specialty ?? "-"}</TableCell>
                 <TableCell className="py-2">
@@ -212,7 +231,7 @@ export const RetainersTable: React.FC<Props> = ({ data, onEdit, onDelete }) => {
                 <TableCell className={`py-2 text-sm ${r.canceled_at ? "text-destructive" : ""}`}>
                   {formatDate(r.canceled_at)}
                 </TableCell>
-                <TableCell className={`sticky right-0 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] py-2 ${getRowBgClass(clientStatus) || 'bg-background'}`}>
+                <TableCell className={`sticky right-0 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] py-2 ${rowBgClass || 'bg-background'}`}>
                   <div className="flex gap-1">
                     <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => onEdit(r)}>
                       <Pencil className="h-4 w-4" />
