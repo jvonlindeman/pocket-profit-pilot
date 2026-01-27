@@ -35,3 +35,7 @@ verify_jwt = true
 [[functions]]
 name = "exchange-rates"
 verify_jwt = true
+
+[[functions]]
+name = "sync-client-status"
+verify_jwt = false

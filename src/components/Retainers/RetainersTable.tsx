@@ -27,6 +27,26 @@ function formatDate(dateStr: string | null): string {
   }
 }
 
+// Mapeo de colores para el badge de estado de cliente
+const statusColors: Record<string, string> = {
+  'OK': 'bg-green-100 text-green-800 border-green-200',
+  'Agradecido': 'bg-green-100 text-green-800 border-green-200',
+  'En seguimiento': 'bg-blue-100 text-blue-800 border-blue-200',
+  'Esperando respuesta': 'bg-blue-100 text-blue-800 border-blue-200',
+  'Duda o consulta': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  'Con pendiente': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  'Insatisfecho leve': 'bg-orange-100 text-orange-800 border-orange-200',
+  'Enojado': 'bg-red-100 text-red-800 border-red-200',
+  'Frustrado': 'bg-red-100 text-red-800 border-red-200',
+  'Amenaza con irse': 'bg-red-100 text-red-800 border-red-200',
+  'Reclamo grave': 'bg-red-100 text-red-800 border-red-200',
+};
+
+function getStatusBadgeClass(status: string | null): string {
+  if (!status) return 'bg-gray-100 text-gray-500 border-gray-200';
+  return statusColors[status] || 'bg-gray-100 text-gray-600 border-gray-200';
+}
+
 export const RetainersTable: React.FC<Props> = ({ data, onEdit, onDelete }) => {
   return (
     <div className="overflow-x-auto border rounded-md">
@@ -35,6 +55,7 @@ export const RetainersTable: React.FC<Props> = ({ data, onEdit, onDelete }) => {
           <TableRow>
             <TableHead className="min-w-[180px]">Cliente</TableHead>
             <TableHead>Espec.</TableHead>
+            <TableHead>Estado</TableHead>
             <TableHead className="text-right">Ingreso</TableHead>
             <TableHead className="text-right">Redes</TableHead>
             <TableHead className="text-right">Gastos</TableHead>
@@ -57,6 +78,9 @@ export const RetainersTable: React.FC<Props> = ({ data, onEdit, onDelete }) => {
               return 'bg-green-500';                        // Activo
             };
             
+            // Get client status from row (cast to any since types may not be updated yet)
+            const clientStatus = (r as any).client_status as string | null;
+            
             return (
               <TableRow key={r.id}>
                 <TableCell className="font-medium py-2">
@@ -78,6 +102,14 @@ export const RetainersTable: React.FC<Props> = ({ data, onEdit, onDelete }) => {
                   </div>
                 </TableCell>
                 <TableCell className="py-2 text-sm">{r.specialty ?? "-"}</TableCell>
+                <TableCell className="py-2">
+                  <Badge 
+                    variant="outline" 
+                    className={`text-[10px] px-1.5 py-0.5 ${getStatusBadgeClass(clientStatus)}`}
+                  >
+                    {clientStatus || "—"}
+                  </Badge>
+                </TableCell>
                 <TableCell className="text-right py-2 text-sm">{formatCurrency(Number(r.net_income ?? 0))}</TableCell>
                 <TableCell className="text-right py-2 text-sm">{formatCurrency(Number(r.social_media_cost ?? 0))}</TableCell>
                 <TableCell className="text-right py-2 text-sm">{formatCurrency(Number(r.total_expenses ?? 0))}</TableCell>
