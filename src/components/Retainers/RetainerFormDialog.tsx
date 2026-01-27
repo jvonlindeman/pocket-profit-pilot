@@ -63,6 +63,9 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
   const [canceledAt, setCanceledAt] = React.useState<string>(
     initial?.canceled_at ? formatDateForInput(initial.canceled_at) : getTodayDateString()
   );
+  const [expectedReactivationDate, setExpectedReactivationDate] = React.useState<string>(
+    (initial as any)?.expected_reactivation_date ? formatDateForInput((initial as any).expected_reactivation_date) : ""
+  );
 
   React.useEffect(() => {
     if (open) {
@@ -81,6 +84,7 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
       setStatus(getInitialStatus(initial));
       setPausedAt((initial as any)?.paused_at ? formatDateForInput((initial as any).paused_at) : getTodayDateString());
       setCanceledAt(initial?.canceled_at ? formatDateForInput(initial.canceled_at) : getTodayDateString());
+      setExpectedReactivationDate((initial as any)?.expected_reactivation_date ? formatDateForInput((initial as any).expected_reactivation_date) : "");
     }
   }, [open, initial]);
 
@@ -105,6 +109,7 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
       active: status !== "canceled",
       paused_at: status === "paused" ? new Date(pausedAt).toISOString() : null,
       canceled_at: status === "canceled" ? new Date(canceledAt).toISOString() : null,
+      expected_reactivation_date: status === "paused" && expectedReactivationDate ? expectedReactivationDate : null,
     } as RetainerInsert;
     await onSave(payload);
     onOpenChange(false);
@@ -229,9 +234,23 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
                     </Label>
                   </div>
                   {status === "paused" && (
-                    <div className="ml-6">
-                      <Label className="text-xs text-muted-foreground">Fecha de pausa</Label>
-                      <Input type="date" value={pausedAt} onChange={(e) => setPausedAt(e.target.value)} className="mt-1 max-w-[180px]" />
+                    <div className="ml-6 space-y-3">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Fecha de pausa</Label>
+                        <Input type="date" value={pausedAt} onChange={(e) => setPausedAt(e.target.value)} className="mt-1 max-w-[180px]" />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-yellow-600 dark:text-yellow-500">
+                          ¿Cuándo contactar para reactivar?
+                        </Label>
+                        <Input 
+                          type="date" 
+                          value={expectedReactivationDate} 
+                          onChange={(e) => setExpectedReactivationDate(e.target.value)} 
+                          className="mt-1 max-w-[180px] border-yellow-300 focus:border-yellow-500" 
+                          min={getTodayDateString()}
+                        />
+                      </div>
                     </div>
                   )}
                   <div className="flex items-center space-x-2">

@@ -243,6 +243,7 @@ export type Database = {
           client_status: string | null
           client_status_date: string | null
           created_at: string
+          expected_reactivation_date: string | null
           has_whatsapp_bot: boolean
           id: string
           is_legacy: boolean
@@ -267,6 +268,7 @@ export type Database = {
           client_status?: string | null
           client_status_date?: string | null
           created_at?: string
+          expected_reactivation_date?: string | null
           has_whatsapp_bot?: boolean
           id?: string
           is_legacy?: boolean
@@ -291,6 +293,7 @@ export type Database = {
           client_status?: string | null
           client_status_date?: string | null
           created_at?: string
+          expected_reactivation_date?: string | null
           has_whatsapp_bot?: boolean
           id?: string
           is_legacy?: boolean

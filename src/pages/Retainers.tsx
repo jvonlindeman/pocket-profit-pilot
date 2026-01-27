@@ -14,6 +14,7 @@ import { CsvPasteDialog } from "@/components/Retainers/CsvPasteDialog";
 import { GroupedRetainersSection } from "@/components/Retainers/GroupedRetainersSection";
 import { useChurnMetrics } from "@/hooks/useChurnCalculator";
 import { ProfitabilityDashboard } from "@/components/Retainers/ProfitabilityDashboard";
+import { ReactivationAlerts } from "@/components/Retainers/ReactivationAlerts";
 import { isMedicalClient } from "@/utils/retainerClassification";
 
 function useSEO() {
@@ -308,6 +309,10 @@ const RetainersPage: React.FC = () => {
           <div>Cargando...</div>
         ) : (
           <>
+            <ReactivationAlerts 
+              retainers={rows} 
+              onEdit={(row) => { setEditing(row); setFormOpen(true); }} 
+            />
             <GroupedRetainersSection
               title="Doctor Premier"
               variant="doctor-premier"
