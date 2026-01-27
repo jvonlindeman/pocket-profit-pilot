@@ -83,6 +83,10 @@ Deno.serve(async (req) => {
       if (arrayProp) {
         clientStatuses = rawResponse[arrayProp];
         console.log(`[sync-client-status] Found array in property: ${arrayProp}`);
+      } else if ('client_id' in rawResponse && 'status' in rawResponse) {
+        // Single client object - wrap in array
+        clientStatuses = [rawResponse as N8nClientStatus];
+        console.log(`[sync-client-status] Received single client object, wrapping in array`);
       } else {
         // Log the actual structure for debugging
         console.error(`[sync-client-status] Unexpected format. Keys: ${Object.keys(rawResponse).join(', ')}`);
