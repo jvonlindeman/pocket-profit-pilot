@@ -1,28 +1,68 @@
 
-# Sincronización Automática n8n + Vista de JSON
+# Visibilidad de Clientes Pausados y Cancelados
 
-## Resumen
+## Problema Actual
 
-Sincronizar automáticamente el estado de clientes desde n8n cuando se carga la página de Retainers, y agregar un panel colapsable para ver el JSON de respuesta del webhook.
+El filtro por defecto está en "Solo activos", lo cual oculta pausados y cancelados. El usuario tiene que cambiar manualmente el filtro para verlos.
+
+## Solución Propuesta
+
+### 1. Cambiar Comportamiento por Defecto
+
+Mostrar **activos + pausados** en la vista principal, ya que los pausados son clientes que podrían reactivarse y necesitan visibilidad.
+
+### 2. Clientes Pausados - Visibilidad Prominente
+
+Mantenerlos en la tabla principal con indicadores visuales claros:
+- Fondo de fila amarillo/ámbar suave
+- Badge "PAUSADO" visible en la columna de cliente
+- Mostrar fecha de reactivación esperada si existe
+
+### 3. Clientes Cancelados - Histórico Sutil
+
+Crear una sección colapsable "Historial de bajas" debajo de las tablas principales:
+- Colapsada por defecto
+- Estilo más tenue (opacidad reducida, texto gris)
+- Solo muestra: nombre, fecha de baja, MRR que se perdió
+- Permite ver el histórico sin saturar la vista principal
 
 ---
 
-## Cambios a Implementar
+## Cambios en Filtros
 
-### 1. Sincronización Automática al Cargar
+Nuevas opciones de estado:
 
-Agregar un `useEffect` que dispare la sincronización automáticamente cuando:
-- La página carga por primera vez
-- Los datos de retainers ya están disponibles
+| Valor | Muestra |
+|-------|---------|
+| `"current"` (default) | Activos + Pausados |
+| `"active-only"` | Solo activos (sin pausados) |
+| `"paused-only"` | Solo pausados |
+| `"history"` | Solo cancelados (histórico) |
 
-Para evitar llamadas duplicadas, se usará una referencia (`useRef`) que trackea si ya se ejecutó la sincronización en esta sesión.
+---
 
-### 2. Panel de Debug con JSON de Respuesta
+## Diseño Visual
 
-Agregar un componente colapsable debajo del botón de sincronización que muestre:
-- Resultado de la última sincronización (updated, notFound, notFoundClients)
-- JSON completo formateado
-- Estado visual (éxito/error)
+### Fila de Cliente Pausado
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ 🟡 Dr. García  [PAUSADO]  │ Cardio │ $500 │ Reactiva: 15 feb │
+└─────────────────────────────────────────────────────────┘
+  ^ punto amarillo            ^ badge     ^ fecha visible
+  ^ fondo fila amarillo suave
+```
+
+### Sección de Histórico (colapsada por defecto)
+
+```
+▶ Historial de bajas (3 clientes)
+  ┌───────────────────────────────────────────────────┐
+  │ Clínica Norte  │ Baja: 15 ene 2026  │ $800 MRR   │
+  │ Dr. Méndez     │ Baja: 3 dic 2025   │ $500 MRR   │
+  │ Alfa Panama    │ Baja: 19 ene 2026  │ $1,200 MRR │
+  └───────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -30,99 +70,175 @@ Agregar un componente colapsable debajo del botón de sincronización que muestr
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/hooks/queries/useRetainers.ts` | Modificar `useSyncClientStatus` para exponer los datos de respuesta |
-| `src/pages/Retainers.tsx` | Agregar `useEffect` para sync automático + componente de debug JSON |
+| `src/pages/Retainers.tsx` | Cambiar filtro default, agregar sección de histórico |
+| `src/components/Retainers/RetainersTable.tsx` | Mejorar indicadores visuales para pausados |
+| Nuevo: `CanceledClientsHistory.tsx` | Componente colapsable para histórico |
 
 ---
 
 ## Sección Técnica
 
-### Hook Modificado (useRetainers.ts)
-
-La mutación ya retorna `SyncClientStatusResult` en `onSuccess`. Necesitamos exponer `data` del mutation result:
+### Nuevo Filtro Default
 
 ```typescript
-// El hook ya retorna esto:
-const syncStatusMut = useSyncClientStatus();
+// Antes:
+const [statusFilter, setStatusFilter] = React.useState<...>("active");
 
-// Podemos acceder a:
-syncStatusMut.data    // SyncClientStatusResult después de éxito
-syncStatusMut.error   // Error si falló
-syncStatusMut.status  // 'idle' | 'pending' | 'success' | 'error'
+// Después:
+const [statusFilter, setStatusFilter] = React.useState<
+  "current" | "active-only" | "paused-only" | "history"
+>("current");
 ```
 
-### Sincronización Automática (Retainers.tsx)
+### Lógica de Filtrado Actualizada
 
 ```typescript
-// Referencia para evitar doble sync
-const hasSyncedRef = React.useRef(false);
-
-// Auto-sync al cargar (una sola vez)
-React.useEffect(() => {
-  if (!isLoading && rows.length > 0 && !hasSyncedRef.current) {
-    hasSyncedRef.current = true;
-    syncStatusMut.mutate();
-  }
-}, [isLoading, rows.length]);
+const filtered = React.useMemo(() => {
+  return rows.filter((r) => {
+    const isPaused = r.active && !!(r as any).paused_at;
+    const isActiveNotPaused = r.active && !(r as any).paused_at;
+    const isCanceled = !r.active;
+    
+    switch (statusFilter) {
+      case "current":
+        // Activos + Pausados (excluir cancelados)
+        return r.active;
+      case "active-only":
+        return isActiveNotPaused;
+      case "paused-only":
+        return isPaused;
+      case "history":
+        return isCanceled;
+      default:
+        return true;
+    }
+    // ... resto de filtros
+  });
+}, [rows, statusFilter, ...]);
 ```
 
-### Panel de Debug Colapsable
+### Lista de Cancelados (separada del filtro principal)
+
+```typescript
+// Siempre calculamos los cancelados para el historial
+const canceledClients = React.useMemo(() => {
+  return rows
+    .filter(r => !r.active)
+    .sort((a, b) => {
+      // Ordenar por fecha de baja, más reciente primero
+      const dateA = a.canceled_at ? new Date(a.canceled_at).getTime() : 0;
+      const dateB = b.canceled_at ? new Date(b.canceled_at).getTime() : 0;
+      return dateB - dateA;
+    });
+}, [rows]);
+```
+
+### Componente de Histórico
 
 ```tsx
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, Code } from "lucide-react";
+// src/components/Retainers/CanceledClientsHistory.tsx
+interface Props {
+  clients: RetainerRow[];
+}
 
-// Estado para controlar apertura
-const [debugOpen, setDebugOpen] = React.useState(false);
-
-// En el JSX, después del botón de sincronizar:
-{syncStatusMut.data && (
-  <Collapsible open={debugOpen} onOpenChange={setDebugOpen}>
-    <CollapsibleTrigger asChild>
-      <Button variant="ghost" size="sm" className="gap-1">
-        <Code className="h-4 w-4" />
-        Ver respuesta JSON
-        <ChevronDown className={cn(
-          "h-4 w-4 transition-transform",
-          debugOpen && "rotate-180"
-        )} />
-      </Button>
-    </CollapsibleTrigger>
-    <CollapsibleContent>
-      <Card className="mt-2 bg-slate-50">
-        <CardContent className="pt-4">
-          <div className="text-sm space-y-2">
-            <div className="flex gap-4">
-              <Badge variant="success">{syncStatusMut.data.updated} actualizados</Badge>
-              {syncStatusMut.data.notFound > 0 && (
-                <Badge variant="secondary">{syncStatusMut.data.notFound} sin n8n_id</Badge>
-              )}
-            </div>
-            <pre className="bg-slate-100 p-3 rounded text-xs overflow-auto max-h-48">
-              {JSON.stringify(syncStatusMut.data, null, 2)}
-            </pre>
+export const CanceledClientsHistory: React.FC<Props> = ({ clients }) => {
+  const [isOpen, setIsOpen] = React.useState(false);
+  
+  if (clients.length === 0) return null;
+  
+  const totalLostMRR = clients.reduce((sum, c) => sum + (c.net_income ?? 0), 0);
+  
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <CollapsibleTrigger asChild>
+        <button className="w-full flex items-center justify-between p-3 rounded-lg border bg-gray-50/50 hover:bg-gray-100/50 transition-colors">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Archive className="h-4 w-4" />
+            <span className="text-sm">
+              Historial de bajas ({clients.length} clientes)
+            </span>
           </div>
-        </CardContent>
-      </Card>
-    </CollapsibleContent>
-  </Collapsible>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground">
+              {formatCurrency(totalLostMRR)} MRR perdido
+            </span>
+            <ChevronDown className={cn(
+              "h-4 w-4 text-muted-foreground transition-transform",
+              isOpen && "rotate-180"
+            )} />
+          </div>
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="mt-2 border rounded-lg overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gray-50">
+                <TableHead>Cliente</TableHead>
+                <TableHead>Especialidad</TableHead>
+                <TableHead>Fecha de baja</TableHead>
+                <TableHead className="text-right">MRR perdido</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {clients.map(c => (
+                <TableRow key={c.id} className="opacity-70">
+                  <TableCell className="font-medium">{c.client_name}</TableCell>
+                  <TableCell>{c.specialty ?? "-"}</TableCell>
+                  <TableCell>
+                    {c.canceled_at 
+                      ? new Date(c.canceled_at).toLocaleDateString('es-PA', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric'
+                        })
+                      : "-"
+                    }
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {formatCurrency(c.net_income ?? 0)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+};
+```
+
+### Mejora Visual en RetainersTable para Pausados
+
+```tsx
+// En RetainersTable.tsx, agregar badge más visible para pausados
+{(r as any).paused_at && r.active && (
+  <Badge className="ml-1 text-[10px] px-1.5 py-0.5 bg-yellow-100 text-yellow-700 border-yellow-300">
+    PAUSADO
+  </Badge>
+)}
+
+// En la columna de fecha de reactivación (para pausados):
+{(r as any).paused_at && r.active && (r as any).expected_reactivation_date && (
+  <div className="text-xs text-yellow-600">
+    Reactiva: {formatDate((r as any).expected_reactivation_date)}
+  </div>
 )}
 ```
 
-### Flujo Completo
+### Opciones del Select Actualizadas
 
-```text
-1. Usuario abre /retainers
-2. useRetainersQuery carga los datos
-3. useEffect detecta que rows.length > 0 y hasSyncedRef es false
-4. Dispara syncStatusMut.mutate() automáticamente
-5. UI muestra spinner en el botón mientras carga
-6. Al completar, syncStatusMut.data contiene el resultado
-7. Usuario puede expandir el panel de debug para ver el JSON
+```tsx
+<Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as ...)}>
+  <SelectTrigger>
+    <SelectValue />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="current">Activos y pausados</SelectItem>
+    <SelectItem value="active-only">Solo activos</SelectItem>
+    <SelectItem value="paused-only">Solo pausados</SelectItem>
+    <SelectItem value="history">Histórico (bajas)</SelectItem>
+  </SelectContent>
+</Select>
 ```
-
-### Consideraciones
-
-- **Single call**: La referencia `hasSyncedRef` asegura que solo se llama una vez por sesión de página
-- **No bloquea UI**: La sincronización corre en background mientras el usuario ya puede ver los datos
-- **Debug opcional**: El JSON está oculto por defecto para no saturar la UI
