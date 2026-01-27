@@ -1,115 +1,105 @@
 
-# Agregar Modo Debug para Ver Respuesta Raw de n8n
+
+# Colorear Filas Segun Estado del Cliente
 
 ## Objetivo
 
-Agregar un parametro `debug=true` a la Edge Function para que retorne la respuesta raw del webhook sin procesarla. Esto te permitira ver exactamente que estructura esta enviando n8n.
+Cambiar el color de fondo de toda la fila en la tabla de retainers segun el estado del cliente (`client_status`). Los colores seran pasteles suaves para no ser agresivos visualmente.
 
 ---
 
-## Solucion
+## Paleta de Colores Pastel por Estado
 
-Modificar la Edge Function para aceptar un query parameter `?debug=true` que:
+| Estado | Color de Fila |
+|--------|---------------|
+| OK / Agradecido | Verde pastel muy suave (`bg-green-50/60`) |
+| En seguimiento / Esperando respuesta | Azul pastel (`bg-blue-50/60`) |
+| Duda o consulta / Con pendiente | Amarillo pastel (`bg-amber-50/60`) |
+| Insatisfecho leve | Naranja pastel (`bg-orange-50/60`) |
+| Enojado / Frustrado / Amenaza / Reclamo grave | Rosa/rojo pastel (`bg-red-50/60`) |
+| Sin estado | Sin color (fondo normal) |
 
-1. Llama al webhook de n8n (una sola vez)
-2. Retorna la respuesta raw completa en lugar de procesarla
-3. Incluye metadata util: tipo de dato, si es array, keys del objeto, etc.
+La opacidad `/60` hace que el color sea aun mas sutil.
 
 ---
 
-## Cambios en sync-client-status/index.ts
+## Cambios en RetainersTable.tsx
 
-### 1. Detectar modo debug (despues de linea 52)
-
-```typescript
-// Check for debug mode
-const url = new URL(req.url);
-const debugMode = url.searchParams.get("debug") === "true";
-```
-
-### 2. Retornar respuesta raw si debug=true (despues de linea 70)
+### 1. Agregar funcion para obtener color de fila (linea 49)
 
 ```typescript
-// If debug mode, return raw response for inspection
-if (debugMode) {
-  return new Response(
-    JSON.stringify({
-      debug: true,
-      responseType: typeof rawResponse,
-      isArray: Array.isArray(rawResponse),
-      keys: rawResponse && typeof rawResponse === 'object' ? Object.keys(rawResponse) : null,
-      itemCount: Array.isArray(rawResponse) ? rawResponse.length : null,
-      rawData: rawResponse,
-      sampleItem: Array.isArray(rawResponse) && rawResponse.length > 0 ? rawResponse[0] : null,
-    }, null, 2),
-    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
+// Mapeo de colores pastel para el fondo de la fila segun estado
+function getRowBgClass(status: string | null): string {
+  if (!status) return '';
+  
+  const rowColors: Record<string, string> = {
+    'OK': 'bg-green-50/70',
+    'Agradecido': 'bg-green-50/70',
+    'En seguimiento': 'bg-blue-50/70',
+    'Esperando respuesta': 'bg-blue-50/70',
+    'Duda o consulta': 'bg-amber-50/70',
+    'Con pendiente': 'bg-amber-50/70',
+    'Insatisfecho leve': 'bg-orange-50/70',
+    'Enojado': 'bg-red-50/60',
+    'Frustrado': 'bg-red-50/60',
+    'Amenaza con irse': 'bg-red-50/60',
+    'Reclamo grave': 'bg-red-50/60',
+  };
+  
+  return rowColors[status] || '';
 }
 ```
 
----
+### 2. Aplicar clase a TableRow (linea 85)
 
-## Como Usar
-
-### Opcion A: Modificar el frontend temporalmente
-
-Agregar `?debug=true` a la URL del fetch en `useRetainers.ts`:
-
-```typescript
-const response = await fetch(`${SUPABASE_URL}/functions/v1/sync-client-status?debug=true`, {
+Cambiar:
+```tsx
+<TableRow key={r.id}>
 ```
 
-### Opcion B: Llamar directamente desde consola del navegador
+Por:
+```tsx
+<TableRow key={r.id} className={getRowBgClass(clientStatus)}>
+```
 
-```javascript
-const token = (await supabase.auth.getSession()).data.session.access_token;
-const res = await fetch('https://rstexocnpvtxfhqbnetn.supabase.co/functions/v1/sync-client-status?debug=true', {
-  method: 'POST',
-  headers: { 'Authorization': `Bearer ${token}` }
-});
-console.log(await res.json());
+### 3. Actualizar celda de acciones sticky
+
+La celda sticky necesita heredar el color de fondo para mantener consistencia visual:
+
+```tsx
+<TableCell className={`sticky right-0 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] py-2 ${getRowBgClass(clientStatus) || 'bg-background'}`}>
 ```
 
 ---
 
-## Resultado Esperado
+## Vista Previa Visual
 
-Cuando llames con `?debug=true`, recibiras algo como:
-
-```json
-{
-  "debug": true,
-  "responseType": "object",
-  "isArray": false,
-  "keys": ["client_id", "name", "status", "date"],
-  "itemCount": null,
-  "rawData": {
-    "client_id": "86dxj8mba",
-    "name": "Dr. Guillermo Brennan",
-    "status": "Activo",
-    "date": "2026-01-27"
-  },
-  "sampleItem": null
-}
+```text
++-----------------------------------------------------+
+| Cliente          | Espec.  | Estado         | ... |
++-----------------------------------------------------+
+| Dr. Martinez     | Cardio  | OK             | ... | <- Verde pastel
+| Dra. Lopez       | Dermato | En seguimiento | ... | <- Azul pastel  
+| Dr. Perez        | General | Enojado        | ... | <- Rojo pastel
+| Clinica ABC      | Hospital| -              | ... | <- Sin color
++-----------------------------------------------------+
 ```
-
-Esto confirma que n8n esta enviando un solo objeto en lugar de un array.
 
 ---
 
-## Archivos a Modificar
+## Archivo a Modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `supabase/functions/sync-client-status/index.ts` | Agregar logica de debug mode |
+| `src/components/Retainers/RetainersTable.tsx` | Agregar funcion `getRowBgClass` y aplicar a TableRow |
 
 ---
 
 ## Seccion Tecnica
 
-La implementacion:
-1. Extrae query params de la URL de la request
-2. Si `debug=true`, retorna inmediatamente despues de parsear el JSON
-3. Incluye metadatos utiles para diagnostico
-4. El webhook solo se llama una vez (cumple con el requisito de single call)
-5. En modo normal (sin debug), el comportamiento es identico al actual
+- Se usa Tailwind con opacidad (`/70` o `/60`) para lograr colores pastel sutiles
+- La celda sticky de acciones hereda el color de fondo para evitar discontinuidad visual
+- Los estados negativos (Enojado, Frustrado, etc.) usan rojo mas suave (`/60`) para no alarmar
+- Las filas sin estado mantienen el fondo por defecto de la tabla
+- Compatible con modo oscuro ya que Tailwind ajusta automaticamente los tonos
+
