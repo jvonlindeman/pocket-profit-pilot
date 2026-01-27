@@ -1,109 +1,115 @@
 
+# Agregar Modo Debug para Ver Respuesta Raw de n8n
 
-# Corregir Error "clientStatuses is not iterable"
+## Objetivo
 
-## Problema Identificado
-
-El webhook de n8n esta devolviendo datos en un formato diferente al esperado. El codigo actual asume que la respuesta es un array directo:
-```typescript
-const clientStatuses: N8nClientStatus[] = await webhookResponse.json();
-```
-
-Pero el webhook podria estar devolviendo:
-- Un objeto envuelto: `{ data: [...] }` o `{ clients: [...] }`
-- Un objeto vacio: `{}`
-- Una respuesta que no es JSON valido
-
-Los logs confirman: `Received undefined client statuses from n8n`
+Agregar un parametro `debug=true` a la Edge Function para que retorne la respuesta raw del webhook sin procesarla. Esto te permitira ver exactamente que estructura esta enviando n8n.
 
 ---
 
 ## Solucion
 
-Modificar la edge function para:
+Modificar la Edge Function para aceptar un query parameter `?debug=true` que:
 
-1. **Loguear la respuesta raw** para diagnostico
-2. **Detectar automaticamente el formato** (array directo u objeto con propiedad array)
-3. **Validar que sea un array** antes de iterar
-4. **Retornar error descriptivo** si el formato no es valido
+1. Llama al webhook de n8n (una sola vez)
+2. Retorna la respuesta raw completa en lugar de procesarla
+3. Incluye metadata util: tipo de dato, si es array, keys del objeto, etc.
 
 ---
 
 ## Cambios en sync-client-status/index.ts
 
-### Codigo actualizado (lineas 68-77)
+### 1. Detectar modo debug (despues de linea 52)
 
 ```typescript
-// Parse response and handle different formats
-const rawResponse = await webhookResponse.json();
-console.log(`[sync-client-status] Raw response type: ${typeof rawResponse}, isArray: ${Array.isArray(rawResponse)}`);
+// Check for debug mode
+const url = new URL(req.url);
+const debugMode = url.searchParams.get("debug") === "true";
+```
 
-// Handle both array and wrapped object formats
-let clientStatuses: N8nClientStatus[];
+### 2. Retornar respuesta raw si debug=true (despues de linea 70)
 
-if (Array.isArray(rawResponse)) {
-  // Direct array format
-  clientStatuses = rawResponse;
-} else if (rawResponse && typeof rawResponse === 'object') {
-  // Check common wrapper properties: data, clients, items, results
-  const possibleArrays = ['data', 'clients', 'items', 'results'];
-  const arrayProp = possibleArrays.find(prop => Array.isArray(rawResponse[prop]));
-  
-  if (arrayProp) {
-    clientStatuses = rawResponse[arrayProp];
-    console.log(`[sync-client-status] Found array in property: ${arrayProp}`);
-  } else {
-    // Log the actual structure for debugging
-    console.error(`[sync-client-status] Unexpected format. Keys: ${Object.keys(rawResponse).join(', ')}`);
-    return new Response(
-      JSON.stringify({ 
-        error: "Invalid webhook response format", 
-        receivedKeys: Object.keys(rawResponse),
-        hint: "Expected an array or object with data/clients/items property"
-      }),
-      { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-} else {
-  console.error(`[sync-client-status] Response is not array or object: ${rawResponse}`);
+```typescript
+// If debug mode, return raw response for inspection
+if (debugMode) {
   return new Response(
-    JSON.stringify({ error: "Invalid webhook response", received: String(rawResponse) }),
-    { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    JSON.stringify({
+      debug: true,
+      responseType: typeof rawResponse,
+      isArray: Array.isArray(rawResponse),
+      keys: rawResponse && typeof rawResponse === 'object' ? Object.keys(rawResponse) : null,
+      itemCount: Array.isArray(rawResponse) ? rawResponse.length : null,
+      rawData: rawResponse,
+      sampleItem: Array.isArray(rawResponse) && rawResponse.length > 0 ? rawResponse[0] : null,
+    }, null, 2),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
-
-console.log(`[sync-client-status] Received ${clientStatuses.length} client statuses from n8n`);
 ```
 
 ---
 
-## Beneficios
+## Como Usar
 
-| Aspecto | Antes | Despues |
-|---------|-------|---------|
-| Formato array directo | Funciona | Funciona |
-| Formato `{ data: [...] }` | Error | Funciona |
-| Respuesta invalida | Error generico | Error descriptivo con keys |
-| Diagnostico | Sin info | Logs detallados |
+### Opcion A: Modificar el frontend temporalmente
+
+Agregar `?debug=true` a la URL del fetch en `useRetainers.ts`:
+
+```typescript
+const response = await fetch(`${SUPABASE_URL}/functions/v1/sync-client-status?debug=true`, {
+```
+
+### Opcion B: Llamar directamente desde consola del navegador
+
+```javascript
+const token = (await supabase.auth.getSession()).data.session.access_token;
+const res = await fetch('https://rstexocnpvtxfhqbnetn.supabase.co/functions/v1/sync-client-status?debug=true', {
+  method: 'POST',
+  headers: { 'Authorization': `Bearer ${token}` }
+});
+console.log(await res.json());
+```
 
 ---
 
-## Archivo a modificar
+## Resultado Esperado
+
+Cuando llames con `?debug=true`, recibiras algo como:
+
+```json
+{
+  "debug": true,
+  "responseType": "object",
+  "isArray": false,
+  "keys": ["client_id", "name", "status", "date"],
+  "itemCount": null,
+  "rawData": {
+    "client_id": "86dxj8mba",
+    "name": "Dr. Guillermo Brennan",
+    "status": "Activo",
+    "date": "2026-01-27"
+  },
+  "sampleItem": null
+}
+```
+
+Esto confirma que n8n esta enviando un solo objeto en lugar de un array.
+
+---
+
+## Archivos a Modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `supabase/functions/sync-client-status/index.ts` | Agregar deteccion de formato flexible |
+| `supabase/functions/sync-client-status/index.ts` | Agregar logica de debug mode |
 
 ---
 
 ## Seccion Tecnica
 
-La edge function ahora:
-1. Parsea la respuesta JSON sin asumir estructura
-2. Verifica si es array directo con `Array.isArray()`
-3. Si es objeto, busca propiedades comunes que contengan arrays
-4. Loguea la estructura real para facilitar debugging futuro
-5. Retorna error 422 con informacion util si el formato no es reconocido
-
-Esto cumple con el requisito de llamar el webhook una sola vez - solo se hace un fetch, y el procesamiento es local.
-
+La implementacion:
+1. Extrae query params de la URL de la request
+2. Si `debug=true`, retorna inmediatamente despues de parsear el JSON
+3. Incluye metadatos utiles para diagnostico
+4. El webhook solo se llama una vez (cumple con el requisito de single call)
+5. En modo normal (sin debug), el comportamiento es identico al actual
