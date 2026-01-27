@@ -6,6 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { DollarSign, Settings2, FileText, Activity } from "lucide-react";
 import type { RetainerInsert, RetainerRow } from "@/types/retainers";
 import { parseNumberLike } from "@/types/retainers";
 
@@ -52,10 +54,8 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
   const [notes, setNotes] = React.useState(initial?.notes ?? "");
   const [n8nId, setN8nId] = React.useState(initial?.n8n_id ?? "");
   
-  // Calculated total MRR
   const totalMRR = parseNumberLike(baseIncome) + parseNumberLike(upsellIncome);
   
-  // New status management
   const [status, setStatus] = React.useState<ClientStatus>(getInitialStatus(initial));
   const [pausedAt, setPausedAt] = React.useState<string>(
     (initial as any)?.paused_at ? formatDateForInput((initial as any).paused_at) : getTodayDateString()
@@ -93,7 +93,7 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
       specialty: specialty.trim() || null,
       base_income: baseIncomeValue,
       upsell_income: upsellIncomeValue,
-      net_income: baseIncomeValue + upsellIncomeValue, // Calculated from base + upsell
+      net_income: baseIncomeValue + upsellIncomeValue,
       social_media_cost: parseNumberLike(socialCost),
       total_expenses: parseNumberLike(totalExpenses),
       uses_stripe: usesStripe,
@@ -102,7 +102,6 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
       is_legacy: isLegacy,
       notes: notes?.trim() || null,
       n8n_id: n8nId?.trim() || null,
-      // Status-based fields
       active: status !== "canceled",
       paused_at: status === "paused" ? new Date(pausedAt).toISOString() : null,
       canceled_at: status === "canceled" ? new Date(canceledAt).toISOString() : null,
@@ -115,134 +114,168 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>{initial ? "Editar retainer" : "Nuevo retainer"}</DialogTitle>
           <DialogDescription>Gestiona los datos del cliente retainer.</DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="text-sm font-medium">Cliente</label>
-            <Input value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Nombre del cliente" />
-          </div>
-          <div>
-            <label className="text-sm font-medium">Especialidad</label>
-            <Input value={specialty ?? ""} onChange={(e) => setSpecialty(e.target.value)} placeholder="Ej. SEO, Ads" />
-          </div>
-          <div>
-            <label className="text-sm font-medium">Ingreso base</label>
-            <Input value={baseIncome} onChange={(e) => setBaseIncome(e.target.value)} placeholder="0"
-              inputMode="decimal" />
-          </div>
-          <div>
-            <label className="text-sm font-medium">Upsells</label>
-            <Input value={upsellIncome} onChange={(e) => setUpsellIncome(e.target.value)} placeholder="0"
-              inputMode="decimal" className="border-green-200 focus:border-green-400" />
-          </div>
-          <div>
-            <label className="text-sm font-medium">Total MRR</label>
-            <div className="h-10 px-3 py-2 rounded-md bg-muted text-sm font-medium flex items-center">
-              ${totalMRR.toLocaleString('es-PA', { maximumFractionDigits: 0 })}
-              {parseNumberLike(upsellIncome) > 0 && (
-                <span className="ml-2 text-xs text-green-600">(+${parseNumberLike(upsellIncome).toLocaleString('es-PA', { maximumFractionDigits: 0 })} upsell)</span>
-              )}
+        <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+          {/* Always visible: Client info */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-sm font-medium">Cliente *</Label>
+              <Input value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Nombre" className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">Especialidad</Label>
+              <Input value={specialty ?? ""} onChange={(e) => setSpecialty(e.target.value)} placeholder="SEO, Ads..." className="mt-1" />
             </div>
           </div>
-          <div>
-            <label className="text-sm font-medium">Redes (costo)</label>
-            <Input value={socialCost} onChange={(e) => setSocialCost(e.target.value)} placeholder="0"
-              inputMode="decimal" />
-          </div>
-          <div>
-            <label className="text-sm font-medium">Total de gastos</label>
-            <Input value={totalExpenses} onChange={(e) => setTotalExpenses(e.target.value)} placeholder="0"
-              inputMode="decimal" />
-          </div>
-          <div>
-            <label className="text-sm font-medium">Artículos/mes</label>
-            <Input value={articlesPerMonth} onChange={(e) => setArticlesPerMonth(e.target.value)} placeholder="0"
-              inputMode="numeric" />
-          </div>
-          <div className="flex items-center gap-3">
-            <Switch checked={usesStripe} onCheckedChange={setUsesStripe} id="usesStripe" />
-            <label htmlFor="usesStripe" className="text-sm">Stripe</label>
-          </div>
-          <div className="flex items-center gap-3">
-            <Switch checked={hasWhatsappBot} onCheckedChange={setHasWhatsappBot} id="hasWhatsappBot" />
-            <label htmlFor="hasWhatsappBot" className="text-sm">WhatsApp Bot</label>
-          </div>
-          <div className="flex items-center gap-3">
-            <Switch checked={isLegacy} onCheckedChange={setIsLegacy} id="isLegacy" />
-            <label htmlFor="isLegacy" className="text-sm text-muted-foreground">Legacy (importado)</label>
-          </div>
-          <div className="md:col-span-2">
-            <label className="text-sm font-medium">n8n ID</label>
-            <Input 
-              value={n8nId ?? ""} 
-              onChange={(e) => setN8nId(e.target.value)} 
-              placeholder="ID único en n8n (ej: 3nuuwjh)"
-              className="font-mono text-sm"
-            />
-          </div>
+
+          <Accordion type="multiple" defaultValue={["ingresos", "estado"]} className="w-full">
+            {/* Income Section */}
+            <AccordionItem value="ingresos">
+              <AccordionTrigger className="py-2 text-sm">
+                <span className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-green-600" />
+                  Ingresos
+                  <span className="text-muted-foreground font-normal ml-2">
+                    MRR: ${totalMRR.toLocaleString('es-PA', { maximumFractionDigits: 0 })}
+                  </span>
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="pt-2 pb-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">Ingreso base</Label>
+                    <Input value={baseIncome} onChange={(e) => setBaseIncome(e.target.value)} placeholder="0" inputMode="decimal" className="mt-1" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Upsells</Label>
+                    <Input value={upsellIncome} onChange={(e) => setUpsellIncome(e.target.value)} placeholder="0" inputMode="decimal" className="mt-1 border-green-200 focus:border-green-400" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Redes (costo)</Label>
+                    <Input value={socialCost} onChange={(e) => setSocialCost(e.target.value)} placeholder="0" inputMode="decimal" className="mt-1" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Total gastos</Label>
+                    <Input value={totalExpenses} onChange={(e) => setTotalExpenses(e.target.value)} placeholder="0" inputMode="decimal" className="mt-1" />
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Services Section */}
+            <AccordionItem value="servicios">
+              <AccordionTrigger className="py-2 text-sm">
+                <span className="flex items-center gap-2">
+                  <Settings2 className="h-4 w-4 text-blue-600" />
+                  Servicios
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="pt-2 pb-3">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="usesStripe" className="text-sm">Stripe</Label>
+                    <Switch checked={usesStripe} onCheckedChange={setUsesStripe} id="usesStripe" />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="hasWhatsappBot" className="text-sm">WhatsApp Bot</Label>
+                    <Switch checked={hasWhatsappBot} onCheckedChange={setHasWhatsappBot} id="hasWhatsappBot" />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="articlesInput" className="text-sm">Artículos/mes</Label>
+                    <Input id="articlesInput" value={articlesPerMonth} onChange={(e) => setArticlesPerMonth(e.target.value)} placeholder="0" inputMode="numeric" className="w-20 text-right" />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="isLegacy" className="text-sm text-muted-foreground">Legacy (importado)</Label>
+                    <Switch checked={isLegacy} onCheckedChange={setIsLegacy} id="isLegacy" />
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Status Section */}
+            <AccordionItem value="estado">
+              <AccordionTrigger className="py-2 text-sm">
+                <span className="flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-orange-600" />
+                  Estado
+                  <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${
+                    status === 'active' ? 'bg-green-100 text-green-700' :
+                    status === 'paused' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-red-100 text-red-700'
+                  }`}>
+                    {status === 'active' ? 'Activo' : status === 'paused' ? 'Pausado' : 'Cancelado'}
+                  </span>
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="pt-2 pb-3">
+                <RadioGroup value={status} onValueChange={(v) => setStatus(v as ClientStatus)} className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="active" id="status-active" />
+                    <Label htmlFor="status-active" className="flex items-center gap-2 cursor-pointer">
+                      <span className="w-2 h-2 rounded-full bg-green-500" />
+                      Activo
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="paused" id="status-paused" />
+                    <Label htmlFor="status-paused" className="flex items-center gap-2 cursor-pointer">
+                      <span className="w-2 h-2 rounded-full bg-yellow-500" />
+                      Pausado
+                    </Label>
+                  </div>
+                  {status === "paused" && (
+                    <div className="ml-6">
+                      <Label className="text-xs text-muted-foreground">Fecha de pausa</Label>
+                      <Input type="date" value={pausedAt} onChange={(e) => setPausedAt(e.target.value)} className="mt-1 max-w-[180px]" />
+                    </div>
+                  )}
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="canceled" id="status-canceled" />
+                    <Label htmlFor="status-canceled" className="flex items-center gap-2 cursor-pointer">
+                      <span className="w-2 h-2 rounded-full bg-red-500" />
+                      Cancelado
+                    </Label>
+                  </div>
+                  {status === "canceled" && (
+                    <div className="ml-6">
+                      <Label className="text-xs text-destructive">Fecha de baja</Label>
+                      <Input type="date" value={canceledAt} onChange={(e) => setCanceledAt(e.target.value)} className="mt-1 max-w-[180px] border-destructive/50" />
+                    </div>
+                  )}
+                </RadioGroup>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Notes Section */}
+            <AccordionItem value="notas">
+              <AccordionTrigger className="py-2 text-sm">
+                <span className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  Notas y Config
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="pt-2 pb-3">
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs">n8n ID</Label>
+                    <Input value={n8nId ?? ""} onChange={(e) => setN8nId(e.target.value)} placeholder="ID en n8n" className="mt-1 font-mono text-sm" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Notas</Label>
+                    <Textarea value={notes ?? ""} onChange={(e) => setNotes(e.target.value)} placeholder="Notas opcionales" className="mt-1" rows={2} />
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </div>
 
-        {/* Status section with radio buttons */}
-        <div className="mt-4 border rounded-lg p-4">
-          <label className="text-sm font-medium mb-3 block">Estado del cliente</label>
-          <RadioGroup value={status} onValueChange={(v) => setStatus(v as ClientStatus)} className="space-y-3">
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="active" id="status-active" />
-              <Label htmlFor="status-active" className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-green-500" />
-                Activo
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="paused" id="status-paused" />
-              <Label htmlFor="status-paused" className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-yellow-500" />
-                Pausado
-              </Label>
-            </div>
-            {status === "paused" && (
-              <div className="ml-6">
-                <label className="text-sm text-muted-foreground">Fecha de pausa</label>
-                <Input 
-                  type="date" 
-                  value={pausedAt} 
-                  onChange={(e) => setPausedAt(e.target.value)} 
-                  className="mt-1 max-w-[200px]"
-                />
-              </div>
-            )}
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="canceled" id="status-canceled" />
-              <Label htmlFor="status-canceled" className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-red-500" />
-                Cancelado
-              </Label>
-            </div>
-            {status === "canceled" && (
-              <div className="ml-6">
-                <label className="text-sm text-destructive">Fecha de baja</label>
-                <Input 
-                  type="date" 
-                  value={canceledAt} 
-                  onChange={(e) => setCanceledAt(e.target.value)} 
-                  className="mt-1 max-w-[200px] border-destructive/50"
-                />
-              </div>
-            )}
-          </RadioGroup>
-        </div>
-
-        <div className="mt-4">
-          <label className="text-sm font-medium">Notas</label>
-          <Textarea value={notes ?? ""} onChange={(e) => setNotes(e.target.value)} placeholder="Notas opcionales" />
-        </div>
-
-        <DialogFooter>
+        <DialogFooter className="flex-shrink-0 pt-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button onClick={handleSubmit} disabled={!isValid}>{initial ? "Guardar" : "Crear"}</Button>
         </DialogFooter>
