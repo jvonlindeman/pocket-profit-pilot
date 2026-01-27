@@ -1,117 +1,70 @@
 
 
-# Agregar Sistema de Upsells para Retainers
+# Implementar Sistema de Upsells (Continuación)
 
-## Objetivo
+## Estado Actual
 
-Implementar un sistema para trackear upsells (ventas adicionales) en clientes existentes, permitiendo ver el crecimiento del MRR por cliente y calcular metricas de expansion revenue.
-
----
-
-## Enfoque Propuesto
-
-Agregar dos campos nuevos a la tabla `retainers`:
-
-| Campo | Tipo | Descripcion |
-|-------|------|-------------|
-| `base_income` | numeric | MRR inicial cuando el cliente empezo |
-| `upsell_income` | numeric | Suma de todos los upsells vendidos |
-
-La formula seria: `net_income = base_income + upsell_income`
-
-Esto permite:
-- Ver cuanto paga cada cliente de base vs upsells
-- Calcular **Expansion MRR** (crecimiento por upsells)
-- Identificar clientes con mayor potencial de crecimiento
+- Plan de upsells fue aprobado anteriormente
+- La base de datos **no tiene** las columnas `base_income` ni `upsell_income`
+- El formulario sigue usando solo `net_income`
 
 ---
 
-## Vista en Formulario
+## Pasos a Implementar
 
-```text
-+------------------------------------------+
-| Ingreso base        | $400              | <- Lo que pagaba antes
-+------------------------------------------+
-| Upsells             | $597              | <- Lo que le vendiste adicional
-+------------------------------------------+
-| Total MRR           | $997 (calculado)  | <- Suma automatica
-+------------------------------------------+
-```
+### 1. Migración de Base de Datos
 
----
+Agregar las columnas necesarias:
 
-## Vista en Tabla
-
-Nueva columna o tooltip mostrando el desglose:
-
-```text
-| Cliente         | MRR     | Upsell  | Margen |
-|-----------------|---------|---------|--------|
-| Fernando Agreda | $997    | +$597   | 45%    |
-| Otro Cliente    | $500    | -       | 60%    |
-```
-
-Los clientes con upsells mostrarian un indicador visual (ej. flecha verde hacia arriba).
-
----
-
-## Cambios Necesarios
-
-### 1. Base de Datos (Migracion)
-
-Agregar columnas a tabla `retainers`:
 ```sql
 ALTER TABLE retainers
 ADD COLUMN base_income numeric NOT NULL DEFAULT 0,
 ADD COLUMN upsell_income numeric NOT NULL DEFAULT 0;
+
+-- Migrar datos existentes: todo el net_income actual es base_income
+UPDATE retainers SET base_income = net_income WHERE base_income = 0;
 ```
 
-### 2. Actualizar Tipos (src/integrations/supabase/types.ts)
+### 2. Actualizar Tipos TypeScript
 
-Agregar `base_income` y `upsell_income` a los tipos Row/Insert/Update de retainers.
+En `src/integrations/supabase/types.ts`, agregar a la definición de retainers:
+- `base_income: number`
+- `upsell_income: number`
 
-### 3. Formulario (RetainerFormDialog.tsx)
+### 3. Modificar Formulario (RetainerFormDialog.tsx)
 
-- Cambiar campo "Ingreso neto" por dos campos: "Ingreso base" y "Upsells"
-- Mostrar el total calculado (readonly)
-- Al guardar: `net_income = base_income + upsell_income`
+Cambiar el campo "Ingreso neto" por:
+- **Ingreso base**: MRR inicial del cliente
+- **Upsells**: Ventas adicionales
+- **Total MRR**: Calculado automáticamente (readonly)
 
-### 4. Tabla (RetainersTable.tsx)
+```text
++------------------------------------------+
+| Ingreso base        | $400              |
++------------------------------------------+
+| Upsells             | $597              |
++------------------------------------------+
+| Total MRR           | $997 (calculado)  |
++------------------------------------------+
+```
 
-- Agregar indicador visual en columna MRR cuando hay upsells
-- Tooltip mostrando desglose: "Base: $400 + Upsell: $597"
+### 4. Actualizar Tabla (RetainersTable.tsx)
 
-### 5. Metricas de Expansion (useProfitabilityMetrics.ts)
+En la columna de Ingreso, mostrar:
+- El total ($997)
+- Indicador de upsell si hay (+$597 en verde)
+- Tooltip con desglose completo
 
-Agregar nuevas metricas:
+### 5. Métricas de Expansión (useProfitabilityMetrics.ts)
+
+Agregar nuevas métricas:
 - `totalUpsellRevenue`: Suma de todos los upsells
 - `clientsWithUpsells`: Cantidad de clientes con upsells
-- `expansionRate`: Porcentaje de ingresos provenientes de upsells
+- `expansionRate`: % de ingresos que viene de upsells
 
-### 6. KPIs en Dashboard de Rentabilidad
+### 6. Card de Expansion MRR (KPISummaryCards.tsx)
 
-Nuevo card mostrando:
-- **Expansion MRR**: $X,XXX (suma de upsells)
-- **% Expansion**: X% del MRR total viene de upsells
-
----
-
-## Migracion de Datos Existentes
-
-Para clientes actuales, se asume:
-- `base_income = net_income` (todo el ingreso actual es base)
-- `upsell_income = 0`
-
-Puedes ajustar manualmente los clientes que ya tenian upsells.
-
----
-
-## Ejemplo con tu Caso
-
-Fernando Agreda:
-- Antes: `net_income = 400`, `base_income = 0`, `upsell_income = 0`
-- Despues de migracion: `base_income = 400`, `upsell_income = 0`
-- Despues del upsell: `base_income = 400`, `upsell_income = 597`, `net_income = 997`
+Nuevo card mostrando Expansion MRR total
 
 ---
 
@@ -119,21 +72,21 @@ Fernando Agreda:
 
 | Archivo | Cambio |
 |---------|--------|
-| Nueva migracion SQL | Agregar columnas `base_income` y `upsell_income` |
-| `src/integrations/supabase/types.ts` | Actualizar tipos de retainers |
-| `src/types/retainers.ts` | Actualizar tipos si es necesario |
-| `src/components/Retainers/RetainerFormDialog.tsx` | Dividir ingreso en base + upsell |
-| `src/components/Retainers/RetainersTable.tsx` | Mostrar indicador de upsell |
-| `src/hooks/useProfitabilityMetrics.ts` | Agregar metricas de expansion |
-| `src/components/Retainers/ProfitabilityDashboard/KPISummaryCards.tsx` | Card de Expansion MRR |
+| Nueva migración SQL | Agregar columnas `base_income` y `upsell_income` |
+| `src/integrations/supabase/types.ts` | Tipos actualizados |
+| `src/components/Retainers/RetainerFormDialog.tsx` | Campos separados base + upsell |
+| `src/components/Retainers/RetainersTable.tsx` | Indicador visual de upsell |
+| `src/hooks/useProfitabilityMetrics.ts` | Métricas de expansión |
+| `src/components/Retainers/ProfitabilityDashboard/KPISummaryCards.tsx` | Card Expansion MRR |
 
 ---
 
-## Seccion Tecnica
+## Ejemplo con Fernando Agreda
 
-- La migracion usa `DEFAULT 0` para que todos los valores existentes sean validos
-- Se actualiza `net_income` automaticamente al guardar (suma de base + upsell)
-- El calculo de churn NO cambia - sigue usando `net_income` para MRR total
-- Los upsells se consideran parte del cliente existente, no "nuevo MRR"
-- Para expansion revenue: solo se cuenta `upsell_income` de clientes activos
+Después de implementar:
+1. Editas a Fernando Agreda
+2. Pones: Base = $400, Upsell = $597
+3. El sistema calcula: net_income = $997
+4. En la tabla ves: "$997 (+$597)"
+5. En KPIs ves: "Expansion MRR: $597"
 
