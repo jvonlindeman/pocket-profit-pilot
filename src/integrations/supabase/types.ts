@@ -237,6 +237,7 @@ export type Database = {
         Row: {
           active: boolean
           articles_per_month: number
+          base_income: number
           canceled_at: string | null
           client_name: string
           client_status: string | null
@@ -254,11 +255,13 @@ export type Database = {
           specialty: string | null
           total_expenses: number
           updated_at: string
+          upsell_income: number
           uses_stripe: boolean
         }
         Insert: {
           active?: boolean
           articles_per_month?: number
+          base_income?: number
           canceled_at?: string | null
           client_name: string
           client_status?: string | null
@@ -276,11 +279,13 @@ export type Database = {
           specialty?: string | null
           total_expenses?: number
           updated_at?: string
+          upsell_income?: number
           uses_stripe?: boolean
         }
         Update: {
           active?: boolean
           articles_per_month?: number
+          base_income?: number
           canceled_at?: string | null
           client_name?: string
           client_status?: string | null
@@ -298,6 +303,7 @@ export type Database = {
           specialty?: string | null
           total_expenses?: number
           updated_at?: string
+          upsell_income?: number
           uses_stripe?: boolean
         }
         Relationships: []
