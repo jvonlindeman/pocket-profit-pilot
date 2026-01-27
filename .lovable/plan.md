@@ -1,183 +1,209 @@
 
 
-# Plan: Agregar filtros de Stripe, WhatsApp Bot y mejorar vista de inactivos
+# Plan: Agregar estado de Pausa a clientes
 
-## Situación actual
+## Concepto
 
-Los filtros existentes son:
-- Búsqueda por texto (cliente o especialidad)
-- Dropdown de especialidad
-- Toggle "Solo activos" (oculta inactivos cuando está ON)
+Agregar un tercer estado para clientes: **Pausado**. Un cliente pausado:
+- Sigue existiendo como cliente (no es un "logo" perdido)
+- Pero no genera ingresos temporalmente
 
-## Nuevos filtros a agregar
+## Estados de cliente
 
-| Filtro | Tipo | Comportamiento |
-|--------|------|----------------|
-| Stripe | Toggle/Checkbox | Mostrar solo clientes que usan Stripe |
-| WhatsApp Bot | Toggle/Checkbox | Mostrar solo clientes con bot de WA |
-| Estado | Select con 3 opciones | Todos / Solo activos / Solo perdidos |
+| Estado | active | canceled_at | paused_at | Descripción |
+|--------|--------|-------------|-----------|-------------|
+| Activo | true | null | null | Cliente normal generando MRR |
+| Pausado | true | null | fecha | Cliente temporalmente sin generar MRR |
+| Perdido | false | fecha | null | Cliente cancelado definitivamente |
 
----
+## Impacto en Churn Rate
 
-## Cambio en el filtro de estado
+| Métrica | Activo | Pausado | Perdido |
+|---------|--------|---------|---------|
+| Logo Churn (cuenta como cliente) | Si | Si | No |
+| Revenue Churn (cuenta en MRR) | Si | No | No |
+| Ending Active count | Si | Si | No |
+| Ending MRR | Si | No | No |
 
-Actualmente el toggle binario "Solo activos" no permite ver **solo** los perdidos. Lo cambiaremos a un Select con 3 opciones:
-
-| Opción | Muestra |
-|--------|---------|
-| Todos | Activos + Inactivos |
-| Solo activos | Solo `active = true` |
-| Solo perdidos | Solo `active = false` |
-
-Esto permite analizar específicamente los clientes que se fueron.
+Esto significa:
+- Un cliente pausado **no** incrementa `churnedThisPeriod` (logo churn)
+- Un cliente pausado **si** reduce el `endingMRR` (revenue churn)
+- El Retention Rate de logos no se ve afectado por pausas
+- El Net Revenue Retention baja cuando hay clientes pausados
 
 ---
 
 ## Diseño de UI
 
+### En la tabla de retainers
+
 ```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  Filtros                                                                    │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  [Buscar___________________]  [Especialidad ▼]  [Estado ▼]                 │
-│                                                                             │
-│  Servicios:                                                                 │
-│  ┌──────────────────┐  ┌──────────────────┐                                │
-│  │ ☐ Usa Stripe     │  │ ☐ WhatsApp Bot   │                                │
-│  └──────────────────┘  └──────────────────┘                                │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+| Cliente              | Espec. | Ingreso | ... | Estado |
+|----------------------|--------|---------|-----|--------|
+| Dr. Batista          | Cardio | $800    | ... | Activo |
+| Dr. Lopez            | Neuro  | $650    | ... | Pausado [icon] |
+| Clinica ABC          | Clinica| $1200   | ... | Perdido |
 ```
 
----
+El indicador visual cambia:
+- Verde: Activo
+- Amarillo/Naranja: Pausado
+- Rojo: Perdido/Cancelado
 
-## Lógica de filtrado actualizada
+### En el formulario de edición
 
-```typescript
-const filtered = React.useMemo(() => {
-  return rows.filter((r) => {
-    // Filtro de estado (nuevo)
-    if (statusFilter === "active" && !r.active) return false;
-    if (statusFilter === "lost" && r.active) return false;
-    // statusFilter === "all" muestra todos
-    
-    // Filtro de Stripe (nuevo)
-    if (stripeOnly && !r.uses_stripe) return false;
-    
-    // Filtro de WhatsApp Bot (nuevo)
-    if (whatsappOnly && !r.has_whatsapp_bot) return false;
-    
-    // Filtro de especialidad (existente)
-    if (specialty !== "ALL" && (r.specialty ?? "") !== specialty) return false;
-    
-    // Búsqueda de texto (existente)
-    if (search) {
-      const s = search.toLowerCase();
-      if (!r.client_name.toLowerCase().includes(s) && 
-          !(r.specialty ?? "").toLowerCase().includes(s)) return false;
-    }
-    
-    return true;
-  });
-}, [rows, statusFilter, stripeOnly, whatsappOnly, specialty, search]);
+```text
+Estado del cliente:
+┌─────────────────────────────────────────────┐
+│ ( ) Activo                                  │
+│ ( ) Pausado   [Fecha de pausa: ____]        │
+│ ( ) Cancelado [Fecha de baja: ____]         │
+└─────────────────────────────────────────────┘
 ```
+
+### En los filtros
+
+El filtro de "Estado" tendrá 4 opciones:
+- Todos
+- Solo activos (incluye pausados)
+- Solo pausados
+- Solo perdidos
 
 ---
 
 ## Sección Técnica
 
-### Archivo a modificar
+### 1. Migración de base de datos
 
-`src/pages/Retainers.tsx`
+Agregar columna `paused_at` a la tabla `retainers`:
 
-### Nuevos estados
+```sql
+ALTER TABLE retainers 
+ADD COLUMN paused_at timestamptz DEFAULT NULL;
 
-```typescript
-// Reemplazar onlyActive por statusFilter
-const [statusFilter, setStatusFilter] = React.useState<"all" | "active" | "lost">("active");
-
-// Nuevos filtros booleanos
-const [stripeOnly, setStripeOnly] = React.useState(false);
-const [whatsappOnly, setWhatsappOnly] = React.useState(false);
+COMMENT ON COLUMN retainers.paused_at IS 'Fecha en que el cliente entró en pausa. NULL = no está pausado.';
 ```
 
-### Nueva UI de filtros
+### 2. Actualizar tipos TypeScript
 
+Archivo: `src/integrations/supabase/types.ts`
+
+El tipo se regenerará automáticamente con la migración, pero incluirá:
 ```typescript
-<CardContent>
-  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-    {/* Búsqueda - existente */}
-    <div className="md:col-span-2">
-      <label className="text-sm">Buscar</label>
-      <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cliente o especialidad" />
-    </div>
-    
-    {/* Especialidad - existente */}
-    <div>
-      <label className="text-sm">Especialidad</label>
-      <Select value={specialty} onValueChange={setSpecialty}>
-        <SelectTrigger>
-          <SelectValue placeholder="Todas" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="ALL">Todas</SelectItem>
-          {specialties.map((s) => (
-            <SelectItem key={s} value={s}>{s}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-    
-    {/* Estado - NUEVO (reemplaza toggle) */}
-    <div>
-      <label className="text-sm">Estado</label>
-      <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | "active" | "lost")}>
-        <SelectTrigger>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Todos</SelectItem>
-          <SelectItem value="active">Solo activos</SelectItem>
-          <SelectItem value="lost">Solo perdidos</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-  </div>
-  
-  {/* Fila de checkboxes para servicios */}
-  <div className="flex flex-wrap gap-4 mt-4">
-    <div className="flex items-center gap-2">
-      <Checkbox 
-        id="stripeOnly" 
-        checked={stripeOnly} 
-        onCheckedChange={(checked) => setStripeOnly(!!checked)} 
-      />
-      <label htmlFor="stripeOnly" className="text-sm flex items-center gap-1">
-        <CreditCard className="h-4 w-4" /> Usa Stripe
-      </label>
-    </div>
-    <div className="flex items-center gap-2">
-      <Checkbox 
-        id="whatsappOnly" 
-        checked={whatsappOnly} 
-        onCheckedChange={(checked) => setWhatsappOnly(!!checked)} 
-      />
-      <label htmlFor="whatsappOnly" className="text-sm flex items-center gap-1">
-        <MessageSquare className="h-4 w-4" /> WhatsApp Bot
-      </label>
-    </div>
-  </div>
-</CardContent>
+paused_at: string | null
 ```
+
+### 3. Modificar cálculo de Churn
+
+Archivo: `src/hooks/useChurnCalculator.ts`
+
+Lógica actualizada:
+```typescript
+const pausedAt: Date | null = toDate((r as any).paused_at);
+
+// Un cliente está "activo para logos" si:
+// - Fue creado antes del período Y
+// - No está cancelado (o fue cancelado después del período)
+// Nota: pausado NO afecta logo churn
+
+// Para Revenue Churn, un cliente pausado NO contribuye al MRR
+const isPausedDuringPeriod = !!pausedAt && isOnOrBefore(pausedAt, periodEnd);
+
+// Logo Churn (sin cambios para pausados)
+if (wasActiveAtEnd) endingActive += 1;
+
+// Revenue Churn (pausados no contribuyen)
+if (wasActiveAtEnd && !isPausedDuringPeriod) {
+  endingMRR += netIncome;
+}
+```
+
+### 4. Actualizar métricas de Churn
+
+Agregar nuevas métricas al tipo `ChurnMetrics`:
+```typescript
+pausedCount: number;      // Clientes actualmente pausados
+pausedMRR: number;        // MRR de clientes pausados
+```
+
+### 5. Actualizar formulario de edición
+
+Archivo: `src/components/Retainers/RetainerFormDialog.tsx`
+
+Cambiar de toggle "Activo" a radio buttons con 3 estados:
+- Activo
+- Pausado (muestra campo fecha de pausa)
+- Cancelado (muestra campo fecha de baja)
+
+### 6. Actualizar tabla de retainers
+
+Archivo: `src/components/Retainers/RetainersTable.tsx`
+
+Cambiar indicador de estado:
+```typescript
+// Color del indicador
+const getStatusColor = (r: RetainerRow) => {
+  if (!r.active) return 'bg-red-500';      // Perdido
+  if (r.paused_at) return 'bg-yellow-500'; // Pausado
+  return 'bg-green-500';                   // Activo
+};
+
+// Tooltip o texto
+const getStatusLabel = (r: RetainerRow) => {
+  if (!r.active) return 'Perdido';
+  if (r.paused_at) return 'Pausado';
+  return 'Activo';
+};
+```
+
+### 7. Actualizar filtros
+
+Archivo: `src/pages/Retainers.tsx`
+
+Cambiar el Select de estado:
+```typescript
+type StatusFilter = "all" | "active" | "paused" | "lost";
+
+// En el filtrado:
+if (statusFilter === "active" && (!r.active || r.paused_at)) return false;
+if (statusFilter === "paused" && (!r.active || !r.paused_at)) return false;
+if (statusFilter === "lost" && r.active) return false;
+```
+
+### 8. Actualizar sección de Churn en UI
+
+Mostrar nuevas métricas:
+```text
+┌─────────────────────────────────────────────────────────┐
+│ Churn Rate (Enero 2026)                                │
+├─────────────────────────────────────────────────────────┤
+│ Logo Retention: 95.2%  │  Revenue Retention: 89.5%     │
+│ Perdidos: 2            │  Pausados: 3 ($1,500 MRR)     │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Archivos a modificar
+
+| Archivo | Cambio |
+|---------|--------|
+| Migración SQL | Agregar columna `paused_at` |
+| `src/integrations/supabase/types.ts` | Se regenera automáticamente |
+| `src/hooks/useChurnCalculator.ts` | Lógica de churn parcial para pausados |
+| `src/components/Retainers/RetainerFormDialog.tsx` | Radio buttons para estado |
+| `src/components/Retainers/RetainersTable.tsx` | Indicador visual de pausa |
+| `src/pages/Retainers.tsx` | Filtro "Solo pausados" |
+| `src/types/retainers.ts` | Helpers para estado de cliente |
 
 ---
 
 ## Resultado esperado
 
-- Dropdown de Estado con 3 opciones: Todos / Solo activos / Solo perdidos
-- Checkbox para filtrar solo clientes con Stripe
-- Checkbox para filtrar solo clientes con WhatsApp Bot
-- Los filtros son combinables (ej: "Solo perdidos" + "Usa Stripe" = clientes perdidos que usaban Stripe)
-- Contadores en los headers de grupo se actualizan según los filtros aplicados
+- Nuevo estado "Pausado" disponible para clientes
+- Los clientes pausados siguen contando como "logos activos"
+- Los clientes pausados NO contribuyen al MRR (afecta Revenue Churn)
+- UI clara con indicadores de color (verde/amarillo/rojo)
+- Filtros actualizados para ver solo pausados
+- Métricas de churn muestran cuántos clientes y MRR están pausados
 
