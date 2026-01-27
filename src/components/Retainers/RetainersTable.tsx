@@ -47,6 +47,27 @@ function getStatusBadgeClass(status: string | null): string {
   return statusColors[status] || 'bg-gray-100 text-gray-600 border-gray-200';
 }
 
+// Mapeo de colores pastel para el fondo de la fila segun estado
+function getRowBgClass(status: string | null): string {
+  if (!status) return '';
+  
+  const rowColors: Record<string, string> = {
+    'OK': 'bg-green-50/70',
+    'Agradecido': 'bg-green-50/70',
+    'En seguimiento': 'bg-blue-50/70',
+    'Esperando respuesta': 'bg-blue-50/70',
+    'Duda o consulta': 'bg-amber-50/70',
+    'Con pendiente': 'bg-amber-50/70',
+    'Insatisfecho leve': 'bg-orange-50/70',
+    'Enojado': 'bg-red-50/60',
+    'Frustrado': 'bg-red-50/60',
+    'Amenaza con irse': 'bg-red-50/60',
+    'Reclamo grave': 'bg-red-50/60',
+  };
+  
+  return rowColors[status] || '';
+}
+
 export const RetainersTable: React.FC<Props> = ({ data, onEdit, onDelete }) => {
   return (
     <div className="overflow-x-auto border rounded-md">
@@ -82,7 +103,7 @@ export const RetainersTable: React.FC<Props> = ({ data, onEdit, onDelete }) => {
             const clientStatus = (r as any).client_status as string | null;
             
             return (
-              <TableRow key={r.id}>
+              <TableRow key={r.id} className={getRowBgClass(clientStatus)}>
                 <TableCell className="font-medium py-2">
                   <div className="flex items-center gap-1.5">
                     <span className={`w-2 h-2 rounded-full flex-shrink-0 ${getStatusColor()}`} />
@@ -122,7 +143,7 @@ export const RetainersTable: React.FC<Props> = ({ data, onEdit, onDelete }) => {
                 <TableCell className={`py-2 text-sm ${r.canceled_at ? "text-destructive" : ""}`}>
                   {formatDate(r.canceled_at)}
                 </TableCell>
-                <TableCell className="sticky right-0 bg-background shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] py-2">
+                <TableCell className={`sticky right-0 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] py-2 ${getRowBgClass(clientStatus) || 'bg-background'}`}>
                   <div className="flex gap-1">
                     <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => onEdit(r)}>
                       <Pencil className="h-4 w-4" />
