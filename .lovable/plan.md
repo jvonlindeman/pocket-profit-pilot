@@ -1,130 +1,139 @@
 
 
-# Corregir Mapeo de Colores para Estados con Emojis
+# Agregar Sistema de Upsells para Retainers
 
-## Problema Identificado
+## Objetivo
 
-Los valores de `client_status` en la base de datos incluyen emojis al inicio:
-- `🟢 Agradecido`
-- `🟢 En seguimiento`  
-- `🟡 Esperando respuesta`
-- `🟡 Duda o consulta`
-
-El codigo actual busca coincidencias exactas como `"En seguimiento"`, pero no encuentra match porque el valor real es `"🟢 En seguimiento"`.
+Implementar un sistema para trackear upsells (ventas adicionales) en clientes existentes, permitiendo ver el crecimiento del MRR por cliente y calcular metricas de expansion revenue.
 
 ---
 
-## Solucion
+## Enfoque Propuesto
 
-Modificar la funcion `getRowBgClass()` para que busque si el status **contiene** alguna de las palabras clave, en lugar de requerir una coincidencia exacta.
+Agregar dos campos nuevos a la tabla `retainers`:
+
+| Campo | Tipo | Descripcion |
+|-------|------|-------------|
+| `base_income` | numeric | MRR inicial cuando el cliente empezo |
+| `upsell_income` | numeric | Suma de todos los upsells vendidos |
+
+La formula seria: `net_income = base_income + upsell_income`
+
+Esto permite:
+- Ver cuanto paga cada cliente de base vs upsells
+- Calcular **Expansion MRR** (crecimiento por upsells)
+- Identificar clientes con mayor potencial de crecimiento
 
 ---
 
-## Cambios en RetainersTable.tsx
+## Vista en Formulario
 
-### Reemplazar la funcion getRowBgClass (lineas 50-69)
-
-```typescript
-// Mapeo de colores pastel para el fondo de la fila segun estado
-function getRowBgClass(status: string | null): string {
-  if (!status) return '';
-  
-  // Buscar por contenido, no coincidencia exacta (los estados pueden tener emojis)
-  const statusLower = status.toLowerCase();
-  
-  // Estados positivos - verde pastel
-  if (statusLower.includes('ok') || statusLower.includes('agradecido')) {
-    return 'bg-green-50/70';
-  }
-  
-  // Estados de seguimiento - azul pastel
-  if (statusLower.includes('seguimiento') || statusLower.includes('esperando')) {
-    return 'bg-blue-50/70';
-  }
-  
-  // Estados de atencion - amarillo/ambar pastel
-  if (statusLower.includes('duda') || statusLower.includes('consulta') || statusLower.includes('pendiente')) {
-    return 'bg-amber-50/70';
-  }
-  
-  // Estados de alerta leve - naranja pastel
-  if (statusLower.includes('insatisfecho')) {
-    return 'bg-orange-50/70';
-  }
-  
-  // Estados criticos - rojo pastel
-  if (statusLower.includes('enojado') || statusLower.includes('frustrado') || 
-      statusLower.includes('amenaza') || statusLower.includes('reclamo')) {
-    return 'bg-red-50/60';
-  }
-  
-  return '';
-}
-```
-
-### Actualizar tambien getStatusBadgeClass (lineas 45-48)
-
-```typescript
-function getStatusBadgeClass(status: string | null): string {
-  if (!status) return 'bg-gray-100 text-gray-500 border-gray-200';
-  
-  const statusLower = status.toLowerCase();
-  
-  // Estados positivos
-  if (statusLower.includes('ok') || statusLower.includes('agradecido')) {
-    return 'bg-green-100 text-green-800 border-green-200';
-  }
-  
-  // Estados de seguimiento
-  if (statusLower.includes('seguimiento') || statusLower.includes('esperando')) {
-    return 'bg-blue-100 text-blue-800 border-blue-200';
-  }
-  
-  // Estados de atencion
-  if (statusLower.includes('duda') || statusLower.includes('consulta') || statusLower.includes('pendiente')) {
-    return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-  }
-  
-  // Estados de alerta
-  if (statusLower.includes('insatisfecho')) {
-    return 'bg-orange-100 text-orange-800 border-orange-200';
-  }
-  
-  // Estados criticos
-  if (statusLower.includes('enojado') || statusLower.includes('frustrado') || 
-      statusLower.includes('amenaza') || statusLower.includes('reclamo')) {
-    return 'bg-red-100 text-red-800 border-red-200';
-  }
-  
-  return 'bg-gray-100 text-gray-600 border-gray-200';
-}
+```text
++------------------------------------------+
+| Ingreso base        | $400              | <- Lo que pagaba antes
++------------------------------------------+
+| Upsells             | $597              | <- Lo que le vendiste adicional
++------------------------------------------+
+| Total MRR           | $997 (calculado)  | <- Suma automatica
++------------------------------------------+
 ```
 
 ---
 
-## Resultado Esperado
+## Vista en Tabla
 
-Con esta correccion:
-- `🟢 Agradecido` -> detecta "agradecido" -> aplica `bg-green-50/70`
-- `🟡 Esperando respuesta` -> detecta "esperando" -> aplica `bg-blue-50/70`
-- `🟡 Duda o consulta` -> detecta "duda" -> aplica `bg-amber-50/70`
+Nueva columna o tooltip mostrando el desglose:
 
-Las filas ahora mostraran los colores pastel correctos independientemente de si tienen emojis u otros prefijos.
+```text
+| Cliente         | MRR     | Upsell  | Margen |
+|-----------------|---------|---------|--------|
+| Fernando Agreda | $997    | +$597   | 45%    |
+| Otro Cliente    | $500    | -       | 60%    |
+```
+
+Los clientes con upsells mostrarian un indicador visual (ej. flecha verde hacia arriba).
 
 ---
 
-## Archivo a Modificar
+## Cambios Necesarios
+
+### 1. Base de Datos (Migracion)
+
+Agregar columnas a tabla `retainers`:
+```sql
+ALTER TABLE retainers
+ADD COLUMN base_income numeric NOT NULL DEFAULT 0,
+ADD COLUMN upsell_income numeric NOT NULL DEFAULT 0;
+```
+
+### 2. Actualizar Tipos (src/integrations/supabase/types.ts)
+
+Agregar `base_income` y `upsell_income` a los tipos Row/Insert/Update de retainers.
+
+### 3. Formulario (RetainerFormDialog.tsx)
+
+- Cambiar campo "Ingreso neto" por dos campos: "Ingreso base" y "Upsells"
+- Mostrar el total calculado (readonly)
+- Al guardar: `net_income = base_income + upsell_income`
+
+### 4. Tabla (RetainersTable.tsx)
+
+- Agregar indicador visual en columna MRR cuando hay upsells
+- Tooltip mostrando desglose: "Base: $400 + Upsell: $597"
+
+### 5. Metricas de Expansion (useProfitabilityMetrics.ts)
+
+Agregar nuevas metricas:
+- `totalUpsellRevenue`: Suma de todos los upsells
+- `clientsWithUpsells`: Cantidad de clientes con upsells
+- `expansionRate`: Porcentaje de ingresos provenientes de upsells
+
+### 6. KPIs en Dashboard de Rentabilidad
+
+Nuevo card mostrando:
+- **Expansion MRR**: $X,XXX (suma de upsells)
+- **% Expansion**: X% del MRR total viene de upsells
+
+---
+
+## Migracion de Datos Existentes
+
+Para clientes actuales, se asume:
+- `base_income = net_income` (todo el ingreso actual es base)
+- `upsell_income = 0`
+
+Puedes ajustar manualmente los clientes que ya tenian upsells.
+
+---
+
+## Ejemplo con tu Caso
+
+Fernando Agreda:
+- Antes: `net_income = 400`, `base_income = 0`, `upsell_income = 0`
+- Despues de migracion: `base_income = 400`, `upsell_income = 0`
+- Despues del upsell: `base_income = 400`, `upsell_income = 597`, `net_income = 997`
+
+---
+
+## Archivos a Modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/components/Retainers/RetainersTable.tsx` | Cambiar funciones de mapeo para usar `includes()` en lugar de coincidencia exacta |
+| Nueva migracion SQL | Agregar columnas `base_income` y `upsell_income` |
+| `src/integrations/supabase/types.ts` | Actualizar tipos de retainers |
+| `src/types/retainers.ts` | Actualizar tipos si es necesario |
+| `src/components/Retainers/RetainerFormDialog.tsx` | Dividir ingreso en base + upsell |
+| `src/components/Retainers/RetainersTable.tsx` | Mostrar indicador de upsell |
+| `src/hooks/useProfitabilityMetrics.ts` | Agregar metricas de expansion |
+| `src/components/Retainers/ProfitabilityDashboard/KPISummaryCards.tsx` | Card de Expansion MRR |
 
 ---
 
 ## Seccion Tecnica
 
-- Se usa `toLowerCase()` para hacer la comparacion case-insensitive
-- Se usa `includes()` para buscar subcadenas en lugar de coincidencia exacta
-- El orden de las condiciones importa: se evaluan de mas especifico a mas general
-- Esto hace el codigo mas robusto ante variaciones en el formato del status
+- La migracion usa `DEFAULT 0` para que todos los valores existentes sean validos
+- Se actualiza `net_income` automaticamente al guardar (suma de base + upsell)
+- El calculo de churn NO cambia - sigue usando `net_income` para MRR total
+- Los upsells se consideran parte del cliente existente, no "nuevo MRR"
+- Para expansion revenue: solo se cuenta `upsell_income` de clientes activos
 
