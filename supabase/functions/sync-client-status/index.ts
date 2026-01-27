@@ -51,6 +51,10 @@ Deno.serve(async (req) => {
 
     console.log(`[sync-client-status] User ${user.id} triggered sync`);
 
+    // Check for debug mode
+    const url = new URL(req.url);
+    const debugMode = url.searchParams.get("debug") === "true";
+
     // Fetch data from n8n webhook
     const webhookResponse = await fetch(N8N_WEBHOOK_URL, {
       method: "GET",
@@ -68,6 +72,22 @@ Deno.serve(async (req) => {
     // Parse response and handle different formats
     const rawResponse = await webhookResponse.json();
     console.log(`[sync-client-status] Raw response type: ${typeof rawResponse}, isArray: ${Array.isArray(rawResponse)}`);
+
+    // If debug mode, return raw response for inspection
+    if (debugMode) {
+      return new Response(
+        JSON.stringify({
+          debug: true,
+          responseType: typeof rawResponse,
+          isArray: Array.isArray(rawResponse),
+          keys: rawResponse && typeof rawResponse === 'object' ? Object.keys(rawResponse) : null,
+          itemCount: Array.isArray(rawResponse) ? rawResponse.length : null,
+          rawData: rawResponse,
+          sampleItem: Array.isArray(rawResponse) && rawResponse.length > 0 ? rawResponse[0] : null,
+        }, null, 2),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Handle both array and wrapped object formats
     let clientStatuses: N8nClientStatus[];
