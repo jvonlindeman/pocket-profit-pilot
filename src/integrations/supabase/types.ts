@@ -244,6 +244,7 @@ export type Database = {
           id: string
           is_legacy: boolean
           metadata: Json
+          n8n_id: string | null
           net_income: number
           notes: string | null
           paused_at: string | null
@@ -263,6 +264,7 @@ export type Database = {
           id?: string
           is_legacy?: boolean
           metadata?: Json
+          n8n_id?: string | null
           net_income?: number
           notes?: string | null
           paused_at?: string | null
@@ -282,6 +284,7 @@ export type Database = {
           id?: string
           is_legacy?: boolean
           metadata?: Json
+          n8n_id?: string | null
           net_income?: number
           notes?: string | null
           paused_at?: string | null
