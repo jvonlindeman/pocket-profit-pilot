@@ -411,12 +411,24 @@ const RetainersPage: React.FC = () => {
                   <div className="text-xl font-semibold">{formatCurrency(churn.startingMRR)}</div>
                 </div>
                 <div className="border rounded-md p-3">
-                  <div className="text-sm text-muted-foreground">MRR Nuevo</div>
-                  <div className="text-xl font-semibold text-green-600">{formatCurrency(churn.newMRR)}</div>
+                  <div className="text-sm text-muted-foreground">MRR Nuevo (Net)</div>
+                  <div className="text-xl font-semibold text-green-600">{formatCurrency(churn.netNewMRR)}</div>
+                  <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                    <div>Clientes nuevos: {formatCurrency(churn.newMRR)}</div>
+                    {churn.expansionMRR > 0 && (
+                      <div className="text-green-600">+ Expansion: {formatCurrency(churn.expansionMRR)}</div>
+                    )}
+                  </div>
                 </div>
                 <div className="border rounded-md p-3">
-                  <div className="text-sm text-muted-foreground">MRR Perdido</div>
-                  <div className="text-xl font-semibold text-red-600">{formatCurrency(churn.churnedMRR)}</div>
+                  <div className="text-sm text-muted-foreground">MRR Perdido (Gross)</div>
+                  <div className="text-xl font-semibold text-red-600">{formatCurrency(churn.grossRevenueChurn)}</div>
+                  <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                    <div>Cancelaciones: {formatCurrency(churn.churnedMRR)}</div>
+                    {churn.contractionMRR > 0 && (
+                      <div className="text-red-600">+ Contraction: {formatCurrency(churn.contractionMRR)}</div>
+                    )}
+                  </div>
                 </div>
                 <div className="border rounded-md p-3">
                   <div className="text-sm text-muted-foreground">MRR Pausado</div>
