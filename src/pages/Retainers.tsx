@@ -8,11 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { useRetainersQuery, useCreateRetainer, useUpdateRetainer, useDeleteRetainer, upsertByClientName } from "@/hooks/queries/useRetainers";
 import type { RetainerInsert, RetainerRow } from "@/types/retainers";
-import { RetainersTable } from "@/components/Retainers/RetainersTable";
 import { RetainerFormDialog } from "@/components/Retainers/RetainerFormDialog";
 import { CsvPasteDialog } from "@/components/Retainers/CsvPasteDialog";
+import { GroupedRetainersSection } from "@/components/Retainers/GroupedRetainersSection";
 import { useChurnMetrics } from "@/hooks/useChurnCalculator";
 import { ProfitabilityDashboard } from "@/components/Retainers/ProfitabilityDashboard";
+import { isMedicalClient } from "@/utils/retainerClassification";
+
 function useSEO() {
   React.useEffect(() => {
     const title = "Retainers | Gestión de clientes retainer";
@@ -109,6 +111,20 @@ const RetainersPage: React.FC = () => {
       return true;
     });
   }, [rows, onlyActive, specialty, search]);
+
+  // Separate filtered retainers into Doctor Premier and Webart groups
+  const { doctorPremier, webart } = React.useMemo(() => {
+    const dp: RetainerRow[] = [];
+    const wa: RetainerRow[] = [];
+    for (const r of filtered) {
+      if (isMedicalClient(r.specialty)) {
+        dp.push(r);
+      } else {
+        wa.push(r);
+      }
+    }
+    return { doctorPremier: dp, webart: wa };
+  }, [filtered]);
 
   const countsBySpecialty = React.useMemo(() => {
     const map = new Map<string, number>();
@@ -224,15 +240,31 @@ const RetainersPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <section className="mt-6">
+      <section className="mt-6 space-y-4">
         {isLoading ? (
           <div>Cargando...</div>
         ) : (
-          <RetainersTable
-            data={filtered}
-            onEdit={(row) => { setEditing(row); setFormOpen(true); }}
-            onDelete={handleDelete}
-          />
+          <>
+            <GroupedRetainersSection
+              title="Doctor Premier"
+              variant="doctor-premier"
+              retainers={doctorPremier}
+              onEdit={(row) => { setEditing(row); setFormOpen(true); }}
+              onDelete={handleDelete}
+            />
+            <GroupedRetainersSection
+              title="Webart"
+              variant="webart"
+              retainers={webart}
+              onEdit={(row) => { setEditing(row); setFormOpen(true); }}
+              onDelete={handleDelete}
+            />
+            {doctorPremier.length === 0 && webart.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                No se encontraron retainers con los filtros actuales.
+              </div>
+            )}
+          </>
         )}
       </section>
 
