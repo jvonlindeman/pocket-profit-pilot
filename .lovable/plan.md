@@ -1,147 +1,177 @@
 
 
-# Plan: Optimizar tabla de Retainers para eliminar scroll horizontal
+# Plan: Agrupar clientes en Doctor Premier y Webart
 
-## Problema
+## Objetivo
 
-La tabla actual tiene 13 columnas, lo que causa:
-- Scroll horizontal obligatorio para ver los botones de acción
-- Filas muy anchas que no caben en pantalla
-- Mala experiencia de usuario al editar/eliminar
-
-## Solución propuesta
-
-Implementar **columna de acciones sticky** + **diseño compacto** para que todo quepa sin scroll horizontal.
+Separar visualmente los retainers en dos secciones:
+- **Doctor Premier**: Clientes médicos (clínicas, doctores, hospitales, laboratorios)
+- **Webart**: Clientes no médicos (empresas, comercios, servicios generales)
 
 ---
 
-## Cambios a implementar
+## Lógica de clasificación
 
-### 1. Columna de acciones "sticky" (fija a la derecha)
+| Grupo | Criterio |
+|-------|----------|
+| Doctor Premier | Tiene `specialty` médica (cualquier valor excepto Funeraria) |
+| Webart | `specialty` es NULL, vacío, o "Funeraria" |
 
-La columna de acciones permanecerá visible mientras se hace scroll horizontal, usando `position: sticky` y `right: 0`.
+### Especialidades médicas detectadas:
+Alergologo, Cardiologo, Cardiovascular, Cirujano, Cirujano Plástico, Clinica Radiologia, Clínica Ultrasonidos, Dentista, Dermatologo, Fondoaudiologa, Gastro, Ginecologo, Hospital, Internista, Laboratorio, Oftalmologo, Oncologo, Ortopeda, Otorrino, Resonancia, Urólogo, Varices
 
-### 2. Consolidar columnas para reducir ancho
-
-| Antes | Después |
-|-------|---------|
-| Stripe (columna separada) | Iconos en la celda de Cliente |
-| WA Bot (columna separada) | Iconos en la celda de Cliente |
-| Activo (columna separada) | Badge de color en Cliente |
-| Margen + Margen % (2 cols) | Una sola columna con ambos valores |
-
-### 3. Diseño compacto de celdas
-
-- Reducir padding de celdas
-- Usar texto más pequeño donde sea apropiado
-- Iconos en lugar de texto "Sí/No"
+### Especialidades no médicas:
+Funeraria, NULL (sin especialidad)
 
 ---
 
-## Nueva estructura de columnas (8 en lugar de 13)
-
-| Columna | Contenido |
-|---------|-----------|
-| Cliente | Nombre + badges (Legacy, Stripe, WA Bot) + indicador activo/inactivo |
-| Especialidad | Texto corto |
-| Ingreso | Monto formateado |
-| Redes | Costo redes sociales |
-| Gastos | Total gastos |
-| Margen | Monto + porcentaje en una línea |
-| Fecha baja | Fecha o "-" |
-| Acciones | Botones sticky siempre visibles |
-
----
-
-## Mockup visual
+## Diseño de la UI
 
 ```text
-┌──────────────────────────────────────────────────────────────────────────┐
-│ Cliente              │ Espec. │ Ingreso │ Redes │ Gastos │ Margen      │ Baja │ Acciones │
-├──────────────────────────────────────────────────────────────────────────┤
-│ Acme Corp            │ Salud  │ $2,500  │ $200  │ $800   │ $1,700 (68%)│  -   │ [✏️][🗑️] │
-│ 🟢 Legacy 💳 📱      │        │         │       │        │             │      │  ← sticky│
-├──────────────────────────────────────────────────────────────────────────┤
-│ Beta Inc             │ Legal  │ $1,800  │ $150  │ $600   │ $1,200 (67%)│  -   │ [✏️][🗑️] │
-│ 🟢 💳               │        │         │       │        │             │      │          │
-└──────────────────────────────────────────────────────────────────────────┘
-
-Leyenda iconos:
-🟢/🔴 = Activo/Inactivo
-💳 = Usa Stripe  
-📱 = WhatsApp Bot
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  [Botones: Agregar | Importar CSV | Exportar CSV]                           │
+│  [Filtros: Buscar | Especialidad | Solo activos]                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │  DOCTOR PREMIER                                    43 clientes | $28,000 ││
+│  ├─────────────────────────────────────────────────────────────────────────┤│
+│  │  | Cliente     | Espec.   | Ingreso | Redes | Gastos | Margen   | Baja | ││
+│  │  | Dr. Batista | Alergo   | $850    | $0    | $200   | $650 77% |  -   | ││
+│  │  | Dr. Effio   | Cardio   | $800    | $100  | $300   | $500 63% |  -   | ││
+│  │  | ...         | ...      | ...     | ...   | ...    | ...      | ...  | ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │  WEBART                                            23 clientes | $14,000 ││
+│  ├─────────────────────────────────────────────────────────────────────────┤│
+│  │  | Cliente      | Espec.     | Ingreso | Redes | Gastos | Margen | Baja | ││
+│  │  | Alfa Panama  | -          | $500    | $0    | $150   | $350   |  -   | ││
+│  │  | Arcom        | -          | $1180   | $200  | $400   | $780   |  -   | ││
+│  │  | Fudimi       | Funeraria  | $1100   | $150  | $350   | $750   |  -   | ││
+│  │  | ...          | ...        | ...     | ...   | ...    | ...    | ...  | ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+│                                                                             │
+│  [Resumen | Churn | Dashboard de Rentabilidad]                              │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Componentes a crear/modificar
+
+| Archivo | Cambio |
+|---------|--------|
+| `src/utils/retainerClassification.ts` | Nuevo: lógica para clasificar médico/no-médico |
+| `src/components/Retainers/GroupedRetainersSection.tsx` | Nuevo: sección con header del grupo + tabla |
+| `src/pages/Retainers.tsx` | Modificar: usar secciones agrupadas en lugar de una sola tabla |
+
+---
+
+## Detalle de cada sección
+
+Cada grupo mostrará:
+- **Header con nombre del grupo** (Doctor Premier / Webart)
+- **KPIs rápidos**: cantidad de clientes, MRR total del grupo
+- **Tabla de retainers** (la misma estructura optimizada actual)
+- **Colapsable** (opcional): poder expandir/contraer cada sección
 
 ---
 
 ## Sección Técnica
 
-### Archivo a modificar
-
-`src/components/Retainers/RetainersTable.tsx`
-
-### Cambios específicos
-
-**1. Columna sticky para acciones:**
+### Archivo: `src/utils/retainerClassification.ts`
 
 ```typescript
-// En TableHead de Acciones
-<TableHead className="sticky right-0 bg-background shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">
-  Acciones
-</TableHead>
+// Lista de especialidades médicas conocidas
+const MEDICAL_SPECIALTIES = [
+  "Alergologo", "Cardiologo", "Cardiovascular", 
+  "Cirjuano Cardiovascular", "Cirujano", "Cirujano Plástico",
+  "Clinica Radiologia", "Clínica Ultrasonidos", "Dentista",
+  "Dermatologo", "Fondoaudiologa", "Gastro", "Ginecologo",
+  "Hospital", "Internista", "Laboratorio", "Oftalmologo",
+  "Oncologo", "Ortopeda", "Otorrino", "Resonancia", 
+  "Urólogo", "Varices"
+];
 
-// En TableCell de Acciones  
-<TableCell className="sticky right-0 bg-background shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">
-  ...botones
-</TableCell>
+export function isMedicalClient(specialty: string | null): boolean {
+  if (!specialty) return false;
+  return MEDICAL_SPECIALTIES.some(
+    s => s.toLowerCase() === specialty.toLowerCase()
+  );
+}
+
+export type ClientGroup = "doctor-premier" | "webart";
+
+export function getClientGroup(specialty: string | null): ClientGroup {
+  return isMedicalClient(specialty) ? "doctor-premier" : "webart";
+}
 ```
 
-**2. Consolidar Cliente con iconos:**
+### Archivo: `src/components/Retainers/GroupedRetainersSection.tsx`
 
 ```typescript
-<TableCell className="font-medium">
-  <div className="flex items-center gap-1">
-    <span className={`w-2 h-2 rounded-full ${r.active ? 'bg-green-500' : 'bg-red-500'}`} />
-    <span>{r.client_name}</span>
-    {row.is_legacy && <Badge variant="outline" className="text-xs">L</Badge>}
-    {row.uses_stripe && <CreditCard className="h-3 w-3 text-muted-foreground" />}
-    {row.has_whatsapp_bot && <MessageSquare className="h-3 w-3 text-muted-foreground" />}
-  </div>
-</TableCell>
+interface Props {
+  title: string;
+  icon?: React.ReactNode;
+  retainers: RetainerRow[];
+  onEdit: (row: RetainerRow) => void;
+  onDelete: (row: RetainerRow) => void;
+}
+
+// Componente que muestra:
+// 1. Collapsible header con título + métricas
+// 2. Tabla de retainers cuando está expandido
 ```
 
-**3. Combinar Margen + Margen%:**
+### Cambios en `src/pages/Retainers.tsx`
 
 ```typescript
-<TableCell className="text-right">
-  <div>
-    <div className="font-medium">{formatCurrency(margin)}</div>
-    <div className="text-xs text-muted-foreground">{marginPct.toFixed(1)}%</div>
-  </div>
-</TableCell>
+// Separar los retainers filtrados en dos grupos
+const { doctorPremier, webart } = React.useMemo(() => {
+  const dp: RetainerRow[] = [];
+  const wa: RetainerRow[] = [];
+  for (const r of filtered) {
+    if (isMedicalClient(r.specialty)) {
+      dp.push(r);
+    } else {
+      wa.push(r);
+    }
+  }
+  return { doctorPremier: dp, webart: wa };
+}, [filtered]);
+
+// Renderizar dos secciones separadas
+<GroupedRetainersSection
+  title="Doctor Premier"
+  retainers={doctorPremier}
+  ...
+/>
+<GroupedRetainersSection
+  title="Webart"
+  retainers={webart}
+  ...
+/>
 ```
 
-**4. Botones de acción compactos con iconos:**
+---
 
-```typescript
-<TableCell className="sticky right-0 bg-background">
-  <div className="flex gap-1">
-    <Button size="icon" variant="ghost" onClick={() => onEdit(r)}>
-      <Pencil className="h-4 w-4" />
-    </Button>
-    <Button size="icon" variant="ghost" className="text-destructive" onClick={() => onDelete(r)}>
-      <Trash2 className="h-4 w-4" />
-    </Button>
-  </div>
-</TableCell>
-```
+## Comportamiento de filtros
+
+Los filtros existentes seguirán funcionando normalmente:
+- "Buscar" filtra en ambos grupos
+- "Especialidad" filtra en ambos grupos
+- "Solo activos" filtra en ambos grupos
+
+Si después del filtro un grupo queda vacío, se oculta esa sección o se muestra un mensaje "Sin resultados".
 
 ---
 
 ## Resultado esperado
 
-- Tabla de 8 columnas en lugar de 13
-- Botones de acción siempre visibles (sticky)
-- Todo el contenido cabe en una fila sin scroll horizontal en la mayoría de pantallas
-- Información consolidada con iconos intuitivos
+- Dos secciones claramente diferenciadas
+- Doctor Premier arriba, Webart abajo
+- Cada sección muestra su MRR total y cantidad de clientes
+- Secciones colapsables para enfocarse en un grupo a la vez
+- Mantiene todas las funciones actuales (editar, eliminar, filtrar)
 
