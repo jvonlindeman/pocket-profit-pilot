@@ -138,8 +138,11 @@ export function useProfitabilityMetrics(
         zohoExpenseShare = financialData.totalZohoExpenses * incomeShare;
       }
 
-      // Real profit = Net Income - Direct Expenses - OPEX Share - Zoho Expense Share
-      const realProfit = netIncome - expenses - opexShare - zohoExpenseShare;
+      // Real profit calculation - avoid double counting
+      // If we have Zoho data, don't subtract retainer expenses (they're already in zohoExpenseShare)
+      const realProfit = financialData?.totalZohoExpenses 
+        ? netIncome - opexShare - zohoExpenseShare  // Real data: avoid double counting
+        : netIncome - expenses - opexShare;         // No real data: use retainer expenses as estimate
       const realMarginPercent = income > 0 ? (realProfit / income) * 100 : 0;
 
       return {
@@ -180,7 +183,10 @@ export function useProfitabilityMetrics(
     const totalNetIncome = totalIncome - totalStripeFees;
     const totalOpex = financialData?.opexAmount ?? 0;
     const totalZohoExpenses = financialData?.totalZohoExpenses ?? 0;
-    const totalRealProfit = totalNetIncome - totalExpenses - totalOpex - totalZohoExpenses;
+    // Avoid double counting - if we have Zoho data, don't subtract retainer expenses
+    const totalRealProfit = financialData?.totalZohoExpenses
+      ? totalNetIncome - totalOpex - totalZohoExpenses  // Real data
+      : totalNetIncome - totalExpenses - totalOpex;     // No real data
     const realMarginPercent = totalIncome > 0 ? (totalRealProfit / totalIncome) * 100 : 0;
 
     // Stripe clients stats
