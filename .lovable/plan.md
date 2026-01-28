@@ -1,65 +1,74 @@
 
 
-# Mejora de UI para Tarjetas KPI - Evitar Truncamiento
+# Corrección de Doble Conteo de Gastos en Dashboard de Rentabilidad
 
 ## Problema Identificado
 
-Las tarjetas de KPI muestran valores truncados como "USD 46,..." debido a:
-- Clase CSS `truncate` aplicada a los valores
-- Grid de 6 columnas en pantallas grandes que limita el ancho
-- Valores de moneda largos que no caben en el espacio disponible
+El cálculo actual de "Profit Real" está restando dos veces los mismos gastos:
+
+```text
+ACTUAL (incorrecto):
+Real Profit = Net Income - expenses - opexShare - zohoExpenseShare
+                           ^^^^^^^              ^^^^^^^^^^^^^^^
+                           MISMO DATO (doble conteo)
+```
+
+Los gastos de "redes", "social media", etc. que están en la tabla de retainers son los mismos que vienen de Zoho Books.
 
 ---
 
-## Solución Propuesta
+## Solución
 
-### Cambio 1: Eliminar truncamiento en valores principales
+Cuando tenemos datos financieros reales de Zoho, **NO debemos restar los gastos directos del retainer** porque ya están incluidos en `totalZohoExpenses`.
 
-Remover la clase `truncate` del valor principal para que se muestre completo.
-
-### Cambio 2: Ajustar el grid responsive
-
-Cambiar de 6 columnas fijas a un layout más flexible que permita valores completos:
-- En móvil: 2 columnas
-- En tablet: 3 columnas  
-- En desktop: 3 columnas en 2 filas (mejor legibilidad)
-
-### Cambio 3: Reducir tamaño de fuente para valores largos
-
-Usar texto más pequeño pero visible para evitar overflow.
+```text
+CORRECTO:
+Real Profit = Net Income - OPEX - Zoho Expenses (prorrateado)
+```
 
 ---
 
-## Archivo a Modificar
+## Cambios a Implementar
 
-| Archivo | Cambio |
-|---------|--------|
-| `src/components/Retainers/ProfitabilityDashboard/KPISummaryCards.tsx` | Ajustar clases CSS |
+### Archivo: `src/hooks/useProfitabilityMetrics.ts`
 
----
+**Línea 142** - Cálculo por cliente:
+```typescript
+// ANTES (doble conteo):
+const realProfit = netIncome - expenses - opexShare - zohoExpenseShare;
 
-## Cambios Específicos
+// DESPUÉS (correcto):
+// Si tenemos datos reales de Zoho, NO restamos expenses porque ya están en zohoExpenseShare
+const realProfit = financialData?.totalZohoExpenses 
+  ? netIncome - opexShare - zohoExpenseShare  // Datos reales: evitar doble conteo
+  : netIncome - expenses - opexShare;         // Sin datos reales: usar expenses directos
+```
 
-```tsx
-// Línea 89: Cambiar grid layout
-<div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+**Línea 183** - Cálculo total:
+```typescript
+// ANTES (doble conteo):
+const totalRealProfit = totalNetIncome - totalExpenses - totalOpex - totalZohoExpenses;
 
-// Línea 96: Quitar truncate del valor principal
-<p className="text-lg font-bold mt-1">{card.value}</p>
-
-// Línea 98: Mantener truncate solo en subtitle (opcional)
-<p className={`text-xs font-medium mt-0.5 ${card.color} line-clamp-2`}>{card.subtitle}</p>
+// DESPUÉS (correcto):
+const totalRealProfit = financialData?.totalZohoExpenses
+  ? totalNetIncome - totalOpex - totalZohoExpenses  // Datos reales
+  : totalNetIncome - totalExpenses - totalOpex;     // Sin datos reales
 ```
 
 ---
 
 ## Resultado Esperado
 
-| Antes | Después |
-|-------|---------|
-| USD 46,... | USD 46,545 |
-| USD 44,... | USD 44,823 |
-| 6 columnas apretadas | 3 columnas con espacio |
+| Métrica | Antes (doble conteo) | Después (correcto) |
+|---------|---------------------|-------------------|
+| Gastos contados | Retainer + Zoho | Solo Zoho |
+| Profit Real | ~USD 32,089 | ~USD 35,000+ |
+| Margen Real | ~69.3% | Mayor |
 
-Las tarjetas tendrán más espacio horizontal para mostrar valores completos sin truncar.
+---
+
+## Lógica de Fallback
+
+- **Con datos de Zoho**: Usar solo gastos prorrateados de Zoho (evita doble conteo)
+- **Sin datos de Zoho**: Usar gastos directos del retainer como aproximación
 
