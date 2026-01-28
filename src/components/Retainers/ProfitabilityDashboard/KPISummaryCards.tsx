@@ -1,7 +1,8 @@
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, DollarSign, TrendingUp, TrendingDown, Percent, ArrowUpRight, CreditCard, Wallet } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Users, DollarSign, TrendingDown, ArrowUpRight, CreditCard, Wallet, AlertCircle } from "lucide-react";
 import type { ProfitabilityMetrics } from "@/hooks/useProfitabilityMetrics";
 
 interface KPISummaryCardsProps {
@@ -72,19 +73,23 @@ export const KPISummaryCards: React.FC<KPISummaryCardsProps> = ({ metrics }) => 
   ];
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
       {/* Real data indicator */}
-      <div className="flex items-center gap-2">
-        {metrics.hasRealData ? (
-          <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50">
-            ✓ Datos financieros reales
-          </Badge>
-        ) : (
-          <Badge variant="outline" className="text-yellow-600 border-yellow-300 bg-yellow-50">
-            ⚠ Carga el dashboard financiero para ver datos reales
-          </Badge>
-        )}
-      </div>
+      {!metrics.hasRealData && (
+        <Alert className="bg-amber-50 border-amber-200">
+          <AlertCircle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-800">
+            Para ver datos reales de Stripe y Zoho, primero carga el{" "}
+            <a href="/" className="underline font-medium hover:text-amber-900">Dashboard Financiero</a>
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {metrics.hasRealData && (
+        <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50">
+          ✓ Datos financieros reales
+        </Badge>
+      )}
       
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {cards.map((card) => (
