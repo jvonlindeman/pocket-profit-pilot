@@ -86,16 +86,16 @@ export const KPISummaryCards: React.FC<KPISummaryCardsProps> = ({ metrics }) => 
         )}
       </div>
       
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {cards.map((card) => (
           <Card key={card.title} className="overflow-hidden">
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground truncate">{card.title}</p>
-                  <p className="text-xl font-bold mt-1 truncate">{card.value}</p>
+                  <p className="text-xs font-medium text-muted-foreground">{card.title}</p>
+                  <p className="text-lg font-bold mt-1">{card.value}</p>
                   {card.subtitle && (
-                    <p className={`text-xs font-medium mt-0.5 ${card.color} truncate`}>{card.subtitle}</p>
+                    <p className={`text-xs font-medium mt-0.5 ${card.color} line-clamp-2`}>{card.subtitle}</p>
                   )}
                 </div>
                 <div className={`${card.bgColor} p-2 rounded-lg shrink-0`}>
