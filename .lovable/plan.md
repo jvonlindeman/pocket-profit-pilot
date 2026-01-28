@@ -1,74 +1,71 @@
 
 
-# Corrección de Doble Conteo de Gastos en Dashboard de Rentabilidad
+# Solución: Indicador de Estado y Carga de Datos
 
 ## Problema Identificado
 
-El cálculo actual de "Profit Real" está restando dos veces los mismos gastos:
+El contexto compartido `FinancialDataContext` solo recibe datos cuando:
+1. El usuario visita el Dashboard Financiero
+2. El usuario presiona el botón para cargar datos de Stripe/Zoho
+3. El componente `RefinedFinancialSummary` se renderiza y sincroniza los datos
+
+Si el usuario va directamente a Retainers sin cargar el dashboard, los valores son 0.
+
+---
+
+## Solución Propuesta
+
+### Opción A: Indicador Visual + Mensaje Claro (Recomendado)
+
+Mostrar un banner informativo cuando los datos financieros no están cargados, indicando al usuario que debe cargar el dashboard primero.
+
+### Cambios:
+
+**Archivo:** `src/components/Retainers/ProfitabilityDashboard/KPISummaryCards.tsx`
+
+Agregar un alert/banner cuando `hasRealData` es `false`:
+
+```tsx
+{!metrics.hasRealData && (
+  <Alert className="mb-4 bg-yellow-50 border-yellow-200">
+    <AlertCircle className="h-4 w-4 text-yellow-600" />
+    <AlertTitle>Datos estimados</AlertTitle>
+    <AlertDescription>
+      Para ver datos reales de Stripe y Zoho, primero carga el 
+      <a href="/" className="underline font-medium ml-1">Dashboard Financiero</a>
+    </AlertDescription>
+  </Alert>
+)}
+```
+
+---
+
+## Datos de OPEX
+
+Según la base de datos, `opex_amount: 0` es el valor real configurado en `monthly_balances`.
+
+Si deseas agregar OPEX:
+1. Ve al Dashboard Financiero
+2. Edita el balance mensual de enero 2026
+3. Agrega el valor de OPEX
+
+---
+
+## Flujo Correcto para el Usuario
 
 ```text
-ACTUAL (incorrecto):
-Real Profit = Net Income - expenses - opexShare - zohoExpenseShare
-                           ^^^^^^^              ^^^^^^^^^^^^^^^
-                           MISMO DATO (doble conteo)
-```
-
-Los gastos de "redes", "social media", etc. que están en la tabla de retainers son los mismos que vienen de Zoho Books.
-
----
-
-## Solución
-
-Cuando tenemos datos financieros reales de Zoho, **NO debemos restar los gastos directos del retainer** porque ya están incluidos en `totalZohoExpenses`.
-
-```text
-CORRECTO:
-Real Profit = Net Income - OPEX - Zoho Expenses (prorrateado)
+1. Ir a Dashboard Financiero (/)
+2. Seleccionar rango de fechas (ej: enero 2026)
+3. Presionar "Cargar datos" para obtener Stripe + Zoho
+4. Los datos se sincronizan automáticamente al contexto
+5. Ir a Retainers → Dashboard de Rentabilidad muestra datos reales
 ```
 
 ---
 
-## Cambios a Implementar
+## Archivos a Modificar
 
-### Archivo: `src/hooks/useProfitabilityMetrics.ts`
-
-**Línea 142** - Cálculo por cliente:
-```typescript
-// ANTES (doble conteo):
-const realProfit = netIncome - expenses - opexShare - zohoExpenseShare;
-
-// DESPUÉS (correcto):
-// Si tenemos datos reales de Zoho, NO restamos expenses porque ya están en zohoExpenseShare
-const realProfit = financialData?.totalZohoExpenses 
-  ? netIncome - opexShare - zohoExpenseShare  // Datos reales: evitar doble conteo
-  : netIncome - expenses - opexShare;         // Sin datos reales: usar expenses directos
-```
-
-**Línea 183** - Cálculo total:
-```typescript
-// ANTES (doble conteo):
-const totalRealProfit = totalNetIncome - totalExpenses - totalOpex - totalZohoExpenses;
-
-// DESPUÉS (correcto):
-const totalRealProfit = financialData?.totalZohoExpenses
-  ? totalNetIncome - totalOpex - totalZohoExpenses  // Datos reales
-  : totalNetIncome - totalExpenses - totalOpex;     // Sin datos reales
-```
-
----
-
-## Resultado Esperado
-
-| Métrica | Antes (doble conteo) | Después (correcto) |
-|---------|---------------------|-------------------|
-| Gastos contados | Retainer + Zoho | Solo Zoho |
-| Profit Real | ~USD 32,089 | ~USD 35,000+ |
-| Margen Real | ~69.3% | Mayor |
-
----
-
-## Lógica de Fallback
-
-- **Con datos de Zoho**: Usar solo gastos prorrateados de Zoho (evita doble conteo)
-- **Sin datos de Zoho**: Usar gastos directos del retainer como aproximación
+| Archivo | Cambio |
+|---------|--------|
+| `src/components/Retainers/ProfitabilityDashboard/KPISummaryCards.tsx` | Agregar alert informativo |
 
