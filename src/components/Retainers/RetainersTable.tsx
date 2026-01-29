@@ -173,29 +173,65 @@ export const RetainersTable: React.FC<Props> = ({ data, onEdit, onDelete }) => {
                 </TableCell>
                 <TableCell className="py-2 text-sm">{r.specialty ?? "-"}</TableCell>
                 <TableCell className="py-2">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Badge 
-                          variant="outline" 
-                          className={`text-[10px] px-1.5 py-0.5 cursor-help ${getStatusBadgeClass(clientStatus)}`}
-                        >
-                          {clientStatus || "—"}
-                        </Badge>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-xs">
-                          {(r as any).client_status_date 
-                            ? `Actualizado: ${new Date((r as any).client_status_date).toLocaleDateString('es-PA', { 
-                                day: 'numeric', 
-                                month: 'short', 
-                                year: 'numeric' 
-                              })}`
-                            : 'Sin fecha de actualización'}
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <div className="space-y-0.5">
+                    {/* Línea 1: Estado + días + quién */}
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge 
+                              variant="outline" 
+                              className={`text-[10px] px-1.5 py-0.5 cursor-help ${getStatusBadgeClass(clientStatus)}`}
+                            >
+                              {clientStatus || "—"}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">
+                              {(r as any).client_status_date 
+                                ? `Actualizado: ${new Date((r as any).client_status_date).toLocaleDateString('es-PA', { 
+                                    day: 'numeric', 
+                                    month: 'short', 
+                                    year: 'numeric' 
+                                  })}`
+                                : 'Sin fecha de actualización'}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      {/* Días desde contacto */}
+                      {(r as any).days_since_contact !== null && (r as any).days_since_contact !== undefined && (
+                        <span className={`text-[10px] font-medium ${
+                          (r as any).days_since_contact > 7 
+                            ? 'text-orange-600 dark:text-orange-400' 
+                            : 'text-muted-foreground'
+                        }`}>
+                          {(r as any).days_since_contact === 0 ? 'hoy' : `${(r as any).days_since_contact}d`}
+                        </span>
+                      )}
+                      {/* Quién envió último mensaje */}
+                      {(r as any).last_message_from && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="outline" className="text-[10px] px-1 py-0">
+                                {(r as any).last_message_from === 'Cliente' ? '👤' : '🏢'}
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="text-xs">Último mensaje: {(r as any).last_message_from}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                    </div>
+                    {/* Línea 2: Project Manager */}
+                    {(r as any).project_manager && (
+                      <span className="text-[10px] text-muted-foreground block">
+                        PM: {(r as any).project_manager}
+                      </span>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="text-right py-2 text-sm">
                   <TooltipProvider>
