@@ -243,15 +243,18 @@ export type Database = {
           client_status: string | null
           client_status_date: string | null
           created_at: string
+          days_since_contact: number | null
           expected_reactivation_date: string | null
           has_whatsapp_bot: boolean
           id: string
           is_legacy: boolean
+          last_message_from: string | null
           metadata: Json
           n8n_id: string | null
           net_income: number
           notes: string | null
           paused_at: string | null
+          project_manager: string | null
           social_media_cost: number
           specialty: string | null
           total_expenses: number
@@ -268,15 +271,18 @@ export type Database = {
           client_status?: string | null
           client_status_date?: string | null
           created_at?: string
+          days_since_contact?: number | null
           expected_reactivation_date?: string | null
           has_whatsapp_bot?: boolean
           id?: string
           is_legacy?: boolean
+          last_message_from?: string | null
           metadata?: Json
           n8n_id?: string | null
           net_income?: number
           notes?: string | null
           paused_at?: string | null
+          project_manager?: string | null
           social_media_cost?: number
           specialty?: string | null
           total_expenses?: number
@@ -293,15 +299,18 @@ export type Database = {
           client_status?: string | null
           client_status_date?: string | null
           created_at?: string
+          days_since_contact?: number | null
           expected_reactivation_date?: string | null
           has_whatsapp_bot?: boolean
           id?: string
           is_legacy?: boolean
+          last_message_from?: string | null
           metadata?: Json
           n8n_id?: string | null
           net_income?: number
           notes?: string | null
           paused_at?: string | null
+          project_manager?: string | null
           social_media_cost?: number
           specialty?: string | null
           total_expenses?: number

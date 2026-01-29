@@ -12,6 +12,9 @@ interface N8nClientStatus {
   name: string;
   status: string;
   date: string;
+  days_since_contact?: number;
+  last_message_from?: string;
+  project_manager?: string;
 }
 
 Deno.serve(async (req) => {
@@ -143,6 +146,9 @@ Deno.serve(async (req) => {
         .update({
           client_status: trimmedStatus,
           client_status_date: client.date,
+          days_since_contact: client.days_since_contact ?? null,
+          last_message_from: client.last_message_from ?? null,
+          project_manager: client.project_manager ?? null,
         })
         .eq("n8n_id", client.client_id)
         .select("id");
