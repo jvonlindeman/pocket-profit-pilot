@@ -81,6 +81,7 @@ const DashboardPageWrapper: React.FC = () => {
             error={dashboardState.error}
             dataInitialized={dashboardState.dataInitialized}
             isRefreshing={dashboardState.isRefreshing || dashboardState.globalRefreshInProgress}
+            dateRange={dashboardState.dateRange}
             stripeIncome={dashboardState.stripeIncome}
             stripeFees={dashboardState.stripeFees}
             stripeTransactionFees={dashboardState.stripeTransactionFees}

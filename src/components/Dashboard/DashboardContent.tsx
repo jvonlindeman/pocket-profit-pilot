@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { differenceInDays } from 'date-fns';
 import PeriodHeader from './PeriodHeader';
 import RefinedFinancialSummary from './FinancialCards/RefinedFinancialSummary';
 import TransactionTable from './TransactionTable';
@@ -17,6 +18,7 @@ import PersonalSalaryCalculator from './PersonalSalaryCalculator';
 import { ReceivablesManager } from './Receivables/ReceivablesManager';
 import { FinancialPredictionCard } from './Prediction/FinancialPredictionCard';
 import { useStripeEstimated } from '@/hooks/useStripeEstimated';
+import { YearToDateSummary } from './YearToDateSummary';
 
 interface DashboardContentProps {
   // Core data
@@ -26,6 +28,9 @@ interface DashboardContentProps {
   error: string | null;
   dataInitialized: boolean;
   isRefreshing: boolean;
+
+  // Date range for YTD detection
+  dateRange: { startDate: Date | null; endDate: Date | null };
 
   // Financial data
   stripeIncome: number;
@@ -68,6 +73,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   error,
   dataInitialized,
   isRefreshing,
+  dateRange,
   stripeIncome,
   stripeFees,
   stripeTransactionFees,
@@ -94,11 +100,24 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
   currentDate,
   onBalanceSaved
 }) => {
+  // Detect if this is a year range (> 60 days)
+  const isYearRange = useMemo(() => {
+    if (!dateRange.startDate || !dateRange.endDate) return false;
+    const diffDays = differenceInDays(dateRange.endDate, dateRange.startDate);
+    return diffDays > 60;
+  }, [dateRange]);
+
   // Calculate adjustedZohoIncome using the same formula as the salary calculator
   const adjustedZohoIncome = startingBalance + regularIncome - totalZohoExpenses;
 
   // Get Stripe estimated data (50% of Total Stripe)
   const { halfStripeEstimated, totalStripeProjection } = useStripeEstimated(stripeNet, adjustedZohoIncome);
+
+  // Calculate collaborator expense total
+  const collaboratorExpenseTotal = useMemo(() => {
+    if (!Array.isArray(collaboratorExpenses)) return 0;
+    return collaboratorExpenses.reduce((sum, c) => sum + (c.amount || 0), 0);
+  }, [collaboratorExpenses]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -137,6 +156,17 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
 
         {dataInitialized && (
           <>
+            {/* Year-to-Date Summary - shown when date range > 60 days */}
+            {isYearRange ? (
+              <YearToDateSummary
+                transactions={financialData.transactions}
+                stripeData={{ income: stripeIncome, fees: stripeFees, net: stripeNet }}
+                zohoIncome={regularIncome}
+                totalZohoExpenses={totalZohoExpenses}
+                collaboratorExpenses={collaboratorExpenseTotal}
+              />
+            ) : (
+              <>
             {/* Salary Calculator - Prominent position at top */}
             <SalaryCalculator
               key={calculatorKey}
@@ -234,6 +264,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
                 />
               </CardContent>
             </Card>
+              </>
+            )}
           </>
         )}
       </div>
