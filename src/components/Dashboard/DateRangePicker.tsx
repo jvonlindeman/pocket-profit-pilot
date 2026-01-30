@@ -157,6 +157,24 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
     setIsOpen(false);
   };
 
+  // Año anterior completo (2025)
+  const setLastYear = () => {
+    const today = toPanamaTime(new Date());
+    const lastYear = today.getFullYear() - 1; // 2025
+    
+    const firstDayOfLastYear = createStableDate(new Date(lastYear, 0, 1));  // 1 Ene 2025
+    const lastDayOfLastYear = createStableDate(new Date(lastYear, 11, 31)); // 31 Dic 2025
+    
+    const newRange = {
+      from: firstDayOfLastYear,
+      to: lastDayOfLastYear
+    };
+    
+    onRangeChange(newRange);
+    setTempRange(newRange);
+    setIsOpen(false);
+  };
+
   // Last day of previous month to last day of current month
   const setPreviousMonthEndToCurrentMonthEnd = () => {
     const today = toPanamaTime(new Date());
@@ -262,7 +280,8 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
             <DropdownMenuItem onClick={setPreviousAndCurrentMonth}>Mes anterior + actual</DropdownMenuItem>
             <DropdownMenuItem onClick={setLast30Days}>Últimos 30 días</DropdownMenuItem>
             <DropdownMenuItem onClick={setPreviousMonthEndToCurrentMonthEnd}>Fin mes anterior a fin actual</DropdownMenuItem>
-            <DropdownMenuItem onClick={setThisYear}>Este año</DropdownMenuItem>
+            <DropdownMenuItem onClick={setThisYear}>Este año (2026)</DropdownMenuItem>
+            <DropdownMenuItem onClick={setLastYear}>Año 2025</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
