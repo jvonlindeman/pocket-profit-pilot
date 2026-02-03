@@ -114,6 +114,18 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
       }
     }
     
+    // Detectar expansión: si el upsell_income subió
+    let expansionDelta = 0;
+    if (initial) {
+      const previousUpsell = Number((initial as any).upsell_income) || 0;
+      if (upsellIncomeValue > previousUpsell) {
+        expansionDelta = upsellIncomeValue - previousUpsell;
+      }
+    } else {
+      // Nuevo cliente: si tiene upsell desde el inicio, contarlo como expansión
+      expansionDelta = upsellIncomeValue;
+    }
+    
     const payload: any = {
       client_name: clientName.trim(),
       specialty: specialty.trim() || null,
@@ -134,6 +146,8 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
       expected_reactivation_date: status === "paused" && expectedReactivationDate ? expectedReactivationDate : null,
       // Acumular contracción si hubo reducción de tarifa
       contraction_amount: (Number((initial as any)?.contraction_amount) || 0) + contractionDelta,
+      // Acumular expansión si hubo incremento de upsell
+      expansion_amount: (Number((initial as any)?.expansion_amount) || 0) + expansionDelta,
     } as RetainerInsert;
     await onSave(payload);
     onOpenChange(false);

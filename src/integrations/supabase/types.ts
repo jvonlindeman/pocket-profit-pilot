@@ -245,6 +245,7 @@ export type Database = {
           contraction_amount: number
           created_at: string
           days_since_contact: number | null
+          expansion_amount: number
           expected_reactivation_date: string | null
           has_whatsapp_bot: boolean
           id: string
@@ -274,6 +275,7 @@ export type Database = {
           contraction_amount?: number
           created_at?: string
           days_since_contact?: number | null
+          expansion_amount?: number
           expected_reactivation_date?: string | null
           has_whatsapp_bot?: boolean
           id?: string
@@ -303,6 +305,7 @@ export type Database = {
           contraction_amount?: number
           created_at?: string
           days_since_contact?: number | null
+          expansion_amount?: number
           expected_reactivation_date?: string | null
           has_whatsapp_bot?: boolean
           id?: string

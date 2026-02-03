@@ -115,9 +115,9 @@ export function calculateChurn(retainers: RetainerRow[], monthDate: Date): Churn
       pausedMRR += netIncome;
     }
 
-    // Expansion MRR: upsells from existing clients (not new, active at end, not paused)
-    if (wasActiveAtStart && !isNewThisPeriod && wasActiveAtEnd && !isPausedAtEnd) {
-      expansionMRR += upsellIncome;
+    // Expansion MRR: only the tracked expansion increments (not total upsell)
+    if (wasActiveAtStart && wasActiveAtEnd && !isChurnedThisPeriod) {
+      expansionMRR += Number((r as any).expansion_amount) || 0;
     }
     
     // Contraction MRR: fee reductions from active clients
