@@ -70,7 +70,7 @@ export function calculateChurn(retainers: RetainerRow[], monthDate: Date): Churn
 
   // Expansion/Contraction MRR
   let expansionMRR = 0;
-  let contractionMRR = 0; // For future: when tracking plan downgrades
+  let contractionMRR = 0;
 
   for (const r of retainers) {
     const isLegacy = Boolean((r as any).is_legacy);
@@ -118,6 +118,11 @@ export function calculateChurn(retainers: RetainerRow[], monthDate: Date): Churn
     // Expansion MRR: upsells from existing clients (not new, active at end, not paused)
     if (wasActiveAtStart && !isNewThisPeriod && wasActiveAtEnd && !isPausedAtEnd) {
       expansionMRR += upsellIncome;
+    }
+    
+    // Contraction MRR: fee reductions from active clients
+    if (wasActiveAtStart && wasActiveAtEnd && !isChurnedThisPeriod) {
+      contractionMRR += Number((r as any).contraction_amount) || 0;
     }
   }
 

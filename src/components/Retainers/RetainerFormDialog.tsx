@@ -91,13 +91,23 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
   const handleSubmit = async () => {
     const baseIncomeValue = parseNumberLike(baseIncome);
     const upsellIncomeValue = parseNumberLike(upsellIncome);
+    const newNetIncome = baseIncomeValue + upsellIncomeValue;
+    
+    // Detectar contracción: si el ingreso bajó respecto al anterior
+    let contractionDelta = 0;
+    if (initial) {
+      const previousNetIncome = Number(initial.net_income) || 0;
+      if (newNetIncome < previousNetIncome) {
+        contractionDelta = previousNetIncome - newNetIncome;
+      }
+    }
     
     const payload: any = {
       client_name: clientName.trim(),
       specialty: specialty.trim() || null,
       base_income: baseIncomeValue,
       upsell_income: upsellIncomeValue,
-      net_income: baseIncomeValue + upsellIncomeValue,
+      net_income: newNetIncome,
       social_media_cost: parseNumberLike(socialCost),
       total_expenses: parseNumberLike(totalExpenses),
       uses_stripe: usesStripe,
@@ -110,6 +120,8 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
       paused_at: status === "paused" ? new Date(pausedAt).toISOString() : null,
       canceled_at: status === "canceled" ? new Date(canceledAt).toISOString() : null,
       expected_reactivation_date: status === "paused" && expectedReactivationDate ? expectedReactivationDate : null,
+      // Acumular contracción si hubo reducción de tarifa
+      contraction_amount: (Number((initial as any)?.contraction_amount) || 0) + contractionDelta,
     } as RetainerInsert;
     await onSave(payload);
     onOpenChange(false);
