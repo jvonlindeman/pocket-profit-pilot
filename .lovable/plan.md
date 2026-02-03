@@ -1,94 +1,53 @@
 
-# Corrección del Cálculo de Contraction MRR
+# Mejorar Visualización de Contraction MRR
 
 ## Problema Identificado
 
-El sistema actual detecta contracción comparando el **ingreso total** (base + upsell) anterior vs nuevo. Esto falla cuando hay simultáneamente:
+La lógica de contraction **funciona correctamente** - el cliente "Clinica Dental Obarrio" tiene $356 registrados en `contraction_amount`. Sin embargo, la UI no comunica esto claramente:
 
-1. **Reducción del plan base** (contracción)
-2. **Venta de servicios adicionales** (expansión)
+| Componente | Situación Actual | Problema |
+|------------|------------------|----------|
+| **Diálogo de edición** | Muestra "MRR: $794" | No indica que hubo reducción del plan |
+| **Tabla de retainers** | Muestra "+USD 197" (upsell) | No muestra contracciones acumuladas |
+| **Accordion de Ingresos** | Solo suma base + upsell | No distingue visualmente la contracción |
 
-**Ejemplo del usuario:**
-- Plan bajó de ~$1,000 a $597 → Contracción: $403
-- Se vendió WhatsApp Bot $197 → Expansión: $197
-- Sistema muestra: Net MRR = $794 (solo suma, sin contexto)
+## Solución Propuesta
 
-**Resultado incorrecto:** El sistema no detecta la contracción porque el total puede ser similar o compensado por el upsell.
+Agregar indicadores visuales claros de contracción en tres lugares:
 
----
+### 1. Diálogo - Header de Ingresos
 
-## Solución
-
-Cambiar la lógica para comparar **solo el ingreso base** entre versiones, ignorando los upsells en el cálculo de contracción.
-
-### Lógica Corregida
+Mostrar el MRR con indicador de contracción cuando existe:
 
 ```text
-Antes:
-  contractionDelta = previousNetIncome - newNetIncome  
-  (compara totales)
-
-Después:
-  contractionDelta = previousBaseIncome - newBaseIncome  
-  (compara solo base)
+Antes:  MRR: $794
+Después: MRR: $794 (base bajó $253)
 ```
 
-Esto permite:
-- **Contracción**: Se detecta si el base_income bajó
-- **Expansión**: Se rastrea independientemente via upsell_income
-- **Ambos pueden ocurrir simultáneamente**
+Esto se mostrará solo cuando estás editando un retainer y el `base_income` ingresado es menor al guardado en la BD.
 
----
+### 2. Diálogo - Campo "Ingreso base"
 
-## Cambios a Realizar
+Agregar una nota debajo del campo cuando hay contracción pendiente o histórica:
 
-### Archivo: `src/components/Retainers/RetainerFormDialog.tsx`
-
-Modificar la detección de contracción (líneas 96-103):
-
-```typescript
-// ANTES - Compara totales (incorrecto)
-let contractionDelta = 0;
-if (initial) {
-  const previousNetIncome = Number(initial.net_income) || 0;
-  if (newNetIncome < previousNetIncome) {
-    contractionDelta = previousNetIncome - newNetIncome;
-  }
-}
-
-// DESPUÉS - Compara solo base_income
-let contractionDelta = 0;
-if (initial) {
-  const previousBaseIncome = Number((initial as any).base_income) || 0;
-  if (baseIncomeValue < previousBaseIncome) {
-    contractionDelta = previousBaseIncome - baseIncomeValue;
-  }
-}
+```text
+┌─────────────────────┐
+│ Ingreso base        │
+│ ┌─────────────────┐ │
+│ │ 597             │ │
+│ └─────────────────┘ │
+│ ⚠️ Reducción de $253│  ← Solo visible si bajó
+└─────────────────────┘
 ```
 
----
+### 3. Tabla - Columna de Ingreso
 
-## Resultado Esperado
+Mostrar contracción acumulada en rojo junto al upsell verde:
 
-Con el ejemplo del usuario:
-
-| Campo | Antes | Después |
-|-------|-------|---------|
-| base_income | $1,000 | $597 |
-| upsell_income | $0 | $197 |
-| net_income | $1,000 | $794 |
-| **contraction_amount** | $0 | **$403** |
-
-Dashboard mostrara:
-- **Contraction MRR**: $403 (reducción del plan)
-- **Expansion MRR**: $197 (WhatsApp Bot)
-- **Net effect**: -$206
-
----
-
-## Consideración Adicional
-
-Si el `base_income` anterior no existe en el registro (clientes legacy importados antes de agregar el campo), usaremos `net_income` como fallback para el cálculo inicial.
+```text
+Antes:  USD 794 +USD 197
+Después: USD 794 +USD 197 ↓$356
+```
 
 ---
 
@@ -96,4 +55,82 @@ Si el `base_income` anterior no existe en el registro (clientes legacy importado
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/components/Retainers/RetainerFormDialog.tsx` | Comparar `base_income` en lugar de `net_income` para detectar contracción |
+| `src/components/Retainers/RetainerFormDialog.tsx` | Agregar indicador de reducción en header y campo de ingreso base |
+| `src/components/Retainers/RetainersTable.tsx` | Mostrar contraction_amount en rojo si > 0 |
+
+---
+
+## Detalle Técnico
+
+### RetainerFormDialog.tsx
+
+Agregar cálculo de contractionDelta en tiempo real (no solo al guardar):
+
+```typescript
+// Calcular contracción en tiempo real para mostrar en UI
+const currentBaseIncome = parseNumberLike(baseIncome);
+const previousBaseIncome = initial 
+  ? (Number((initial as any).base_income) || Number(initial.net_income) || 0) 
+  : 0;
+const liveContractionDelta = initial && currentBaseIncome < previousBaseIncome 
+  ? previousBaseIncome - currentBaseIncome 
+  : 0;
+const accumulatedContraction = Number((initial as any)?.contraction_amount) || 0;
+```
+
+En el header del accordion:
+```typescript
+<span className="text-muted-foreground font-normal ml-2">
+  MRR: ${totalMRR.toLocaleString('es-PA', { maximumFractionDigits: 0 })}
+  {liveContractionDelta > 0 && (
+    <span className="text-red-500 ml-1">
+      (base bajó ${liveContractionDelta.toLocaleString('es-PA', { maximumFractionDigits: 0 })})
+    </span>
+  )}
+</span>
+```
+
+Debajo del campo de ingreso base:
+```typescript
+{liveContractionDelta > 0 && (
+  <p className="text-xs text-red-500 mt-1">
+    ↓ Reducción de ${liveContractionDelta.toLocaleString()}
+  </p>
+)}
+```
+
+### RetainersTable.tsx
+
+En la columna de ingreso, después del upsell:
+```typescript
+{Number((r as any).contraction_amount ?? 0) > 0 && (
+  <span className="text-xs text-red-500 ml-1">
+    ↓{formatCurrency(Number((r as any).contraction_amount))}
+  </span>
+)}
+```
+
+---
+
+## Resultado Visual Esperado
+
+**Diálogo al editar "Clinica Dental Obarrio":**
+```text
+$ Ingresos    MRR: $794 (base bajó $253)
+
+Ingreso base           Upsells
+┌─────────────┐       ┌─────────────┐
+│ 597         │       │ 197         │
+└─────────────┘       └─────────────┘
+↓ Reducción de $253
+```
+
+**Tabla de retainers:**
+```text
+Clinica Dental O...   Dentista   USD 794 +USD 197 ↓$356
+```
+
+Esto permite ver de un vistazo:
+- El MRR actual ($794)
+- Cuánto es expansión (+$197 en verde)
+- Cuánto se ha perdido por reducciones (↓$356 en rojo)
