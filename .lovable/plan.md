@@ -1,126 +1,137 @@
 
 
-# Corregir Cálculo de Expansion MRR
+# Dashboard de Análisis OPEX: Presupuesto vs Real
 
-## Problema Identificado
+## Objetivo
 
-El cálculo actual de Expansion MRR suma **todo el upsell_income acumulado** de cada cliente activo, en lugar de solo los upsells **nuevos del período**.
-
-| Cliente | upsell_income | Situación | Expansion Real |
-|---------|---------------|-----------|----------------|
-| Clinica Dental | $197 | Upsell nuevo este mes | $197 |
-| Cliente X | $500 | Upsell de hace 6 meses | $0 (ya contado) |
-| **Total mostrado** | **$697** | | **$197** |
-
-El sistema está re-contando upsells históricos como "nuevos" cada mes.
+Visualizar el **OPEX controlable** (colaboradores + herramientas/servicios de Zoho) vs tu presupuesto mental, para saber cuánto margen tienes para contratar o invertir.
 
 ---
 
-## Solución Propuesta
+## Definición de OPEX Real
 
-Similar a como se rastrea `contraction_amount` para reducciones, agregar `previous_upsell_income` para calcular solo los **upsells nuevos del período**.
+| Incluido | Fuente | Ejemplo |
+|----------|--------|---------|
+| Colaboradores | Zoho - categoría "Pagos a colaboradores" | $8,000 |
+| Otros Gastos | Zoho - otras transacciones expense | $2,500 |
+| **Total OPEX Real** | | **$10,500** |
 
-### Enfoque: Comparar upsell actual vs anterior al guardar
-
-1. **Nuevo campo**: `previous_upsell_income` - Almacena el upsell anterior antes de editar
-2. **Al guardar**: Calcular `expansion_delta = upsell_income_nuevo - upsell_income_anterior`
-3. **En Churn**: Sumar solo los `expansion_delta` positivos del período
+**Excluido**: Stripe fees (no controlables, proporcionales a ingresos)
 
 ---
 
-## Alternativa Más Simple (Recomendada)
-
-En lugar de agregar otro campo, **reutilizar la lógica existente**:
-
-Agregar `expansion_amount` (análogo a `contraction_amount`) que acumula los incrementos de upsell:
+## Visualización Propuesta
 
 ```text
-expansion_amount += MAX(0, new_upsell - previous_upsell)
+┌────────────────────────────────────────────────────────────────────┐
+│  Análisis OPEX                                                     │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐   │
+│  │ Presupuesto│  │ Real       │  │ Diferencia │  │ Disponible │   │
+│  │ (Mental)   │  │ (Zoho)     │  │            │  │ p/Crecer   │   │
+│  │ $13,000    │  │ $10,500    │  │ +$2,500    │  │ $6,200     │   │
+│  │            │  │            │  │ bajo pres. │  │ /mes       │   │
+│  └────────────┘  └────────────┘  └────────────┘  └────────────┘   │
+│                                                                    │
+│  Desglose:                                                         │
+│  ├─ Colaboradores:     $8,000  (76%)                              │
+│  └─ Otros Gastos:      $2,500  (24%)                              │
+│                                                                    │
+│  Insights:                                                         │
+│  • Tienes ~$2,500/mes bajo tu presupuesto                         │
+│  • Margen para 1 contratación de ~$1,500 sin riesgo               │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Cambios a Realizar
+## Métricas Clave
 
-### Fase 1: Migración de Base de Datos
+| Métrica | Cálculo | Para qué sirve |
+|---------|---------|----------------|
+| **OPEX Presupuestado** | `monthly_balances.opex_amount` | Lo que esperas gastar |
+| **OPEX Real** | Colaboradores + Otros (Zoho) | Lo que realmente gastas |
+| **Varianza** | Presupuesto - Real | Indica si estás sobre/bajo |
+| **Disponible para Crecer** | MRR Total - OPEX Real Promedio | Margen para inversión |
 
-```sql
-ALTER TABLE retainers 
-ADD COLUMN expansion_amount numeric DEFAULT 0 NOT NULL;
-```
+---
 
-### Fase 2: Detectar Expansiones al Guardar
+## Archivos a Crear/Modificar
 
-**Archivo**: `src/components/Retainers/RetainerFormDialog.tsx`
+| Archivo | Acción | Descripción |
+|---------|--------|-------------|
+| `src/hooks/useOpexAnalysis.ts` | CREAR | Hook para calcular OPEX real vs presupuestado |
+| `src/components/Retainers/OpexAnalysisPanel.tsx` | CREAR | Panel con KPIs, desglose y insights |
+| `src/pages/Retainers.tsx` | MODIFICAR | Integrar panel debajo de ProfitabilityDashboard |
+
+---
+
+## Detalle Técnico
+
+### Hook: useOpexAnalysis
 
 ```typescript
-// Detectar expansión: upsell_income subió
-let expansionDelta = 0;
-if (initial) {
-  const previousUpsell = Number((initial as any).upsell_income) || 0;
-  if (upsellIncomeValue > previousUpsell) {
-    expansionDelta = upsellIncomeValue - previousUpsell;
-  }
+interface OpexAnalysis {
+  // Presupuesto (de monthly_balances)
+  budgetedOpex: number;
+  
+  // Real (de Zoho, sin Stripe fees)
+  realOpex: {
+    collaborators: number;    // Pagos a colaboradores
+    otherExpenses: number;    // Otros gastos operativos
+    total: number;
+  };
+  
+  // Análisis
+  variance: number;           // Presupuesto - Real
+  variancePercent: number;
+  
+  // Para planificación
+  totalMRR: number;
+  availableForGrowth: number; // MRR - OPEX Real
+  
+  // Estado
+  hasRealData: boolean;       // Si hay datos de Zoho cargados
 }
-
-const payload = {
-  // ... otros campos
-  expansion_amount: (Number((initial as any)?.expansion_amount) || 0) + expansionDelta,
-};
 ```
 
-### Fase 3: Usar expansion_amount en Cálculo de Churn
+### Datos Necesarios
 
-**Archivo**: `src/hooks/useChurnCalculator.ts`
+Se obtienen del `FinancialDataContext` existente:
+- `collaboratorExpenses`: Ya se filtra por categoría "Pagos a colaboradores"
+- `totalZohoExpenses`: Total de gastos Zoho
+- `opexAmount`: Del `monthly_balances` actual
 
+Cálculo:
 ```typescript
-// ANTES - Usa todo el upsell acumulado (incorrecto)
-if (wasActiveAtStart && !isNewThisPeriod && wasActiveAtEnd && !isPausedAtEnd) {
-  expansionMRR += upsellIncome;
-}
-
-// DESPUÉS - Usa solo las expansiones registradas
-if (wasActiveAtStart && wasActiveAtEnd && !isChurnedThisPeriod) {
-  expansionMRR += Number((r as any).expansion_amount) || 0;
-}
+const collaboratorTotal = collaboratorExpenses.reduce((sum, cat) => sum + cat.total, 0);
+const otherExpenses = totalZohoExpenses - collaboratorTotal;
+const realOpex = collaboratorTotal + otherExpenses; // = totalZohoExpenses
 ```
 
----
+### Componente: OpexAnalysisPanel
 
-## Resultado Esperado
-
-Con el caso de "Clinica Dental Obarrio":
-
-| Campo | Antes | Después |
-|-------|-------|---------|
-| base_income | $850 | $597 |
-| upsell_income | $0 | $197 |
-| contraction_amount | $0 | $253 (850-597) |
-| **expansion_amount** | $0 | **$197** (nuevo) |
-
-Dashboard mostrará:
-- **MRR Nuevo (Net)**: $197 (solo el upsell nuevo)
-- **MRR Perdido (Gross)**: $356 (contracciones)
-- **Net Effect**: $197 - $356 = -$159
+Recibe datos del contexto financiero y muestra:
+1. **4 KPI Cards**: Presupuesto, Real, Varianza, Disponible
+2. **Desglose colapsable**: Colaboradores vs Otros con porcentajes
+3. **Insights automáticos**: Basados en la varianza
 
 ---
 
-## Archivos a Modificar
+## Integración con Datos Existentes
 
-| Archivo | Cambio |
-|---------|--------|
-| Migración SQL | CREAR - Nuevo campo `expansion_amount` |
-| `src/integrations/supabase/types.ts` | REGENERAR - Incluir nuevo campo |
-| `src/components/Retainers/RetainerFormDialog.tsx` | MODIFICAR - Detectar y guardar expansiones |
-| `src/hooks/useChurnCalculator.ts` | MODIFICAR - Usar expansion_amount en lugar de upsell_income total |
+El panel usará `FinancialDataContext` que ya contiene:
+- `opexAmount` (presupuesto del mes)
+- `collaboratorExpenses` (desglose por colaborador)
+- `totalZohoExpenses` (gastos Zoho totales)
+
+Solo necesita calcular las diferencias y mostrarlas visualmente.
 
 ---
 
-## Nota sobre Datos Históricos
+## Nota sobre Historial
 
-Para clientes con `upsell_income > 0` pero sin `expansion_amount` (no se rastrea cuándo ocurrió):
-- Se considerará `expansion_amount = 0` (no se "re-cuenta" retroactivamente)
-- Solo se rastreará hacia adelante cuando edites el cliente
-
-Alternativamente, podemos hacer una migración para copiar `upsell_income` inicial a `expansion_amount` como punto de partida.
+Para una primera versión, mostraremos solo el **mes actual**. Si quieres ver tendencias históricas, necesitaríamos almacenar snapshots mensuales de OPEX real (actualmente solo se guarda el presupuestado en `monthly_balances`).
 
