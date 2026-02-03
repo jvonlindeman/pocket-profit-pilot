@@ -1,137 +1,110 @@
 
+# Corregir Error de Selección de Facturas Stripe
 
-# Dashboard de Análisis OPEX: Presupuesto vs Real
+## Problema Identificado
 
-## Objetivo
+Al intentar seleccionar facturas de Stripe en la sección de Receivables, aparece el error **"Error updating selection"**.
 
-Visualizar el **OPEX controlable** (colaboradores + herramientas/servicios de Zoho) vs tu presupuesto mental, para saber cuánto margen tienes para contratar o invertir.
+### Causa Raíz
 
----
+El código en `useReceivablesData.tsx` está enviando `user_id: null` en el upsert:
 
-## Definición de OPEX Real
+```typescript
+// Línea 280 actual
+user_id: null, // Set to null for anonymous access
+```
 
-| Incluido | Fuente | Ejemplo |
-|----------|--------|---------|
-| Colaboradores | Zoho - categoría "Pagos a colaboradores" | $8,000 |
-| Otros Gastos | Zoho - otras transacciones expense | $2,500 |
-| **Total OPEX Real** | | **$10,500** |
+Pero las políticas RLS actuales requieren autenticación y los registros existentes tienen `user_id` asignado correctamente.
 
-**Excluido**: Stripe fees (no controlables, proporcionales a ingresos)
-
----
-
-## Visualización Propuesta
+### Flujo del Error
 
 ```text
-┌────────────────────────────────────────────────────────────────────┐
-│  Análisis OPEX                                                     │
-├────────────────────────────────────────────────────────────────────┤
-│                                                                    │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐   │
-│  │ Presupuesto│  │ Real       │  │ Diferencia │  │ Disponible │   │
-│  │ (Mental)   │  │ (Zoho)     │  │            │  │ p/Crecer   │   │
-│  │ $13,000    │  │ $10,500    │  │ +$2,500    │  │ $6,200     │   │
-│  │            │  │            │  │ bajo pres. │  │ /mes       │   │
-│  └────────────┘  └────────────┘  └────────────┘  └────────────┘   │
-│                                                                    │
-│  Desglose:                                                         │
-│  ├─ Colaboradores:     $8,000  (76%)                              │
-│  └─ Otros Gastos:      $2,500  (24%)                              │
-│                                                                    │
-│  Insights:                                                         │
-│  • Tienes ~$2,500/mes bajo tu presupuesto                         │
-│  • Margen para 1 contratación de ~$1,500 sin riesgo               │
-│                                                                    │
-└────────────────────────────────────────────────────────────────────┘
+Usuario hace clic en checkbox
+       ↓
+handleItemToggle() en StripeReceivablesSection
+       ↓
+updateSelection() en useReceivablesData
+       ↓
+supabase.upsert({ user_id: null, ... })  ← PROBLEMA
+       ↓
+Conflicto con RLS o constraint
+       ↓
+"Error updating selection"
 ```
 
 ---
 
-## Métricas Clave
+## Solución
 
-| Métrica | Cálculo | Para qué sirve |
-|---------|---------|----------------|
-| **OPEX Presupuestado** | `monthly_balances.opex_amount` | Lo que esperas gastar |
-| **OPEX Real** | Colaboradores + Otros (Zoho) | Lo que realmente gastas |
-| **Varianza** | Presupuesto - Real | Indica si estás sobre/bajo |
-| **Disponible para Crecer** | MRR Total - OPEX Real Promedio | Margen para inversión |
+Modificar `updateSelection` para obtener el `user_id` del usuario autenticado en lugar de usar `null`.
 
----
+### Cambio Requerido
 
-## Archivos a Crear/Modificar
+**Archivo**: `src/hooks/useReceivablesData.tsx`
 
-| Archivo | Acción | Descripción |
-|---------|--------|-------------|
-| `src/hooks/useOpexAnalysis.ts` | CREAR | Hook para calcular OPEX real vs presupuestado |
-| `src/components/Retainers/OpexAnalysisPanel.tsx` | CREAR | Panel con KPIs, desglose y insights |
-| `src/pages/Retainers.tsx` | MODIFICAR | Integrar panel debajo de ProfitabilityDashboard |
-
----
-
-## Detalle Técnico
-
-### Hook: useOpexAnalysis
-
+**Antes** (líneas 262-283):
 ```typescript
-interface OpexAnalysis {
-  // Presupuesto (de monthly_balances)
-  budgetedOpex: number;
-  
-  // Real (de Zoho, sin Stripe fees)
-  realOpex: {
-    collaborators: number;    // Pagos a colaboradores
-    otherExpenses: number;    // Otros gastos operativos
-    total: number;
-  };
-  
-  // Análisis
-  variance: number;           // Presupuesto - Real
-  variancePercent: number;
-  
-  // Para planificación
-  totalMRR: number;
-  availableForGrowth: number; // MRR - OPEX Real
-  
-  // Estado
-  hasRealData: boolean;       // Si hay datos de Zoho cargados
-}
+const updateSelection = async (...) => {
+  try {
+    const { error } = await supabase
+      .from('receivables_selections')
+      .upsert({
+        selection_type: selectionType,
+        item_id: itemId,
+        selected,
+        amount,
+        metadata,
+        user_id: null, // ← PROBLEMA: null en lugar de user_id real
+      }, {
+        onConflict: 'selection_type,item_id'
+      });
 ```
 
-### Datos Necesarios
-
-Se obtienen del `FinancialDataContext` existente:
-- `collaboratorExpenses`: Ya se filtra por categoría "Pagos a colaboradores"
-- `totalZohoExpenses`: Total de gastos Zoho
-- `opexAmount`: Del `monthly_balances` actual
-
-Cálculo:
+**Después**:
 ```typescript
-const collaboratorTotal = collaboratorExpenses.reduce((sum, cat) => sum + cat.total, 0);
-const otherExpenses = totalZohoExpenses - collaboratorTotal;
-const realOpex = collaboratorTotal + otherExpenses; // = totalZohoExpenses
+const updateSelection = async (...) => {
+  try {
+    // Obtener el usuario autenticado
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      console.error('No authenticated user found');
+      toast.error('Please log in to save selections');
+      return false;
+    }
+    
+    const { error } = await supabase
+      .from('receivables_selections')
+      .upsert({
+        selection_type: selectionType,
+        item_id: itemId,
+        selected,
+        amount,
+        metadata,
+        user_id: user.id, // ← CORREGIDO: usar el ID del usuario autenticado
+      }, {
+        onConflict: 'selection_type,item_id'
+      });
 ```
 
-### Componente: OpexAnalysisPanel
+---
 
-Recibe datos del contexto financiero y muestra:
-1. **4 KPI Cards**: Presupuesto, Real, Varianza, Disponible
-2. **Desglose colapsable**: Colaboradores vs Otros con porcentajes
-3. **Insights automáticos**: Basados en la varianza
+## Archivos a Modificar
+
+| Archivo | Cambio |
+|---------|--------|
+| `src/hooks/useReceivablesData.tsx` | Modificar `updateSelection` para obtener y usar `user.id` |
 
 ---
 
-## Integración con Datos Existentes
+## Impacto
 
-El panel usará `FinancialDataContext` que ya contiene:
-- `opexAmount` (presupuesto del mes)
-- `collaboratorExpenses` (desglose por colaborador)
-- `totalZohoExpenses` (gastos Zoho totales)
-
-Solo necesita calcular las diferencias y mostrarlas visualmente.
+- Las selecciones se guardarán correctamente asociadas al usuario
+- Se eliminará el error "Error updating selection"
+- Los checkboxes funcionarán como se espera
 
 ---
 
-## Nota sobre Historial
+## Nota sobre Errores de Red
 
-Para una primera versión, mostraremos solo el **mes actual**. Si quieres ver tendencias históricas, necesitaríamos almacenar snapshots mensuales de OPEX real (actualmente solo se guarda el presupuestado en `monthly_balances`).
-
+Los logs también muestran errores "Failed to fetch" para `monthly_balances`. Esto parece ser un problema de conectividad temporal separado, pero no es la causa del error de selección que reportas.
