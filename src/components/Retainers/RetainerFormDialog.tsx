@@ -93,12 +93,14 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
     const upsellIncomeValue = parseNumberLike(upsellIncome);
     const newNetIncome = baseIncomeValue + upsellIncomeValue;
     
-    // Detectar contracción: si el ingreso bajó respecto al anterior
+    // Detectar contracción: si el ingreso BASE bajó respecto al anterior
+    // (compara solo base_income, no el total, para permitir upsells simultáneos)
     let contractionDelta = 0;
     if (initial) {
-      const previousNetIncome = Number(initial.net_income) || 0;
-      if (newNetIncome < previousNetIncome) {
-        contractionDelta = previousNetIncome - newNetIncome;
+      // Fallback a net_income para clientes legacy sin base_income
+      const previousBaseIncome = Number((initial as any).base_income) || Number(initial.net_income) || 0;
+      if (baseIncomeValue < previousBaseIncome) {
+        contractionDelta = previousBaseIncome - baseIncomeValue;
       }
     }
     
