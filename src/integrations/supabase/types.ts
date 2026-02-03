@@ -242,6 +242,7 @@ export type Database = {
           client_name: string
           client_status: string | null
           client_status_date: string | null
+          contraction_amount: number
           created_at: string
           days_since_contact: number | null
           expected_reactivation_date: string | null
@@ -270,6 +271,7 @@ export type Database = {
           client_name: string
           client_status?: string | null
           client_status_date?: string | null
+          contraction_amount?: number
           created_at?: string
           days_since_contact?: number | null
           expected_reactivation_date?: string | null
@@ -298,6 +300,7 @@ export type Database = {
           client_name?: string
           client_status?: string | null
           client_status_date?: string | null
+          contraction_amount?: number
           created_at?: string
           days_since_contact?: number | null
           expected_reactivation_date?: string | null
