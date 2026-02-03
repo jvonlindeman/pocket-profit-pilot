@@ -15,6 +15,7 @@ import { CsvPasteDialog } from "@/components/Retainers/CsvPasteDialog";
 import { GroupedRetainersSection } from "@/components/Retainers/GroupedRetainersSection";
 import { useChurnMetrics } from "@/hooks/useChurnCalculator";
 import { ProfitabilityDashboard } from "@/components/Retainers/ProfitabilityDashboard";
+import { OpexAnalysisPanel } from "@/components/Retainers/OpexAnalysisPanel";
 import { ReactivationAlerts } from "@/components/Retainers/ReactivationAlerts";
 import { CanceledClientsHistory } from "@/components/Retainers/CanceledClientsHistory";
 import { isMedicalClient } from "@/utils/retainerClassification";
@@ -86,8 +87,15 @@ function exportCsv(rows: RetainerRow[]) {
 const ProfitabilityDashboardSection: React.FC<{ rows: RetainerRow[] }> = ({ rows }) => {
   const financialData = useSharedFinancialData();
   
+  // Calculate total MRR from all active retainers
+  const totalMRR = React.useMemo(() => {
+    return rows
+      .filter(r => r.active)
+      .reduce((sum, r) => sum + (r.net_income || 0), 0);
+  }, [rows]);
+  
   return (
-    <section className="mt-6">
+    <section className="mt-6 space-y-6">
       <ProfitabilityDashboard 
         retainers={rows} 
         financialData={{
@@ -98,6 +106,7 @@ const ProfitabilityDashboardSection: React.FC<{ rows: RetainerRow[] }> = ({ rows
           opexAmount: financialData.opexAmount,
         }}
       />
+      <OpexAnalysisPanel totalMRR={totalMRR} />
     </section>
   );
 };
