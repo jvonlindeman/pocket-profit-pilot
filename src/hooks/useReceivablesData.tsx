@@ -269,6 +269,15 @@ export const useReceivablesData = () => {
     try {
       console.log('🔄 Updating selection:', { selectionType, itemId, selected, amount });
       
+      // Get authenticated user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.error('❌ No authenticated user found');
+        toast.error('Please log in to save selections');
+        return false;
+      }
+      
       const { error } = await supabase
         .from('receivables_selections')
         .upsert({
@@ -277,7 +286,7 @@ export const useReceivablesData = () => {
           selected,
           amount,
           metadata,
-          user_id: null, // Set to null for anonymous access
+          user_id: user.id,
         }, {
           onConflict: 'selection_type,item_id'
         });
