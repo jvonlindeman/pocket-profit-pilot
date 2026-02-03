@@ -244,6 +244,11 @@ export const RetainersTable: React.FC<Props> = ({ data, onEdit, onDelete }) => {
                               +{formatCurrency(Number((r as any).upsell_income))}
                             </span>
                           )}
+                          {Number((r as any).contraction_amount ?? 0) > 0 && (
+                            <span className="text-xs text-red-500 ml-1">
+                              ↓{formatCurrency(Number((r as any).contraction_amount))}
+                            </span>
+                          )}
                         </div>
                       </TooltipTrigger>
                       <TooltipContent>

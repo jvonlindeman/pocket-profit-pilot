@@ -56,6 +56,16 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
   
   const totalMRR = parseNumberLike(baseIncome) + parseNumberLike(upsellIncome);
   
+  // Calcular contracción en tiempo real para mostrar en UI
+  const currentBaseIncome = parseNumberLike(baseIncome);
+  const previousBaseIncome = initial 
+    ? (Number((initial as any).base_income) || Number(initial.net_income) || 0) 
+    : 0;
+  const liveContractionDelta = initial && currentBaseIncome < previousBaseIncome 
+    ? previousBaseIncome - currentBaseIncome 
+    : 0;
+  const accumulatedContraction = Number((initial as any)?.contraction_amount) || 0;
+  
   const [status, setStatus] = React.useState<ClientStatus>(getInitialStatus(initial));
   const [pausedAt, setPausedAt] = React.useState<string>(
     (initial as any)?.paused_at ? formatDateForInput((initial as any).paused_at) : getTodayDateString()
@@ -161,6 +171,11 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
                   Ingresos
                   <span className="text-muted-foreground font-normal ml-2">
                     MRR: ${totalMRR.toLocaleString('es-PA', { maximumFractionDigits: 0 })}
+                    {liveContractionDelta > 0 && (
+                      <span className="text-red-500 ml-1">
+                        (base bajó ${liveContractionDelta.toLocaleString('es-PA', { maximumFractionDigits: 0 })})
+                      </span>
+                    )}
                   </span>
                 </span>
               </AccordionTrigger>
@@ -169,6 +184,16 @@ export const RetainerFormDialog: React.FC<Props> = ({ open, onOpenChange, initia
                   <div>
                     <Label className="text-xs">Ingreso base</Label>
                     <Input value={baseIncome} onChange={(e) => setBaseIncome(e.target.value)} placeholder="0" inputMode="decimal" className="mt-1" />
+                    {liveContractionDelta > 0 && (
+                      <p className="text-xs text-red-500 mt-1">
+                        ↓ Reducción de ${liveContractionDelta.toLocaleString('es-PA', { maximumFractionDigits: 0 })}
+                      </p>
+                    )}
+                    {accumulatedContraction > 0 && liveContractionDelta === 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Contracción acumulada: ${accumulatedContraction.toLocaleString('es-PA', { maximumFractionDigits: 0 })}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <Label className="text-xs">Upsells</Label>
