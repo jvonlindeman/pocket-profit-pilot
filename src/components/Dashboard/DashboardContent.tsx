@@ -19,6 +19,7 @@ import { ReceivablesManager } from './Receivables/ReceivablesManager';
 import { FinancialPredictionCard } from './Prediction/FinancialPredictionCard';
 import { useStripeEstimated } from '@/hooks/useStripeEstimated';
 import { YearToDateSummary } from './YearToDateSummary';
+import { OpexAnalysisPanel } from '@/components/Retainers/OpexAnalysisPanel';
 
 interface DashboardContentProps {
   // Core data
@@ -239,6 +240,11 @@ const DashboardContent: React.FC<DashboardContentProps> = ({
               historicalMonthlyExpenses={totalZohoExpenses}
               startingBalance={startingBalance}
             />
+
+            <Separator />
+
+            {/* OPEX Analysis - Budget vs Real */}
+            <OpexAnalysisPanel totalMRR={regularIncome + stripeNet} />
 
             <Separator />
 
