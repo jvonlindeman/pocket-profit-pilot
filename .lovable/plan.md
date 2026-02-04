@@ -1,110 +1,80 @@
 
-# Corregir Error de Selección de Facturas Stripe
 
-## Problema Identificado
+# Mover Panel de Análisis OPEX al Dashboard Financiero
 
-Al intentar seleccionar facturas de Stripe en la sección de Receivables, aparece el error **"Error updating selection"**.
+## Objetivo
 
-### Causa Raíz
+Reubicar el componente `OpexAnalysisPanel` de la página de Retainers al Dashboard Financiero, donde hace más sentido contextual ya que:
+- Los datos de OPEX real provienen de Zoho (ya cargados en el Dashboard)
+- El presupuesto OPEX viene del `monthly_balances` (ya disponible en Dashboard)
+- Permite ver gastos presupuestados vs reales junto con el resto de métricas financieras
 
-El código en `useReceivablesData.tsx` está enviando `user_id: null` en el upsert:
+---
 
-```typescript
-// Línea 280 actual
-user_id: null, // Set to null for anonymous access
-```
+## Cambios a Realizar
 
-Pero las políticas RLS actuales requieren autenticación y los registros existentes tienen `user_id` asignado correctamente.
+| Archivo | Acción | Descripción |
+|---------|--------|-------------|
+| `src/components/Dashboard/DashboardContent.tsx` | MODIFICAR | Agregar `OpexAnalysisPanel` después de `FinancialPredictionCard` |
+| `src/pages/Retainers.tsx` | MODIFICAR | Remover `OpexAnalysisPanel` del `ProfitabilityDashboardSection` |
 
-### Flujo del Error
+---
+
+## Ubicación Propuesta en Dashboard
 
 ```text
-Usuario hace clic en checkbox
-       ↓
-handleItemToggle() en StripeReceivablesSection
-       ↓
-updateSelection() en useReceivablesData
-       ↓
-supabase.upsert({ user_id: null, ... })  ← PROBLEMA
-       ↓
-Conflicto con RLS o constraint
-       ↓
-"Error updating selection"
+┌─────────────────────────────────────────┐
+│  SalaryCalculator                       │
+├─────────────────────────────────────────┤
+│  PersonalSalaryCalculator               │
+├─────────────────────────────────────────┤
+│  RefinedFinancialSummary                │
+├─────────────────────────────────────────┤
+│  ReceivablesManager                     │
+├─────────────────────────────────────────┤
+│  FinancialPredictionCard                │
+├─────────────────────────────────────────┤
+│  OpexAnalysisPanel  ← NUEVO AQUÍ        │
+├─────────────────────────────────────────┤
+│  TransactionCategorySummary             │
+├─────────────────────────────────────────┤
+│  Transacciones                          │
+└─────────────────────────────────────────┘
 ```
 
 ---
 
-## Solución
+## Detalle Técnico
 
-Modificar `updateSelection` para obtener el `user_id` del usuario autenticado en lugar de usar `null`.
+### DashboardContent.tsx
 
-### Cambio Requerido
+Importar el componente y pasarle el `totalMRR`. Como en el Dashboard no tenemos el MRR de retainers directamente, usaremos el ingreso neto de Zoho (`regularIncome`) como aproximación del ingreso recurrente mensual:
 
-**Archivo**: `src/hooks/useReceivablesData.tsx`
-
-**Antes** (líneas 262-283):
 ```typescript
-const updateSelection = async (...) => {
-  try {
-    const { error } = await supabase
-      .from('receivables_selections')
-      .upsert({
-        selection_type: selectionType,
-        item_id: itemId,
-        selected,
-        amount,
-        metadata,
-        user_id: null, // ← PROBLEMA: null en lugar de user_id real
-      }, {
-        onConflict: 'selection_type,item_id'
-      });
+import { OpexAnalysisPanel } from '@/components/Retainers/OpexAnalysisPanel';
+
+// Dentro del JSX, después de FinancialPredictionCard:
+<OpexAnalysisPanel totalMRR={regularIncome + stripeNet} />
 ```
 
-**Después**:
+### Retainers.tsx
+
+Remover la línea que renderiza `OpexAnalysisPanel` del `ProfitabilityDashboardSection`:
+
 ```typescript
-const updateSelection = async (...) => {
-  try {
-    // Obtener el usuario autenticado
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      console.error('No authenticated user found');
-      toast.error('Please log in to save selections');
-      return false;
-    }
-    
-    const { error } = await supabase
-      .from('receivables_selections')
-      .upsert({
-        selection_type: selectionType,
-        item_id: itemId,
-        selected,
-        amount,
-        metadata,
-        user_id: user.id, // ← CORREGIDO: usar el ID del usuario autenticado
-      }, {
-        onConflict: 'selection_type,item_id'
-      });
+// Antes:
+<ProfitabilityDashboard ... />
+<OpexAnalysisPanel totalMRR={totalMRR} />
+
+// Después:
+<ProfitabilityDashboard ... />
 ```
 
 ---
 
-## Archivos a Modificar
+## Consideraciones
 
-| Archivo | Cambio |
-|---------|--------|
-| `src/hooks/useReceivablesData.tsx` | Modificar `updateSelection` para obtener y usar `user.id` |
+- El panel seguirá usando `FinancialDataContext` para obtener los datos de OPEX
+- Como el Dashboard ya tiene toda la data, el panel mostrará información correcta inmediatamente
+- El `totalMRR` se calculará como `regularIncome + stripeNet` (ingreso total del período)
 
----
-
-## Impacto
-
-- Las selecciones se guardarán correctamente asociadas al usuario
-- Se eliminará el error "Error updating selection"
-- Los checkboxes funcionarán como se espera
-
----
-
-## Nota sobre Errores de Red
-
-Los logs también muestran errores "Failed to fetch" para `monthly_balances`. Esto parece ser un problema de conectividad temporal separado, pero no es la causa del error de selección que reportas.
