@@ -73,12 +73,20 @@ function exportCsv(rows: RetainerRow[]) {
       r.notes ?? "",
     ];
   });
-  const csv = [headers.join(","), ...body.map((row) => row.join(","))].join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const escape = (v: unknown) => {
+    const s = v == null ? "" : String(v);
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const csv = [headers, ...body]
+    .map((row) => row.map(escape).join(","))
+    .join("\r\n");
+  // BOM para que Excel reconozca UTF-8 (acentos/ñ)
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "retainers.csv";
+  const today = new Date().toISOString().slice(0, 10);
+  a.download = `retainers-${today}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
