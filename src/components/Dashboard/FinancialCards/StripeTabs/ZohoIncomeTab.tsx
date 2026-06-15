@@ -27,7 +27,7 @@ const ZohoIncomeTab: React.FC = () => {
         />
         
         {/* Debug information */}
-        {process.env.NODE_ENV === 'development' && (
+        {import.meta.env.DEV && (
           <div className="text-xs text-gray-400">
             <p>Direct calc: {formatCurrency(zohoIncome)}</p>
             <p>From context: {formatCurrency(regularIncome)}</p>

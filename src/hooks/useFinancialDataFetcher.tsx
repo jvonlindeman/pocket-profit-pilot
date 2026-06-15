@@ -29,7 +29,7 @@ export const useFinancialDataFetcher = () => {
   
   // References to prevent duplicate calls
   const currentRequestIdRef = useRef<string>('');
-  const connectivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const connectivityTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Check cache status - simplified stub that returns defaults
   const checkCacheStatus = useCallback(async (
