@@ -13,6 +13,7 @@ import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
 import Retainers from "./pages/Retainers";
 import Login from "./pages/Login";
+import { GunplaInventoryPage } from "./features/gunpla-inventory";
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -27,6 +28,7 @@ const App = () => (
               <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/retainers" element={<ProtectedRoute><Retainers /></ProtectedRoute>} />
+              <Route path="/gunpla" element={<GunplaInventoryPage />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
