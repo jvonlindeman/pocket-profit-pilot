@@ -11,8 +11,22 @@ Open it at **`/gunpla`**.
   grade, status, location, and "for sale").
 - Summary cards: total kits, built, backlog, for-sale count, and total spent.
 - Add / edit / delete kits via a dialog form.
-- Persists to `localStorage` (key `gunpla-inventory:v1`). No backend required.
 - "Reset" restores the original data shipped from the source sheet.
+
+## Storage: local SQLite database
+
+Data lives in a **local SQLite database on your machine**, served by a tiny Node API in
+[`/server`](../../../server). See [`server/README.md`](../../../server/README.md) to start it.
+
+- **Server running** → the SQLite file (`server/data/gunpla.db`) is the source of truth.
+  The header shows a green **Local DB** badge. A `localStorage` copy is kept as an offline
+  mirror.
+- **Server not running** → the page falls back to browser storage (`localStorage`, key
+  `gunpla-inventory:v1`) so it still works; the header shows **Browser only** and a hint to
+  start the server.
+
+The frontend talks to the API through the Vite dev proxy (`/gunpla-api` →
+`http://localhost:4787`). Override the base URL with `VITE_GUNPLA_API` if needed.
 
 ## Data source
 
@@ -45,10 +59,11 @@ gunpla-inventory/
 ├── index.ts                  # public exports
 ├── types.ts                  # GunplaItem + filter/stat types
 ├── data/seedData.ts          # generated seed (from the sheet)
-├── hooks/useGunplaInventory.ts
+├── hooks/useGunplaInventory.ts  # SQLite API w/ localStorage fallback
 ├── lib/
 │   ├── inventory.ts          # filtering, stats, helpers (pure)
-│   └── storage.ts            # localStorage load/save/reset
+│   ├── api.ts                # local SQLite server client
+│   └── storage.ts            # localStorage offline cache
 └── components/
     ├── StatsCards.tsx
     ├── FilterBar.tsx
@@ -59,5 +74,4 @@ gunpla-inventory/
 ## Notes
 
 - The route is public (not wrapped in `ProtectedRoute`) so it works standalone.
-- Storage is per-browser; to share data across devices, swap `lib/storage.ts` for a
-  Supabase-backed implementation (a `gunpla_items` table mirrors `GunplaItem` 1:1).
+- The SQLite DB stays on your machine — nothing is sent to any cloud service.

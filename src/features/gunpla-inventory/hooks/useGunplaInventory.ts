@@ -5,37 +5,95 @@ import {
   resetInventory,
   saveInventory,
 } from "../lib/storage";
+import {
+  createItem,
+  deleteItemApi,
+  fetchItems,
+  pingApi,
+  resetItemsApi,
+  updateItem,
+} from "../lib/api";
 
 /**
- * localStorage-backed inventory store. Seeds from the sheet on first run and
- * persists every mutation.
+ * Inventory store backed by the local SQLite server.
+ *
+ * On mount it checks whether the server (cd server && npm start) is reachable:
+ * - online  → the SQLite DB is the source of truth; a localStorage copy is kept
+ *             as a cache/offline mirror.
+ * - offline → falls back to the localStorage cache (seeded from the sheet) so the
+ *             page still works; changes persist locally until the server is up.
  */
 export function useGunplaInventory() {
-  const [items, setItems] = useState<GunplaItem[]>(() => loadInventory());
+  const [items, setItems] = useState<GunplaItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [online, setOnline] = useState(false);
 
   useEffect(() => {
-    saveInventory(items);
-  }, [items]);
-
-  const upsertItem = useCallback((item: GunplaItem) => {
-    setItems((prev) => {
-      const idx = prev.findIndex((i) => i.code === item.code);
-      if (idx === -1) return [...prev, item];
-      const next = [...prev];
-      next[idx] = item;
-      return next;
-    });
+    let cancelled = false;
+    (async () => {
+      const reachable = await pingApi();
+      if (cancelled) return;
+      if (reachable) {
+        try {
+          const data = await fetchItems();
+          if (cancelled) return;
+          setOnline(true);
+          setItems(data);
+          saveInventory(data); // keep an offline mirror
+          setLoading(false);
+          return;
+        } catch {
+          /* fall through to offline */
+        }
+      }
+      if (cancelled) return;
+      setOnline(false);
+      setItems(loadInventory());
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const removeItem = useCallback((code: string) => {
-    setItems((prev) => prev.filter((i) => i.code !== code));
+  // Apply an update to local state + offline mirror.
+  const applyLocal = useCallback((next: GunplaItem[]) => {
+    setItems(next);
+    saveInventory(next);
   }, []);
 
-  const reset = useCallback(() => {
-    setItems(resetInventory());
-  }, []);
+  const upsertItem = useCallback(
+    async (item: GunplaItem) => {
+      const exists = items.some((i) => i.code === item.code);
+      const next = exists
+        ? items.map((i) => (i.code === item.code ? item : i))
+        : [...items, item];
+      applyLocal(next);
+      if (online) {
+        await (exists ? updateItem(item) : createItem(item));
+      }
+    },
+    [items, online, applyLocal]
+  );
+
+  const removeItem = useCallback(
+    async (code: string) => {
+      applyLocal(items.filter((i) => i.code !== code));
+      if (online) await deleteItemApi(code);
+    },
+    [items, online, applyLocal]
+  );
+
+  const reset = useCallback(async () => {
+    if (online) {
+      const data = await resetItemsApi();
+      applyLocal(data);
+    } else {
+      applyLocal(resetInventory());
+    }
+  }, [online, applyLocal]);
 
   const codes = useMemo(() => new Set(items.map((i) => i.code)), [items]);
 
-  return { items, setItems, upsertItem, removeItem, reset, codes };
+  return { items, loading, online, upsertItem, removeItem, reset, codes };
 }
