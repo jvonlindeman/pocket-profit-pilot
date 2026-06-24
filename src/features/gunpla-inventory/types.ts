@@ -45,3 +45,12 @@ export interface InventoryStats {
   backlog: number;
   forSale: number;
 }
+
+/** Aggregated metrics for one group (e.g. a single grade or location). */
+export interface Breakdown {
+  key: string;
+  count: number;
+  spent: number;
+  built: number;
+  backlog: number;
+}

@@ -1,8 +1,36 @@
 import type {
+  Breakdown,
   GunplaItem,
   InventoryFilters,
   InventoryStats,
 } from "../types";
+
+/**
+ * Group kits by a string field and aggregate count + spend + status mix.
+ * Sorted by count (desc), then by spend (desc).
+ */
+export function groupBy(
+  items: GunplaItem[],
+  key: keyof GunplaItem
+): Breakdown[] {
+  const map = new Map<string, Breakdown>();
+  for (const item of items) {
+    const raw = item[key];
+    const bucket = (typeof raw === "string" && raw.trim()) || "—";
+    let row = map.get(bucket);
+    if (!row) {
+      row = { key: bucket, count: 0, spent: 0, built: 0, backlog: 0 };
+      map.set(bucket, row);
+    }
+    row.count += 1;
+    row.spent += item.paid ?? 0;
+    if (item.status === "Built") row.built += 1;
+    if (item.status === "Backlog") row.backlog += 1;
+  }
+  return Array.from(map.values()).sort(
+    (a, b) => b.count - a.count || b.spent - a.spent
+  );
+}
 
 /** Compute aggregate stats over a list of kits. */
 export function computeStats(items: GunplaItem[]): InventoryStats {

@@ -20,9 +20,17 @@ import {
   computeStats,
   distinctValues,
   filterItems,
+  groupBy,
   nextCode,
 } from "./lib/inventory";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import StatsCards from "./components/StatsCards";
+import StatsPanel from "./components/StatsPanel";
 import FilterBar from "./components/FilterBar";
 import InventoryTable from "./components/InventoryTable";
 import ItemFormDialog from "./components/ItemFormDialog";
@@ -54,6 +62,10 @@ const GunplaInventoryPage = () => {
     [items, filters]
   );
   const stats = useMemo(() => computeStats(filtered), [filtered]);
+  const byGrade = useMemo(() => groupBy(filtered, "grade"), [filtered]);
+  const byStatus = useMemo(() => groupBy(filtered, "status"), [filtered]);
+  const byLocation = useMemo(() => groupBy(filtered, "location"), [filtered]);
+  const bySource = useMemo(() => groupBy(filtered, "source"), [filtered]);
 
   const suggestedCode = useMemo(
     () => nextCode(items, filters.grade || "HG"),
@@ -173,11 +185,27 @@ const GunplaInventoryPage = () => {
             onClear={() => setFilters(EMPTY_FILTERS)}
           />
 
-          <InventoryTable
-            items={filtered}
-            onEdit={handleEdit}
-            onDelete={setPendingDelete}
-          />
+          <Tabs defaultValue="list">
+            <TabsList>
+              <TabsTrigger value="list">Kits</TabsTrigger>
+              <TabsTrigger value="stats">Stats</TabsTrigger>
+            </TabsList>
+            <TabsContent value="list" className="mt-4">
+              <InventoryTable
+                items={filtered}
+                onEdit={handleEdit}
+                onDelete={setPendingDelete}
+              />
+            </TabsContent>
+            <TabsContent value="stats" className="mt-4">
+              <StatsPanel
+                byGrade={byGrade}
+                byStatus={byStatus}
+                byLocation={byLocation}
+                bySource={bySource}
+              />
+            </TabsContent>
+          </Tabs>
         </>
       )}
 
