@@ -9,7 +9,10 @@ Open it at **`/gunpla`**.
 
 - Lists all kits in a searchable, filterable table (search by name/code/source, filter by
   grade, status, location, and "for sale").
-- Summary cards: total kits, built, backlog, for-sale count, and total spent.
+- Summary cards: total kits, built, backlog, for-sale count, and total spent. Each shows the
+  whole-collection total plus a `· filtered` subtotal when a filter is active.
+- **Build progress** bar: built vs backlog vs other, with % built. Reflects the filtered scope
+  (e.g. filter by grade to see that grade's progress).
 - **Stats tab**: breakdowns by grade, status, location, and source (count + spend, with
   mini-bars and a built/backlog split). All breakdowns respect the active filters.
 - Add / edit / delete kits via a dialog form.

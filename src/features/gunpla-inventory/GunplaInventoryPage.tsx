@@ -30,6 +30,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import StatsCards from "./components/StatsCards";
+import BuildProgress from "./components/BuildProgress";
 import StatsPanel from "./components/StatsPanel";
 import FilterBar from "./components/FilterBar";
 import InventoryTable from "./components/InventoryTable";
@@ -62,6 +63,8 @@ const GunplaInventoryPage = () => {
     [items, filters]
   );
   const stats = useMemo(() => computeStats(filtered), [filtered]);
+  const totalStats = useMemo(() => computeStats(items), [items]);
+  const isFiltered = filtered.length !== items.length;
   const byGrade = useMemo(() => groupBy(filtered, "grade"), [filtered]);
   const byStatus = useMemo(() => groupBy(filtered, "status"), [filtered]);
   const byLocation = useMemo(() => groupBy(filtered, "location"), [filtered]);
@@ -174,7 +177,20 @@ const GunplaInventoryPage = () => {
             </p>
           )}
 
-          <StatsCards stats={stats} />
+          <StatsCards
+            total={totalStats}
+            filtered={stats}
+            isFiltered={isFiltered}
+          />
+
+          <BuildProgress
+            stats={stats}
+            scopeLabel={
+              isFiltered
+                ? `Filtered · ${stats.totalKits} kits`
+                : "Whole collection"
+            }
+          />
 
           <FilterBar
             filters={filters}
