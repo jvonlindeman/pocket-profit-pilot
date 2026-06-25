@@ -1,0 +1,112 @@
+#!/bin/bash
+# Gunpla Inventory — launcher inside the .app bundle.
+# Double-clicking the app runs THIS script (no Terminal window). On each open it:
+#   1. pulls the latest version from GitHub (auto-update, best-effort),
+#   2. starts the tiny local server if it isn't already running (restarts it if
+#      an update came down),
+#   3. opens the app in a browser window.
+# Your data stays in ~/Documents/Gunpla Inventory and is never touched.
+
+PORT=8080
+URL="http://localhost:${PORT}"
+LOG="${HOME}/Library/Logs/Gunpla Inventory.log"
+
+# GUI apps don't inherit your shell PATH, so add the usual tool locations.
+export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:${PATH}"
+# Never let git block on a credential prompt — fail fast and keep going.
+export GIT_TERMINAL_PROMPT=0
+
+# The app code lives in the folder that CONTAINS this .app bundle:
+#   <ROOT>/Gunpla Inventory.app/Contents/MacOS/gunpla-inventory
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+mkdir -p "$(dirname "$LOG")"
+
+alert() {
+  /usr/bin/osascript -e "display dialog \"$1\" with title \"Gunpla Inventory\" buttons {\"OK\"} default button \"OK\"" >/dev/null 2>&1
+}
+note() {
+  /usr/bin/osascript -e "display notification \"$1\" with title \"Gunpla Inventory\"" >/dev/null 2>&1
+}
+find_bin() {
+  local name="$1"; shift
+  local c
+  for c in "$(command -v "$name" 2>/dev/null)" "$@"; do
+    if [ -n "$c" ] && [ -x "$c" ]; then echo "$c"; return 0; fi
+  done
+  return 1
+}
+open_window() {
+  if [ -d "/Applications/Google Chrome.app" ]; then
+    open -na "Google Chrome" --args --app="$URL" --new-window
+  elif [ -d "/Applications/Microsoft Edge.app" ]; then
+    open -na "Microsoft Edge" --args --app="$URL" --new-window
+  else
+    open "$URL"
+  fi
+}
+
+# --- Auto-update: git pull (best-effort; offline / no-credentials just skips) --
+UPDATED=0
+GIT="$(find_bin git /usr/bin/git /opt/homebrew/bin/git /usr/local/bin/git)"
+if [ -n "$GIT" ] && "$GIT" -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  note "Buscando actualizaciones…"
+  BEFORE="$("$GIT" -C "$ROOT" rev-parse HEAD 2>/dev/null)"
+  "$GIT" -C "$ROOT" pull --ff-only --quiet >>"$LOG" 2>&1
+  AFTER="$("$GIT" -C "$ROOT" rev-parse HEAD 2>/dev/null)"
+  [ -n "$BEFORE" ] && [ "$BEFORE" != "$AFTER" ] && UPDATED=1
+fi
+
+# --- Is the server already running? -------------------------------------------
+RUNNING=0
+/usr/bin/curl -s -o /dev/null --max-time 1 "${URL}/api/health" && RUNNING=1
+
+# Running and nothing new → just open the window.
+if [ "$RUNNING" = 1 ] && [ "$UPDATED" = 0 ]; then
+  open_window
+  exit 0
+fi
+
+# Running but we pulled an update → stop it so the new code loads.
+if [ "$RUNNING" = 1 ] && [ "$UPDATED" = 1 ]; then
+  /usr/sbin/lsof -ti tcp:${PORT} 2>/dev/null | xargs kill 2>/dev/null
+  sleep 1
+fi
+
+# --- Need Node to (re)start the server ----------------------------------------
+NODE="$(find_bin node /usr/local/bin/node /opt/homebrew/bin/node /usr/bin/node "${HOME}/.volta/bin/node")"
+if [ -z "$NODE" ] && [ -d "${HOME}/.nvm/versions/node" ]; then
+  v="$(/bin/ls -1 "${HOME}/.nvm/versions/node" 2>/dev/null | sort -V | tail -1)"
+  [ -n "$v" ] && [ -x "${HOME}/.nvm/versions/node/${v}/bin/node" ] && \
+    NODE="${HOME}/.nvm/versions/node/${v}/bin/node"
+fi
+if [ -z "$NODE" ]; then
+  alert "No encontré Node.js, que la app necesita.\n\nInstálalo gratis desde nodejs.org (versión LTS) y vuelve a abrir esta app."
+  open "https://nodejs.org"
+  exit 1
+fi
+
+# --- First run (or after deleting them): install the server's dependencies ----
+if [ ! -d "${ROOT}/server/node_modules" ]; then
+  if find_bin npm /usr/local/bin/npm /opt/homebrew/bin/npm >/dev/null; then
+    note "Preparando la app por primera vez (1-2 min)…"
+    ( cd "${ROOT}/server" && npm install --no-audit --no-fund ) >>"$LOG" 2>&1
+  else
+    alert "Falta preparar la app y no encontré npm.\n\nAbre una vez «start.command» (en la carpeta) para completar la instalación, y luego usa este ícono."
+    exit 1
+  fi
+fi
+
+# --- Start the server in the background, detached from this launcher ----------
+GUNPLA_PORT="$PORT" nohup "$NODE" "${ROOT}/server/index.mjs" >>"$LOG" 2>&1 &
+
+# --- Wait until it answers, then open ------------------------------------------
+for _ in $(seq 1 40); do
+  if /usr/bin/curl -s -o /dev/null --max-time 1 "${URL}/api/health"; then
+    open_window
+    exit 0
+  fi
+  sleep 0.5
+done
+
+alert "La app tardó demasiado en arrancar.\n\nRevisa el registro:\n${LOG}"
+exit 1
