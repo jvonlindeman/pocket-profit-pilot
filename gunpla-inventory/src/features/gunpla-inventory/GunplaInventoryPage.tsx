@@ -227,6 +227,7 @@ const GunplaInventoryPage = () => {
                 sort={sort}
                 onSort={toggleSort}
                 onEdit={handleEdit}
+                onInlineSave={handleSave}
                 onDelete={setPendingDelete}
               />
             </TabsContent>

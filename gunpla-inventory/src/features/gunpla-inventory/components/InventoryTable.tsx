@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   Table,
   TableBody,
@@ -8,23 +9,40 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  Check,
   ExternalLink,
   Pencil,
+  Settings2,
   Tag,
   Trash2,
+  X,
 } from "lucide-react";
 import type { GunplaItem } from "../types";
-import { formatMoney, type SortKey, type SortState } from "../lib/inventory";
+import {
+  formatMoney,
+  STATUS_OPTIONS,
+  type SortKey,
+  type SortState,
+} from "../lib/inventory";
 
 interface InventoryTableProps {
   items: GunplaItem[];
   sort: SortState;
   onSort: (key: SortKey) => void;
   onEdit: (item: GunplaItem) => void;
+  onInlineSave: (item: GunplaItem) => void;
   onDelete: (item: GunplaItem) => void;
 }
 
@@ -39,8 +57,51 @@ const InventoryTable = ({
   sort,
   onSort,
   onEdit,
+  onInlineSave,
   onDelete,
 }: InventoryTableProps) => {
+  // Inline row editing: one row at a time. `draft` is a full clone of the row
+  // being edited, so fields not shown in the table are preserved on save.
+  const [editingCode, setEditingCode] = useState<string | null>(null);
+  const [draft, setDraft] = useState<GunplaItem | null>(null);
+
+  // If the editing row disappears (filter/sort/delete), exit edit mode cleanly.
+  useEffect(() => {
+    if (editingCode && !items.some((i) => i.code === editingCode)) {
+      setEditingCode(null);
+      setDraft(null);
+    }
+  }, [items, editingCode]);
+
+  const startEdit = (item: GunplaItem) => {
+    setEditingCode(item.code);
+    setDraft({ ...item });
+  };
+  const cancelEdit = () => {
+    setEditingCode(null);
+    setDraft(null);
+  };
+  const saveEdit = () => {
+    if (!draft) return;
+    if (draft.name.trim() === "") return; // name is required (mirrors the dialog)
+    onInlineSave({
+      ...draft,
+      name: draft.name.trim(),
+      grade: draft.grade.trim(),
+    });
+    setEditingCode(null);
+    setDraft(null);
+  };
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      saveEdit();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancelEdit();
+    }
+  };
+
   const SortHead = ({
     column,
     label,
@@ -102,72 +163,191 @@ const InventoryTable = ({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {items.map((item) => (
-            <TableRow key={item.code}>
-              <TableCell className="font-mono text-xs">{item.code}</TableCell>
-              <TableCell className="font-medium">
-                <div className="flex items-center gap-1.5">
-                  <span>{item.name || "—"}</span>
-                  {item.sell && (
-                    <Tag className="h-3.5 w-3.5 text-purple-600" aria-label="For sale" />
-                  )}
-                  {item.delpiLink && (
-                    <a
-                      href={item.delpiLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-muted-foreground hover:text-foreground"
-                      title="Decal link"
+          {items.map((item) => {
+            const editing = editingCode === item.code && draft !== null;
+
+            if (editing && draft) {
+              return (
+                <TableRow key={item.code}>
+                  <TableCell className="font-mono text-xs">
+                    {item.code}
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      autoFocus
+                      className="h-8"
+                      value={draft.name}
+                      onChange={(e) =>
+                        setDraft({ ...draft, name: e.target.value })
+                      }
+                      onKeyDown={onKeyDown}
+                      placeholder="Kit name"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      className="h-8"
+                      value={draft.grade}
+                      onChange={(e) =>
+                        setDraft({ ...draft, grade: e.target.value })
+                      }
+                      onKeyDown={onKeyDown}
+                      placeholder="Grade"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Select
+                      value={draft.status}
+                      onValueChange={(v) => setDraft({ ...draft, status: v })}
                     >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
-                  )}
-                </div>
-                {item.peebsLimited &&
-                  item.peebsLimited.toLowerCase() !== "no" && (
-                    <span className="text-xs text-muted-foreground">
-                      {item.peebsLimited}
-                    </span>
-                  )}
-              </TableCell>
-              <TableCell>
-                <Badge variant="outline">{item.grade}</Badge>
-              </TableCell>
-              <TableCell>
-                <Badge variant={statusVariant(item.status)}>
-                  {item.status}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-sm text-muted-foreground">
-                {item.location || "—"}
-              </TableCell>
-              <TableCell className="text-right text-sm">
-                {formatMoney(item.paid)}
-              </TableCell>
-              <TableCell>
-                <div className="flex justify-end gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => onEdit(item)}
-                    aria-label="Edit"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive"
-                    onClick={() => onDelete(item)}
-                    aria-label="Delete"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
+                      <SelectTrigger className="h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUS_OPTIONS.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      className="h-8"
+                      value={draft.location}
+                      onChange={(e) =>
+                        setDraft({ ...draft, location: e.target.value })
+                      }
+                      onKeyDown={onKeyDown}
+                      placeholder="Location"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      className="h-8 text-right"
+                      value={draft.paid ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        const n = Number(v);
+                        setDraft({
+                          ...draft,
+                          paid: v === "" || Number.isNaN(n) ? null : n,
+                        });
+                      }}
+                      onKeyDown={onKeyDown}
+                      placeholder="—"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-green-600"
+                        onClick={saveEdit}
+                        aria-label="Save"
+                      >
+                        <Check className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={cancelEdit}
+                        aria-label="Cancel"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            }
+
+            return (
+              <TableRow key={item.code}>
+                <TableCell className="font-mono text-xs">{item.code}</TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-1.5">
+                    <span>{item.name || "—"}</span>
+                    {item.sell && (
+                      <Tag
+                        className="h-3.5 w-3.5 text-purple-600"
+                        aria-label="For sale"
+                      />
+                    )}
+                    {item.delpiLink && (
+                      <a
+                        href={item.delpiLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-muted-foreground hover:text-foreground"
+                        title="Decal link"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    )}
+                  </div>
+                  {item.peebsLimited &&
+                    item.peebsLimited.toLowerCase() !== "no" && (
+                      <span className="text-xs text-muted-foreground">
+                        {item.peebsLimited}
+                      </span>
+                    )}
+                </TableCell>
+                <TableCell>
+                  <Badge variant="outline">{item.grade}</Badge>
+                </TableCell>
+                <TableCell>
+                  <Badge variant={statusVariant(item.status)}>
+                    {item.status}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {item.location || "—"}
+                </TableCell>
+                <TableCell className="text-right text-sm">
+                  {formatMoney(item.paid)}
+                </TableCell>
+                <TableCell>
+                  <div className="flex justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => startEdit(item)}
+                      aria-label="Edit in row"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => onEdit(item)}
+                      aria-label="Edit all fields"
+                      title="Edit all fields"
+                    >
+                      <Settings2 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive"
+                      onClick={() => onDelete(item)}
+                      aria-label="Delete"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>

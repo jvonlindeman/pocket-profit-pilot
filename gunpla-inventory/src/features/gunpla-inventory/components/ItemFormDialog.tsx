@@ -19,8 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { GunplaItem } from "../types";
-
-const STATUS_OPTIONS = ["Backlog", "In Progress", "Built"];
+import { STATUS_OPTIONS } from "../lib/inventory";
 
 interface ItemFormDialogProps {
   open: boolean;

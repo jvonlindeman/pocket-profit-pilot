@@ -110,6 +110,9 @@ export function nextCode(items: GunplaItem[], prefix: string): string {
   return `${safePrefix}-${String(max + 1).padStart(3, "0")}`;
 }
 
+/** Status values offered in the form dialog and inline row editor. */
+export const STATUS_OPTIONS = ["Backlog", "In Progress", "Built"] as const;
+
 export type SortKey =
   | "code"
   | "name"
