@@ -23,31 +23,31 @@ const CARDS: CardDef[] = [
   {
     label: "Kits",
     icon: Boxes,
-    tint: "text-blue-600",
+    tint: "text-blue-600 dark:text-blue-400",
     get: (s) => String(s.totalKits),
   },
   {
     label: "Built",
     icon: CheckCircle2,
-    tint: "text-green-600",
+    tint: "text-green-600 dark:text-green-400",
     get: (s) => String(s.built),
   },
   {
     label: "Backlog",
     icon: Clock,
-    tint: "text-amber-600",
+    tint: "text-amber-600 dark:text-amber-400",
     get: (s) => String(s.backlog),
   },
   {
     label: "For sale",
     icon: Tag,
-    tint: "text-purple-600",
+    tint: "text-purple-600 dark:text-purple-400",
     get: (s) => String(s.forSale),
   },
   {
     label: "Total spent",
     icon: DollarSign,
-    tint: "text-emerald-600",
+    tint: "text-emerald-600 dark:text-emerald-400",
     get: (s) => formatMoney(s.totalSpent),
   },
 ];

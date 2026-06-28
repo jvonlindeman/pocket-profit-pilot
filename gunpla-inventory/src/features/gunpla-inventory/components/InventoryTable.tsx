@@ -247,7 +247,7 @@ const InventoryTable = ({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-green-600"
+                        className="h-8 w-8 text-green-600 dark:text-green-400"
                         onClick={saveEdit}
                         aria-label="Save"
                       >
@@ -276,7 +276,7 @@ const InventoryTable = ({
                     <span>{item.name || "—"}</span>
                     {item.sell && (
                       <Tag
-                        className="h-3.5 w-3.5 text-purple-600"
+                        className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400"
                         aria-label="For sale"
                       />
                     )}

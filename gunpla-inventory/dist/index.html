@@ -6,8 +6,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Gunpla Inventory</title>
     <meta name="description" content="Personal Gunpla collection inventory and build tracker" />
-    <script type="module" crossorigin src="/assets/index-DcNRP7AH.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-Bww8gRyw.css">
+    <script>
+      // Apply the saved (or OS-preferred) theme before paint to avoid a flash.
+      (function () {
+        try {
+          var saved = localStorage.getItem("gunpla-theme");
+          var dark = saved
+            ? saved === "dark"
+            : window.matchMedia("(prefers-color-scheme: dark)").matches;
+          if (dark) document.documentElement.classList.add("dark");
+        } catch (e) {}
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-40gDerNZ.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BM511jKl.css">
   </head>
   <body>
     <div id="root"></div>

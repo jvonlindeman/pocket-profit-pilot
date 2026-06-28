@@ -32,6 +32,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import ThemeToggle from "./components/ThemeToggle";
 import StatsCards from "./components/StatsCards";
 import BuildProgress from "./components/BuildProgress";
 import StatsPanel from "./components/StatsPanel";
@@ -163,6 +164,7 @@ const GunplaInventoryPage = () => {
           </p>
         </div>
         <div className="flex gap-2">
+          <ThemeToggle />
           <ExportMenu items={sorted} />
           <Button variant="outline" onClick={() => setResetOpen(true)}>
             <RotateCcw className="mr-1.5 h-4 w-4" />
@@ -183,7 +185,7 @@ const GunplaInventoryPage = () => {
       ) : (
         <>
           {!online && (
-            <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
               Local server not detected — running on browser storage, so changes
               won&apos;t be written to your{" "}
               <code className="font-mono">~/Documents/Gunpla Inventory</code>{" "}
