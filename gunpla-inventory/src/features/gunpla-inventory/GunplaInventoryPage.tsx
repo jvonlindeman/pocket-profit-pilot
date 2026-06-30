@@ -14,8 +14,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Database, HardDrive, Loader2, Plus, RotateCcw } from "lucide-react";
 
-import type { GunplaItem, InventoryFilters } from "./types";
+import type {
+  BuildPriority,
+  GunplaItem,
+  InventoryFilters,
+  Paint,
+} from "./types";
 import { useGunplaInventory } from "./hooks/useGunplaInventory";
+import { deletePhotoApi } from "./lib/api";
 import {
   computeStats,
   deriveStatus,
@@ -148,6 +154,46 @@ const GunplaInventoryPage = () => {
     persistQuiet({ ...item, status: "Backlog" }, `Removed ${item.code} from builds`);
   };
 
+  const handleAddPhoto = (item: GunplaItem, filename: string) => {
+    persistQuiet({ ...item, photos: [...(item.photos ?? []), filename] });
+  };
+
+  const handleRemovePhoto = (item: GunplaItem, filename: string) => {
+    persistQuiet({
+      ...item,
+      photos: (item.photos ?? []).filter((p) => p !== filename),
+    });
+    deletePhotoApi(filename).catch(() => {
+      /* file may already be gone; the array update is what matters */
+    });
+  };
+
+  const handleSaveStageNote = (
+    item: GunplaItem,
+    stageKey: string,
+    note: string
+  ) => {
+    const notes = { ...(item.stageNotes ?? {}) };
+    if (note.trim()) notes[stageKey] = note.trim();
+    else delete notes[stageKey];
+    persistQuiet({ ...item, stageNotes: notes });
+  };
+
+  const handleSavePaints = (item: GunplaItem, paints: Paint[]) => {
+    persistQuiet({ ...item, paints });
+  };
+
+  const handleSaveInfo = (
+    item: GunplaItem,
+    info: {
+      startedAt: string | null;
+      finishedAt: string | null;
+      priority: BuildPriority | null;
+    }
+  ) => {
+    persistQuiet({ ...item, ...info });
+  };
+
   const confirmDelete = async () => {
     if (!pendingDelete) return;
     const { code } = pendingDelete;
@@ -273,9 +319,15 @@ const GunplaInventoryPage = () => {
             <TabsContent value="projects" className="mt-4">
               <ProjectsPanel
                 items={items}
+                online={online}
                 onStartBuild={handleStartBuild}
                 onToggleStage={handleToggleStage}
                 onRemoveBuild={handleRemoveBuild}
+                onAddPhoto={handleAddPhoto}
+                onRemovePhoto={handleRemovePhoto}
+                onSaveStageNote={handleSaveStageNote}
+                onSavePaints={handleSavePaints}
+                onSaveInfo={handleSaveInfo}
               />
             </TabsContent>
             <TabsContent value="stats" className="mt-4">

@@ -3,6 +3,14 @@
 
 export type GunplaStatus = "Backlog" | "Built" | "In Progress";
 
+export type BuildPriority = "high" | "medium" | "low";
+
+/** One line of a project's paint recipe: which area got which paint. */
+export interface Paint {
+  area: string;
+  paint: string;
+}
+
 export interface GunplaItem {
   /** Unique code from the sheet, e.g. "HG-001". Used as the stable id. */
   code: string;
@@ -30,6 +38,18 @@ export interface GunplaItem {
   /** Completed build-stage keys (see BUILD_STAGES in lib/inventory). Optional
    *  so existing/seed items without it stay valid; treated as [] when absent. */
   stages?: string[];
+  /** Progress photo filenames stored on disk under the data dir's photos/. */
+  photos?: string[];
+  /** Per-stage notes, keyed by stage key (e.g. { priming: "Mr. Surfacer 1500" }). */
+  stageNotes?: Record<string, string>;
+  /** Structured paint recipe: which area got which paint. */
+  paints?: Paint[];
+  /** Build start date, "YYYY-MM-DD". */
+  startedAt?: string | null;
+  /** Build finish date, "YYYY-MM-DD". */
+  finishedAt?: string | null;
+  /** Priority for ordering active builds. */
+  priority?: BuildPriority | null;
 }
 
 export interface InventoryFilters {

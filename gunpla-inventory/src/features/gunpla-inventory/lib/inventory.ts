@@ -141,6 +141,43 @@ export function deriveStatus(stages: string[]): GunplaStatus {
   return stagesDone(stages) >= BUILD_STAGES.length ? "Built" : "In Progress";
 }
 
+/** Priority levels offered for active builds (highest first). */
+export const PRIORITY_OPTIONS = [
+  { key: "high", label: "High" },
+  { key: "medium", label: "Medium" },
+  { key: "low", label: "Low" },
+] as const;
+
+/** Sort rank for a priority (lower = more urgent; no priority sinks last). */
+export function priorityRank(p: string | null | undefined): number {
+  const i = PRIORITY_OPTIONS.findIndex((o) => o.key === p);
+  return i === -1 ? PRIORITY_OPTIONS.length : i;
+}
+
+/** Order active builds: by priority (High→Low→none), then start date, then code. */
+export function sortProjects(items: GunplaItem[]): GunplaItem[] {
+  return [...items].sort((a, b) => {
+    const pr = priorityRank(a.priority) - priorityRank(b.priority);
+    if (pr !== 0) return pr;
+    const da = a.startedAt || "";
+    const db = b.startedAt || "";
+    if (da !== db) return da.localeCompare(db);
+    return a.code.localeCompare(b.code);
+  });
+}
+
+/** Format an ISO date ("YYYY-MM-DD") as e.g. "Dec 25, 2025"; "—" when empty. */
+export function formatDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(d);
+}
+
 export type SortKey =
   | "code"
   | "name"

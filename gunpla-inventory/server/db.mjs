@@ -30,6 +30,13 @@ const DATA_FILE =
 
 mkdirSync(dirname(DATA_FILE), { recursive: true });
 
+// Progress photos live as real files next to inventory.json, so they show up in
+// Finder / iCloud and never bloat the JSON (only filenames are stored on items).
+const PHOTOS_DIR = join(dirname(DATA_FILE), "photos");
+mkdirSync(PHOTOS_DIR, { recursive: true });
+
+const PRIORITIES = new Set(["high", "medium", "low"]);
+
 /** Coerce an incoming item into the canonical on-disk shape. */
 function normalize(item) {
   const num = (v) =>
@@ -51,6 +58,34 @@ function normalize(item) {
     stages: Array.isArray(item.stages)
       ? item.stages.filter((s) => typeof s === "string")
       : [],
+    photos: Array.isArray(item.photos)
+      ? item.photos.filter((p) => typeof p === "string")
+      : [],
+    stageNotes:
+      item.stageNotes && typeof item.stageNotes === "object"
+        ? Object.fromEntries(
+            Object.entries(item.stageNotes)
+              .filter(([, v]) => typeof v === "string" && v.trim() !== "")
+              .map(([k, v]) => [String(k), String(v)])
+          )
+        : {},
+    paints: Array.isArray(item.paints)
+      ? item.paints
+          .map((p) => ({
+            area: String(p?.area || "").trim(),
+            paint: String(p?.paint || "").trim(),
+          }))
+          .filter((p) => p.area || p.paint)
+      : [],
+    startedAt:
+      typeof item.startedAt === "string" && item.startedAt.trim()
+        ? item.startedAt.trim()
+        : null,
+    finishedAt:
+      typeof item.finishedAt === "string" && item.finishedAt.trim()
+        ? item.finishedAt.trim()
+        : null,
+    priority: PRIORITIES.has(item.priority) ? item.priority : null,
   };
 }
 
@@ -154,4 +189,4 @@ export function resetToSeed() {
   return replaceAll(seed);
 }
 
-export { DATA_FILE };
+export { DATA_FILE, PHOTOS_DIR };

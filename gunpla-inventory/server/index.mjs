@@ -1,8 +1,8 @@
 import express from "express";
 import cors from "cors";
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync, unlinkSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { dirname, join, basename } from "node:path";
 import {
   getItems,
   getItem,
@@ -12,6 +12,7 @@ import {
   resetToSeed,
   seedIfEmpty,
   DATA_FILE,
+  PHOTOS_DIR,
 } from "./db.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -21,7 +22,7 @@ const PORT = Number(process.env.GUNPLA_PORT || 4787);
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "12mb" })); // headroom for base64 photos (downscaled client-side)
 
 // Seed from seed.json on the very first run (no data file yet).
 const seeded = seedIfEmpty();
@@ -70,6 +71,46 @@ app.post("/api/reset", (_req, res) => {
   const count = resetToSeed();
   res.json({ ok: true, count });
 });
+
+// --- Progress photos: files saved on disk, served at /photos/<filename> -------
+const PHOTO_EXTS = new Set(["jpg", "jpeg", "png", "webp"]);
+
+// Save a base64 image, return its filename. The client owns the item.photos list.
+app.post("/api/photos", (req, res) => {
+  try {
+    const { code, ext, base64 } = req.body || {};
+    if (!code || !base64) {
+      return res.status(400).json({ error: "code and base64 are required" });
+    }
+    const safeExt = PHOTO_EXTS.has(String(ext).toLowerCase())
+      ? String(ext).toLowerCase()
+      : "jpg";
+    const buf = Buffer.from(base64, "base64");
+    if (!buf.length || buf.length > 12 * 1024 * 1024) {
+      return res.status(400).json({ error: "Invalid or oversized image" });
+    }
+    const safeCode = basename(String(code)).replace(/[^a-zA-Z0-9._-]/g, "_");
+    const filename = `${safeCode}-${Date.now()}.${safeExt}`;
+    writeFileSync(join(PHOTOS_DIR, filename), buf);
+    res.status(201).json({ filename });
+  } catch (err) {
+    res.status(400).json({ error: String(err.message || err) });
+  }
+});
+
+// Delete the file from disk (item array is updated client-side via upsert).
+app.delete("/api/photos/:filename", (req, res) => {
+  try {
+    const file = join(PHOTOS_DIR, basename(req.params.filename));
+    if (existsSync(file)) unlinkSync(file);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: String(err.message || err) });
+  }
+});
+
+// Serve photo files (registered before the SPA catch-all so it isn't intercepted).
+app.use("/photos", express.static(PHOTOS_DIR));
 
 // In the packaged app we also serve the built frontend from this same server,
 // so the whole thing runs as ONE process on ONE origin (no Vite, no proxy).
