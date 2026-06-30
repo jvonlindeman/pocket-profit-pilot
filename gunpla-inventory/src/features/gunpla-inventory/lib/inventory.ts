@@ -1,6 +1,7 @@
 import type {
   Breakdown,
   GunplaItem,
+  GunplaStatus,
   InventoryFilters,
   InventoryStats,
 } from "../types";
@@ -112,6 +113,33 @@ export function nextCode(items: GunplaItem[], prefix: string): string {
 
 /** Status values offered in the form dialog and inline row editor. */
 export const STATUS_OPTIONS = ["Backlog", "In Progress", "Built"] as const;
+
+/** Ordered build pipeline (full airbrush flow) tracked per kit in the Projects tab. */
+export const BUILD_STAGES = [
+  { key: "assembly", label: "Assembly" },
+  { key: "sanding", label: "Sanding & seams" },
+  { key: "priming", label: "Priming" },
+  { key: "basecoat", label: "Base coat (airbrush)" },
+  { key: "detail", label: "Detail paint" },
+  { key: "paneling", label: "Panel lining" },
+  { key: "decals", label: "Decals / waterslides" },
+  { key: "topcoat", label: "Topcoat" },
+] as const;
+
+/** How many of the known stages are completed (ignores unknown keys). */
+export function stagesDone(stages: string[] | undefined): number {
+  if (!stages) return 0;
+  return BUILD_STAGES.filter((s) => stages.includes(s.key)).length;
+}
+
+/**
+ * Derive a kit's status from its build stages while it's an active project:
+ * all stages done → Built, otherwise In Progress (even with 0 done — it's on
+ * the bench). Used only when working a kit in the Projects tab.
+ */
+export function deriveStatus(stages: string[]): GunplaStatus {
+  return stagesDone(stages) >= BUILD_STAGES.length ? "Built" : "In Progress";
+}
 
 export type SortKey =
   | "code"

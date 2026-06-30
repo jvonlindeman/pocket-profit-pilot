@@ -48,6 +48,7 @@ function emptyItem(code: string): GunplaItem {
     sell: false,
     delpiLink: "",
     review: "",
+    stages: [],
   };
 }
 

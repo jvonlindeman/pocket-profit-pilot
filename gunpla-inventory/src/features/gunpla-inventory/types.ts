@@ -27,6 +27,9 @@ export interface GunplaItem {
   delpiLink: string;
   /** Free-form notes. */
   review: string;
+  /** Completed build-stage keys (see BUILD_STAGES in lib/inventory). Optional
+   *  so existing/seed items without it stay valid; treated as [] when absent. */
+  stages?: string[];
 }
 
 export interface InventoryFilters {

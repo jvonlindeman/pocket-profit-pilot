@@ -48,6 +48,9 @@ function normalize(item) {
     sell: !!item.sell,
     delpiLink: String(item.delpiLink || ""),
     review: String(item.review || ""),
+    stages: Array.isArray(item.stages)
+      ? item.stages.filter((s) => typeof s === "string")
+      : [],
   };
 }
 

@@ -18,6 +18,7 @@ import type { GunplaItem, InventoryFilters } from "./types";
 import { useGunplaInventory } from "./hooks/useGunplaInventory";
 import {
   computeStats,
+  deriveStatus,
   distinctValues,
   filterItems,
   groupBy,
@@ -34,6 +35,7 @@ import {
 } from "@/components/ui/tabs";
 import ThemeToggle from "./components/ThemeToggle";
 import StatsCards from "./components/StatsCards";
+import ProjectsPanel from "./components/ProjectsPanel";
 import BuildProgress from "./components/BuildProgress";
 import StatsPanel from "./components/StatsPanel";
 import FilterBar from "./components/FilterBar";
@@ -110,6 +112,40 @@ const GunplaInventoryPage = () => {
     } catch (err) {
       toast.error(`Could not save ${item.code}: ${(err as Error).message}`);
     }
+  };
+
+  // --- Projects tab: build-stage tracking -------------------------------------
+  const persistQuiet = async (item: GunplaItem, successMsg?: string) => {
+    try {
+      await upsertItem(item);
+      if (successMsg) toast.success(successMsg);
+    } catch (err) {
+      toast.error(`Could not save ${item.code}: ${(err as Error).message}`);
+    }
+  };
+
+  const handleStartBuild = (code: string) => {
+    const item = items.find((i) => i.code === code);
+    if (!item) return;
+    persistQuiet({ ...item, status: "In Progress" }, `Started build: ${item.code}`);
+  };
+
+  const handleToggleStage = (item: GunplaItem, stageKey: string) => {
+    const current = item.stages ?? [];
+    const next = current.includes(stageKey)
+      ? current.filter((s) => s !== stageKey)
+      : [...current, stageKey];
+    const status = deriveStatus(next);
+    persistQuiet(
+      { ...item, stages: next, status },
+      status === "Built" ? `${item.code} built! 🎉` : undefined
+    );
+  };
+
+  const handleRemoveBuild = (code: string) => {
+    const item = items.find((i) => i.code === code);
+    if (!item) return;
+    persistQuiet({ ...item, status: "Backlog" }, `Removed ${item.code} from builds`);
   };
 
   const confirmDelete = async () => {
@@ -221,6 +257,7 @@ const GunplaInventoryPage = () => {
           <Tabs defaultValue="list">
             <TabsList>
               <TabsTrigger value="list">Kits</TabsTrigger>
+              <TabsTrigger value="projects">Projects</TabsTrigger>
               <TabsTrigger value="stats">Stats</TabsTrigger>
             </TabsList>
             <TabsContent value="list" className="mt-4">
@@ -231,6 +268,14 @@ const GunplaInventoryPage = () => {
                 onEdit={handleEdit}
                 onInlineSave={handleSave}
                 onDelete={setPendingDelete}
+              />
+            </TabsContent>
+            <TabsContent value="projects" className="mt-4">
+              <ProjectsPanel
+                items={items}
+                onStartBuild={handleStartBuild}
+                onToggleStage={handleToggleStage}
+                onRemoveBuild={handleRemoveBuild}
               />
             </TabsContent>
             <TabsContent value="stats" className="mt-4">
