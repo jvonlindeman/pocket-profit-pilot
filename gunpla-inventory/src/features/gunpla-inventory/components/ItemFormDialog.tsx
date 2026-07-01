@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -18,26 +18,105 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { List } from "lucide-react";
 import type { GunplaItem } from "../types";
-import { STATUS_OPTIONS } from "../lib/inventory";
+import { STATUS_OPTIONS, distinctValues, nextCode } from "../lib/inventory";
 
 interface ItemFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Item being edited, or null when creating a new one. */
   item: GunplaItem | null;
-  /** Suggested code for a new item. */
-  suggestedCode: string;
-  /** True if the provided code already exists (new-item collision guard). */
-  existingCodes: Set<string>;
+  /** Whole inventory — used to suggest options and auto-generate the code. */
+  items: GunplaItem[];
   onSave: (item: GunplaItem) => void;
 }
 
-function emptyItem(code: string): GunplaItem {
+const NEW_VALUE = "__new__";
+
+/**
+ * A dropdown of existing values with an "Add new…" escape hatch. Falls back to a
+ * free-text input for brand-new or one-off values, with a button to return to the list.
+ */
+function SuggestField({
+  id,
+  value,
+  options,
+  placeholder,
+  onChange,
+}: {
+  id?: string;
+  value: string;
+  options: string[];
+  placeholder?: string;
+  onChange: (v: string) => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const known = options.includes(value);
+  const showInput = adding || (value !== "" && !known);
+
+  if (showInput) {
+    return (
+      <div className="flex gap-1.5">
+        <Input
+          id={id}
+          value={value}
+          placeholder={placeholder}
+          autoFocus={adding}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        {options.length > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="shrink-0"
+            title="Choose from the list"
+            aria-label="Choose from the list"
+            onClick={() => {
+              setAdding(false);
+              onChange("");
+            }}
+          >
+            <List className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <Select
+      value={value}
+      onValueChange={(v) => {
+        if (v === NEW_VALUE) {
+          setAdding(true);
+          onChange("");
+        } else {
+          onChange(v);
+        }
+      }}
+    >
+      <SelectTrigger id={id}>
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((o) => (
+          <SelectItem key={o} value={o}>
+            {o}
+          </SelectItem>
+        ))}
+        <SelectItem value={NEW_VALUE}>➕ Add new…</SelectItem>
+      </SelectContent>
+    </Select>
+  );
+}
+
+function emptyItem(grade: string, code: string): GunplaItem {
   return {
     code,
     name: "",
-    grade: "HG",
+    grade,
     thirdPartyDecals: false,
     peebsLimited: "",
     location: "",
@@ -56,33 +135,49 @@ const ItemFormDialog = ({
   open,
   onOpenChange,
   item,
-  suggestedCode,
-  existingCodes,
+  items,
   onSave,
 }: ItemFormDialogProps) => {
   const isEditing = item !== null;
-  const [form, setForm] = useState<GunplaItem>(emptyItem(suggestedCode));
+
+  const gradeOptions = useMemo(() => distinctValues(items, "grade"), [items]);
+  const locationOptions = useMemo(
+    () => distinctValues(items, "location"),
+    [items]
+  );
+  const sourceOptions = useMemo(() => distinctValues(items, "source"), [items]);
+  const peebsOptions = useMemo(
+    () => distinctValues(items, "peebsLimited"),
+    [items]
+  );
+  const makeCode = (grade: string) => nextCode(items, grade || "HG");
+
+  const [form, setForm] = useState<GunplaItem>(() =>
+    emptyItem("HG", makeCode("HG"))
+  );
 
   useEffect(() => {
-    if (open) {
-      setForm(item ? { ...item } : emptyItem(suggestedCode));
-    }
-  }, [open, item, suggestedCode]);
+    if (!open) return;
+    setForm(item ? { ...item } : emptyItem("HG", makeCode("HG")));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, item]);
 
   const set = <K extends keyof GunplaItem>(key: K, value: GunplaItem[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  const codeCollision =
-    !isEditing && form.code.trim() !== "" && existingCodes.has(form.code.trim());
-  const canSave = form.name.trim() !== "" && form.code.trim() !== "" && !codeCollision;
+  // Changing the grade re-generates the (read-only) code for new kits.
+  const setGrade = (grade: string) =>
+    setForm((prev) => ({
+      ...prev,
+      grade,
+      code: isEditing ? prev.code : makeCode(grade),
+    }));
+
+  const canSave = form.name.trim() !== "" && form.code.trim() !== "";
 
   const handleSave = () => {
     if (!canSave) return;
-    onSave({
-      ...form,
-      code: form.code.trim(),
-      name: form.name.trim(),
-    });
+    onSave({ ...form, code: form.code.trim(), name: form.name.trim() });
     onOpenChange(false);
   };
 
@@ -100,20 +195,22 @@ const ItemFormDialog = ({
               <Input
                 id="code"
                 value={form.code}
-                disabled={isEditing}
-                onChange={(e) => set("code", e.target.value)}
+                readOnly
+                tabIndex={-1}
+                className="cursor-not-allowed bg-muted text-muted-foreground"
               />
-              {codeCollision && (
-                <p className="text-xs text-destructive">Code already exists.</p>
-              )}
+              <p className="text-xs text-muted-foreground">
+                {isEditing ? "Fixed ID" : "Auto-generated from grade"}
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="grade">Grade</Label>
-              <Input
+              <SuggestField
                 id="grade"
                 value={form.grade}
-                onChange={(e) => set("grade", e.target.value)}
-                placeholder="HG, EG, FM…"
+                options={gradeOptions}
+                placeholder="HG, MG, RG…"
+                onChange={setGrade}
               />
             </div>
           </div>
@@ -131,10 +228,7 @@ const ItemFormDialog = ({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="status">Status</Label>
-              <Select
-                value={form.status}
-                onValueChange={(v) => set("status", v)}
-              >
+              <Select value={form.status} onValueChange={(v) => set("status", v)}>
                 <SelectTrigger id="status">
                   <SelectValue />
                 </SelectTrigger>
@@ -149,11 +243,12 @@ const ItemFormDialog = ({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="location">Location</Label>
-              <Input
+              <SuggestField
                 id="location"
                 value={form.location}
-                onChange={(e) => set("location", e.target.value)}
+                options={locationOptions}
                 placeholder="Display, Storage…"
+                onChange={(v) => set("location", v)}
               />
             </div>
           </div>
@@ -192,22 +287,24 @@ const ItemFormDialog = ({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="peebs">P-Bandai / Limited</Label>
-              <Input
+              <SuggestField
                 id="peebs"
                 value={form.peebsLimited}
-                onChange={(e) => set("peebsLimited", e.target.value)}
-                placeholder="P-Bandai…"
+                options={peebsOptions}
+                placeholder="No, P-Bandai…"
+                onChange={(v) => set("peebsLimited", v)}
               />
             </div>
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="source">Source</Label>
-            <Input
+            <SuggestField
               id="source"
               value={form.source}
-              onChange={(e) => set("source", e.target.value)}
+              options={sourceOptions}
               placeholder="Where you bought it"
+              onChange={(v) => set("source", v)}
             />
           </div>
 

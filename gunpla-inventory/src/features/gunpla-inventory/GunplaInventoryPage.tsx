@@ -28,7 +28,6 @@ import {
   distinctValues,
   filterItems,
   groupBy,
-  nextCode,
   sortItems,
   type SortKey,
   type SortState,
@@ -84,11 +83,6 @@ const GunplaInventoryPage = () => {
   const byStatus = useMemo(() => groupBy(filtered, "status"), [filtered]);
   const byLocation = useMemo(() => groupBy(filtered, "location"), [filtered]);
   const bySource = useMemo(() => groupBy(filtered, "source"), [filtered]);
-
-  const suggestedCode = useMemo(
-    () => nextCode(items, filters.grade || "HG"),
-    [items, filters.grade]
-  );
 
   const patchFilters = (patch: Partial<InventoryFilters>) =>
     setFilters((prev) => ({ ...prev, ...patch }));
@@ -346,8 +340,7 @@ const GunplaInventoryPage = () => {
         open={formOpen}
         onOpenChange={setFormOpen}
         item={editingItem}
-        suggestedCode={suggestedCode}
-        existingCodes={codes}
+        items={items}
         onSave={handleSave}
       />
 
