@@ -23,6 +23,7 @@ import type { BuildPriority, GunplaItem, Paint } from "../types";
 import {
   BUILD_STAGES,
   formatDate,
+  PRIORITY_BADGE_CLASSES,
   PRIORITY_OPTIONS,
   sortProjects,
   stagesDone,
@@ -51,12 +52,6 @@ interface ProjectsPanelProps {
 
 const TOTAL = BUILD_STAGES.length;
 
-const PRIORITY_BADGE: Record<string, string> = {
-  high: "border-red-300 text-red-700 dark:border-red-800 dark:text-red-300",
-  medium:
-    "border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-300",
-  low: "border-slate-300 text-slate-600 dark:border-slate-700 dark:text-slate-300",
-};
 const priorityLabel = (p?: string | null) =>
   PRIORITY_OPTIONS.find((o) => o.key === p)?.label ?? "";
 
@@ -184,7 +179,7 @@ const ProjectsPanel = ({
                         {item.priority && (
                           <Badge
                             variant="outline"
-                            className={PRIORITY_BADGE[item.priority]}
+                            className={PRIORITY_BADGE_CLASSES[item.priority]}
                           >
                             {priorityLabel(item.priority)}
                           </Badge>

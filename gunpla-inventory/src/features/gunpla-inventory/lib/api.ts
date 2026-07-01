@@ -1,4 +1,4 @@
-import type { GunplaItem } from "../types";
+import type { GunplaItem, StashPaint } from "../types";
 
 // Base URL of the local JSON-file API. In dev this hits the Vite proxy
 // (`/gunpla-api` → http://localhost:4787/api). Override with VITE_GUNPLA_API.
@@ -17,16 +17,29 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-/** Returns true if the local server is reachable. */
-export async function pingApi(): Promise<boolean> {
+export interface HealthInfo {
+  ok: boolean;
+  count?: number;
+  version?: string | null;
+  updateAvailable?: boolean;
+}
+
+/** Fetch the server's health/version info; null when unreachable. */
+export async function fetchHealth(): Promise<HealthInfo | null> {
   try {
     const res = await fetch(`${API_BASE}/health`, {
       signal: AbortSignal.timeout(2500),
     });
-    return res.ok;
+    if (!res.ok) return null;
+    return (await res.json()) as HealthInfo;
   } catch {
-    return false;
+    return null;
   }
+}
+
+/** Returns true if the local server is reachable. */
+export async function pingApi(): Promise<boolean> {
+  return (await fetchHealth()) !== null;
 }
 
 export function fetchItems(): Promise<GunplaItem[]> {
@@ -57,6 +70,20 @@ export function resetItemsApi(): Promise<GunplaItem[]> {
   return request<{ ok: boolean }>("/reset", { method: "POST" }).then(
     fetchItems
   );
+}
+
+// --- Paint stash ---------------------------------------------------------------
+
+export function fetchPaints(): Promise<StashPaint[]> {
+  return request<StashPaint[]>("/paints");
+}
+
+/** Replace the whole stash on the server (single-user: last write wins). */
+export function savePaintsApi(paints: StashPaint[]): Promise<StashPaint[]> {
+  return request<StashPaint[]>("/paints", {
+    method: "PUT",
+    body: JSON.stringify(paints),
+  });
 }
 
 // --- Progress photos ---------------------------------------------------------

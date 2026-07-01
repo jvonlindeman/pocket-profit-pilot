@@ -3,6 +3,8 @@ import cors from "cors";
 import { existsSync, writeFileSync, unlinkSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, basename } from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import {
   getItems,
   getItem,
@@ -11,6 +13,8 @@ import {
   itemCount,
   resetToSeed,
   seedIfEmpty,
+  getPaints,
+  replacePaints,
   DATA_FILE,
   PHOTOS_DIR,
 } from "./db.mjs";
@@ -27,8 +31,52 @@ app.use(express.json({ limit: "12mb" })); // headroom for base64 photos (downsca
 // Seed from seed.json on the very first run (no data file yet).
 const seeded = seedIfEmpty();
 
+// --- Version awareness ---------------------------------------------------------
+// Best-effort git probe so the UI can show what's running and whether a newer
+// version exists upstream. Must never crash or delay startup: tarball installs
+// have no .git (version stays null), and offline fetches simply keep the flag.
+const run = promisify(execFile);
+const GIT_OPTS = {
+  timeout: 15000,
+  env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+};
+const versionInfo = { version: null, updateAvailable: false };
+
+async function refreshVersionInfo() {
+  try {
+    const { stdout } = await run(
+      "git",
+      ["-C", __dirname, "rev-parse", "--short", "HEAD"],
+      GIT_OPTS
+    );
+    versionInfo.version = stdout.trim() || null;
+  } catch {
+    versionInfo.version = null;
+    return;
+  }
+  try {
+    await run("git", ["-C", __dirname, "fetch", "--quiet"], GIT_OPTS);
+    const [head, upstream] = await Promise.all([
+      run("git", ["-C", __dirname, "rev-parse", "HEAD"], GIT_OPTS),
+      run("git", ["-C", __dirname, "rev-parse", "@{u}"], GIT_OPTS),
+    ]);
+    versionInfo.updateAvailable =
+      head.stdout.trim() !== upstream.stdout.trim();
+  } catch {
+    /* offline / no upstream — leave updateAvailable as-is */
+  }
+}
+refreshVersionInfo();
+setInterval(refreshVersionInfo, 30 * 60 * 1000).unref();
+
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, count: itemCount(), file: DATA_FILE });
+  res.json({
+    ok: true,
+    count: itemCount(),
+    file: DATA_FILE,
+    version: versionInfo.version,
+    updateAvailable: versionInfo.updateAvailable,
+  });
 });
 
 app.get("/api/items", (_req, res) => {
@@ -70,6 +118,23 @@ app.delete("/api/items/:code", (req, res) => {
 app.post("/api/reset", (_req, res) => {
   const count = resetToSeed();
   res.json({ ok: true, count });
+});
+
+// --- Paint stash (stored in paints.json, separate from the kits) ---------------
+app.get("/api/paints", (_req, res) => {
+  res.json(getPaints());
+});
+
+// Whole-array replace: simplest correct API at personal scale (last write wins).
+app.put("/api/paints", (req, res) => {
+  if (!Array.isArray(req.body)) {
+    return res.status(400).json({ error: "Expected an array of paints" });
+  }
+  try {
+    res.json(replacePaints(req.body));
+  } catch (err) {
+    res.status(400).json({ error: String(err.message || err) });
+  }
 });
 
 // --- Progress photos: files saved on disk, served at /photos/<filename> -------
@@ -117,10 +182,14 @@ app.use("/photos", express.static(PHOTOS_DIR));
 // In dev this folder doesn't exist and Vite serves the app instead — harmless.
 const servingApp = existsSync(DIST_DIR);
 if (servingApp) {
-  app.use(express.static(DIST_DIR));
+  // index: false so "/" falls through to the fallback below, which serves
+  // index.html with no-cache — hashed JS/CSS assets keep normal caching.
+  app.use(express.static(DIST_DIR, { index: false }));
   // SPA fallback: anything that isn't an /api route returns index.html.
   app.get(/^(?!\/api\/).*/, (_req, res) => {
-    res.sendFile(join(DIST_DIR, "index.html"));
+    res.sendFile(join(DIST_DIR, "index.html"), {
+      headers: { "Cache-Control": "no-cache" },
+    });
   });
 }
 

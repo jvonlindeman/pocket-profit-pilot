@@ -21,6 +21,8 @@ import type {
   Paint,
 } from "./types";
 import { useGunplaInventory } from "./hooks/useGunplaInventory";
+import { usePaintStash } from "./hooks/usePaintStash";
+import { useVersionCheck } from "./hooks/useVersionCheck";
 import { deletePhotoApi } from "./lib/api";
 import {
   computeStats,
@@ -41,6 +43,8 @@ import {
 import ThemeToggle from "./components/ThemeToggle";
 import StatsCards from "./components/StatsCards";
 import ProjectsPanel from "./components/ProjectsPanel";
+import BenchDashboard from "./components/BenchDashboard";
+import PaintStashPanel from "./components/PaintStashPanel";
 import BuildProgress from "./components/BuildProgress";
 import StatsPanel from "./components/StatsPanel";
 import FilterBar from "./components/FilterBar";
@@ -59,7 +63,12 @@ const EMPTY_FILTERS: InventoryFilters = {
 const GunplaInventoryPage = () => {
   const { items, loading, online, upsertItem, removeItem, reset, codes } =
     useGunplaInventory();
+  const paintStash = usePaintStash();
+  const { version, serverChanged, updateAvailable } = useVersionCheck(
+    online && !loading
+  );
 
+  const [tab, setTab] = useState("bench");
   const [filters, setFilters] = useState<InventoryFilters>(EMPTY_FILTERS);
   const [formOpen, setFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<GunplaItem | null>(null);
@@ -231,6 +240,11 @@ const GunplaInventoryPage = () => {
                   Browser only
                 </Badge>
               ))}
+            {version && (
+              <span className="font-mono text-xs text-muted-foreground">
+                v {version}
+              </span>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">
             {items.length} kits ·{" "}
@@ -270,36 +284,66 @@ const GunplaInventoryPage = () => {
             </p>
           )}
 
-          <StatsCards
-            total={totalStats}
-            filtered={stats}
-            isFiltered={isFiltered}
-          />
+          {serverChanged ? (
+            <p className="flex items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+              <span>
+                The app was updated behind this window — reload to get the
+                latest version.
+              </span>
+              <Button size="sm" onClick={() => location.reload()}>
+                Reload
+              </Button>
+            </p>
+          ) : updateAvailable ? (
+            <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+              A new version is ready — quit and reopen the app icon to update.
+            </p>
+          ) : null}
 
-          <BuildProgress
-            stats={stats}
-            scopeLabel={
-              isFiltered
-                ? `Filtered · ${stats.totalKits} kits`
-                : "Whole collection"
-            }
-          />
+          {tab !== "bench" && (
+            <>
+              <StatsCards
+                total={totalStats}
+                filtered={stats}
+                isFiltered={isFiltered}
+              />
 
-          <FilterBar
-            filters={filters}
-            grades={grades}
-            statuses={statuses}
-            locations={locations}
-            onChange={patchFilters}
-            onClear={() => setFilters(EMPTY_FILTERS)}
-          />
+              <BuildProgress
+                stats={stats}
+                scopeLabel={
+                  isFiltered
+                    ? `Filtered · ${stats.totalKits} kits`
+                    : "Whole collection"
+                }
+              />
 
-          <Tabs defaultValue="list">
+              <FilterBar
+                filters={filters}
+                grades={grades}
+                statuses={statuses}
+                locations={locations}
+                onChange={patchFilters}
+                onClear={() => setFilters(EMPTY_FILTERS)}
+              />
+            </>
+          )}
+
+          <Tabs value={tab} onValueChange={setTab}>
             <TabsList>
+              <TabsTrigger value="bench">Bench</TabsTrigger>
               <TabsTrigger value="list">Kits</TabsTrigger>
               <TabsTrigger value="projects">Projects</TabsTrigger>
+              <TabsTrigger value="paints">Paints</TabsTrigger>
               <TabsTrigger value="stats">Stats</TabsTrigger>
             </TabsList>
+            <TabsContent value="bench" className="mt-4">
+              <BenchDashboard
+                items={items}
+                stats={totalStats}
+                onGoToProjects={() => setTab("projects")}
+                onAddKit={handleAdd}
+              />
+            </TabsContent>
             <TabsContent value="list" className="mt-4">
               <InventoryTable
                 items={sorted}
@@ -322,6 +366,16 @@ const GunplaInventoryPage = () => {
                 onSaveStageNote={handleSaveStageNote}
                 onSavePaints={handleSavePaints}
                 onSaveInfo={handleSaveInfo}
+              />
+            </TabsContent>
+            <TabsContent value="paints" className="mt-4">
+              <PaintStashPanel
+                items={items}
+                paints={paintStash.paints}
+                loading={paintStash.loading}
+                onAdd={paintStash.addPaint}
+                onUpdate={paintStash.updatePaint}
+                onRemove={paintStash.removePaint}
               />
             </TabsContent>
             <TabsContent value="stats" className="mt-4">

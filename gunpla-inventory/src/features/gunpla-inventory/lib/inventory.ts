@@ -166,6 +166,60 @@ export function sortProjects(items: GunplaItem[]): GunplaItem[] {
   });
 }
 
+/** Badge color classes per priority level (shared by Projects + Bench cards). */
+export const PRIORITY_BADGE_CLASSES: Record<string, string> = {
+  high: "border-red-300 text-red-700 dark:border-red-800 dark:text-red-300",
+  medium:
+    "border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-300",
+  low: "border-slate-300 text-slate-600 dark:border-slate-700 dark:text-slate-300",
+};
+
+/** Parse the Date.now() timestamp embedded in photo filenames ("CODE-<ts>.jpg"). */
+export function photoTimestamp(filename: string): number | null {
+  const m = filename.match(/-(\d{10,})\.(jpe?g|png|webp)$/i);
+  return m ? Number(m[1]) : null;
+}
+
+export interface RecentPhoto {
+  filename: string;
+  code: string;
+  name: string;
+  ts: number;
+}
+
+/** Newest n photos across the whole collection (by filename timestamp). */
+export function latestPhotos(items: GunplaItem[], n: number): RecentPhoto[] {
+  const all: RecentPhoto[] = [];
+  for (const item of items) {
+    for (const filename of item.photos ?? []) {
+      all.push({
+        filename,
+        code: item.code,
+        name: item.name,
+        ts: photoTimestamp(filename) ?? 0,
+      });
+    }
+  }
+  return all.sort((a, b) => b.ts - a.ts).slice(0, n);
+}
+
+/** Most recently finished builds (needs a finishedAt date). */
+export function recentlyCompleted(items: GunplaItem[], n: number): GunplaItem[] {
+  return items
+    .filter((i) => i.finishedAt)
+    .sort((a, b) => (b.finishedAt ?? "").localeCompare(a.finishedAt ?? ""))
+    .slice(0, n);
+}
+
+/** The newest photo of a kit, for card thumbnails. */
+export function lastPhotoOf(item: GunplaItem): string | null {
+  const photos = item.photos ?? [];
+  if (photos.length === 0) return null;
+  return [...photos].sort(
+    (a, b) => (photoTimestamp(b) ?? 0) - (photoTimestamp(a) ?? 0)
+  )[0];
+}
+
 /** Format an ISO date ("YYYY-MM-DD") as e.g. "Dec 25, 2025"; "—" when empty. */
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";

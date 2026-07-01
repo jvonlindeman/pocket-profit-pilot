@@ -11,6 +11,18 @@ export interface Paint {
   paint: string;
 }
 
+export type PaintStatus = "ok" | "low" | "out";
+
+/** A paint you own (or need), tracked in the stash — stored in paints.json. */
+export interface StashPaint {
+  id: string;
+  brand: string;
+  code: string;
+  name: string;
+  type: string;
+  status: PaintStatus;
+}
+
 export interface GunplaItem {
   /** Unique code from the sheet, e.g. "HG-001". Used as the stable id. */
   code: string;

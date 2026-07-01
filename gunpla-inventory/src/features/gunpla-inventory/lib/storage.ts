@@ -1,7 +1,8 @@
-import type { GunplaItem } from "../types";
+import type { GunplaItem, StashPaint } from "../types";
 import { seedItems } from "../data/seedData";
 
 const STORAGE_KEY = "gunpla-inventory:v1";
+const PAINTS_KEY = "gunpla-paints:v1";
 
 /** Load the inventory from localStorage, seeding it on first run. */
 export function loadInventory(): GunplaItem[] {
@@ -35,4 +36,25 @@ export function resetInventory(): GunplaItem[] {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seedItems));
   }
   return [...seedItems];
+}
+
+/** Load the paint stash mirror (no seed — starts empty). */
+export function loadPaintStash(): StashPaint[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(PAINTS_KEY);
+    const parsed = raw ? (JSON.parse(raw) as StashPaint[]) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function savePaintStash(paints: StashPaint[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PAINTS_KEY, JSON.stringify(paints));
+  } catch {
+    /* ignore quota / serialization errors */
+  }
 }

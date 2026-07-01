@@ -189,4 +189,62 @@ export function resetToSeed() {
   return replaceAll(seed);
 }
 
-export { DATA_FILE, PHOTOS_DIR };
+// --- Paint stash: a second, independent store in paints.json -------------------
+// Kept fully separate from the kits store so a malformed paints write can never
+// touch inventory.json. Same safety patterns: corrupt-file backup + atomic write.
+
+const PAINTS_FILE = join(dirname(DATA_FILE), "paints.json");
+const PAINT_STATUSES = new Set(["ok", "low", "out"]);
+
+function normalizePaint(p, i) {
+  return {
+    id: String(p?.id || "").trim() || `paint-${Date.now()}-${i}`,
+    brand: String(p?.brand || "").trim(),
+    code: String(p?.code || "").trim(),
+    name: String(p?.name || "").trim(),
+    type: String(p?.type || "").trim(),
+    status: PAINT_STATUSES.has(p?.status) ? p.status : "ok",
+  };
+}
+
+let paints = [];
+if (existsSync(PAINTS_FILE)) {
+  const raw = readFileSync(PAINTS_FILE, "utf8");
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) paints = parsed.map(normalizePaint);
+  } catch {
+    const backup = `${PAINTS_FILE}.corrupt-${Date.now()}`;
+    try {
+      writeFileSync(backup, raw, "utf8");
+    } catch {
+      /* ignore */
+    }
+    console.warn(
+      `⚠️  ${PAINTS_FILE} was unreadable; backed it up to ${backup} and started empty.`
+    );
+  }
+}
+
+function persistPaints() {
+  const tmp = `${PAINTS_FILE}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify(paints, null, 2)}\n`, "utf8");
+  renameSync(tmp, PAINTS_FILE);
+}
+
+export function getPaints() {
+  return [...paints];
+}
+
+/** Replace the whole stash (single-user app: last write wins). */
+export function replacePaints(arr) {
+  const seen = new Set();
+  paints = arr
+    .map(normalizePaint)
+    .filter((p) => p.brand || p.code || p.name)
+    .filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)));
+  persistPaints();
+  return getPaints();
+}
+
+export { DATA_FILE, PHOTOS_DIR, PAINTS_FILE };
