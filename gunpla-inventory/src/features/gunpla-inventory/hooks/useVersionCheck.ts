@@ -13,6 +13,7 @@ import { fetchHealth } from "../lib/api";
  */
 export function useVersionCheck(enabled: boolean) {
   const [version, setVersion] = useState<string | null>(null);
+  const [checked, setChecked] = useState(false);
   const [serverChanged, setServerChanged] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const firstSeen = useRef<string | null>(null);
@@ -24,6 +25,7 @@ export function useVersionCheck(enabled: boolean) {
     const check = async () => {
       const health = await fetchHealth();
       if (cancelled || !health) return;
+      setChecked(true);
       const v = health.version ?? null;
       if (v) {
         if (firstSeen.current === null) firstSeen.current = v;
@@ -44,5 +46,5 @@ export function useVersionCheck(enabled: boolean) {
     };
   }, [enabled]);
 
-  return { version, serverChanged, updateAvailable };
+  return { version, checked, serverChanged, updateAvailable };
 }

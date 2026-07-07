@@ -65,7 +65,7 @@ const GunplaInventoryPage = () => {
   const { items, loading, online, upsertItem, removeItem, reset, codes } =
     useGunplaInventory();
   const paintStash = usePaintStash();
-  const { version, serverChanged, updateAvailable } = useVersionCheck(
+  const { version, checked, serverChanged, updateAvailable } = useVersionCheck(
     online && !loading
   );
 
@@ -311,6 +311,15 @@ const GunplaInventoryPage = () => {
           ) : updateAvailable ? (
             <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
               A new version is ready — quit and reopen the app icon to update.
+            </p>
+          ) : checked && version === null ? (
+            <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+              ⚠️ Esta copia de la app <strong>no puede auto-actualizarse</strong>{" "}
+              (no está conectada a git). Abre la app desde{" "}
+              <code className="font-mono">
+                Documentos/gunpla/gunpla-inventory
+              </code>{" "}
+              y ancla ese ícono al Dock; esta carpeta copiada puedes borrarla.
             </p>
           ) : null}
 
