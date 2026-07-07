@@ -34,22 +34,41 @@ interface ItemFormDialogProps {
 
 const NEW_VALUE = "__new__";
 
+/** Common kit scales offered alongside whatever values already exist. */
+const SCALE_SUGGESTIONS = ["1/144", "1/100", "1/60", "1/48", "Non-scale"];
+
+/**
+ * Prefix for auto-generated codes: the grade when set (Bandai kits), else the
+ * brand's first word (third-party kits, e.g. "Moxin" → MOXIN-001), else "KIT".
+ */
+function codePrefix(grade: string, brand: string): string {
+  const g = grade.trim();
+  if (g) return g;
+  const b = brand.trim().split(/\s+/)[0]?.replace(/[^a-zA-Z0-9]/g, "") ?? "";
+  return b ? b.toUpperCase().slice(0, 8) : "KIT";
+}
+
 /**
  * A dropdown of existing values with an "Add new…" escape hatch. Falls back to a
  * free-text input for brand-new or one-off values, with a button to return to the list.
  */
+const NONE_VALUE = "__none__";
+
 function SuggestField({
   id,
   value,
   options,
   placeholder,
   onChange,
+  clearable = false,
 }: {
   id?: string;
   value: string;
   options: string[];
   placeholder?: string;
   onChange: (v: string) => void;
+  /** Offer a "None" choice that sets the value to "". */
+  clearable?: boolean;
 }) {
   const [adding, setAdding] = useState(false);
   const known = options.includes(value);
@@ -92,6 +111,8 @@ function SuggestField({
         if (v === NEW_VALUE) {
           setAdding(true);
           onChange("");
+        } else if (v === NONE_VALUE) {
+          onChange("");
         } else {
           onChange(v);
         }
@@ -101,6 +122,7 @@ function SuggestField({
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
+        {clearable && <SelectItem value={NONE_VALUE}>— None —</SelectItem>}
         {options.map((o) => (
           <SelectItem key={o} value={o}>
             {o}
@@ -117,6 +139,8 @@ function emptyItem(grade: string, code: string): GunplaItem {
     code,
     name: "",
     grade,
+    brand: "",
+    scale: "",
     thirdPartyDecals: false,
     peebsLimited: "",
     location: "",
@@ -141,6 +165,12 @@ const ItemFormDialog = ({
   const isEditing = item !== null;
 
   const gradeOptions = useMemo(() => distinctValues(items, "grade"), [items]);
+  const brandOptions = useMemo(() => distinctValues(items, "brand"), [items]);
+  const scaleOptions = useMemo(() => {
+    const seen = new Set(distinctValues(items, "scale"));
+    for (const s of SCALE_SUGGESTIONS) seen.add(s);
+    return [...seen];
+  }, [items]);
   const locationOptions = useMemo(
     () => distinctValues(items, "location"),
     [items]
@@ -150,7 +180,8 @@ const ItemFormDialog = ({
     () => distinctValues(items, "peebsLimited"),
     [items]
   );
-  const makeCode = (grade: string) => nextCode(items, grade || "HG");
+  const makeCode = (grade: string, brand = "") =>
+    nextCode(items, codePrefix(grade, brand));
 
   const [form, setForm] = useState<GunplaItem>(() =>
     emptyItem("HG", makeCode("HG"))
@@ -165,12 +196,19 @@ const ItemFormDialog = ({
   const set = <K extends keyof GunplaItem>(key: K, value: GunplaItem[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  // Changing the grade re-generates the (read-only) code for new kits.
+  // Changing grade or brand re-generates the (read-only) code for new kits:
+  // grade wins as prefix; without a grade the brand is used (third-party kits).
   const setGrade = (grade: string) =>
     setForm((prev) => ({
       ...prev,
       grade,
-      code: isEditing ? prev.code : makeCode(grade),
+      code: isEditing ? prev.code : makeCode(grade, prev.brand ?? ""),
+    }));
+  const setBrand = (brand: string) =>
+    setForm((prev) => ({
+      ...prev,
+      brand,
+      code: isEditing ? prev.code : makeCode(prev.grade, brand),
     }));
 
   const canSave = form.name.trim() !== "" && form.code.trim() !== "";
@@ -204,13 +242,37 @@ const ItemFormDialog = ({
               </p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="grade">Grade</Label>
+              <Label htmlFor="grade">Grade / Line</Label>
               <SuggestField
                 id="grade"
                 value={form.grade}
                 options={gradeOptions}
                 placeholder="HG, MG, RG…"
                 onChange={setGrade}
+                clearable
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="brand">Brand</Label>
+              <SuggestField
+                id="brand"
+                value={form.brand ?? ""}
+                options={brandOptions}
+                placeholder="Bandai, Moxin…"
+                onChange={setBrand}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="scale">Scale</Label>
+              <SuggestField
+                id="scale"
+                value={form.scale ?? ""}
+                options={scaleOptions}
+                placeholder="1/144, 1/100…"
+                onChange={(v) => set("scale", v)}
               />
             </div>
           </div>

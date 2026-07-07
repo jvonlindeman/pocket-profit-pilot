@@ -55,6 +55,7 @@ import ExportMenu from "./components/ExportMenu";
 const EMPTY_FILTERS: InventoryFilters = {
   search: "",
   grade: "",
+  brand: "",
   status: "",
   location: "",
   sellOnly: false,
@@ -77,6 +78,7 @@ const GunplaInventoryPage = () => {
   const [sort, setSort] = useState<SortState>({ key: "code", dir: "asc" });
 
   const grades = useMemo(() => distinctValues(items, "grade"), [items]);
+  const brands = useMemo(() => distinctValues(items, "brand"), [items]);
   const statuses = useMemo(() => distinctValues(items, "status"), [items]);
   const locations = useMemo(() => distinctValues(items, "location"), [items]);
 
@@ -320,6 +322,7 @@ const GunplaInventoryPage = () => {
               <FilterBar
                 filters={filters}
                 grades={grades}
+                brands={brands}
                 statuses={statuses}
                 locations={locations}
                 onChange={patchFilters}

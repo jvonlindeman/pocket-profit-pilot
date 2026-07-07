@@ -13,6 +13,7 @@ import type { InventoryFilters } from "../types";
 interface FilterBarProps {
   filters: InventoryFilters;
   grades: string[];
+  brands: string[];
   statuses: string[];
   locations: string[];
   onChange: (patch: Partial<InventoryFilters>) => void;
@@ -24,6 +25,7 @@ const ALL = "__all__";
 const FilterBar = ({
   filters,
   grades,
+  brands,
   statuses,
   locations,
   onChange,
@@ -32,6 +34,7 @@ const FilterBar = ({
   const hasActiveFilters =
     filters.search ||
     filters.grade ||
+    filters.brand ||
     filters.status ||
     filters.location ||
     filters.sellOnly;
@@ -64,6 +67,25 @@ const FilterBar = ({
           ))}
         </SelectContent>
       </Select>
+
+      {brands.length > 0 && (
+        <Select
+          value={filters.brand || ALL}
+          onValueChange={(v) => onChange({ brand: v === ALL ? "" : v })}
+        >
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Brand" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>All brands</SelectItem>
+            {brands.map((b) => (
+              <SelectItem key={b} value={b}>
+                {b}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
 
       <Select
         value={filters.status || ALL}

@@ -65,6 +65,7 @@ export function filterItems(
   const search = filters.search.trim().toLowerCase();
   return items.filter((item) => {
     if (filters.grade && item.grade !== filters.grade) return false;
+    if (filters.brand && item.brand !== filters.brand) return false;
     if (filters.status && item.status !== filters.status) return false;
     if (filters.location && item.location !== filters.location) return false;
     if (filters.sellOnly && !item.sell) return false;
@@ -73,6 +74,8 @@ export function filterItems(
         item.name,
         item.code,
         item.grade,
+        item.brand,
+        item.scale,
         item.source,
         item.peebsLimited,
         item.location,

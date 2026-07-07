@@ -5,6 +5,8 @@ const COLUMNS: (keyof GunplaItem)[] = [
   "code",
   "name",
   "grade",
+  "brand",
+  "scale",
   "thirdPartyDecals",
   "peebsLimited",
   "location",

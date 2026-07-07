@@ -45,6 +45,8 @@ function normalize(item) {
     code: String(item.code || "").trim(),
     name: String(item.name || "").trim(),
     grade: String(item.grade || "").trim(),
+    brand: String(item.brand || "").trim(),
+    scale: String(item.scale || "").trim(),
     thirdPartyDecals: !!item.thirdPartyDecals,
     peebsLimited: String(item.peebsLimited || ""),
     location: String(item.location || ""),

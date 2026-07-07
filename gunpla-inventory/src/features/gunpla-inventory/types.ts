@@ -27,8 +27,12 @@ export interface GunplaItem {
   /** Unique code from the sheet, e.g. "HG-001". Used as the stable id. */
   code: string;
   name: string;
-  /** Grade / line, e.g. "HG", "EG", "FM", "Figure-Rise", "Kotobukiya"... */
+  /** Grade / line, e.g. "HG", "EG", "FM"… Optional for third-party kits. */
   grade: string;
+  /** Manufacturer: "Bandai", "Kotobukiya", "Moxin"… Empty = unspecified. */
+  brand?: string;
+  /** Kit scale: "1/144", "1/100", "1/60", "Non-scale"… */
+  scale?: string;
   /** Whether the kit includes / needs third-party decals or waterslides. */
   thirdPartyDecals: boolean;
   /** "P-Bandai", "Limited Item", "No", etc. (from "Peebs or Limited"). */
@@ -67,6 +71,7 @@ export interface GunplaItem {
 export interface InventoryFilters {
   search: string;
   grade: string; // "" = all
+  brand: string; // "" = all
   status: string; // "" = all
   location: string; // "" = all
   sellOnly: boolean;

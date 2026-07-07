@@ -300,7 +300,14 @@ const InventoryTable = ({
                     )}
                 </TableCell>
                 <TableCell>
-                  <Badge variant="outline">{item.grade}</Badge>
+                  <Badge variant="outline">
+                    {item.grade || item.brand || "—"}
+                  </Badge>
+                  {item.scale && (
+                    <span className="block text-xs text-muted-foreground">
+                      {item.scale}
+                    </span>
+                  )}
                 </TableCell>
                 <TableCell>
                   <Badge variant={statusVariant(item.status)}>
