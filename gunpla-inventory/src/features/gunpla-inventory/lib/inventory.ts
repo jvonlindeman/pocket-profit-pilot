@@ -121,6 +121,7 @@ export const STATUS_OPTIONS = ["Backlog", "In Progress", "Built"] as const;
 export const BUILD_STAGES = [
   { key: "assembly", label: "Assembly" },
   { key: "sanding", label: "Sanding & seams" },
+  { key: "scribing", label: "Scribing" },
   { key: "priming", label: "Priming" },
   { key: "basecoat", label: "Base coat (airbrush)" },
   { key: "detail", label: "Detail paint" },
@@ -135,13 +136,25 @@ export function stagesDone(stages: string[] | undefined): number {
   return BUILD_STAGES.filter((s) => stages.includes(s.key)).length;
 }
 
+/** How many of the known stages are marked skipped (don't apply to this kit). */
+export function stagesSkipped(skipped: string[] | undefined): number {
+  if (!skipped) return 0;
+  return BUILD_STAGES.filter((s) => skipped.includes(s.key)).length;
+}
+
 /**
  * Derive a kit's status from its build stages while it's an active project:
- * all stages done → Built, otherwise In Progress (even with 0 done — it's on
- * the bench). Used only when working a kit in the Projects tab.
+ * every stage either done or skipped → Built, otherwise In Progress (even with
+ * 0 done — it's on the bench). Used only when working a kit in the Projects tab.
  */
-export function deriveStatus(stages: string[]): GunplaStatus {
-  return stagesDone(stages) >= BUILD_STAGES.length ? "Built" : "In Progress";
+export function deriveStatus(
+  stages: string[],
+  skipped: string[] = []
+): GunplaStatus {
+  const covered = BUILD_STAGES.filter(
+    (s) => stages.includes(s.key) || skipped.includes(s.key)
+  ).length;
+  return covered >= BUILD_STAGES.length ? "Built" : "In Progress";
 }
 
 /** Priority levels offered for active builds (highest first). */

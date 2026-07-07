@@ -11,6 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  Ban,
   CheckCircle2,
   Circle,
   Hammer,
@@ -27,6 +28,7 @@ import {
   PRIORITY_OPTIONS,
   sortProjects,
   stagesDone,
+  stagesSkipped,
 } from "../lib/inventory";
 import ProjectDetailDialog from "./ProjectDetailDialog";
 
@@ -162,9 +164,12 @@ const ProjectsPanel = ({
         <div className="grid gap-4 md:grid-cols-2">
           {active.map((item) => {
             const stages = item.stages ?? [];
+            const skipped = item.skippedStages ?? [];
             const done = stagesDone(stages);
-            const pct = Math.round((done / TOTAL) * 100);
-            const complete = done >= TOTAL;
+            const skippedCount = stagesSkipped(skipped);
+            const applicable = TOTAL - skippedCount;
+            const complete = done + skippedCount >= TOTAL;
+            const pct = Math.round((done / Math.max(1, applicable)) * 100);
             const photoCount = item.photos?.length ?? 0;
             return (
               <Card key={item.code}>
@@ -207,34 +212,48 @@ const ProjectsPanel = ({
                       />
                     </div>
                     <span className="shrink-0 text-xs font-medium text-muted-foreground">
-                      {complete ? "Built 🎉" : `${done}/${TOTAL}`}
+                      {complete ? "Built 🎉" : `${done}/${applicable}`}
                     </span>
                   </div>
 
                   <ul className="space-y-0.5">
                     {BUILD_STAGES.map((stage) => {
-                      const checked = stages.includes(stage.key);
+                      const state = stages.includes(stage.key)
+                        ? "done"
+                        : skipped.includes(stage.key)
+                          ? "skipped"
+                          : "pending";
                       return (
                         <li key={stage.key}>
                           <button
                             type="button"
                             onClick={() => onToggleStage(item, stage.key)}
+                            title="Click: done → skipped → pending"
                             className="flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-sm hover:bg-muted"
                           >
-                            {checked ? (
+                            {state === "done" ? (
                               <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600 dark:text-green-400" />
+                            ) : state === "skipped" ? (
+                              <Ban className="h-4 w-4 shrink-0 text-muted-foreground/70" />
                             ) : (
                               <Circle className="h-4 w-4 shrink-0 text-muted-foreground" />
                             )}
                             <span
                               className={
-                                checked
+                                state === "done"
                                   ? "text-muted-foreground line-through"
-                                  : ""
+                                  : state === "skipped"
+                                    ? "italic text-muted-foreground/70 line-through"
+                                    : ""
                               }
                             >
                               {stage.label}
                             </span>
+                            {state === "skipped" && (
+                              <span className="ml-auto text-[10px] uppercase tracking-wide text-muted-foreground/60">
+                                skipped
+                              </span>
+                            )}
                           </button>
                         </li>
                       );

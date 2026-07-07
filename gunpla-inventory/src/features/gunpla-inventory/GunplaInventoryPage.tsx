@@ -141,15 +141,27 @@ const GunplaInventoryPage = () => {
     persistQuiet({ ...item, status: "In Progress" }, `Started build: ${item.code}`);
   };
 
+  // Each click cycles a stage: pending → done → skipped → pending. Skipped
+  // stages don't apply to the kit (not every build gets primed, scribed, etc.).
   const handleToggleStage = (item: GunplaItem, stageKey: string) => {
-    const current = item.stages ?? [];
-    const next = current.includes(stageKey)
-      ? current.filter((s) => s !== stageKey)
-      : [...current, stageKey];
-    const status = deriveStatus(next);
+    const done = item.stages ?? [];
+    const skipped = item.skippedStages ?? [];
+    let nextDone = done;
+    let nextSkipped = skipped;
+    if (done.includes(stageKey)) {
+      nextDone = done.filter((s) => s !== stageKey);
+      nextSkipped = [...skipped, stageKey];
+    } else if (skipped.includes(stageKey)) {
+      nextSkipped = skipped.filter((s) => s !== stageKey);
+    } else {
+      nextDone = [...done, stageKey];
+    }
+    const status = deriveStatus(nextDone, nextSkipped);
     persistQuiet(
-      { ...item, stages: next, status },
-      status === "Built" ? `${item.code} built! 🎉` : undefined
+      { ...item, stages: nextDone, skippedStages: nextSkipped, status },
+      status === "Built" && item.status !== "Built"
+        ? `${item.code} built! 🎉`
+        : undefined
     );
   };
 

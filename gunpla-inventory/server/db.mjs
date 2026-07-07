@@ -60,6 +60,9 @@ function normalize(item) {
     stages: Array.isArray(item.stages)
       ? item.stages.filter((s) => typeof s === "string")
       : [],
+    skippedStages: Array.isArray(item.skippedStages)
+      ? item.skippedStages.filter((s) => typeof s === "string")
+      : [],
     photos: Array.isArray(item.photos)
       ? item.photos.filter((p) => typeof p === "string")
       : [],

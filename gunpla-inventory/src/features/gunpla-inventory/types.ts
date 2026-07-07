@@ -54,6 +54,9 @@ export interface GunplaItem {
   /** Completed build-stage keys (see BUILD_STAGES in lib/inventory). Optional
    *  so existing/seed items without it stay valid; treated as [] when absent. */
   stages?: string[];
+  /** Stage keys marked "skipped" (don't apply to this kit): they don't count
+   *  toward progress and don't block Built. */
+  skippedStages?: string[];
   /** Progress photo filenames stored on disk under the data dir's photos/. */
   photos?: string[];
   /** Per-stage notes, keyed by stage key (e.g. { priming: "Mr. Surfacer 1500" }). */

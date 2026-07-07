@@ -19,6 +19,7 @@ import {
   recentlyCompleted,
   sortProjects,
   stagesDone,
+  stagesSkipped,
 } from "../lib/inventory";
 import { photoUrl } from "../lib/api";
 import BuildProgress from "./BuildProgress";
@@ -74,7 +75,8 @@ const BenchDashboard = ({
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {active.map((item) => {
             const done = stagesDone(item.stages);
-            const pct = Math.round((done / TOTAL) * 100);
+            const applicable = TOTAL - stagesSkipped(item.skippedStages);
+            const pct = Math.round((done / Math.max(1, applicable)) * 100);
             const thumb = lastPhotoOf(item);
             return (
               <button
@@ -119,7 +121,7 @@ const BenchDashboard = ({
                           />
                         </div>
                         <span className="shrink-0 text-xs text-muted-foreground">
-                          {done}/{TOTAL}
+                          {done}/{applicable}
                         </span>
                       </div>
                     </div>
