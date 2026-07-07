@@ -10,13 +10,23 @@ cd "$(dirname "$0")" || exit 1
 export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
 export GIT_TERMINAL_PROMPT=0
 
+PORT=8080
+URL="http://localhost:${PORT}"
+
 echo "🤖 Gunpla Inventory"
 echo "-------------------"
 
-# 0) Auto-actualización: traer lo último de GitHub (si esto es una copia de git)
+# 0) Auto-actualización: traer lo último de GitHub — mostrando errores si falla
+REPO_V=""
 if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "🔄 Buscando actualizaciones…"
-  git pull --ff-only --quiet || echo "   (sin conexión o sin cambios — uso la versión local)"
+  if ! git pull --ff-only; then
+    echo "⚠️  No pude actualizar (mira el error de arriba: conexión o credenciales)."
+    echo "    Continúo con la versión local."
+  fi
+  REPO_V="$(git rev-parse --short HEAD 2>/dev/null)"
+else
+  echo "⚠️  Esta copia no está conectada a git — no puede auto-actualizarse."
 fi
 
 # 1) Verificar que Node esté instalado
@@ -40,24 +50,32 @@ if [ ! -d server/node_modules ]; then
   fi
 fi
 
-# 3) ¿Ya hay un servidor corriendo (p.ej. abriste el ícono .app)? Solo abrir.
-if curl -s -o /dev/null --max-time 1 "http://localhost:8080/api/health"; then
-  echo "✅ La app ya estaba corriendo. Abriendo el navegador…"
-  open "http://localhost:8080"
-  echo "   (puedes cerrar esta ventana)"
-  read -r -p "Enter para cerrar..."
-  exit 0
+# 3) ¿Ya hay un servidor corriendo? Si su versión coincide con el repo, solo abrir;
+#    si NO coincide (está viejo), lo reinicio para servir el código nuevo.
+HEALTH="$(curl -s --max-time 1 "${URL}/api/health" 2>/dev/null)"
+if [ -n "$HEALTH" ]; then
+  SERVER_V="$(printf '%s' "$HEALTH" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')"
+  if [ -z "$REPO_V" ] || [ "$SERVER_V" = "$REPO_V" ]; then
+    echo "✅ La app ya estaba corriendo (v ${SERVER_V:-?}). Abriendo el navegador…"
+    open "$URL"
+    echo "   (puedes cerrar esta ventana)"
+    read -r -p "Enter para cerrar..."
+    exit 0
+  fi
+  echo "♻️  El servidor corría una versión vieja (${SERVER_V:-?} ≠ ${REPO_V}). Reiniciando…"
+  lsof -ti tcp:${PORT} 2>/dev/null | xargs kill 2>/dev/null
+  sleep 1
 fi
 
 # 4) Abrir el navegador cuando la app esté lista
-( sleep 3; open "http://localhost:8080" ) &
+( sleep 3; open "$URL" ) &
 
 echo
 echo "🚀 Iniciando… deja esta ventana abierta mientras uses la app."
-echo "   La app abrirá en http://localhost:8080"
+echo "   La app abrirá en ${URL}"
 echo "   Tus datos se guardan en: ~/Documents/Gunpla Inventory/inventory.json"
 echo "   Para detenerla: cierra esta ventana o presiona Ctrl-C."
 echo
 
 # 5) Levantar el servidor (sirve la app compilada + la API en un solo proceso)
-GUNPLA_PORT=8080 node server/index.mjs
+GUNPLA_PORT=${PORT} node server/index.mjs
