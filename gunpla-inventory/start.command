@@ -16,12 +16,18 @@ URL="http://localhost:${PORT}"
 echo "🤖 Gunpla Inventory"
 echo "-------------------"
 
-# 0) Auto-actualización: traer lo último de GitHub — mostrando errores si falla
+# 0) Auto-actualización: fetch + reset duro al remoto (inmune a archivos locales
+#    modificados; esta carpeta es solo la app — tus datos viven en Documents).
 REPO_V=""
 if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "🔄 Buscando actualizaciones…"
-  if ! git pull --ff-only; then
-    echo "⚠️  No pude actualizar (mira el error de arriba: conexión o credenciales)."
+  if git fetch --quiet; then
+    git reset --hard "@{u}" >/dev/null 2>&1 || git pull --ff-only || {
+      echo "⚠️  No pude aplicar la actualización (mira el error de arriba)."
+      echo "    Continúo con la versión local."
+    }
+  else
+    echo "⚠️  No pude buscar actualizaciones (conexión o credenciales)."
     echo "    Continúo con la versión local."
   fi
   REPO_V="$(git rev-parse --short HEAD 2>/dev/null)"
@@ -43,7 +49,7 @@ fi
 if [ ! -d server/node_modules ]; then
   echo
   echo "📦 Preparando el servidor por primera vez (1-2 min)..."
-  if ! npm --prefix server install --no-audit --no-fund; then
+  if ! npm --prefix server ci --no-audit --no-fund && ! npm --prefix server install --no-audit --no-fund; then
     echo "❌ Falló la instalación del servidor. Copia el error de arriba y compártelo."
     read -r -p "Enter para cerrar..."
     exit 1

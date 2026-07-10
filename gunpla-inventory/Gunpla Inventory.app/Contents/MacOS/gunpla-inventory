@@ -45,12 +45,26 @@ open_window() {
   fi
 }
 
-# --- Update: git pull, with VISIBLE failure --------------------------------------
+# --- Update: fetch + hard reset to upstream, with VISIBLE failure ----------------
+# reset --hard (instead of a polite pull) makes updates immune to stray local
+# file changes (e.g. npm rewriting a lockfile). Safe here: this clone is a pure
+# app artifact — all user data lives in ~/Documents/Gunpla Inventory, not in it.
 GIT="$(find_bin git /usr/bin/git /opt/homebrew/bin/git /usr/local/bin/git)"
 REPO_V=""
 if [ -n "$GIT" ] && "$GIT" -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  echo "--- $(date) launcher: pulling updates ---" >>"$LOG"
-  if ! "$GIT" -C "$ROOT" pull --ff-only >>"$LOG" 2>&1; then
+  echo "--- $(date) launcher: updating ---" >>"$LOG"
+  DIRTY="$("$GIT" -C "$ROOT" status --porcelain 2>/dev/null)"
+  if [ -n "$DIRTY" ]; then
+    echo "local changes will be discarded by the update:" >>"$LOG"
+    echo "$DIRTY" >>"$LOG"
+  fi
+  if "$GIT" -C "$ROOT" fetch --quiet >>"$LOG" 2>&1; then
+    if ! "$GIT" -C "$ROOT" reset --hard "@{u}" >>"$LOG" 2>&1; then
+      # No upstream configured or reset failed — fall back to a plain pull.
+      "$GIT" -C "$ROOT" pull --ff-only >>"$LOG" 2>&1 || \
+        note "No pude aplicar la actualización — revisa el log."
+    fi
+  else
     note "No pude buscar actualizaciones (sin internet o credenciales) — abriendo la versión local."
   fi
   REPO_V="$("$GIT" -C "$ROOT" rev-parse --short HEAD 2>/dev/null)"
@@ -95,7 +109,9 @@ fi
 if [ ! -d "${ROOT}/server/node_modules" ]; then
   if find_bin npm /usr/local/bin/npm /opt/homebrew/bin/npm >/dev/null; then
     note "Preparando la app por primera vez (1-2 min)…"
-    ( cd "${ROOT}/server" && npm install --no-audit --no-fund ) >>"$LOG" 2>&1
+    # npm ci respects the lockfile without rewriting it (a rewritten lockfile
+    # used to block updates); fall back to install on very old npm.
+    ( cd "${ROOT}/server" && { npm ci --no-audit --no-fund || npm install --no-audit --no-fund; } ) >>"$LOG" 2>&1
   else
     alert "Falta preparar la app y no encontré npm.\n\nAbre una vez «start.command» (en la carpeta) para completar la instalación, y luego usa este ícono."
     exit 1
