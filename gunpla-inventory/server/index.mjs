@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join, basename } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { networkInterfaces } from "node:os";
 import {
   getItems,
   getItem,
@@ -15,8 +16,10 @@ import {
   seedIfEmpty,
   getPaints,
   replacePaints,
+  backupNow,
   DATA_FILE,
   PHOTOS_DIR,
+  BACKUPS_DIR,
 } from "./db.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -30,6 +33,10 @@ app.use(express.json({ limit: "12mb" })); // headroom for base64 photos (downsca
 
 // Seed from seed.json on the very first run (no data file yet).
 const seeded = seedIfEmpty();
+
+// Automatic daily backups of the JSON data files (kept 14 days).
+backupNow();
+setInterval(backupNow, 24 * 60 * 60 * 1000).unref();
 
 // --- Version awareness ---------------------------------------------------------
 // Best-effort git probe so the UI can show what's running and whether a newer
@@ -77,6 +84,17 @@ app.get("/api/health", (_req, res) => {
     version: versionInfo.version,
     updateAvailable: versionInfo.updateAvailable,
   });
+});
+
+// LAN addresses where a phone/tablet on the same WiFi can reach this server.
+app.get("/api/lan", (_req, res) => {
+  const ips = [];
+  for (const list of Object.values(networkInterfaces())) {
+    for (const ni of list || []) {
+      if (ni.family === "IPv4" && !ni.internal) ips.push(ni.address);
+    }
+  }
+  res.json({ port: PORT, ips });
 });
 
 app.get("/api/items", (_req, res) => {
@@ -198,6 +216,7 @@ app.listen(PORT, () => {
   console.log(`   → http://localhost:${PORT}`);
   console.log(`   → Data file: ${DATA_FILE}`);
   console.log(`   → ${servingApp ? "Serving app + API" : "API only"}`);
+  console.log(`   → Backups: ${BACKUPS_DIR}`);
   if (seeded) console.log(`   → Seeded from seed.json (first run)`);
   console.log(`   → ${itemCount()} kits loaded\n`);
 });

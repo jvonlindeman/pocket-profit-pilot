@@ -45,6 +45,9 @@ import StatsCards from "./components/StatsCards";
 import ProjectsPanel from "./components/ProjectsPanel";
 import BenchDashboard from "./components/BenchDashboard";
 import PaintStashPanel from "./components/PaintStashPanel";
+import OpenOnPhoneDialog from "./components/OpenOnPhoneDialog";
+import FocusMode from "./components/FocusMode";
+import WorkshopStats from "./components/WorkshopStats";
 import BuildProgress from "./components/BuildProgress";
 import StatsPanel from "./components/StatsPanel";
 import FilterBar from "./components/FilterBar";
@@ -70,6 +73,7 @@ const GunplaInventoryPage = () => {
   );
 
   const [tab, setTab] = useState("bench");
+  const [focusCode, setFocusCode] = useState<string | null>(null);
   const [filters, setFilters] = useState<InventoryFilters>(EMPTY_FILTERS);
   const [formOpen, setFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<GunplaItem | null>(null);
@@ -295,8 +299,9 @@ const GunplaInventoryPage = () => {
               : `${filtered.length} matching`}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <ThemeToggle />
+          {online && <OpenOnPhoneDialog />}
           <ExportMenu items={sorted} />
           <Button variant="outline" onClick={() => setResetOpen(true)}>
             <RotateCcw className="mr-1.5 h-4 w-4" />
@@ -381,7 +386,7 @@ const GunplaInventoryPage = () => {
           )}
 
           <Tabs value={tab} onValueChange={setTab}>
-            <TabsList>
+            <TabsList className="h-auto flex-wrap">
               <TabsTrigger value="bench">Bench</TabsTrigger>
               <TabsTrigger value="list">Kits</TabsTrigger>
               <TabsTrigger value="projects">Projects</TabsTrigger>
@@ -418,6 +423,7 @@ const GunplaInventoryPage = () => {
                 onSaveStageNote={handleSaveStageNote}
                 onSavePaints={handleSavePaints}
                 onSaveInfo={handleSaveInfo}
+                onFocus={setFocusCode}
               />
             </TabsContent>
             <TabsContent value="paints" className="mt-4">
@@ -430,7 +436,8 @@ const GunplaInventoryPage = () => {
                 onRemove={paintStash.removePaint}
               />
             </TabsContent>
-            <TabsContent value="stats" className="mt-4">
+            <TabsContent value="stats" className="mt-4 space-y-4">
+              <WorkshopStats items={items} />
               <StatsPanel
                 byGrade={byGrade}
                 byStatus={byStatus}
@@ -441,6 +448,21 @@ const GunplaInventoryPage = () => {
           </Tabs>
         </>
       )}
+
+      {focusCode &&
+        (() => {
+          const focusItem = items.find((i) => i.code === focusCode);
+          return focusItem ? (
+            <FocusMode
+              item={focusItem}
+              online={online}
+              onClose={() => setFocusCode(null)}
+              onToggleStage={handleToggleStage}
+              onSaveStageNote={handleSaveStageNote}
+              onAddPhoto={handleAddPhoto}
+            />
+          ) : null;
+        })()}
 
       <ItemFormDialog
         open={formOpen}

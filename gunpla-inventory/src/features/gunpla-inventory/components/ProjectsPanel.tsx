@@ -14,6 +14,7 @@ import {
   Ban,
   CheckCircle2,
   Circle,
+  Crosshair,
   Hammer,
   Image as ImageIcon,
   Plus,
@@ -50,6 +51,7 @@ interface ProjectsPanelProps {
       priority: BuildPriority | null;
     }
   ) => void;
+  onFocus: (code: string) => void;
 }
 
 const TOTAL = BUILD_STAGES.length;
@@ -68,6 +70,7 @@ const ProjectsPanel = ({
   onSaveStageNote,
   onSavePaints,
   onSaveInfo,
+  onFocus,
 }: ProjectsPanelProps) => {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -265,14 +268,20 @@ const ProjectsPanel = ({
                   </ul>
 
                   <div className="flex items-center justify-between gap-2 pt-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSelectedCode(item.code)}
-                    >
-                      <Settings2 className="mr-1.5 h-4 w-4" />
-                      Details
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => onFocus(item.code)}>
+                        <Crosshair className="mr-1.5 h-4 w-4" />
+                        Focus
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedCode(item.code)}
+                      >
+                        <Settings2 className="mr-1.5 h-4 w-4" />
+                        Details
+                      </Button>
+                    </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       {photoCount > 0 && (
                         <span className="flex items-center gap-1">

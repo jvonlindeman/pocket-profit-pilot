@@ -18,6 +18,9 @@ import {
   writeFileSync,
   renameSync,
   existsSync,
+  copyFileSync,
+  readdirSync,
+  rmSync,
 } from "node:fs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -262,4 +265,32 @@ export function replacePaints(arr) {
   return getPaints();
 }
 
-export { DATA_FILE, PHOTOS_DIR, PAINTS_FILE };
+// --- Automatic backups ----------------------------------------------------------
+// Dated copies of the two JSON files (the fragile part of the data) next to them:
+//   <data dir>/Backups/YYYY-MM-DD/inventory.json + paints.json
+// Photos are already one-file-per-photo and are not duplicated. Keeps last 14 days.
+
+const BACKUPS_DIR = join(dirname(DATA_FILE), "Backups");
+const KEEP_BACKUPS = 14;
+
+export function backupNow() {
+  try {
+    const stamp = new Date().toISOString().slice(0, 10);
+    const dir = join(BACKUPS_DIR, stamp);
+    mkdirSync(dir, { recursive: true });
+    if (existsSync(DATA_FILE)) copyFileSync(DATA_FILE, join(dir, "inventory.json"));
+    if (existsSync(PAINTS_FILE)) copyFileSync(PAINTS_FILE, join(dir, "paints.json"));
+    const dated = readdirSync(BACKUPS_DIR)
+      .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+      .sort();
+    for (const d of dated.slice(0, Math.max(0, dated.length - KEEP_BACKUPS))) {
+      rmSync(join(BACKUPS_DIR, d), { recursive: true, force: true });
+    }
+    return true;
+  } catch (err) {
+    console.warn(`⚠️  Backup failed: ${err.message}`);
+    return false;
+  }
+}
+
+export { DATA_FILE, PHOTOS_DIR, PAINTS_FILE, BACKUPS_DIR };

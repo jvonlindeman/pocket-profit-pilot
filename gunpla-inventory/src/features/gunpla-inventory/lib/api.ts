@@ -72,6 +72,17 @@ export function resetItemsApi(): Promise<GunplaItem[]> {
   );
 }
 
+// --- LAN info (open on your phone) ----------------------------------------------
+
+export interface LanInfo {
+  port: number;
+  ips: string[];
+}
+
+export function fetchLanInfo(): Promise<LanInfo> {
+  return request<LanInfo>("/lan");
+}
+
 // --- Paint stash ---------------------------------------------------------------
 
 export function fetchPaints(): Promise<StashPaint[]> {

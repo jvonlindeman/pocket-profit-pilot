@@ -238,6 +238,46 @@ export function lastPhotoOf(item: GunplaItem): string | null {
   )[0];
 }
 
+export interface MonthCount {
+  month: string; // "YYYY-MM"
+  label: string; // "Jul"
+  count: number;
+}
+
+/** Builds finished per month over the last `monthsBack` months (needs finishedAt). */
+export function finishedByMonth(
+  items: GunplaItem[],
+  monthsBack = 12
+): MonthCount[] {
+  const now = new Date();
+  const out: MonthCount[] = [];
+  for (let i = monthsBack - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    out.push({
+      month: key,
+      label: new Intl.DateTimeFormat("en-US", { month: "short" }).format(d),
+      count: items.filter((it) => (it.finishedAt ?? "").startsWith(key)).length,
+    });
+  }
+  return out;
+}
+
+/** Average days from startedAt to finishedAt across dated builds; null if none. */
+export function avgBuildDays(items: GunplaItem[]): number | null {
+  const spans = items
+    .filter((i) => i.startedAt && i.finishedAt)
+    .map(
+      (i) =>
+        (new Date(`${i.finishedAt}T00:00:00`).getTime() -
+          new Date(`${i.startedAt}T00:00:00`).getTime()) /
+        86400000
+    )
+    .filter((d) => d >= 0 && !Number.isNaN(d));
+  if (spans.length === 0) return null;
+  return spans.reduce((a, b) => a + b, 0) / spans.length;
+}
+
 /** Format an ISO date ("YYYY-MM-DD") as e.g. "Dec 25, 2025"; "—" when empty. */
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
