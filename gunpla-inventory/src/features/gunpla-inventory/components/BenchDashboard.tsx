@@ -75,7 +75,9 @@ const BenchDashboard = ({
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {active.map((item) => {
             const done = stagesDone(item.stages);
-            const applicable = TOTAL - stagesSkipped(item.skippedStages);
+            const skippedCount = stagesSkipped(item.skippedStages);
+            const applicable = TOTAL - skippedCount;
+            const complete = done + skippedCount >= TOTAL;
             const pct = Math.round((done / Math.max(1, applicable)) * 100);
             const thumb = lastPhotoOf(item);
             return (
@@ -121,7 +123,7 @@ const BenchDashboard = ({
                           />
                         </div>
                         <span className="shrink-0 text-xs text-muted-foreground">
-                          {done}/{applicable}
+                          {complete ? "Built 🎉" : `${done}/${applicable}`}
                         </span>
                       </div>
                     </div>

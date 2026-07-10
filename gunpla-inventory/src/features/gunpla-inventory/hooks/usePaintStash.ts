@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import type { StashPaint } from "../types";
 import { loadPaintStash, savePaintStash } from "../lib/storage";
 import { fetchPaints, pingApi, savePaintsApi } from "../lib/api";
@@ -43,13 +44,16 @@ export function usePaintStash() {
   }, []);
 
   const applyAll = useCallback(
-    async (next: StashPaint[]) => {
+    (next: StashPaint[]) => {
+      // Optimistic local update is the source of truth for the UI. We do NOT
+      // re-apply the server's response afterwards — doing so would clobber any
+      // edit made while the PUT was in flight (lost-update bug).
       setPaints(next);
       savePaintStash(next);
       if (online) {
-        const normalized = await savePaintsApi(next);
-        setPaints(normalized);
-        savePaintStash(normalized);
+        savePaintsApi(next).catch((err) => {
+          toast.error(`Could not save paints: ${(err as Error).message}`);
+        });
       }
     },
     [online]

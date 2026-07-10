@@ -37,6 +37,13 @@ const NEW_VALUE = "__new__";
 /** Common kit scales offered alongside whatever values already exist. */
 const SCALE_SUGGESTIONS = ["1/144", "1/100", "1/60", "1/48", "Non-scale"];
 
+/** Parse a number input value; empty or non-numeric → null (never NaN). */
+function toNum(v: string): number | null {
+  if (v === "") return null;
+  const n = Number(v);
+  return Number.isNaN(n) ? null : n;
+}
+
 /**
  * Prefix for auto-generated codes: the grade when set (Bandai kits), else the
  * brand's first word (third-party kits, e.g. "Moxin" → MOXIN-001), else "KIT".
@@ -323,12 +330,7 @@ const ItemFormDialog = ({
                 type="number"
                 min={0}
                 value={form.quantity ?? ""}
-                onChange={(e) =>
-                  set(
-                    "quantity",
-                    e.target.value === "" ? null : Number(e.target.value)
-                  )
-                }
+                onChange={(e) => set("quantity", toNum(e.target.value))}
               />
             </div>
             <div className="space-y-1.5">
@@ -339,12 +341,7 @@ const ItemFormDialog = ({
                 min={0}
                 step="0.01"
                 value={form.paid ?? ""}
-                onChange={(e) =>
-                  set(
-                    "paid",
-                    e.target.value === "" ? null : Number(e.target.value)
-                  )
-                }
+                onChange={(e) => set("paid", toNum(e.target.value))}
               />
             </div>
             <div className="space-y-1.5">

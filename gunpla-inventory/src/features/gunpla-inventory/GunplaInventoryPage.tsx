@@ -138,7 +138,18 @@ const GunplaInventoryPage = () => {
   const handleStartBuild = (code: string) => {
     const item = items.find((i) => i.code === code);
     if (!item) return;
-    persistQuiet({ ...item, status: "In Progress" }, `Started build: ${item.code}`);
+    // Redoing a finished kit starts fresh; resuming a shelved one keeps progress.
+    const redo = item.status === "Built";
+    persistQuiet(
+      {
+        ...item,
+        status: "In Progress",
+        finishedAt: null,
+        stages: redo ? [] : item.stages,
+        skippedStages: redo ? [] : item.skippedStages,
+      },
+      `Started build: ${item.code}`
+    );
   };
 
   // Each click cycles a stage: pending → done → skipped → pending. Skipped
@@ -157,8 +168,20 @@ const GunplaInventoryPage = () => {
       nextDone = [...done, stageKey];
     }
     const status = deriveStatus(nextDone, nextSkipped);
+    // Stamp the finish date the first time it's fully built; clear it if it
+    // drops back to In Progress. This is what feeds "Recently completed".
+    const finishedAt =
+      status === "Built"
+        ? item.finishedAt || new Date().toISOString().slice(0, 10)
+        : null;
     persistQuiet(
-      { ...item, stages: nextDone, skippedStages: nextSkipped, status },
+      {
+        ...item,
+        stages: nextDone,
+        skippedStages: nextSkipped,
+        status,
+        finishedAt,
+      },
       status === "Built" && item.status !== "Built"
         ? `${item.code} built! 🎉`
         : undefined
@@ -168,7 +191,10 @@ const GunplaInventoryPage = () => {
   const handleRemoveBuild = (code: string) => {
     const item = items.find((i) => i.code === code);
     if (!item) return;
-    persistQuiet({ ...item, status: "Backlog" }, `Removed ${item.code} from builds`);
+    persistQuiet(
+      { ...item, status: "Backlog", finishedAt: null },
+      `Removed ${item.code} from builds`
+    );
   };
 
   const handleAddPhoto = (item: GunplaItem, filename: string) => {
@@ -180,9 +206,11 @@ const GunplaInventoryPage = () => {
       ...item,
       photos: (item.photos ?? []).filter((p) => p !== filename),
     });
-    deletePhotoApi(filename).catch(() => {
-      /* file may already be gone; the array update is what matters */
-    });
+    if (online) {
+      deletePhotoApi(filename).catch(() => {
+        /* file may already be gone; the array update is what matters */
+      });
+    }
   };
 
   const handleSaveStageNote = (

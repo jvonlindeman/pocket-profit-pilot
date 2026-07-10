@@ -106,7 +106,9 @@ export function distinctValues(
 export function nextCode(items: GunplaItem[], prefix: string): string {
   const safePrefix = prefix.trim().toUpperCase() || "ITEM";
   let max = 0;
-  const re = new RegExp(`^${safePrefix}-(\\d+)$`, "i");
+  // Escape regex metacharacters — a grade like "RG(v2" must not break the regex.
+  const escaped = safePrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`^${escaped}-(\\d+)$`, "i");
   for (const item of items) {
     const m = item.code.match(re);
     if (m) max = Math.max(max, parseInt(m[1], 10));

@@ -39,8 +39,11 @@ const PRIORITIES = new Set(["high", "medium", "low"]);
 
 /** Coerce an incoming item into the canonical on-disk shape. */
 function normalize(item) {
-  const num = (v) =>
-    v === null || v === undefined || v === "" ? null : Number(v);
+  const num = (v) => {
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v);
+    return Number.isNaN(n) ? null : n;
+  };
   return {
     code: String(item.code || "").trim(),
     name: String(item.name || "").trim(),
@@ -133,6 +136,8 @@ function persist() {
 function ingest(items) {
   itemsByCode = new Map();
   for (const it of items) {
+    // Skip stray nulls / non-objects from a hand-edited file (don't crash boot).
+    if (!it || typeof it !== "object") continue;
     const n = normalize(it);
     if (n.code) itemsByCode.set(n.code, n);
   }
@@ -182,8 +187,13 @@ export function replaceAll(items) {
  */
 export function seedIfEmpty() {
   if (fileExisted || itemsByCode.size > 0) return false;
-  const seed = JSON.parse(readFileSync(SEED_FILE, "utf8"));
-  replaceAll(seed);
+  try {
+    const seed = JSON.parse(readFileSync(SEED_FILE, "utf8"));
+    replaceAll(Array.isArray(seed) ? seed : []);
+  } catch (err) {
+    // A missing/broken seed must not prevent the app from starting empty.
+    console.warn(`⚠️  Could not read seed.json: ${err.message}. Starting empty.`);
+  }
   fileExisted = true;
   return true;
 }

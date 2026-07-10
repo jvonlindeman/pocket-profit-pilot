@@ -19,21 +19,22 @@ export function normalizePaintText(s: string): string {
 }
 
 /**
- * A recipe text is covered when some stash entry's "brand code" or name is a
- * substring of it (or vice versa), case/whitespace-insensitive — so a stash
- * entry "Tamiya X-7" covers the recipe "tamiya x-7 red gloss".
+ * Is a recipe paint already in the stash? Matches only on a SPECIFIC token so a
+ * bare brand ("Tamiya") doesn't mark every Tamiya paint as owned:
+ *  - the stash entry's code appears in the recipe (codes are identifying: X-7, C33), or
+ *  - the stash entry's name matches the recipe (min length so short/generic
+ *    names don't match everything).
+ * Erring toward NOT-covered is safe: at worst you see a paint you already own on
+ * the list; the dangerous direction (hiding a paint you need) is what this avoids.
  */
 export function stashCovers(stash: StashPaint[], recipeText: string): boolean {
   const r = normalizePaintText(recipeText);
-  if (!r) return true; // nothing to buy for an empty entry
+  if (!r) return true; // nothing to buy for an empty recipe line
   for (const p of stash) {
-    const candidates = [
-      normalizePaintText(`${p.brand} ${p.code}`),
-      normalizePaintText(p.name),
-    ];
-    for (const c of candidates) {
-      if (c && (c.includes(r) || r.includes(c))) return true;
-    }
+    const code = normalizePaintText(p.code);
+    if (code.length >= 2 && r.includes(code)) return true;
+    const name = normalizePaintText(p.name);
+    if (name.length >= 4 && (r.includes(name) || name.includes(r))) return true;
   }
   return false;
 }

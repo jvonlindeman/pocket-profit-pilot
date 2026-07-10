@@ -168,7 +168,11 @@ const ProjectsPanel = ({
             const done = stagesDone(stages);
             const skippedCount = stagesSkipped(skipped);
             const applicable = TOTAL - skippedCount;
-            const complete = done + skippedCount >= TOTAL;
+            // Count each stage once even if it's (wrongly) in both arrays.
+            const covered = BUILD_STAGES.filter(
+              (s) => stages.includes(s.key) || skipped.includes(s.key)
+            ).length;
+            const complete = covered >= TOTAL;
             const pct = Math.round((done / Math.max(1, applicable)) * 100);
             const photoCount = item.photos?.length ?? 0;
             return (
