@@ -23,6 +23,7 @@ import {
   ArrowUpDown,
   Check,
   ExternalLink,
+  Hammer,
   Pencil,
   Settings2,
   Tag,
@@ -41,6 +42,7 @@ interface InventoryTableProps {
   items: GunplaItem[];
   sort: SortState;
   onSort: (key: SortKey) => void;
+  onStartBuild: (item: GunplaItem) => void;
   onEdit: (item: GunplaItem) => void;
   onInlineSave: (item: GunplaItem) => void;
   onDelete: (item: GunplaItem) => void;
@@ -56,6 +58,7 @@ const InventoryTable = ({
   items,
   sort,
   onSort,
+  onStartBuild,
   onEdit,
   onInlineSave,
   onDelete,
@@ -159,7 +162,7 @@ const InventoryTable = ({
               className="w-[90px]"
               align="right"
             />
-            <TableHead className="w-[120px] text-right">Actions</TableHead>
+            <TableHead className="w-[150px] text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -322,6 +325,28 @@ const InventoryTable = ({
                 </TableCell>
                 <TableCell>
                   <div className="flex justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={`h-8 w-8 ${
+                        item.status === "In Progress"
+                          ? "text-green-600 dark:text-green-400"
+                          : ""
+                      }`}
+                      onClick={() => onStartBuild(item)}
+                      aria-label={
+                        item.status === "In Progress"
+                          ? "On the bench — go to project"
+                          : "Start build"
+                      }
+                      title={
+                        item.status === "In Progress"
+                          ? "On the bench — go to project"
+                          : "Start build"
+                      }
+                    >
+                      <Hammer className="h-4 w-4" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"

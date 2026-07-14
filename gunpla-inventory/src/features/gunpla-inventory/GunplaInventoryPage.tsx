@@ -53,6 +53,7 @@ import StatsPanel from "./components/StatsPanel";
 import FilterBar from "./components/FilterBar";
 import InventoryTable from "./components/InventoryTable";
 import ItemFormDialog from "./components/ItemFormDialog";
+import StartBuildDialog from "./components/StartBuildDialog";
 import ExportMenu from "./components/ExportMenu";
 
 const EMPTY_FILTERS: InventoryFilters = {
@@ -78,6 +79,7 @@ const GunplaInventoryPage = () => {
   const [formOpen, setFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<GunplaItem | null>(null);
   const [pendingDelete, setPendingDelete] = useState<GunplaItem | null>(null);
+  const [startCandidate, setStartCandidate] = useState<GunplaItem | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
   const [sort, setSort] = useState<SortState>({ key: "code", dir: "asc" });
 
@@ -139,21 +141,35 @@ const GunplaInventoryPage = () => {
     }
   };
 
+  // Starting a build asks where the kit actually is (StartBuildDialog) instead
+  // of guessing; a kit already on the bench just jumps to its project.
   const handleStartBuild = (code: string) => {
     const item = items.find((i) => i.code === code);
     if (!item) return;
-    // Redoing a finished kit starts fresh; resuming a shelved one keeps progress.
-    const redo = item.status === "Built";
+    if (item.status === "In Progress") {
+      setTab("projects");
+      return;
+    }
+    setStartCandidate(item);
+  };
+
+  const confirmStartBuild = (
+    item: GunplaItem,
+    stages: string[],
+    skipped: string[]
+  ) => {
+    setStartCandidate(null);
     persistQuiet(
       {
         ...item,
         status: "In Progress",
         finishedAt: null,
-        stages: redo ? [] : item.stages,
-        skippedStages: redo ? [] : item.skippedStages,
+        stages,
+        skippedStages: skipped,
       },
       `Started build: ${item.code}`
     );
+    setTab("projects");
   };
 
   // Each click cycles a stage: pending → done → skipped → pending. Skipped
@@ -406,6 +422,7 @@ const GunplaInventoryPage = () => {
                 items={sorted}
                 sort={sort}
                 onSort={toggleSort}
+                onStartBuild={(item) => handleStartBuild(item.code)}
                 onEdit={handleEdit}
                 onInlineSave={handleSave}
                 onDelete={setPendingDelete}
@@ -470,6 +487,12 @@ const GunplaInventoryPage = () => {
         item={editingItem}
         items={items}
         onSave={handleSave}
+      />
+
+      <StartBuildDialog
+        item={startCandidate}
+        onOpenChange={(open) => !open && setStartCandidate(null)}
+        onConfirm={confirmStartBuild}
       />
 
       <AlertDialog
