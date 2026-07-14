@@ -1,0 +1,22 @@
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+node_modules
+# NOTE: dist/ IS committed on purpose — it's the prebuilt app the server serves,
+# so a `git pull` delivers updates with no rebuild needed on the user's Mac.
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

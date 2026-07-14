@@ -1,0 +1,333 @@
+import type {
+  Breakdown,
+  GunplaItem,
+  GunplaStatus,
+  InventoryFilters,
+  InventoryStats,
+} from "../types";
+
+/**
+ * Group kits by a string field and aggregate count + spend + status mix.
+ * Sorted by count (desc), then by spend (desc).
+ */
+export function groupBy(
+  items: GunplaItem[],
+  key: keyof GunplaItem
+): Breakdown[] {
+  const map = new Map<string, Breakdown>();
+  for (const item of items) {
+    const raw = item[key];
+    const bucket = (typeof raw === "string" && raw.trim()) || "—";
+    let row = map.get(bucket);
+    if (!row) {
+      row = { key: bucket, count: 0, spent: 0, built: 0, backlog: 0 };
+      map.set(bucket, row);
+    }
+    row.count += 1;
+    row.spent += item.paid ?? 0;
+    if (item.status === "Built") row.built += 1;
+    if (item.status === "Backlog") row.backlog += 1;
+  }
+  return Array.from(map.values()).sort(
+    (a, b) => b.count - a.count || b.spent - a.spent
+  );
+}
+
+/** Compute aggregate stats over a list of kits. */
+export function computeStats(items: GunplaItem[]): InventoryStats {
+  return items.reduce<InventoryStats>(
+    (acc, item) => {
+      const qty = item.quantity ?? 1;
+      acc.totalKits += 1;
+      acc.totalQuantity += qty;
+      acc.totalSpent += item.paid ?? 0;
+      if (item.status === "Built") acc.built += 1;
+      if (item.status === "Backlog") acc.backlog += 1;
+      if (item.sell) acc.forSale += 1;
+      return acc;
+    },
+    {
+      totalKits: 0,
+      totalQuantity: 0,
+      totalSpent: 0,
+      built: 0,
+      backlog: 0,
+      forSale: 0,
+    }
+  );
+}
+
+/** Apply search + facet filters. */
+export function filterItems(
+  items: GunplaItem[],
+  filters: InventoryFilters
+): GunplaItem[] {
+  const search = filters.search.trim().toLowerCase();
+  return items.filter((item) => {
+    if (filters.grade && item.grade !== filters.grade) return false;
+    if (filters.brand && item.brand !== filters.brand) return false;
+    if (filters.status && item.status !== filters.status) return false;
+    if (filters.location && item.location !== filters.location) return false;
+    if (filters.sellOnly && !item.sell) return false;
+    if (search) {
+      const haystack = [
+        item.name,
+        item.code,
+        item.grade,
+        item.brand,
+        item.scale,
+        item.source,
+        item.peebsLimited,
+        item.location,
+        item.review,
+      ]
+        .join(" ")
+        .toLowerCase();
+      if (!haystack.includes(search)) return false;
+    }
+    return true;
+  });
+}
+
+/** Distinct, sorted values of a string field — for filter dropdowns. */
+export function distinctValues(
+  items: GunplaItem[],
+  key: keyof GunplaItem
+): string[] {
+  const set = new Set<string>();
+  for (const item of items) {
+    const value = item[key];
+    if (typeof value === "string" && value.trim()) set.add(value.trim());
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b));
+}
+
+/** Generate the next sequential code for a grade prefix, e.g. "HG-140". */
+export function nextCode(items: GunplaItem[], prefix: string): string {
+  const safePrefix = prefix.trim().toUpperCase() || "ITEM";
+  let max = 0;
+  // Escape regex metacharacters — a grade like "RG(v2" must not break the regex.
+  const escaped = safePrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`^${escaped}-(\\d+)$`, "i");
+  for (const item of items) {
+    const m = item.code.match(re);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return `${safePrefix}-${String(max + 1).padStart(3, "0")}`;
+}
+
+/** Status values offered in the form dialog and inline row editor. */
+export const STATUS_OPTIONS = ["Backlog", "In Progress", "Built"] as const;
+
+/** Ordered build pipeline (full airbrush flow) tracked per kit in the Projects tab. */
+export const BUILD_STAGES = [
+  { key: "assembly", label: "Assembly" },
+  { key: "sanding", label: "Sanding & seams" },
+  { key: "scribing", label: "Scribing" },
+  { key: "priming", label: "Priming" },
+  { key: "basecoat", label: "Base coat (airbrush)" },
+  { key: "detail", label: "Detail paint" },
+  { key: "paneling", label: "Panel lining" },
+  { key: "decals", label: "Decals / waterslides" },
+  { key: "topcoat", label: "Topcoat" },
+] as const;
+
+/** How many of the known stages are completed (ignores unknown keys). */
+export function stagesDone(stages: string[] | undefined): number {
+  if (!stages) return 0;
+  return BUILD_STAGES.filter((s) => stages.includes(s.key)).length;
+}
+
+/** How many of the known stages are marked skipped (don't apply to this kit). */
+export function stagesSkipped(skipped: string[] | undefined): number {
+  if (!skipped) return 0;
+  return BUILD_STAGES.filter((s) => skipped.includes(s.key)).length;
+}
+
+/**
+ * Derive a kit's status from its build stages while it's an active project:
+ * every stage either done or skipped → Built, otherwise In Progress (even with
+ * 0 done — it's on the bench). Used only when working a kit in the Projects tab.
+ */
+export function deriveStatus(
+  stages: string[],
+  skipped: string[] = []
+): GunplaStatus {
+  const covered = BUILD_STAGES.filter(
+    (s) => stages.includes(s.key) || skipped.includes(s.key)
+  ).length;
+  return covered >= BUILD_STAGES.length ? "Built" : "In Progress";
+}
+
+/** Priority levels offered for active builds (highest first). */
+export const PRIORITY_OPTIONS = [
+  { key: "high", label: "High" },
+  { key: "medium", label: "Medium" },
+  { key: "low", label: "Low" },
+] as const;
+
+/** Sort rank for a priority (lower = more urgent; no priority sinks last). */
+export function priorityRank(p: string | null | undefined): number {
+  const i = PRIORITY_OPTIONS.findIndex((o) => o.key === p);
+  return i === -1 ? PRIORITY_OPTIONS.length : i;
+}
+
+/** Order active builds: by priority (High→Low→none), then start date, then code. */
+export function sortProjects(items: GunplaItem[]): GunplaItem[] {
+  return [...items].sort((a, b) => {
+    const pr = priorityRank(a.priority) - priorityRank(b.priority);
+    if (pr !== 0) return pr;
+    const da = a.startedAt || "";
+    const db = b.startedAt || "";
+    if (da !== db) return da.localeCompare(db);
+    return a.code.localeCompare(b.code);
+  });
+}
+
+/** Badge color classes per priority level (shared by Projects + Bench cards). */
+export const PRIORITY_BADGE_CLASSES: Record<string, string> = {
+  high: "border-red-300 text-red-700 dark:border-red-800 dark:text-red-300",
+  medium:
+    "border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-300",
+  low: "border-slate-300 text-slate-600 dark:border-slate-700 dark:text-slate-300",
+};
+
+/** Parse the Date.now() timestamp embedded in photo filenames ("CODE-<ts>.jpg"). */
+export function photoTimestamp(filename: string): number | null {
+  const m = filename.match(/-(\d{10,})\.(jpe?g|png|webp)$/i);
+  return m ? Number(m[1]) : null;
+}
+
+export interface RecentPhoto {
+  filename: string;
+  code: string;
+  name: string;
+  ts: number;
+}
+
+/** Newest n photos across the whole collection (by filename timestamp). */
+export function latestPhotos(items: GunplaItem[], n: number): RecentPhoto[] {
+  const all: RecentPhoto[] = [];
+  for (const item of items) {
+    for (const filename of item.photos ?? []) {
+      all.push({
+        filename,
+        code: item.code,
+        name: item.name,
+        ts: photoTimestamp(filename) ?? 0,
+      });
+    }
+  }
+  return all.sort((a, b) => b.ts - a.ts).slice(0, n);
+}
+
+/** Most recently finished builds (needs a finishedAt date). */
+export function recentlyCompleted(items: GunplaItem[], n: number): GunplaItem[] {
+  return items
+    .filter((i) => i.finishedAt)
+    .sort((a, b) => (b.finishedAt ?? "").localeCompare(a.finishedAt ?? ""))
+    .slice(0, n);
+}
+
+/** The newest photo of a kit, for card thumbnails. */
+export function lastPhotoOf(item: GunplaItem): string | null {
+  const photos = item.photos ?? [];
+  if (photos.length === 0) return null;
+  return [...photos].sort(
+    (a, b) => (photoTimestamp(b) ?? 0) - (photoTimestamp(a) ?? 0)
+  )[0];
+}
+
+export interface MonthCount {
+  month: string; // "YYYY-MM"
+  label: string; // "Jul"
+  count: number;
+}
+
+/** Builds finished per month over the last `monthsBack` months (needs finishedAt). */
+export function finishedByMonth(
+  items: GunplaItem[],
+  monthsBack = 12
+): MonthCount[] {
+  const now = new Date();
+  const out: MonthCount[] = [];
+  for (let i = monthsBack - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    out.push({
+      month: key,
+      label: new Intl.DateTimeFormat("en-US", { month: "short" }).format(d),
+      count: items.filter((it) => (it.finishedAt ?? "").startsWith(key)).length,
+    });
+  }
+  return out;
+}
+
+/** Average days from startedAt to finishedAt across dated builds; null if none. */
+export function avgBuildDays(items: GunplaItem[]): number | null {
+  const spans = items
+    .filter((i) => i.startedAt && i.finishedAt)
+    .map(
+      (i) =>
+        (new Date(`${i.finishedAt}T00:00:00`).getTime() -
+          new Date(`${i.startedAt}T00:00:00`).getTime()) /
+        86400000
+    )
+    .filter((d) => d >= 0 && !Number.isNaN(d));
+  if (spans.length === 0) return null;
+  return spans.reduce((a, b) => a + b, 0) / spans.length;
+}
+
+/** Format an ISO date ("YYYY-MM-DD") as e.g. "Dec 25, 2025"; "—" when empty. */
+export function formatDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(d);
+}
+
+export type SortKey =
+  | "code"
+  | "name"
+  | "grade"
+  | "status"
+  | "location"
+  | "paid";
+export type SortDir = "asc" | "desc";
+export interface SortState {
+  key: SortKey;
+  dir: SortDir;
+}
+
+/** Return a new array sorted by the given column/direction. */
+export function sortItems(
+  items: GunplaItem[],
+  sort: SortState
+): GunplaItem[] {
+  const mult = sort.dir === "asc" ? 1 : -1;
+  const copy = [...items];
+  copy.sort((a, b) => {
+    if (sort.key === "paid") {
+      const av = a.paid ?? -Infinity;
+      const bv = b.paid ?? -Infinity;
+      return (av - bv) * mult;
+    }
+    const av = String(a[sort.key] ?? "");
+    const bv = String(b[sort.key] ?? "");
+    // numeric-aware so codes sort HG-2 < HG-10 and names read naturally
+    return av.localeCompare(bv, undefined, { numeric: true }) * mult;
+  });
+  return copy;
+}
+
+export function formatMoney(value: number | null | undefined): string {
+  if (value == null) return "—";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(value);
+}

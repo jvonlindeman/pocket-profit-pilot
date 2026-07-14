@@ -1,0 +1,134 @@
+#!/bin/bash
+# Gunpla Inventory — launcher inside the .app bundle.
+# Double-clicking the app runs THIS script (no Terminal window). On each open it:
+#   1. pulls the latest version from GitHub — and TELLS YOU if that fails,
+#   2. reconciles: if the running server's version differs from the repo's
+#      version, it restarts the server (self-healing, no matter why they differ),
+#   3. opens the app in a browser window.
+# Your data stays in ~/Documents/Gunpla Inventory and is never touched.
+
+PORT=8080
+URL="http://localhost:${PORT}"
+LOG="${HOME}/Library/Logs/Gunpla Inventory.log"
+
+# GUI apps don't inherit your shell PATH, so add the usual tool locations.
+export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:${PATH}"
+# Never let git block on a credential prompt — fail fast and keep going.
+export GIT_TERMINAL_PROMPT=0
+
+# The app code lives in the folder that CONTAINS this .app bundle:
+#   <ROOT>/Gunpla Inventory.app/Contents/MacOS/gunpla-inventory
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+mkdir -p "$(dirname "$LOG")"
+
+alert() {
+  /usr/bin/osascript -e "display dialog \"$1\" with title \"Gunpla Inventory\" buttons {\"OK\"} default button \"OK\"" >/dev/null 2>&1
+}
+note() {
+  /usr/bin/osascript -e "display notification \"$1\" with title \"Gunpla Inventory\"" >/dev/null 2>&1
+}
+find_bin() {
+  local name="$1"; shift
+  local c
+  for c in "$(command -v "$name" 2>/dev/null)" "$@"; do
+    if [ -n "$c" ] && [ -x "$c" ]; then echo "$c"; return 0; fi
+  done
+  return 1
+}
+open_window() {
+  if [ -d "/Applications/Google Chrome.app" ]; then
+    open -na "Google Chrome" --args --app="$URL" --new-window
+  elif [ -d "/Applications/Microsoft Edge.app" ]; then
+    open -na "Microsoft Edge" --args --app="$URL" --new-window
+  else
+    open "$URL"
+  fi
+}
+
+# --- Update: fetch + hard reset to upstream, with VISIBLE failure ----------------
+# reset --hard (instead of a polite pull) makes updates immune to stray local
+# file changes (e.g. npm rewriting a lockfile). Safe here: this clone is a pure
+# app artifact — all user data lives in ~/Documents/Gunpla Inventory, not in it.
+GIT="$(find_bin git /usr/bin/git /opt/homebrew/bin/git /usr/local/bin/git)"
+REPO_V=""
+if [ -n "$GIT" ] && "$GIT" -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "--- $(date) launcher: updating ---" >>"$LOG"
+  DIRTY="$("$GIT" -C "$ROOT" status --porcelain 2>/dev/null)"
+  if [ -n "$DIRTY" ]; then
+    echo "local changes will be discarded by the update:" >>"$LOG"
+    echo "$DIRTY" >>"$LOG"
+  fi
+  if "$GIT" -C "$ROOT" fetch --quiet >>"$LOG" 2>&1; then
+    if ! "$GIT" -C "$ROOT" reset --hard "@{u}" >>"$LOG" 2>&1; then
+      # No upstream configured or reset failed — fall back to a plain pull.
+      "$GIT" -C "$ROOT" pull --ff-only >>"$LOG" 2>&1 || \
+        note "No pude aplicar la actualización — revisa el log."
+    fi
+  else
+    note "No pude buscar actualizaciones (sin internet o credenciales) — abriendo la versión local."
+  fi
+  REPO_V="$("$GIT" -C "$ROOT" rev-parse --short HEAD 2>/dev/null)"
+else
+  # A copied folder without .git can never update itself — say so, loudly enough.
+  note "Esta copia no se auto-actualiza (no está conectada a git)."
+  echo "--- $(date) launcher: ROOT is not a git work tree, skipping update ---" >>"$LOG"
+fi
+
+# --- Reconcile: is a server running, and does its version match the repo? --------
+HEALTH="$(/usr/bin/curl -s --max-time 1 "${URL}/api/health" 2>/dev/null)"
+RUNNING=0
+[ -n "$HEALTH" ] && RUNNING=1
+SERVER_V="$(printf '%s' "$HEALTH" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')"
+
+if [ "$RUNNING" = 1 ]; then
+  if [ -z "$REPO_V" ] || [ "$SERVER_V" = "$REPO_V" ]; then
+    # Same version (or we can't tell) → fast path: just open the window.
+    open_window
+    exit 0
+  fi
+  # Version mismatch → the running server is stale. Restart it.
+  echo "--- $(date) launcher: server v'$SERVER_V' != repo v'$REPO_V', restarting ---" >>"$LOG"
+  /usr/sbin/lsof -ti tcp:${PORT} 2>/dev/null | xargs kill 2>/dev/null
+  sleep 1
+fi
+
+# --- Need Node to (re)start the server -------------------------------------------
+NODE="$(find_bin node /usr/local/bin/node /opt/homebrew/bin/node /usr/bin/node "${HOME}/.volta/bin/node")"
+if [ -z "$NODE" ] && [ -d "${HOME}/.nvm/versions/node" ]; then
+  v="$(/bin/ls -1 "${HOME}/.nvm/versions/node" 2>/dev/null | sort -V | tail -1)"
+  [ -n "$v" ] && [ -x "${HOME}/.nvm/versions/node/${v}/bin/node" ] && \
+    NODE="${HOME}/.nvm/versions/node/${v}/bin/node"
+fi
+if [ -z "$NODE" ]; then
+  alert "No encontré Node.js, que la app necesita.\n\nInstálalo gratis desde nodejs.org (versión LTS) y vuelve a abrir esta app."
+  open "https://nodejs.org"
+  exit 1
+fi
+
+# --- First run (or after deleting them): install the server's dependencies -------
+if [ ! -d "${ROOT}/server/node_modules" ]; then
+  if find_bin npm /usr/local/bin/npm /opt/homebrew/bin/npm >/dev/null; then
+    note "Preparando la app por primera vez (1-2 min)…"
+    # npm ci respects the lockfile without rewriting it (a rewritten lockfile
+    # used to block updates); fall back to install on very old npm.
+    ( cd "${ROOT}/server" && { npm ci --no-audit --no-fund || npm install --no-audit --no-fund; } ) >>"$LOG" 2>&1
+  else
+    alert "Falta preparar la app y no encontré npm.\n\nAbre una vez «start.command» (en la carpeta) para completar la instalación, y luego usa este ícono."
+    exit 1
+  fi
+fi
+
+# --- Start the server in the background, detached from this launcher -------------
+GUNPLA_PORT="$PORT" nohup "$NODE" "${ROOT}/server/index.mjs" >>"$LOG" 2>&1 &
+
+# --- Wait until it answers, then open ---------------------------------------------
+for _ in $(seq 1 40); do
+  if /usr/bin/curl -s -o /dev/null --max-time 1 "${URL}/api/health"; then
+    open_window
+    exit 0
+  fi
+  sleep 0.5
+done
+
+alert "La app tardó demasiado en arrancar.\n\nRevisa el registro:\n${LOG}"
+exit 1

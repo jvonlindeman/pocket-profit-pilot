@@ -1,0 +1,538 @@
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Database, HardDrive, Loader2, Plus, RotateCcw } from "lucide-react";
+
+import type {
+  BuildPriority,
+  GunplaItem,
+  InventoryFilters,
+  Paint,
+} from "./types";
+import { useGunplaInventory } from "./hooks/useGunplaInventory";
+import { usePaintStash } from "./hooks/usePaintStash";
+import { useVersionCheck } from "./hooks/useVersionCheck";
+import { deletePhotoApi } from "./lib/api";
+import {
+  computeStats,
+  deriveStatus,
+  distinctValues,
+  filterItems,
+  groupBy,
+  sortItems,
+  type SortKey,
+  type SortState,
+} from "./lib/inventory";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import ThemeToggle from "./components/ThemeToggle";
+import StatsCards from "./components/StatsCards";
+import ProjectsPanel from "./components/ProjectsPanel";
+import BenchDashboard from "./components/BenchDashboard";
+import PaintStashPanel from "./components/PaintStashPanel";
+import OpenOnPhoneDialog from "./components/OpenOnPhoneDialog";
+import FocusMode from "./components/FocusMode";
+import WorkshopStats from "./components/WorkshopStats";
+import BuildProgress from "./components/BuildProgress";
+import StatsPanel from "./components/StatsPanel";
+import FilterBar from "./components/FilterBar";
+import InventoryTable from "./components/InventoryTable";
+import ItemFormDialog from "./components/ItemFormDialog";
+import StartBuildDialog from "./components/StartBuildDialog";
+import ExportMenu from "./components/ExportMenu";
+
+const EMPTY_FILTERS: InventoryFilters = {
+  search: "",
+  grade: "",
+  brand: "",
+  status: "",
+  location: "",
+  sellOnly: false,
+};
+
+const GunplaInventoryPage = () => {
+  const { items, loading, online, upsertItem, removeItem, reset, codes } =
+    useGunplaInventory();
+  const paintStash = usePaintStash();
+  const { version, checked, serverChanged, updateAvailable } = useVersionCheck(
+    online && !loading
+  );
+
+  const [tab, setTab] = useState("bench");
+  const [focusCode, setFocusCode] = useState<string | null>(null);
+  const [filters, setFilters] = useState<InventoryFilters>(EMPTY_FILTERS);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<GunplaItem | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<GunplaItem | null>(null);
+  const [startCandidate, setStartCandidate] = useState<GunplaItem | null>(null);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [sort, setSort] = useState<SortState>({ key: "code", dir: "asc" });
+
+  const grades = useMemo(() => distinctValues(items, "grade"), [items]);
+  const brands = useMemo(() => distinctValues(items, "brand"), [items]);
+  const statuses = useMemo(() => distinctValues(items, "status"), [items]);
+  const locations = useMemo(() => distinctValues(items, "location"), [items]);
+
+  const filtered = useMemo(
+    () => filterItems(items, filters),
+    [items, filters]
+  );
+  const sorted = useMemo(() => sortItems(filtered, sort), [filtered, sort]);
+  const stats = useMemo(() => computeStats(filtered), [filtered]);
+  const totalStats = useMemo(() => computeStats(items), [items]);
+  const isFiltered = filtered.length !== items.length;
+  const byGrade = useMemo(() => groupBy(filtered, "grade"), [filtered]);
+  const byStatus = useMemo(() => groupBy(filtered, "status"), [filtered]);
+  const byLocation = useMemo(() => groupBy(filtered, "location"), [filtered]);
+  const bySource = useMemo(() => groupBy(filtered, "source"), [filtered]);
+
+  const patchFilters = (patch: Partial<InventoryFilters>) =>
+    setFilters((prev) => ({ ...prev, ...patch }));
+
+  const toggleSort = (key: SortKey) =>
+    setSort((prev) =>
+      prev.key === key
+        ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: "asc" }
+    );
+
+  const handleAdd = () => {
+    setEditingItem(null);
+    setFormOpen(true);
+  };
+
+  const handleEdit = (item: GunplaItem) => {
+    setEditingItem(item);
+    setFormOpen(true);
+  };
+
+  const handleSave = async (item: GunplaItem) => {
+    const isNew = !codes.has(item.code);
+    try {
+      await upsertItem(item);
+      toast.success(isNew ? `Added ${item.code}` : `Updated ${item.code}`);
+    } catch (err) {
+      toast.error(`Could not save ${item.code}: ${(err as Error).message}`);
+    }
+  };
+
+  // --- Projects tab: build-stage tracking -------------------------------------
+  const persistQuiet = async (item: GunplaItem, successMsg?: string) => {
+    try {
+      await upsertItem(item);
+      if (successMsg) toast.success(successMsg);
+    } catch (err) {
+      toast.error(`Could not save ${item.code}: ${(err as Error).message}`);
+    }
+  };
+
+  // Starting a build asks where the kit actually is (StartBuildDialog) instead
+  // of guessing; a kit already on the bench just jumps to its project.
+  const handleStartBuild = (code: string) => {
+    const item = items.find((i) => i.code === code);
+    if (!item) return;
+    if (item.status === "In Progress") {
+      setTab("projects");
+      return;
+    }
+    setStartCandidate(item);
+  };
+
+  const confirmStartBuild = (
+    item: GunplaItem,
+    stages: string[],
+    skipped: string[]
+  ) => {
+    setStartCandidate(null);
+    persistQuiet(
+      {
+        ...item,
+        status: "In Progress",
+        finishedAt: null,
+        stages,
+        skippedStages: skipped,
+      },
+      `Started build: ${item.code}`
+    );
+    setTab("projects");
+  };
+
+  // Each click cycles a stage: pending → done → skipped → pending. Skipped
+  // stages don't apply to the kit (not every build gets primed, scribed, etc.).
+  const handleToggleStage = (item: GunplaItem, stageKey: string) => {
+    const done = item.stages ?? [];
+    const skipped = item.skippedStages ?? [];
+    let nextDone = done;
+    let nextSkipped = skipped;
+    if (done.includes(stageKey)) {
+      nextDone = done.filter((s) => s !== stageKey);
+      nextSkipped = [...skipped, stageKey];
+    } else if (skipped.includes(stageKey)) {
+      nextSkipped = skipped.filter((s) => s !== stageKey);
+    } else {
+      nextDone = [...done, stageKey];
+    }
+    const status = deriveStatus(nextDone, nextSkipped);
+    // Stamp the finish date the first time it's fully built; clear it if it
+    // drops back to In Progress. This is what feeds "Recently completed".
+    const finishedAt =
+      status === "Built"
+        ? item.finishedAt || new Date().toISOString().slice(0, 10)
+        : null;
+    persistQuiet(
+      {
+        ...item,
+        stages: nextDone,
+        skippedStages: nextSkipped,
+        status,
+        finishedAt,
+      },
+      status === "Built" && item.status !== "Built"
+        ? `${item.code} built! 🎉`
+        : undefined
+    );
+  };
+
+  const handleRemoveBuild = (code: string) => {
+    const item = items.find((i) => i.code === code);
+    if (!item) return;
+    persistQuiet(
+      { ...item, status: "Backlog", finishedAt: null },
+      `Removed ${item.code} from builds`
+    );
+  };
+
+  const handleAddPhoto = (item: GunplaItem, filename: string) => {
+    persistQuiet({ ...item, photos: [...(item.photos ?? []), filename] });
+  };
+
+  const handleRemovePhoto = (item: GunplaItem, filename: string) => {
+    persistQuiet({
+      ...item,
+      photos: (item.photos ?? []).filter((p) => p !== filename),
+    });
+    if (online) {
+      deletePhotoApi(filename).catch(() => {
+        /* file may already be gone; the array update is what matters */
+      });
+    }
+  };
+
+  const handleSaveStageNote = (
+    item: GunplaItem,
+    stageKey: string,
+    note: string
+  ) => {
+    const notes = { ...(item.stageNotes ?? {}) };
+    if (note.trim()) notes[stageKey] = note.trim();
+    else delete notes[stageKey];
+    persistQuiet({ ...item, stageNotes: notes });
+  };
+
+  const handleSavePaints = (item: GunplaItem, paints: Paint[]) => {
+    persistQuiet({ ...item, paints });
+  };
+
+  const handleSaveInfo = (
+    item: GunplaItem,
+    info: {
+      startedAt: string | null;
+      finishedAt: string | null;
+      priority: BuildPriority | null;
+    }
+  ) => {
+    persistQuiet({ ...item, ...info });
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    const { code } = pendingDelete;
+    setPendingDelete(null);
+    try {
+      await removeItem(code);
+      toast.success(`Deleted ${code}`);
+    } catch (err) {
+      toast.error(`Could not delete ${code}: ${(err as Error).message}`);
+    }
+  };
+
+  const handleReset = async () => {
+    setResetOpen(false);
+    try {
+      await reset();
+      setFilters(EMPTY_FILTERS);
+      toast.success("Inventory reset to the original sheet data");
+    } catch (err) {
+      toast.error(`Could not reset: ${(err as Error).message}`);
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight">
+              Gunpla Inventory
+            </h1>
+            {!loading &&
+              (online ? (
+                <Badge variant="success" className="gap-1">
+                  <Database className="h-3 w-3" />
+                  Local file
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="gap-1">
+                  <HardDrive className="h-3 w-3" />
+                  Browser only
+                </Badge>
+              ))}
+            {version && (
+              <span className="font-mono text-xs text-muted-foreground">
+                v {version}
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {items.length} kits ·{" "}
+            {filtered.length === items.length
+              ? "showing all"
+              : `${filtered.length} matching`}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <ThemeToggle />
+          {online && <OpenOnPhoneDialog />}
+          <ExportMenu items={sorted} />
+          <Button variant="outline" onClick={() => setResetOpen(true)}>
+            <RotateCcw className="mr-1.5 h-4 w-4" />
+            Reset
+          </Button>
+          <Button onClick={handleAdd}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            Add kit
+          </Button>
+        </div>
+      </header>
+
+      {loading ? (
+        <div className="flex items-center justify-center gap-2 rounded-md border p-10 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading inventory…
+        </div>
+      ) : (
+        <>
+          {!online && (
+            <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+              Local server not detected — running on browser storage, so changes
+              won&apos;t be written to your{" "}
+              <code className="font-mono">~/Documents/Gunpla Inventory</code>{" "}
+              file. Re-open <code className="font-mono">start.command</code> and
+              reload this page.
+            </p>
+          )}
+
+          {serverChanged ? (
+            <p className="flex items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+              <span>
+                The app was updated behind this window — reload to get the
+                latest version.
+              </span>
+              <Button size="sm" onClick={() => location.reload()}>
+                Reload
+              </Button>
+            </p>
+          ) : updateAvailable ? (
+            <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+              A new version is ready — quit and reopen the app icon to update.
+            </p>
+          ) : checked && version === null ? (
+            <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+              ⚠️ Esta copia de la app <strong>no puede auto-actualizarse</strong>{" "}
+              (no está conectada a git). Abre la app desde{" "}
+              <code className="font-mono">
+                Documentos/gunpla/gunpla-inventory
+              </code>{" "}
+              y ancla ese ícono al Dock; esta carpeta copiada puedes borrarla.
+            </p>
+          ) : null}
+
+          {tab !== "bench" && (
+            <>
+              <StatsCards
+                total={totalStats}
+                filtered={stats}
+                isFiltered={isFiltered}
+              />
+
+              <BuildProgress
+                stats={stats}
+                scopeLabel={
+                  isFiltered
+                    ? `Filtered · ${stats.totalKits} kits`
+                    : "Whole collection"
+                }
+              />
+
+              <FilterBar
+                filters={filters}
+                grades={grades}
+                brands={brands}
+                statuses={statuses}
+                locations={locations}
+                onChange={patchFilters}
+                onClear={() => setFilters(EMPTY_FILTERS)}
+              />
+            </>
+          )}
+
+          <Tabs value={tab} onValueChange={setTab}>
+            <TabsList className="h-auto flex-wrap">
+              <TabsTrigger value="bench">Bench</TabsTrigger>
+              <TabsTrigger value="list">Kits</TabsTrigger>
+              <TabsTrigger value="projects">Projects</TabsTrigger>
+              <TabsTrigger value="paints">Paints</TabsTrigger>
+              <TabsTrigger value="stats">Stats</TabsTrigger>
+            </TabsList>
+            <TabsContent value="bench" className="mt-4">
+              <BenchDashboard
+                items={items}
+                stats={totalStats}
+                onGoToProjects={() => setTab("projects")}
+                onAddKit={handleAdd}
+              />
+            </TabsContent>
+            <TabsContent value="list" className="mt-4">
+              <InventoryTable
+                items={sorted}
+                sort={sort}
+                onSort={toggleSort}
+                onStartBuild={(item) => handleStartBuild(item.code)}
+                onEdit={handleEdit}
+                onInlineSave={handleSave}
+                onDelete={setPendingDelete}
+              />
+            </TabsContent>
+            <TabsContent value="projects" className="mt-4">
+              <ProjectsPanel
+                items={items}
+                online={online}
+                onStartBuild={handleStartBuild}
+                onToggleStage={handleToggleStage}
+                onRemoveBuild={handleRemoveBuild}
+                onAddPhoto={handleAddPhoto}
+                onRemovePhoto={handleRemovePhoto}
+                onSaveStageNote={handleSaveStageNote}
+                onSavePaints={handleSavePaints}
+                onSaveInfo={handleSaveInfo}
+                onFocus={setFocusCode}
+              />
+            </TabsContent>
+            <TabsContent value="paints" className="mt-4">
+              <PaintStashPanel
+                items={items}
+                paints={paintStash.paints}
+                loading={paintStash.loading}
+                onAdd={paintStash.addPaint}
+                onUpdate={paintStash.updatePaint}
+                onRemove={paintStash.removePaint}
+              />
+            </TabsContent>
+            <TabsContent value="stats" className="mt-4 space-y-4">
+              <WorkshopStats items={items} />
+              <StatsPanel
+                byGrade={byGrade}
+                byStatus={byStatus}
+                byLocation={byLocation}
+                bySource={bySource}
+              />
+            </TabsContent>
+          </Tabs>
+        </>
+      )}
+
+      {focusCode &&
+        (() => {
+          const focusItem = items.find((i) => i.code === focusCode);
+          return focusItem ? (
+            <FocusMode
+              item={focusItem}
+              online={online}
+              onClose={() => setFocusCode(null)}
+              onToggleStage={handleToggleStage}
+              onSaveStageNote={handleSaveStageNote}
+              onAddPhoto={handleAddPhoto}
+            />
+          ) : null;
+        })()}
+
+      <ItemFormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        item={editingItem}
+        items={items}
+        onSave={handleSave}
+      />
+
+      <StartBuildDialog
+        item={startCandidate}
+        onOpenChange={(open) => !open && setStartCandidate(null)}
+        onConfirm={confirmStartBuild}
+      />
+
+      <AlertDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete kit?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete?.name} ({pendingDelete?.code}) will be removed from
+              your inventory. This only affects this browser.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset inventory?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This restores the original kits from the sheet and discards any
+              local changes you made in this browser.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReset}>Reset</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+};
+
+export default GunplaInventoryPage;

@@ -1,0 +1,8 @@
+node_modules
+# Live data now lives in ~/Documents/Gunpla Inventory, outside the repo.
+# Old local artifacts, kept ignored just in case:
+data/
+*.db
+*.db-shm
+*.db-wal
+*.json.tmp
